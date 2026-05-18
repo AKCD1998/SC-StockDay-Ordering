@@ -1,0 +1,159 @@
+:root {
+  font-family: Georgia, "Times New Roman", serif;
+  color: #1f2933;
+  background: radial-gradient(circle at top left, #f9f3df 0%, #f5f7fb 40%, #ffffff 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 28px 20px 64px;
+}
+
+.hero,
+.panel,
+.kpi {
+  border-radius: 22px;
+  border: 1px solid #d7dfeb;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 40px rgba(31, 41, 51, 0.08);
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  padding: 28px;
+  margin-bottom: 22px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: #915229;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+.sync-card {
+  background: #17324c;
+  color: #fff;
+  border-radius: 18px;
+  padding: 20px;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.kpi {
+  padding: 20px;
+}
+
+.kpi span {
+  display: block;
+  color: #57687a;
+}
+
+.kpi strong {
+  font-size: 36px;
+}
+
+.panel {
+  padding: 24px;
+  margin-bottom: 22px;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+
+.request-list {
+  display: grid;
+  gap: 12px;
+}
+
+.request-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #d6deea;
+  border-radius: 16px;
+}
+
+.table-wrap {
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 12px 10px;
+  border-bottom: 1px solid #e4e9f2;
+  white-space: nowrap;
+}
+
+th {
+  color: #38506b;
+}
+
+.meta {
+  color: #6f7f91;
+  font-size: 12px;
+}
+
+.status {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.status.danger {
+  background: #f8d8dd;
+  color: #842029;
+}
+
+.status.warning {
+  background: #fff1c9;
+  color: #7c5800;
+}
+
+.status.good {
+  background: #d8efdf;
+  color: #165b33;
+}
+
+.status.muted {
+  background: #e6ebf2;
+  color: #445464;
+}
+
+@media (max-width: 900px) {
+  .hero,
+  .kpis,
+  .request-card {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "sc-stockday-ordering",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "server",
+    "apps/admin-web",
+    "apps/order-web",
+    "apps/adapos-sync"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w server\" \"npm run dev -w apps/admin-web\" \"npm run dev -w apps/order-web\"",
+    "dev:server": "npm run dev -w server",
+    "dev:admin": "npm run dev -w apps/admin-web",
+    "dev:order": "npm run dev -w apps/order-web",
+    "dev:sync": "npm run dev -w apps/adapos-sync",
+    "seed": "npm run seed -w server",
+    "db:migrate": "npm run db:migrate -w server",
+    "db:seed": "npm run db:seed -w server",
+    "lint": "npm run lint -ws --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
