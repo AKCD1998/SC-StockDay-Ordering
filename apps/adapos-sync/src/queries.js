@@ -20,7 +20,7 @@ SELECT
   FTPdtLUnit,
   FCPdtLFactor
 FROM TCNMPdt
-WHERE FTPdtStaActive = 'Y';
+WHERE FTPdtStaActive = '1';
 `.trim();
 }
 
