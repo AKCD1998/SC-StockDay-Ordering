@@ -88,6 +88,17 @@ export class PostgresRepository {
         FROM product_purchase_summary
         WHERE period_days = $1
         GROUP BY product_code
+      ),
+      pending_requests AS (
+        SELECT
+          i.product_code,
+          SUM(i.requested_qty) AS pending_requested_qty,
+          COUNT(*) AS pending_request_lines,
+          COUNT(DISTINCT r.branch_code) AS pending_request_branches
+        FROM branch_order_request_items i
+        JOIN branch_order_requests r ON r.id = i.order_request_id
+        WHERE r.status = 'submitted'
+        GROUP BY i.product_code
       )
       SELECT
         p.product_code,
@@ -100,10 +111,14 @@ export class PostgresRepository {
         p.min_stock,
         p.max_stock,
         p.lead_time_days,
-        COALESCE(p.supplier_name, p.supplier_code, '') AS supplier
+        COALESCE(p.supplier_name, p.supplier_code, '') AS supplier,
+        COALESCE(req.pending_requested_qty, 0) AS pending_requested_qty,
+        COALESCE(req.pending_request_lines, 0) AS pending_request_lines,
+        COALESCE(req.pending_request_branches, 0) AS pending_request_branches
       FROM products p
       LEFT JOIN sales s ON s.product_code = p.product_code
       LEFT JOIN purchases pr ON pr.product_code = p.product_code
+      LEFT JOIN pending_requests req ON req.product_code = p.product_code
       ${productFilter}
       ORDER BY p.product_code ASC
       `,
@@ -122,6 +137,9 @@ export class PostgresRepository {
       maxStock: Number(row.max_stock || 0),
       leadTimeDays: Number(row.lead_time_days || 0),
       supplier: row.supplier,
+      pendingRequestedQty: Number(row.pending_requested_qty || 0),
+      pendingRequestLines: Number(row.pending_request_lines || 0),
+      pendingRequestBranches: Number(row.pending_request_branches || 0),
     }));
   }
 

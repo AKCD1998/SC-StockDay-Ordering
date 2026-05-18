@@ -29,6 +29,11 @@ export class MockRepository {
   async getProductSummary(productCode, periodDays) {
     const product = this.products.find((item) => item.productCode === productCode);
     if (!product) return null;
+    const demand = this.aggregatePendingDemand().get(productCode) || {
+      pendingRequestedQty: 0,
+      pendingRequestLines: 0,
+      pendingRequestBranches: 0,
+    };
     return buildStockDayRow(
       {
         productCode: product.productCode,
@@ -42,9 +47,36 @@ export class MockRepository {
         maxStock: product.maxStock,
         leadTimeDays: product.leadTimeDays,
         supplier: product.supplier,
+        pendingRequestedQty: demand.pendingRequestedQty,
+        pendingRequestLines: demand.pendingRequestLines,
+        pendingRequestBranches: demand.pendingRequestBranches,
       },
       periodDays,
     );
+  }
+
+  aggregatePendingDemand() {
+    const summary = new Map();
+
+    for (const request of this.orderRequests.filter((item) => item.status === "submitted")) {
+      const seenInRequest = new Set();
+      for (const item of request.items) {
+        const current = summary.get(item.productCode) || {
+          pendingRequestedQty: 0,
+          pendingRequestLines: 0,
+          pendingRequestBranches: 0,
+        };
+        current.pendingRequestedQty += Number(item.requestedQty || 0);
+        current.pendingRequestLines += 1;
+        if (!seenInRequest.has(item.productCode)) {
+          current.pendingRequestBranches += 1;
+          seenInRequest.add(item.productCode);
+        }
+        summary.set(item.productCode, current);
+      }
+    }
+
+    return summary;
   }
 
   async getStockDay(periodDays) {

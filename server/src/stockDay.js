@@ -6,12 +6,19 @@ export function computeStatus(product, periodDays) {
     return "No sales";
   }
 
-  const stockDay = safeDivide(product.currentStock, avgDailyUsage);
-  if (product.currentStock <= product.minStock || stockDay <= Math.max(product.leadTimeDays, 7)) {
+  const pendingRequestedQty = Number(product.pendingRequestedQty || 0);
+  const projectedStockAfterRequests = product.currentStock - pendingRequestedQty;
+  const effectiveStockDay = safeDivide(projectedStockAfterRequests, avgDailyUsage);
+
+  if (
+    projectedStockAfterRequests <= product.minStock ||
+    effectiveStockDay <= Math.max(product.leadTimeDays, 7)
+  ) {
     return "Reorder soon";
   }
 
-  if (product.currentStock >= product.maxStock || stockDay > 45) {
+  const stockDay = safeDivide(product.currentStock, avgDailyUsage);
+  if (projectedStockAfterRequests >= product.maxStock || stockDay > 45) {
     return "Overstock / slow moving";
   }
 
@@ -21,6 +28,15 @@ export function computeStatus(product, periodDays) {
 export function buildStockDayRow(product, periodDays) {
   const avgDailyUsage = safeDivide(product.soldQtyPeriod, periodDays);
   const stockDay = avgDailyUsage > 0 ? safeDivide(product.currentStock, avgDailyUsage) : null;
+  const pendingRequestedQty = Number(product.pendingRequestedQty || 0);
+  const pendingRequestLines = Number(product.pendingRequestLines || 0);
+  const pendingRequestBranches = Number(product.pendingRequestBranches || 0);
+  const projectedStockAfterRequests = product.currentStock - pendingRequestedQty;
+  const projectedStockDay =
+    avgDailyUsage > 0 ? safeDivide(projectedStockAfterRequests, avgDailyUsage) : null;
+  const requestedVsSoldRatio = product.soldQtyPeriod > 0
+    ? safeDivide(pendingRequestedQty, product.soldQtyPeriod)
+    : 0;
   const startingStock = product.currentStock - product.purchasedQtyPeriod + product.soldQtyPeriod;
   const endingStock = startingStock + product.purchasedQtyPeriod - product.soldQtyPeriod;
   const averageInventory = (startingStock + endingStock) / 2;
@@ -35,6 +51,12 @@ export function buildStockDayRow(product, periodDays) {
     soldQtyPeriod: round2(product.soldQtyPeriod),
     averageDailyUsage: round2(avgDailyUsage),
     stockDay: stockDay === null ? null : round2(stockDay),
+    pendingRequestedQty: round2(pendingRequestedQty),
+    pendingRequestLines,
+    pendingRequestBranches,
+    projectedStockAfterRequests: round2(projectedStockAfterRequests),
+    projectedStockDay: projectedStockDay === null ? null : round2(projectedStockDay),
+    requestedVsSoldRatio: round2(requestedVsSoldRatio),
     purchasedQtyPeriod: round2(product.purchasedQtyPeriod),
     minStock: round2(product.minStock),
     maxStock: round2(product.maxStock),
