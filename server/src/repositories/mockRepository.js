@@ -126,6 +126,10 @@ export class MockRepository {
     };
   }
 
+  async ingestBranches(payload) {
+    return { accepted: (payload.records || []).length };
+  }
+
   async ingestProducts(payload) {
     this.syncRuns.unshift({
       id: makeId("sync"),

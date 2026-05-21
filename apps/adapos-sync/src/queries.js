@@ -49,6 +49,7 @@ export async function getSalesSummaryRows(pool, branchCode, periodDays, dateCuto
     WHERE h.FTBchCode = @branchCode
       AND h.FDShdDocDate >= DATEADD(day, -@periodDays, GETDATE())
       AND h.FDShdDocDate <= @dateCutoff
+      AND EXISTS (SELECT 1 FROM TCNMPdt p WHERE p.FTPdtCode = d.FTPdtCode AND p.FTPdtStaActive = 1)
     GROUP BY d.FTPdtCode
   `);
   return result.recordset;

@@ -346,6 +346,24 @@ export class PostgresRepository {
     };
   }
 
+  async ingestBranches(payload) {
+    let accepted = 0;
+    for (const record of payload.records || []) {
+      await this.pool.query(
+        `
+        INSERT INTO branches (branch_code, branch_name, is_hq)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (branch_code) DO UPDATE SET
+          branch_name = EXCLUDED.branch_name,
+          is_hq = EXCLUDED.is_hq
+        `,
+        [record.branchCode, record.branchName || record.branchCode, record.isHq ?? false],
+      );
+      accepted += 1;
+    }
+    return { accepted };
+  }
+
   async ingestProducts(payload) {
     const records = payload.records || [];
     if (!records.length) return { accepted: 0 };

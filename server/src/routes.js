@@ -87,6 +87,14 @@ export function createRouter(repository) {
     res.json(await repository.getSyncStatus());
   }));
 
+  router.post("/api/sync/branches", asyncHandler(async (req, res) => {
+    const validationError = validateRecordsPayload(req.body);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+    res.json(await repository.ingestBranches(req.body || {}));
+  }));
+
   router.post("/api/sync/products", asyncHandler(async (req, res) => {
     const validationError = validateRecordsPayload(req.body);
     if (validationError) {

@@ -136,6 +136,11 @@ async function runOnce() {
     let totalSent = 0;
 
     try {
+      // Register branch before posting branch-scoped data.
+      await postJson(`${syncConfig.apiBaseUrl}/api/sync/branches`, {
+        records: [{ branchCode: syncConfig.branchCode, isHq: false }],
+      });
+
       if (data.products?.length) {
         console.log(`Posting ${data.products.length} products...`);
         const sent = await postBatches(
