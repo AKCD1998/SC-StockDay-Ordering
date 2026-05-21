@@ -1,95 +1,200 @@
-import { postJson } from "./client.js";
+import sql from "mssql";
 import { syncConfig } from "./config.js";
-import { getMockProductsPayload, getMockPurchasePayload, getMockSalesPayload } from "./mockPayloads.js";
-import { getProductMasterSql, getPurchaseSummarySql, getSalesSummarySql } from "./queries.js";
+import {
+  getProductMasterRows,
+  getSalesSummaryRows,
+  getPurchaseSummaryRows,
+  discoverTransferSchema,
+  getTransferHeaderRows,
+  getTransferLineRows,
+} from "./queries.js";
+import { postJson } from "./client.js";
+import { toProductRecords, toSalesRecords } from "./transform.js";
 
-const periodDays = 30;
+const PERIOD_DAYS = 30;
 
-async function fetchFromAdaPosDryOrPlaceholder() {
-  console.log("adaPOS sync configuration");
-  console.log({
-    host: syncConfig.sqlServerHost,
-    port: syncConfig.sqlServerPort,
-    database: syncConfig.sqlServerDatabase,
-    dryRun: syncConfig.dryRun,
-    intervalMinutes: syncConfig.intervalMinutes,
-  });
+// ── SQL Server connection config ───────────────────────────────────────────────
+// Named instance (SERVER\SQLEXPRESS): pass instanceName separately.
+// mssql + tedious use SQL Server Browser (UDP 1434) to resolve the actual port.
+// Do NOT set port when instanceName is present — it will be ignored or cause errors.
+const sqlServerConfig = {
+  server:   syncConfig.sqlServerHost,
+  user:     syncConfig.sqlServerUser,
+  password: syncConfig.sqlServerPassword,
+  database: syncConfig.sqlServerDatabase,
+  options: {
+    encrypt:                false,  // SQL Server 2008 R2 does not support modern TLS
+    trustServerCertificate: true,
+    enableArithAbort:       true,
+    ...(syncConfig.sqlServerInstanceName
+      ? { instanceName: syncConfig.sqlServerInstanceName }
+      : {}),
+  },
+  // Only include port when NOT using a named instance
+  ...(syncConfig.sqlServerInstanceName ? {} : { port: syncConfig.sqlServerPort }),
+};
 
-  console.log("\nProduct SQL preview:\n", getProductMasterSql());
-  console.log("\nSales SQL preview:\n", getSalesSummarySql(periodDays, syncConfig.dateCutoff));
-  console.log("\nPurchase SQL preview:\n", getPurchaseSummarySql(periodDays));
+// ── Dataset routing ────────────────────────────────────────────────────────────
+async function fetchDatasets(pool) {
+  const data = {};
+  const { datasets, branchCode, dateCutoff } = syncConfig;
 
-  // Real implementation note:
-  // Add a SQL Server client here on the mother PC later, using read-only credentials.
-  // Example flow:
-  // 1. connect to AdaAcc
-  // 2. run the SQL above
-  // 3. map result rows to payload format
-  // 4. POST the payloads to our app API
-  // Never write to adaPOS.
+  if (datasets.includes("schema_discovery")) {
+    data.schema_discovery = await discoverTransferSchema(pool);
+  }
+  if (datasets.includes("products")) {
+    data.products = await getProductMasterRows(pool);
+  }
+  if (datasets.includes("sales")) {
+    data.sales = await getSalesSummaryRows(pool, branchCode, PERIOD_DAYS, dateCutoff);
+  }
+  if (datasets.includes("purchases")) {
+    data.purchases = await getPurchaseSummaryRows(pool, branchCode, PERIOD_DAYS);
+  }
+  if (datasets.includes("transfers")) {
+    data.transfers = await getTransferHeaderRows(pool, branchCode, PERIOD_DAYS);
+  }
+  if (datasets.includes("transfer_lines")) {
+    data.transfer_lines = await getTransferLineRows(pool, branchCode, PERIOD_DAYS);
+  }
 
-  return {
-    productsPayload: getMockProductsPayload(),
-    salesPayload: getMockSalesPayload(periodDays),
-    purchasePayload: getMockPurchasePayload(periodDays),
-  };
+  return data;
 }
 
-async function runOnce() {
-  const startedAt = new Date().toISOString();
-  try {
-    const { productsPayload, salesPayload, purchasePayload } = await fetchFromAdaPosDryOrPlaceholder();
+// ── Batch poster ──────────────────────────────────────────────────────────────
+async function postBatches(url, records, batchSize = 500) {
+  let sent = 0;
+  for (let i = 0; i < records.length; i += batchSize) {
+    await postJson(url, { records: records.slice(i, i + batchSize) });
+    sent += Math.min(batchSize, records.length - i);
+  }
+  return sent;
+}
 
-    if (syncConfig.dryRun) {
-      console.log("\nDry run payload preview");
-      console.log(JSON.stringify({ productsPayload, salesPayload, purchasePayload }, null, 2));
+// ── Main ───────────────────────────────────────────────────────────────────────
+async function runOnce() {
+  console.log("=== AdaPos Sync Agent ===");
+  console.log(`Host:          ${syncConfig.sqlServerHost}`);
+  if (syncConfig.sqlServerInstanceName) {
+    console.log(`Instance:      ${syncConfig.sqlServerInstanceName}`);
+  }
+  console.log(`Database:      ${syncConfig.sqlServerDatabase}`);
+  console.log(`User:          ${syncConfig.sqlServerUser}`);
+  console.log(`Branch filter: ${syncConfig.branchCode}`);
+  console.log(`Datasets:      ${syncConfig.datasets.join(", ")}`);
+  console.log(`Dry-run:       ${syncConfig.dryRun}`);
+  console.log(`Date cutoff:   ${syncConfig.dateCutoff}`);
+  console.log("");
+
+  let pool;
+  try {
+    pool = await sql.connect(sqlServerConfig);
+    console.log("SQL Server: connected OK\n");
+
+    const data = await fetchDatasets(pool);
+
+    // schema_discovery prints differently — show columns + sample, not a row count
+    if (data.schema_discovery) {
+      console.log("── Schema discovery results ──────────────────────────────");
+      for (const [table, info] of Object.entries(data.schema_discovery)) {
+        console.log(`\n[${table}] — ${info.columns.length} columns:`);
+        console.log(info.columns.join(", "));
+        if (info.sample) {
+          console.log("\nSample row:");
+          console.log(JSON.stringify(info.sample, null, 2));
+        }
+      }
+      console.log("\n── Review column names above, then implement transfer queries. ──");
       return;
     }
 
-    const [productsResult, salesResult, purchaseResult] = await Promise.all([
-      postJson(`${syncConfig.apiBaseUrl}/api/sync/products`, productsPayload),
-      postJson(`${syncConfig.apiBaseUrl}/api/sync/sales-summary`, salesPayload),
-      postJson(`${syncConfig.apiBaseUrl}/api/sync/purchase-summary`, purchasePayload),
-    ]);
+    // Normal datasets: print counts
+    let totalRead = 0;
+    for (const [name, rows] of Object.entries(data)) {
+      const count = Array.isArray(rows) ? rows.length : 0;
+      totalRead += count;
+      console.log(`  ${name}: ${count} rows`);
+    }
+    console.log(`\nTotal records read: ${totalRead}`);
 
-    await postJson(`${syncConfig.apiBaseUrl}/api/sync/run-log`, {
-      syncType: "scheduled-sync",
-      startedAt,
-      finishedAt: new Date().toISOString(),
-      status: "success",
-      recordsRead:
-        (productsPayload.records?.length || 0) +
-        (salesPayload.records?.length || 0) +
-        (purchasePayload.records?.length || 0),
-      recordsSent:
-        (productsResult.accepted || 0) +
-        (salesResult.accepted || 0) +
-        (purchaseResult.accepted || 0),
-      message: "Sync completed.",
-    });
+    if (syncConfig.dryRun) {
+      console.log("\n--- Dry-run: no data sent to API ---");
+      console.log("Sample row per dataset:");
+      for (const [name, rows] of Object.entries(data)) {
+        if (Array.isArray(rows) && rows.length > 0) {
+          console.log(`\n[${name}]`);
+          console.log(JSON.stringify(rows[0], null, 2));
+        }
+      }
+      console.log("\nDone. Verify output, then run with --execute to post to API.");
+      return;
+    }
 
-    console.log("Sync completed successfully.");
-  } catch (error) {
-    console.error("Sync failed:", error.message);
+    // Live execute — post each dataset to the API.
+    const runId = `sync-${Date.now()}`;
+    const startedAt = new Date().toISOString();
+    let totalSent = 0;
+
     try {
+      if (data.products?.length) {
+        console.log(`Posting ${data.products.length} products...`);
+        const sent = await postBatches(
+          `${syncConfig.apiBaseUrl}/api/sync/products`,
+          toProductRecords(data.products),
+        );
+        console.log(`  products: ${sent} sent`);
+        totalSent += sent;
+      }
+
+      if (data.sales?.length) {
+        console.log(`Posting ${data.sales.length} sales records...`);
+        const sent = await postBatches(
+          `${syncConfig.apiBaseUrl}/api/sync/sales-summary`,
+          toSalesRecords(data.sales, syncConfig.branchCode, PERIOD_DAYS),
+        );
+        console.log(`  sales: ${sent} sent`);
+        totalSent += sent;
+      }
+
+      if (data.transfers?.length || data.transfer_lines?.length) {
+        const skipped = (data.transfers?.length ?? 0) + (data.transfer_lines?.length ?? 0);
+        console.log(`Transfers: ${skipped} rows read but not posted — server endpoints not yet implemented.`);
+      }
+
       await postJson(`${syncConfig.apiBaseUrl}/api/sync/run-log`, {
-        syncType: "scheduled-sync",
+        id: runId,
+        syncType: `adapos_branch_${syncConfig.branchCode}`,
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        status: "success",
+        recordsRead: totalRead,
+        recordsSent: totalSent,
+        message: `Dry-run=false. products+sales posted for branch ${syncConfig.branchCode}.`,
+      });
+
+      console.log(`\nDone. ${totalSent} records sent to API.`);
+    } catch (postErr) {
+      await postJson(`${syncConfig.apiBaseUrl}/api/sync/run-log`, {
+        id: runId,
+        syncType: `adapos_branch_${syncConfig.branchCode}`,
         startedAt,
         finishedAt: new Date().toISOString(),
         status: "failed",
-        recordsRead: 0,
-        recordsSent: 0,
-        message: error.message,
-      });
-    } catch (logError) {
-      console.error("Could not post run log:", logError.message);
+        recordsRead: totalRead,
+        recordsSent: totalSent,
+        message: postErr.message,
+      }).catch(() => {});
+      throw postErr;
     }
+
+  } catch (err) {
+    console.error("\nSync failed:", err.message);
+    if (err.code)           console.error("Code:",   err.code);
+    if (err.originalError)  console.error("Detail:", err.originalError.message);
+    process.exit(1);
+  } finally {
+    if (pool) await pool.close();
   }
 }
 
 runOnce();
-
-if (!syncConfig.dryRun) {
-  const intervalMs = syncConfig.intervalMinutes * 60 * 1000;
-  setInterval(runOnce, intervalMs);
-}
