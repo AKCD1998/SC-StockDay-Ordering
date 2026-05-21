@@ -5,9 +5,9 @@ export async function postJson(url, payload) {
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json();
+  const text = await response.text();
   if (!response.ok) {
-    throw new Error(data.message || `Request failed: ${response.status}`);
+    throw new Error(`Request failed: ${response.status} — ${text.slice(0, 300)}`);
   }
-  return data;
+  return JSON.parse(text);
 }

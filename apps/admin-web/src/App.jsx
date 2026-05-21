@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
@@ -9,128 +9,569 @@ function statusClass(status) {
   return "good";
 }
 
+function syncTone(status) {
+  if (status === "failed") return "danger";
+  if (status === "running") return "warning";
+  return "good";
+}
+
+function formatNumber(value, digits = 0) {
+  if (value === null || value === undefined || value === "") return "-";
+  return Number(value).toLocaleString("th-TH", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+function formatDateTime(value) {
+  if (!value) return "-";
+  return new Date(value).toLocaleString("th-TH");
+}
+
+function translateStatus(status) {
+  if (status === "Reorder soon") return "ควรสั่งซื้อเพิ่ม";
+  if (status === "Overstock / slow moving") return "ค้างสต็อก / เคลื่อนไหวช้า";
+  if (status === "No sales") return "ยังไม่มีการขาย";
+  if (status === "Normal") return "ปกติ";
+  if (status === "failed") return "ล้มเหลว";
+  if (status === "running") return "กำลังทำงาน";
+  if (status === "submitted") return "ส่งคำขอแล้ว";
+  return status || "-";
+}
+
+async function apiFetch(path, options = {}) {
+  return fetch(`${apiBaseUrl}${path}`, {
+    credentials: "include",
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+    },
+  });
+}
+
+function LoginScreen({ authError, busy, username, password, onUsernameChange, onPasswordChange, onSubmit }) {
+  return (
+    <div className="page auth-page">
+      <section className="auth-shell">
+        <div className="auth-copy">
+          <p className="eyebrow">แดชบอร์ดภายใน</p>
+          <h1>ศูนย์ควบคุม Stock Day</h1>
+          <p>
+            เข้าสู่ระบบด้วยบัญชีผู้ดูแลเพื่อดูสถานะการซิงก์ KPI สต็อก และคำขอสั่งสินค้าจากสาขา
+            ผ่าน backend กลาง
+          </p>
+        </div>
+
+        <form className="auth-card" onSubmit={onSubmit}>
+          <div className="auth-card-header">
+            <h2>เข้าสู่ระบบผู้ดูแล</h2>
+            <p>ใช้ session cookie จาก Render backend</p>
+          </div>
+
+          <label>
+            ชื่อผู้ใช้
+            <input value={username} onChange={onUsernameChange} autoComplete="username" />
+          </label>
+
+          <label>
+            รหัสผ่าน
+            <input
+              type="password"
+              value={password}
+              onChange={onPasswordChange}
+              autoComplete="current-password"
+            />
+          </label>
+
+          {authError && <div className="notice error compact">{authError}</div>}
+
+          <button type="submit" className="primary-button" disabled={busy}>
+            {busy ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+          </button>
+        </form>
+      </section>
+    </div>
+  );
+}
+
 export default function App() {
+  const pageSize = 50;
   const [stockDay, setStockDay] = useState([]);
   const [orderRequests, setOrderRequests] = useState([]);
   const [syncStatus, setSyncStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [authenticating, setAuthenticating] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [session, setSession] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
-    Promise.all([
-      fetch(`${apiBaseUrl}/api/admin/stock-day`).then((res) => res.json()),
-      fetch(`${apiBaseUrl}/api/admin/order-requests`).then((res) => res.json()),
-      fetch(`${apiBaseUrl}/api/admin/sync-status`).then((res) => res.json()),
-    ]).then(([stockData, orderData, syncData]) => {
-      setStockDay(stockData);
-      setOrderRequests(orderData);
-      setSyncStatus(syncData);
-    });
+    let active = true;
+
+    async function restoreSession() {
+      try {
+        const response = await apiFetch("/admin/me");
+        if (response.status === 401) {
+          if (!active) return;
+          setLoading(false);
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error("ตรวจสอบเซสชันผู้ดูแลไม่สำเร็จ");
+        }
+
+        const data = await response.json();
+        if (!active) return;
+
+        setSession({
+          user: data.user,
+          csrfToken: data.csrf_token,
+          permissions: data.permissions,
+        });
+      } catch (sessionError) {
+        if (!active) return;
+        setAuthError(sessionError.message || "ตรวจสอบเซสชันผู้ดูแลไม่สำเร็จ");
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    restoreSession();
+
+    return () => {
+      active = false;
+    };
   }, []);
+
+  useEffect(() => {
+    if (!session) return undefined;
+
+    let active = true;
+
+    async function loadDashboard() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [stockResponse, orderResponse, syncResponse] = await Promise.all([
+          apiFetch("/api/admin/stock-day"),
+          apiFetch("/api/admin/order-requests"),
+          apiFetch("/api/admin/sync-status"),
+        ]);
+
+        if ([stockResponse, orderResponse, syncResponse].some((response) => response.status === 401)) {
+          if (!active) return;
+          setSession(null);
+          setAuthError("เซสชันหมดอายุแล้ว กรุณาเข้าสู่ระบบใหม่");
+          return;
+        }
+
+        if (!stockResponse.ok || !orderResponse.ok || !syncResponse.ok) {
+          throw new Error("โหลดข้อมูลแดชบอร์ดไม่สำเร็จ");
+        }
+
+        const [stockData, orderData, syncData] = await Promise.all([
+          stockResponse.json(),
+          orderResponse.json(),
+          syncResponse.json(),
+        ]);
+
+        if (!active) return;
+
+        setStockDay(stockData);
+        setOrderRequests(orderData);
+        setSyncStatus(syncData);
+      } catch (loadError) {
+        if (!active) return;
+        setError(loadError.message || "โหลดข้อมูลแดชบอร์ดไม่สำเร็จ");
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadDashboard();
+
+    return () => {
+      active = false;
+    };
+  }, [session]);
+
+  async function handleLogin(event) {
+    event.preventDefault();
+    setAuthenticating(true);
+    setAuthError("");
+
+    try {
+      const response = await apiFetch("/admin/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: username.trim(),
+          password,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "เข้าสู่ระบบไม่สำเร็จ");
+      }
+
+      setSession({
+        user: data.user,
+        csrfToken: data.csrf_token,
+      });
+      setPassword("");
+    } catch (loginError) {
+      setAuthError(loginError.message || "เข้าสู่ระบบไม่สำเร็จ");
+    } finally {
+      setAuthenticating(false);
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await apiFetch("/admin/auth/logout", {
+        method: "POST",
+        headers: {
+          "X-CSRF-Token": session?.csrfToken || "",
+        },
+      });
+    } finally {
+      setSession(null);
+      setStockDay([]);
+      setOrderRequests([]);
+      setSyncStatus(null);
+      setError("");
+    }
+  }
+
+  const filteredStock = useMemo(() => {
+    return stockDay.filter((item) => {
+      const matchesStatus = statusFilter === "all" || item.status === statusFilter;
+      const matchesQuery =
+        query.trim() === "" ||
+        [item.productName, item.productCode, item.supplier]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(query.trim().toLowerCase());
+
+      return matchesStatus && matchesQuery;
+    });
+  }, [query, statusFilter, stockDay]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, statusFilter, stockDay.length]);
+
+  const riskItems = useMemo(() => {
+    return [...stockDay]
+      .filter((item) => item.status !== "Normal")
+      .sort((left, right) => {
+        const leftProjected = Number(left.projectedStockDay ?? left.stockDay ?? 0);
+        const rightProjected = Number(right.projectedStockDay ?? right.stockDay ?? 0);
+        return leftProjected - rightProjected;
+      })
+      .slice(0, 5);
+  }, [stockDay]);
 
   const reorderCount = stockDay.filter((item) => item.status === "Reorder soon").length;
   const normalCount = stockDay.filter((item) => item.status === "Normal").length;
   const overstockCount = stockDay.filter((item) => item.status === "Overstock / slow moving").length;
+  const noSalesCount = stockDay.filter((item) => item.status === "No sales").length;
+  const submittedOrders = orderRequests.filter((request) => request.status === "submitted").length;
+  const totalPendingRequestedQty = stockDay.reduce(
+    (sum, item) => sum + Number(item.pendingRequestedQty || 0),
+    0,
+  );
+  const requestedProductsCount = stockDay.filter((item) => Number(item.pendingRequestedQty || 0) > 0).length;
+  const latestRun = syncStatus?.latestRun;
+  const totalPages = Math.max(1, Math.ceil(filteredStock.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pagedStock = useMemo(() => {
+    const startIndex = (safeCurrentPage - 1) * pageSize;
+    return filteredStock.slice(startIndex, startIndex + pageSize);
+  }, [filteredStock, pageSize, safeCurrentPage]);
+
+  if (loading && !session) {
+    return (
+      <div className="page auth-page">
+        <div className="notice">กำลังตรวจสอบเซสชันผู้ดูแล...</div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <LoginScreen
+        authError={authError}
+        busy={authenticating}
+        username={username}
+        password={password}
+        onUsernameChange={(event) => setUsername(event.target.value)}
+        onPasswordChange={(event) => setPassword(event.target.value)}
+        onSubmit={handleLogin}
+      />
+    );
+  }
 
   return (
     <div className="page">
       <header className="hero">
-        <div>
-          <p className="eyebrow">Internal Dashboard</p>
-          <h1>Stock Day Inspection</h1>
+        <div className="hero-copy">
+          <p className="eyebrow">แดชบอร์ดภายใน</p>
+          <h1>ศูนย์ควบคุม Stock Day</h1>
           <p>
-            Management view for branch requests, global stock-day, and latest adaPOS sync status.
+            มุมมองรวมสำหรับติดตามการซิงก์ข้อมูล ความต้องการจากสาขา และสินค้าที่ต้องรีบจัดการ
+            ก่อนเกิดของขาดหรือค้างสต็อก
           </p>
+          <div className="session-strip">
+            <span className="status good">
+              {session.user.id} · {session.user.role}
+            </span>
+            <button type="button" className="ghost-button" onClick={handleLogout}>
+              ออกจากระบบ
+            </button>
+          </div>
         </div>
+
         <div className="sync-card">
-          <h2>Sync Status</h2>
-          <p>Mode: {syncStatus?.mode || "-"}</p>
-          <p>Latest run: {syncStatus?.latestRun?.status || "-"}</p>
-          <p>Records sent: {syncStatus?.latestRun?.recordsSent ?? "-"}</p>
+          <div className="sync-card-header">
+            <h2>สถานะซิงก์ล่าสุด</h2>
+            <span className={`status ${syncTone(latestRun?.status)}`}>
+              {translateStatus(latestRun?.status)}
+            </span>
+          </div>
+          <dl className="sync-grid">
+            <div>
+              <dt>โหมด</dt>
+              <dd>{syncStatus?.mode || "-"}</dd>
+            </div>
+            <div>
+              <dt>เริ่มเมื่อ</dt>
+              <dd>{formatDateTime(latestRun?.startedAt)}</dd>
+            </div>
+            <div>
+              <dt>เสร็จเมื่อ</dt>
+              <dd>{formatDateTime(latestRun?.finishedAt)}</dd>
+            </div>
+            <div>
+              <dt>จำนวนที่ส่ง</dt>
+              <dd>{formatNumber(latestRun?.recordsSent)}</dd>
+            </div>
+          </dl>
         </div>
       </header>
 
+      {error && <div className="notice error">{error}</div>}
+
       <section className="kpis">
         <article className="kpi">
-          <span>Reorder soon</span>
-          <strong>{reorderCount}</strong>
+          <span>ควรสั่งซื้อเพิ่ม</span>
+          <strong>{formatNumber(reorderCount)}</strong>
         </article>
         <article className="kpi">
-          <span>Normal</span>
-          <strong>{normalCount}</strong>
+          <span>สต็อกปกติ</span>
+          <strong>{formatNumber(normalCount)}</strong>
         </article>
         <article className="kpi">
-          <span>Overstock / slow moving</span>
-          <strong>{overstockCount}</strong>
+          <span>ค้างสต็อก</span>
+          <strong>{formatNumber(overstockCount)}</strong>
         </article>
+        <article className="kpi">
+          <span>ไม่มีข้อมูลขาย</span>
+          <strong>{formatNumber(noSalesCount)}</strong>
+        </article>
+        <article className="kpi">
+          <span>คำขอจากสาขา</span>
+          <strong>{formatNumber(submittedOrders)}</strong>
+        </article>
+        <article className="kpi">
+          <span>จำนวนที่สาขาขอรวม</span>
+          <strong>{formatNumber(totalPendingRequestedQty)}</strong>
+        </article>
+        <article className="kpi">
+          <span>สินค้าที่ถูกขอ</span>
+          <strong>{formatNumber(requestedProductsCount)}</strong>
+        </article>
+      </section>
+
+      <section className="dashboard-grid">
+        <section className="panel spotlight">
+          <div className="panel-header stacked">
+            <div>
+              <h2>สินค้าที่ต้องดูทันที</h2>
+              <p>รายการที่มีความเสี่ยงด้าน stock day มากที่สุดในตอนนี้</p>
+            </div>
+          </div>
+
+          <div className="spotlight-list">
+            {riskItems.map((item) => (
+              <article className="spotlight-card" key={item.productCode}>
+                <div>
+                  <strong>{item.productName}</strong>
+                  <p className="meta-line">
+                    {item.productCode} · {item.supplier || "ไม่มีผู้จำหน่าย"}
+                  </p>
+                </div>
+                <div className="spotlight-metrics">
+                  <span>{formatNumber(item.projectedStockDay ?? item.stockDay, 1)} วัน</span>
+                  <span className={`status ${statusClass(item.status)}`}>
+                    {translateStatus(item.status)}
+                  </span>
+                </div>
+              </article>
+            ))}
+            {!riskItems.length && <p className="empty-state">ตอนนี้ยังไม่มีสินค้าที่ต้องเร่งจัดการ</p>}
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel-header stacked">
+            <div>
+              <h2>คำขอจากสาขาล่าสุด</h2>
+              <p>ดูปริมาณและเวลาในการส่งคำขอ ก่อนวางแผนโอนหรือจัดซื้อ</p>
+            </div>
+          </div>
+
+          <div className="request-list">
+            {orderRequests.map((request) => (
+              <article className="request-card" key={request.id}>
+                <div>
+                  <strong>{request.branchName}</strong>
+                  <p className="meta-line">{request.id}</p>
+                  <p className="meta-line">{formatDateTime(request.requestedAt)}</p>
+                </div>
+                <div className="request-side">
+                  <p>{request.items.length} รายการ</p>
+                  <span className={`status ${request.status === "submitted" ? "warning" : "good"}`}>
+                    {translateStatus(request.status || "submitted")}
+                  </span>
+                </div>
+              </article>
+            ))}
+            {!orderRequests.length && <p className="empty-state">ยังไม่มีคำขอสั่งสินค้าจากสาขา</p>}
+          </div>
+        </section>
       </section>
 
       <section className="panel">
         <div className="panel-header">
-          <h2>Latest Branch Order Requests</h2>
-          <p>Manual Excel ordering replacement starts here.</p>
-        </div>
-        <div className="request-list">
-          {orderRequests.map((request) => (
-            <article className="request-card" key={request.id}>
-              <div>
-                <strong>{request.branchName}</strong>
-                <p>{request.id}</p>
-                <p>{new Date(request.requestedAt).toLocaleString()}</p>
-              </div>
-              <div>
-                <p>{request.items.length} item(s)</p>
-                <p>{request.note || "-"}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+          <div>
+            <h2>ตาราง Stock Day</h2>
+            <p>ภาพรวมสุขภาพสต็อกของสินค้าทั้งหมดในช่วงเวลาที่กำลังดู</p>
+          </div>
 
-      <section className="panel">
-        <div className="panel-header">
-          <h2>Stock Day Table</h2>
-          <p>Global stock first for V1. No branch-level stock reconstruction yet.</p>
+          <div className="toolbar">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="ค้นหาชื่อสินค้า รหัสสินค้า หรือผู้จำหน่าย"
+            />
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <option value="all">ทุกสถานะ</option>
+              <option value="Reorder soon">ควรสั่งซื้อเพิ่ม</option>
+              <option value="Normal">ปกติ</option>
+              <option value="Overstock / slow moving">ค้างสต็อก / เคลื่อนไหวช้า</option>
+              <option value="No sales">ยังไม่มีการขาย</option>
+            </select>
+          </div>
         </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Current Stock</th>
-                <th>Sold Qty</th>
-                <th>Avg Daily</th>
-                <th>Stock Day</th>
-                <th>Purchased</th>
-                <th>Min</th>
-                <th>Max</th>
-                <th>Lead Time</th>
-                <th>Supplier</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stockDay.map((row) => (
-                <tr key={row.productCode}>
-                  <td>
-                    <strong>{row.productName}</strong>
-                    <div className="meta">{row.productCode}</div>
-                  </td>
-                  <td>{row.currentStock}</td>
-                  <td>{row.soldQtyPeriod}</td>
-                  <td>{row.averageDailyUsage}</td>
-                  <td>{row.stockDay ?? "-"}</td>
-                  <td>{row.purchasedQtyPeriod}</td>
-                  <td>{row.minStock}</td>
-                  <td>{row.maxStock}</td>
-                  <td>{row.leadTimeDays}</td>
-                  <td>{row.supplier}</td>
-                  <td>
-                    <span className={`status ${statusClass(row.status)}`}>{row.status}</span>
-                  </td>
+
+        {loading ? (
+          <p className="empty-state">กำลังโหลดข้อมูลแดชบอร์ด...</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>สินค้า</th>
+                  <th>คงเหลือปัจจุบัน</th>
+                  <th>ขายสะสม</th>
+                  <th>เฉลี่ยต่อวัน</th>
+                  <th>Stock Day</th>
+                  <th>สาขาขอรวม</th>
+                  <th>คงเหลือหลังหักคำขอ</th>
+                  <th>Projected Day</th>
+                  <th>ซื้อเข้า</th>
+                  <th>Min</th>
+                  <th>Max</th>
+                  <th>Lead Time</th>
+                  <th>ผู้จำหน่าย</th>
+                  <th>สถานะ</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {pagedStock.map((row) => (
+                  <tr key={row.productCode}>
+                    <td>
+                      <strong>{row.productName}</strong>
+                      <div className="meta">{row.productCode}</div>
+                    </td>
+                    <td>{formatNumber(row.currentStock)}</td>
+                    <td>{formatNumber(row.soldQtyPeriod)}</td>
+                    <td>{formatNumber(row.averageDailyUsage, 2)}</td>
+                    <td>{formatNumber(row.stockDay, 1)}</td>
+                    <td>{formatNumber(row.pendingRequestedQty)}</td>
+                    <td>{formatNumber(row.projectedStockAfterRequests)}</td>
+                    <td>{formatNumber(row.projectedStockDay, 1)}</td>
+                    <td>{formatNumber(row.purchasedQtyPeriod)}</td>
+                    <td>{formatNumber(row.minStock)}</td>
+                    <td>{formatNumber(row.maxStock)}</td>
+                    <td>{formatNumber(row.leadTimeDays, 1)}</td>
+                    <td>{row.supplier || "-"}</td>
+                    <td>
+                      <span className={`status ${statusClass(row.status)}`}>
+                        {translateStatus(row.status)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {filteredStock.length > 0 && (
+              <div className="pagination">
+                <p className="pagination-info">
+                  หน้า {formatNumber(safeCurrentPage)} / {formatNumber(totalPages)} · แสดง {formatNumber(pagedStock.length)} จาก{" "}
+                  {formatNumber(filteredStock.length)} รายการ
+                </p>
+                <div className="pagination-actions">
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    disabled={safeCurrentPage === 1}
+                  >
+                    ก่อนหน้า
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                    disabled={safeCurrentPage === totalPages}
+                  >
+                    ถัดไป
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!filteredStock.length && <p className="empty-state">ไม่พบสินค้าที่ตรงกับตัวกรองปัจจุบัน</p>}
+          </div>
+        )}
       </section>
     </div>
   );

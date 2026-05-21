@@ -88,6 +88,17 @@ export class PostgresRepository {
         FROM product_purchase_summary
         WHERE period_days = $1
         GROUP BY product_code
+      ),
+      pending_requests AS (
+        SELECT
+          i.product_code,
+          SUM(i.requested_qty) AS pending_requested_qty,
+          COUNT(*) AS pending_request_lines,
+          COUNT(DISTINCT r.branch_code) AS pending_request_branches
+        FROM branch_order_request_items i
+        JOIN branch_order_requests r ON r.id = i.order_request_id
+        WHERE r.status = 'submitted'
+        GROUP BY i.product_code
       )
       SELECT
         p.product_code,
@@ -100,10 +111,14 @@ export class PostgresRepository {
         p.min_stock,
         p.max_stock,
         p.lead_time_days,
-        COALESCE(p.supplier_name, p.supplier_code, '') AS supplier
+        COALESCE(p.supplier_name, p.supplier_code, '') AS supplier,
+        COALESCE(req.pending_requested_qty, 0) AS pending_requested_qty,
+        COALESCE(req.pending_request_lines, 0) AS pending_request_lines,
+        COALESCE(req.pending_request_branches, 0) AS pending_request_branches
       FROM products p
       LEFT JOIN sales s ON s.product_code = p.product_code
       LEFT JOIN purchases pr ON pr.product_code = p.product_code
+      LEFT JOIN pending_requests req ON req.product_code = p.product_code
       ${productFilter}
       ORDER BY p.product_code ASC
       `,
@@ -122,6 +137,9 @@ export class PostgresRepository {
       maxStock: Number(row.max_stock || 0),
       leadTimeDays: Number(row.lead_time_days || 0),
       supplier: row.supplier,
+      pendingRequestedQty: Number(row.pending_requested_qty || 0),
+      pendingRequestLines: Number(row.pending_request_lines || 0),
+      pendingRequestBranches: Number(row.pending_request_branches || 0),
     }));
   }
 
@@ -329,84 +347,99 @@ export class PostgresRepository {
   }
 
   async ingestProducts(payload) {
+    const records = payload.records || [];
+    if (!records.length) return { accepted: 0 };
+
+    const codes = [], names = [], b1 = [], b2 = [], b3 = [];
+    const sCodes = [], sNames = [];
+    const uSmall = [], fSmall = [], uMed = [], fMed = [], uLarge = [], fLarge = [];
+    const sCurr = [], sRet = [], sWhs = [], minS = [], maxS = [], lead = [];
+    const snapIds = [];
+
+    for (const r of records) {
+      codes.push(r.productCode);
+      names.push(r.productName);
+      b1.push(r.barcode1 || null);
+      b2.push(r.barcode2 || null);
+      b3.push(r.barcode3 || null);
+      sCodes.push(r.supplierCode || null);
+      sNames.push(r.supplierName || null);
+      uSmall.push(r.unitSmall || r.unit || null);
+      fSmall.push(Number(r.factorSmall ?? 1));
+      uMed.push(r.unitMedium || null);
+      fMed.push(r.factorMedium ?? null);
+      uLarge.push(r.unitLarge || null);
+      fLarge.push(r.factorLarge ?? null);
+      sCurr.push(Number(r.stockCurrent || 0));
+      sRet.push(Number(r.stockRetail || 0));
+      sWhs.push(Number(r.stockWarehouse || 0));
+      minS.push(Number(r.minStock || 0));
+      maxS.push(Number(r.maxStock || 0));
+      lead.push(Number(r.leadTimeDays || 0));
+      snapIds.push(makeId("stock_snapshot"));
+    }
+
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      let accepted = 0;
-      for (const record of payload.records || []) {
-        await client.query(
-          `
-          INSERT INTO products
-            (product_code, product_name, barcode_1, barcode_2, barcode_3, supplier_code, supplier_name,
-             unit_small, factor_small, unit_medium, factor_medium, unit_large, factor_large,
-             stock_current, stock_retail, stock_warehouse, min_stock, max_stock, lead_time_days, synced_at)
-          VALUES
-            ($1, $2, $3, $4, $5, $6, $7,
-             $8, $9, $10, $11, $12, $13,
-             $14, $15, $16, $17, $18, $19, NOW())
-          ON CONFLICT (product_code) DO UPDATE SET
-            product_name = EXCLUDED.product_name,
-            barcode_1 = EXCLUDED.barcode_1,
-            barcode_2 = EXCLUDED.barcode_2,
-            barcode_3 = EXCLUDED.barcode_3,
-            supplier_code = EXCLUDED.supplier_code,
-            supplier_name = EXCLUDED.supplier_name,
-            unit_small = EXCLUDED.unit_small,
-            factor_small = EXCLUDED.factor_small,
-            unit_medium = EXCLUDED.unit_medium,
-            factor_medium = EXCLUDED.factor_medium,
-            unit_large = EXCLUDED.unit_large,
-            factor_large = EXCLUDED.factor_large,
-            stock_current = EXCLUDED.stock_current,
-            stock_retail = EXCLUDED.stock_retail,
-            stock_warehouse = EXCLUDED.stock_warehouse,
-            min_stock = EXCLUDED.min_stock,
-            max_stock = EXCLUDED.max_stock,
-            lead_time_days = EXCLUDED.lead_time_days,
-            synced_at = NOW(),
-            updated_at = NOW()
-          `,
-          [
-            record.productCode,
-            record.productName,
-            record.barcode1 || null,
-            record.barcode2 || null,
-            record.barcode3 || null,
-            record.supplierCode || null,
-            record.supplierName || null,
-            record.unitSmall || record.unit || null,
-            Number(record.factorSmall ?? 1),
-            record.unitMedium || null,
-            record.factorMedium ?? null,
-            record.unitLarge || null,
-            record.factorLarge ?? null,
-            Number(record.stockCurrent || 0),
-            Number(record.stockRetail || 0),
-            Number(record.stockWarehouse || 0),
-            Number(record.minStock || 0),
-            Number(record.maxStock || 0),
-            Number(record.leadTimeDays || 0),
-          ],
-        );
 
-        await client.query(
-          `
-          INSERT INTO product_stock_snapshots
-            (id, product_code, snapshot_at, stock_current, stock_retail, stock_warehouse, source_name)
-          VALUES ($1, $2, NOW(), $3, $4, $5, 'adapos_sync')
-          `,
-          [
-            makeId("stock_snapshot"),
-            record.productCode,
-            Number(record.stockCurrent || 0),
-            Number(record.stockRetail || 0),
-            Number(record.stockWarehouse || 0),
-          ],
-        );
-        accepted += 1;
-      }
+      await client.query(
+        `INSERT INTO products
+           (product_code, product_name, barcode_1, barcode_2, barcode_3,
+            supplier_code, supplier_name,
+            unit_small, factor_small, unit_medium, factor_medium,
+            unit_large, factor_large,
+            stock_current, stock_retail, stock_warehouse,
+            min_stock, max_stock, lead_time_days, synced_at)
+         SELECT
+           unnest($1::text[]), unnest($2::text[]),
+           unnest($3::text[]), unnest($4::text[]), unnest($5::text[]),
+           unnest($6::text[]), unnest($7::text[]),
+           unnest($8::text[]), unnest($9::numeric[]),
+           unnest($10::text[]), unnest($11::numeric[]),
+           unnest($12::text[]), unnest($13::numeric[]),
+           unnest($14::numeric[]), unnest($15::numeric[]), unnest($16::numeric[]),
+           unnest($17::numeric[]), unnest($18::numeric[]), unnest($19::numeric[]),
+           NOW()
+         ON CONFLICT (product_code) DO UPDATE SET
+           product_name     = EXCLUDED.product_name,
+           barcode_1        = EXCLUDED.barcode_1,
+           barcode_2        = EXCLUDED.barcode_2,
+           barcode_3        = EXCLUDED.barcode_3,
+           supplier_code    = EXCLUDED.supplier_code,
+           supplier_name    = EXCLUDED.supplier_name,
+           unit_small       = EXCLUDED.unit_small,
+           factor_small     = EXCLUDED.factor_small,
+           unit_medium      = EXCLUDED.unit_medium,
+           factor_medium    = EXCLUDED.factor_medium,
+           unit_large       = EXCLUDED.unit_large,
+           factor_large     = EXCLUDED.factor_large,
+           stock_current    = EXCLUDED.stock_current,
+           stock_retail     = EXCLUDED.stock_retail,
+           stock_warehouse  = EXCLUDED.stock_warehouse,
+           min_stock        = EXCLUDED.min_stock,
+           max_stock        = EXCLUDED.max_stock,
+           lead_time_days   = EXCLUDED.lead_time_days,
+           synced_at        = NOW(),
+           updated_at       = NOW()`,
+        [codes, names, b1, b2, b3, sCodes, sNames,
+          uSmall, fSmall, uMed, fMed, uLarge, fLarge,
+          sCurr, sRet, sWhs, minS, maxS, lead],
+      );
+
+      await client.query(
+        `INSERT INTO product_stock_snapshots
+           (id, product_code, snapshot_at, stock_current, stock_retail, stock_warehouse, source_name)
+         SELECT
+           unnest($1::text[]), unnest($2::text[]),
+           NOW(),
+           unnest($3::numeric[]), unnest($4::numeric[]), unnest($5::numeric[]),
+           'adapos_sync'`,
+        [snapIds, codes, sCurr, sRet, sWhs],
+      );
+
       await client.query("COMMIT");
-      return { accepted };
+      return { accepted: records.length };
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -416,47 +449,51 @@ export class PostgresRepository {
   }
 
   async ingestSalesSummary(payload) {
+    const records = payload.records || [];
+    if (!records.length) return { accepted: 0 };
+
+    const today = new Date().toISOString().slice(0, 10);
+    const ids = [], codes = [], branches = [], pStarts = [], pEnds = [], pDays = [], soldQty = [], avgUsage = [];
+
+    for (const r of records) {
+      const periodDays = Number(r.periodDays || 30);
+      const periodStart = r.periodStart || new Date(Date.now() - (periodDays - 1) * 86400000).toISOString().slice(0, 10);
+      const periodEnd = r.periodEnd || today;
+      ids.push(makeId("sales_summary"));
+      codes.push(r.productCode);
+      branches.push(r.branchCode || null);
+      pStarts.push(periodStart);
+      pEnds.push(periodEnd);
+      pDays.push(periodDays);
+      soldQty.push(Number(r.soldQtyBase || 0));
+      avgUsage.push(Number(r.avgDailyUsage || 0));
+    }
+
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      let accepted = 0;
-      for (const record of payload.records || []) {
-        const periodStart =
-          record.periodStart || new Date(Date.now() - ((record.periodDays || 30) - 1) * 86400000).toISOString().slice(0, 10);
-        const periodEnd = record.periodEnd || new Date().toISOString().slice(0, 10);
-        const periodDays = Number(record.periodDays || 30);
-        await client.query(
-          `
-          DELETE FROM product_sales_summary
-          WHERE product_code = $1
-            AND branch_code IS NOT DISTINCT FROM $2
-            AND period_start = $3
-            AND period_end = $4
-            AND period_days = $5
-          `,
-          [record.productCode, record.branchCode || null, periodStart, periodEnd, periodDays],
-        );
-        await client.query(
-          `
-          INSERT INTO product_sales_summary
-            (id, product_code, branch_code, period_start, period_end, period_days, sold_qty_base, avg_daily_usage, source_name)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'adapos_sync')
-          `,
-          [
-            makeId("sales_summary"),
-            record.productCode,
-            record.branchCode || null,
-            periodStart,
-            periodEnd,
-            periodDays,
-            Number(record.soldQtyBase || 0),
-            Number(record.avgDailyUsage || 0),
-          ],
-        );
-        accepted += 1;
-      }
+
+      await client.query(
+        `DELETE FROM product_sales_summary
+         WHERE (product_code, branch_code, period_start, period_end, period_days) IN (
+           SELECT unnest($1::text[]), unnest($2::text[]), unnest($3::date[]), unnest($4::date[]), unnest($5::int[])
+         )`,
+        [codes, branches, pStarts, pEnds, pDays],
+      );
+
+      await client.query(
+        `INSERT INTO product_sales_summary
+           (id, product_code, branch_code, period_start, period_end, period_days, sold_qty_base, avg_daily_usage, source_name)
+         SELECT
+           unnest($1::text[]), unnest($2::text[]), unnest($3::text[]),
+           unnest($4::date[]), unnest($5::date[]), unnest($6::int[]),
+           unnest($7::numeric[]), unnest($8::numeric[]),
+           'adapos_sync'`,
+        [ids, codes, branches, pStarts, pEnds, pDays, soldQty, avgUsage],
+      );
+
       await client.query("COMMIT");
-      return { accepted };
+      return { accepted: records.length };
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -466,44 +503,49 @@ export class PostgresRepository {
   }
 
   async ingestPurchaseSummary(payload) {
+    const records = payload.records || [];
+    if (!records.length) return { accepted: 0 };
+
+    const today = new Date().toISOString().slice(0, 10);
+    const ids = [], codes = [], pStarts = [], pEnds = [], pDays = [], purchQty = [];
+
+    for (const r of records) {
+      const periodDays = Number(r.periodDays || 30);
+      const periodStart = r.periodStart || new Date(Date.now() - (periodDays - 1) * 86400000).toISOString().slice(0, 10);
+      const periodEnd = r.periodEnd || today;
+      ids.push(makeId("purchase_summary"));
+      codes.push(r.productCode);
+      pStarts.push(periodStart);
+      pEnds.push(periodEnd);
+      pDays.push(periodDays);
+      purchQty.push(Number(r.purchasedQtyBase || 0));
+    }
+
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      let accepted = 0;
-      for (const record of payload.records || []) {
-        const periodStart =
-          record.periodStart || new Date(Date.now() - ((record.periodDays || 30) - 1) * 86400000).toISOString().slice(0, 10);
-        const periodEnd = record.periodEnd || new Date().toISOString().slice(0, 10);
-        const periodDays = Number(record.periodDays || 30);
-        await client.query(
-          `
-          DELETE FROM product_purchase_summary
-          WHERE product_code = $1
-            AND period_start = $2
-            AND period_end = $3
-            AND period_days = $4
-          `,
-          [record.productCode, periodStart, periodEnd, periodDays],
-        );
-        await client.query(
-          `
-          INSERT INTO product_purchase_summary
-            (id, product_code, period_start, period_end, period_days, purchased_qty_base, source_name)
-          VALUES ($1, $2, $3, $4, $5, $6, 'adapos_sync')
-          `,
-          [
-            makeId("purchase_summary"),
-            record.productCode,
-            periodStart,
-            periodEnd,
-            periodDays,
-            Number(record.purchasedQtyBase || 0),
-          ],
-        );
-        accepted += 1;
-      }
+
+      await client.query(
+        `DELETE FROM product_purchase_summary
+         WHERE (product_code, period_start, period_end, period_days) IN (
+           SELECT unnest($1::text[]), unnest($2::date[]), unnest($3::date[]), unnest($4::int[])
+         )`,
+        [codes, pStarts, pEnds, pDays],
+      );
+
+      await client.query(
+        `INSERT INTO product_purchase_summary
+           (id, product_code, period_start, period_end, period_days, purchased_qty_base, source_name)
+         SELECT
+           unnest($1::text[]), unnest($2::text[]),
+           unnest($3::date[]), unnest($4::date[]), unnest($5::int[]),
+           unnest($6::numeric[]),
+           'adapos_sync'`,
+        [ids, codes, pStarts, pEnds, pDays, purchQty],
+      );
+
       await client.query("COMMIT");
-      return { accepted };
+      return { accepted: records.length };
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
