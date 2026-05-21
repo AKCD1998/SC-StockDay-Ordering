@@ -137,7 +137,7 @@ async function runOnce() {
 
     try {
       // Register branch before posting branch-scoped data.
-      await postJson(`${syncConfig.apiBaseUrl}/api/sync/branches`, {
+      await postJson(`${syncConfig.apiBaseUrl}/api/sync/ada/branches`, {
         records: [{ branchCode: syncConfig.branchCode, isHq: false }],
       });
 
@@ -169,8 +169,10 @@ async function runOnce() {
           `${syncConfig.apiBaseUrl}/api/sync/ada/transfers`,
           toTransferPayload(data.transfers ?? [], data.transfer_lines ?? []),
         );
-        console.log(`  transfers: ${result.headersAccepted} headers, ${result.linesAccepted} lines accepted`);
-        totalSent += result.headersAccepted + result.linesAccepted;
+        const hAccepted = result.acceptedHeaders ?? result.headersAccepted ?? 0;
+        const lAccepted = result.acceptedLines   ?? result.linesAccepted   ?? 0;
+        console.log(`  transfers: ${hAccepted} headers, ${lAccepted} lines accepted`);
+        totalSent += hAccepted + lAccepted;
       }
 
       await postJson(`${syncConfig.apiBaseUrl}/api/sync/run-log`, {

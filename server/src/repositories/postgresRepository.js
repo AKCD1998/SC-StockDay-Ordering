@@ -20,7 +20,8 @@ function mapSearchRow(row) {
 
 export class PostgresRepository {
   constructor() {
-    this.pool = getPool();
+    // pool may be overridden after construction (e.g. in tests with a mock pool)
+    try { this.pool = getPool(); } catch { this.pool = null; }
   }
 
   async init() {

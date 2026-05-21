@@ -96,6 +96,15 @@ export function createRouter(repository) {
     res.json(await repository.ingestBranches(req.body || {}));
   }));
 
+  // Alias used by Codex-deployed backend — routes to same handler.
+  router.post("/api/sync/ada/branches", asyncHandler(async (req, res) => {
+    const validationError = validateRecordsPayload(req.body);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+    res.json(await repository.ingestBranches(req.body || {}));
+  }));
+
   router.post("/api/sync/products", asyncHandler(async (req, res) => {
     const validationError = validateRecordsPayload(req.body);
     if (validationError) {
@@ -126,6 +135,21 @@ export function createRouter(repository) {
       return res.status(400).json({ message: validation.error });
     }
     res.json(await repository.ingestTransfers(validation.normalized));
+  }));
+
+  // Alias used by Codex-deployed backend — same handler, same response shape.
+  router.post("/api/sync/ada/transfers", asyncHandler(async (req, res) => {
+    const validationError = validateTransferPayload(req.body);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+    const result = await repository.ingestTransfers(req.body);
+    // Respond with both field-name conventions so either client side works.
+    res.json({
+      ...result,
+      acceptedHeaders: result.headersAccepted,
+      acceptedLines:   result.linesAccepted,
+    });
   }));
 
   router.get("/api/admin/transfers", asyncHandler(async (req, res) => {
