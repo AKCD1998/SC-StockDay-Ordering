@@ -9,7 +9,7 @@ import {
   getTransferLineRows,
 } from "./queries.js";
 import { postJson } from "./client.js";
-import { toProductRecords, toSalesRecords } from "./transform.js";
+import { toProductRecords, toSalesRecords, toTransferPayload } from "./transform.js";
 
 const PERIOD_DAYS = 30;
 
@@ -162,8 +162,15 @@ async function runOnce() {
       }
 
       if (data.transfers?.length || data.transfer_lines?.length) {
-        const skipped = (data.transfers?.length ?? 0) + (data.transfer_lines?.length ?? 0);
-        console.log(`Transfers: ${skipped} rows read but not posted — server endpoints not yet implemented.`);
+        const hCount = data.transfers?.length ?? 0;
+        const lCount = data.transfer_lines?.length ?? 0;
+        console.log(`Posting ${hCount} transfer headers, ${lCount} lines...`);
+        const result = await postJson(
+          `${syncConfig.apiBaseUrl}/api/sync/transfers`,
+          toTransferPayload(data.transfers ?? [], data.transfer_lines ?? []),
+        );
+        console.log(`  transfers: ${result.headersAccepted} headers, ${result.linesAccepted} lines accepted`);
+        totalSent += result.headersAccepted + result.linesAccepted;
       }
 
       await postJson(`${syncConfig.apiBaseUrl}/api/sync/run-log`, {
@@ -174,7 +181,7 @@ async function runOnce() {
         status: "success",
         recordsRead: totalRead,
         recordsSent: totalSent,
-        message: `Dry-run=false. products+sales posted for branch ${syncConfig.branchCode}.`,
+        message: `products+sales+transfers posted for branch ${syncConfig.branchCode}.`,
       });
 
       console.log(`\nDone. ${totalSent} records sent to API.`);

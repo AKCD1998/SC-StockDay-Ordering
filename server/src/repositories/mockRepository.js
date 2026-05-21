@@ -130,6 +130,17 @@ export class MockRepository {
     return { accepted: (payload.records || []).length };
   }
 
+  async ingestTransfers(payload) {
+    return {
+      headersAccepted: (payload.headers || []).length,
+      linesAccepted:   (payload.lines   || []).length,
+    };
+  }
+
+  async getTransfersByBranch(_branchCode, _periodDays) {
+    return [];
+  }
+
   async ingestProducts(payload) {
     this.syncRuns.unshift({
       id: makeId("sync"),

@@ -23,6 +23,46 @@ export function toProductRecords(rows) {
   }));
 }
 
+export function toTransferPayload(headerRows, lineRows) {
+  return {
+    headers: headerRows.map((h) => ({
+      docNo:     h.FTPthDocNo,
+      docType:   h.FTPthDocType   || null,
+      docDate:   h.FDPthDocDate,
+      tnfDate:   h.FDPthTnfDate   || null,
+      branchFrm: h.FTPthBchFrm,
+      branchTo:  h.FTPthBchTo,
+      whFrm:     h.FTPthWhFrm     || null,
+      whTo:      h.FTPthWhTo      || null,
+      type:      h.FTPthType      || null,
+      total:     Number(h.FCPthTotal  || 0),
+      vat:       Number(h.FCPthVat    || 0),
+      grand:     Number(h.FCPthGrand  || 0),
+      deptCode:  h.FTDptCode      || null,
+      usrCode:   h.FTUsrCode      || null,
+    })),
+    lines: lineRows.map((l) => ({
+      docNo:       l.FTPthDocNo,
+      seqNo:       Number(l.FNPtdSeqNo),
+      productCode: l.FTPdtCode      || null,
+      unitCode:    l.FTPunCode      || null,
+      unitName:    l.FTPtdUnitName  || null,
+      factor:      Number(l.FCPtdFactor  ?? 1),
+      qty:         Number(l.FCPtdQty     || 0),
+      qtyBase:     Number(l.FCPtdQtyAll  || 0),
+      cost:        Number(l.FCPtdCost    || 0),
+      costIn:      Number(l.FCPtdCostIn  || 0),
+      net:         Number(l.FCPtdNet     || 0),
+      vat:         Number(l.FCPtdVat     || 0),
+      branchFrm:   l.FTPthBchFrm    || null,
+      branchTo:    l.FTPthBchTo     || null,
+      whFrm:       l.FTPthWhFrm     || null,
+      whTo:        l.FTPthWhTo      || null,
+      docDate:     l.FDPthDocDate   || null,
+    })),
+  };
+}
+
 export function toSalesRecords(rows, branchCode, periodDays) {
   return rows.map((r) => ({
     productCode:   r.FTPdtCode,

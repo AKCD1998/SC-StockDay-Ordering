@@ -619,6 +619,126 @@ export class PostgresRepository {
     return { accepted: 1 };
   }
 
+  async ingestTransfers(payload) {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      let headersAccepted = 0;
+      let linesAccepted = 0;
+
+      for (const h of payload.headers || []) {
+        await client.query(
+          `
+          INSERT INTO transfer_headers
+            (doc_no, branch_frm, branch_to, doc_type, doc_date, tnf_date,
+             wh_frm, wh_to, transfer_type, total, vat, grand, dept_code, usr_code)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+          ON CONFLICT (doc_no) DO UPDATE SET
+            branch_frm    = EXCLUDED.branch_frm,
+            branch_to     = EXCLUDED.branch_to,
+            doc_type      = EXCLUDED.doc_type,
+            doc_date      = EXCLUDED.doc_date,
+            tnf_date      = EXCLUDED.tnf_date,
+            wh_frm        = EXCLUDED.wh_frm,
+            wh_to         = EXCLUDED.wh_to,
+            transfer_type = EXCLUDED.transfer_type,
+            total         = EXCLUDED.total,
+            vat           = EXCLUDED.vat,
+            grand         = EXCLUDED.grand,
+            dept_code     = EXCLUDED.dept_code,
+            usr_code      = EXCLUDED.usr_code,
+            synced_at     = NOW()
+          `,
+          [
+            h.docNo, h.branchFrm, h.branchTo, h.docType || null,
+            h.docDate, h.tnfDate || null, h.whFrm || null, h.whTo || null,
+            h.type || null,
+            Number(h.total || 0), Number(h.vat || 0), Number(h.grand || 0),
+            h.deptCode || null, h.usrCode || null,
+          ],
+        );
+        headersAccepted++;
+      }
+
+      for (const l of payload.lines || []) {
+        await client.query(
+          `
+          INSERT INTO transfer_lines
+            (doc_no, seq_no, product_code, unit_code, unit_name, factor,
+             qty, qty_base, cost, cost_in, net, vat,
+             branch_frm, branch_to, wh_frm, wh_to, doc_date)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+          ON CONFLICT (doc_no, seq_no) DO UPDATE SET
+            product_code = EXCLUDED.product_code,
+            unit_code    = EXCLUDED.unit_code,
+            unit_name    = EXCLUDED.unit_name,
+            factor       = EXCLUDED.factor,
+            qty          = EXCLUDED.qty,
+            qty_base     = EXCLUDED.qty_base,
+            cost         = EXCLUDED.cost,
+            cost_in      = EXCLUDED.cost_in,
+            net          = EXCLUDED.net,
+            vat          = EXCLUDED.vat,
+            synced_at    = NOW()
+          `,
+          [
+            l.docNo, Number(l.seqNo), l.productCode || null,
+            l.unitCode || null, l.unitName || null, Number(l.factor ?? 1),
+            Number(l.qty || 0), Number(l.qtyBase || 0),
+            Number(l.cost || 0), Number(l.costIn || 0),
+            Number(l.net || 0), Number(l.vat || 0),
+            l.branchFrm || null, l.branchTo || null,
+            l.whFrm || null, l.whTo || null, l.docDate || null,
+          ],
+        );
+        linesAccepted++;
+      }
+
+      await client.query("COMMIT");
+      return { headersAccepted, linesAccepted };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getTransfersByBranch(branchCode, periodDays = 30) {
+    const { rows } = await this.pool.query(
+      `
+      SELECT
+        h.doc_no, h.doc_date, h.tnf_date,
+        h.branch_frm, h.branch_to, h.wh_frm, h.wh_to,
+        h.transfer_type, h.grand,
+        COUNT(l.seq_no)::int   AS line_count,
+        COALESCE(SUM(l.qty_base), 0) AS total_qty_base
+      FROM transfer_headers h
+      LEFT JOIN transfer_lines l ON l.doc_no = h.doc_no
+      WHERE (h.branch_frm = $1 OR h.branch_to = $1)
+        AND h.doc_date >= CURRENT_DATE - ($2::int * INTERVAL '1 day')
+      GROUP BY h.doc_no, h.doc_date, h.tnf_date,
+               h.branch_frm, h.branch_to, h.wh_frm, h.wh_to,
+               h.transfer_type, h.grand
+      ORDER BY h.doc_date DESC
+      `,
+      [branchCode, periodDays],
+    );
+    return rows.map((r) => ({
+      docNo:        r.doc_no,
+      docDate:      r.doc_date,
+      tnfDate:      r.tnf_date,
+      branchFrm:    r.branch_frm,
+      branchTo:     r.branch_to,
+      whFrm:        r.wh_frm,
+      whTo:         r.wh_to,
+      transferType: r.transfer_type,
+      grand:        Number(r.grand),
+      lineCount:    r.line_count,
+      totalQtyBase: Number(r.total_qty_base),
+    }));
+  }
+
   async close() {
     await closePool();
   }

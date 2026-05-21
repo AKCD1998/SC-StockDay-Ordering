@@ -33,6 +33,13 @@ function validateRecordsPayload(body) {
   return null;
 }
 
+function validateTransferPayload(body) {
+  if (!body || !Array.isArray(body.headers) || !Array.isArray(body.lines)) {
+    return "Payload must include headers and lines arrays.";
+  }
+  return null;
+}
+
 export function createRouter(repository) {
   const router = express.Router();
 
@@ -117,6 +124,26 @@ export function createRouter(repository) {
       return res.status(400).json({ message: validationError });
     }
     res.json(await repository.ingestPurchaseSummary(req.body || {}));
+  }));
+
+  router.post("/api/sync/transfers", asyncHandler(async (req, res) => {
+    const validationError = validateTransferPayload(req.body);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+    res.json(await repository.ingestTransfers(req.body));
+  }));
+
+  router.get("/api/admin/transfers", asyncHandler(async (req, res) => {
+    const { branchCode } = req.query;
+    if (!branchCode) {
+      return res.status(400).json({ message: "branchCode query param required." });
+    }
+    const periodDays = Number(req.query.periodDays || config.defaultPeriodDays);
+    if (!Number.isFinite(periodDays) || periodDays <= 0) {
+      return res.status(400).json({ message: "periodDays must be a positive number." });
+    }
+    res.json(await repository.getTransfersByBranch(branchCode, periodDays));
   }));
 
   router.post("/api/sync/run-log", asyncHandler(async (req, res) => {
