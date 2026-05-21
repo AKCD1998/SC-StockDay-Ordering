@@ -11,6 +11,11 @@ export function getPool() {
   if (!pool) {
     pool = new Pool({
       connectionString: config.databaseUrl,
+      ssl: config.databaseSsl
+        ? {
+            rejectUnauthorized: false,
+          }
+        : undefined,
     });
   }
 

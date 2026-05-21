@@ -601,6 +601,211 @@ export class PostgresRepository {
     return { accepted: 1 };
   }
 
+  async ingestTransfers(payload) {
+    const headers = payload.headers || [];
+    const lines = payload.lines || [];
+    if (!headers.length && !lines.length) {
+      return { acceptedHeaders: 0, acceptedLines: 0 };
+    }
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      if (headers.length) {
+        const docNos = [];
+        const docTypes = [];
+        const branchCodes = [];
+        const branchCodesTo = [];
+        const warehouseCodes = [];
+        const warehouseCodesTo = [];
+        const docDates = [];
+        const tnfDates = [];
+        const transferTypes = [];
+        const totals = [];
+        const vats = [];
+        const grands = [];
+        const deptCodes = [];
+        const createdBys = [];
+        const approvedBys = [];
+        const rawPayloads = [];
+
+        for (const header of headers) {
+          docNos.push(header.docNo);
+          docTypes.push(header.docType);
+          branchCodes.push(header.branchCode);
+          branchCodesTo.push(header.branchCodeTo);
+          warehouseCodes.push(header.warehouseCode);
+          warehouseCodesTo.push(header.warehouseCodeTo);
+          docDates.push(header.docDate);
+          tnfDates.push(header.tnfDate);
+          transferTypes.push(header.transferType);
+          totals.push(header.total);
+          vats.push(header.vat);
+          grands.push(header.grand);
+          deptCodes.push(header.deptCode);
+          createdBys.push(header.createdBy);
+          approvedBys.push(header.approvedBy);
+          rawPayloads.push(JSON.stringify(header.raw || {}));
+        }
+
+        await client.query(
+          `INSERT INTO ada_transfer_headers
+             (doc_no, doc_type, branch_code, branch_code_to, warehouse_code, warehouse_code_to,
+              doc_date, tnf_date, transfer_type, total, vat, grand, dept_code,
+              created_by, approved_by, raw_payload, synced_at, updated_at)
+           SELECT
+             unnest($1::text[]), unnest($2::text[]), unnest($3::text[]), unnest($4::text[]),
+             unnest($5::text[]), unnest($6::text[]), unnest($7::date[]), unnest($8::date[]),
+             unnest($9::text[]), unnest($10::numeric[]), unnest($11::numeric[]), unnest($12::numeric[]),
+             unnest($13::text[]), unnest($14::text[]), unnest($15::text[]), unnest($16::jsonb[]),
+             NOW(), NOW()
+           ON CONFLICT (doc_no, doc_type, branch_code) DO UPDATE SET
+             branch_code_to = EXCLUDED.branch_code_to,
+             warehouse_code = EXCLUDED.warehouse_code,
+             warehouse_code_to = EXCLUDED.warehouse_code_to,
+             doc_date = EXCLUDED.doc_date,
+             tnf_date = EXCLUDED.tnf_date,
+             transfer_type = EXCLUDED.transfer_type,
+             total = EXCLUDED.total,
+             vat = EXCLUDED.vat,
+             grand = EXCLUDED.grand,
+             dept_code = EXCLUDED.dept_code,
+             created_by = EXCLUDED.created_by,
+             approved_by = EXCLUDED.approved_by,
+             raw_payload = EXCLUDED.raw_payload,
+             synced_at = NOW(),
+             updated_at = NOW()`,
+          [
+            docNos,
+            docTypes,
+            branchCodes,
+            branchCodesTo,
+            warehouseCodes,
+            warehouseCodesTo,
+            docDates,
+            tnfDates,
+            transferTypes,
+            totals,
+            vats,
+            grands,
+            deptCodes,
+            createdBys,
+            approvedBys,
+            rawPayloads,
+          ],
+        );
+      }
+
+      if (lines.length) {
+        const docNos = [];
+        const docTypes = [];
+        const branchCodes = [];
+        const branchCodesTo = [];
+        const lineNos = [];
+        const productCodes = [];
+        const unitCodes = [];
+        const unitNames = [];
+        const qtys = [];
+        const qtyBases = [];
+        const stockFactors = [];
+        const costs = [];
+        const costIns = [];
+        const nets = [];
+        const vats = [];
+        const warehouseCodes = [];
+        const warehouseCodesTo = [];
+        const docDates = [];
+        const rawPayloads = [];
+
+        for (const line of lines) {
+          docNos.push(line.docNo);
+          docTypes.push(line.docType);
+          branchCodes.push(line.branchCode);
+          branchCodesTo.push(line.branchCodeTo);
+          lineNos.push(line.lineNo);
+          productCodes.push(line.productCode);
+          unitCodes.push(line.unitCode);
+          unitNames.push(line.unitName);
+          qtys.push(line.qty);
+          qtyBases.push(line.qtyBase);
+          stockFactors.push(line.stockFactor);
+          costs.push(line.cost);
+          costIns.push(line.costIn);
+          nets.push(line.net);
+          vats.push(line.vat);
+          warehouseCodes.push(line.warehouseCode);
+          warehouseCodesTo.push(line.warehouseCodeTo);
+          docDates.push(line.docDate);
+          rawPayloads.push(JSON.stringify(line.raw || {}));
+        }
+
+        await client.query(
+          `INSERT INTO ada_transfer_lines
+             (doc_no, doc_type, branch_code, branch_code_to, line_no, product_code,
+              unit_code, unit_name, qty, qty_base, stock_factor, cost, cost_in, net, vat,
+              warehouse_code, warehouse_code_to, doc_date, raw_payload, synced_at, updated_at)
+           SELECT
+             unnest($1::text[]), unnest($2::text[]), unnest($3::text[]), unnest($4::text[]),
+             unnest($5::integer[]), unnest($6::text[]), unnest($7::text[]), unnest($8::text[]),
+             unnest($9::numeric[]), unnest($10::numeric[]), unnest($11::numeric[]), unnest($12::numeric[]),
+             unnest($13::numeric[]), unnest($14::numeric[]), unnest($15::numeric[]),
+             unnest($16::text[]), unnest($17::text[]), unnest($18::date[]), unnest($19::jsonb[]),
+             NOW(), NOW()
+           ON CONFLICT (doc_no, doc_type, branch_code, line_no, product_code) DO UPDATE SET
+             branch_code_to = EXCLUDED.branch_code_to,
+             unit_code = EXCLUDED.unit_code,
+             unit_name = EXCLUDED.unit_name,
+             qty = EXCLUDED.qty,
+             qty_base = EXCLUDED.qty_base,
+             stock_factor = EXCLUDED.stock_factor,
+             cost = EXCLUDED.cost,
+             cost_in = EXCLUDED.cost_in,
+             net = EXCLUDED.net,
+             vat = EXCLUDED.vat,
+             warehouse_code = EXCLUDED.warehouse_code,
+             warehouse_code_to = EXCLUDED.warehouse_code_to,
+             doc_date = EXCLUDED.doc_date,
+             raw_payload = EXCLUDED.raw_payload,
+             synced_at = NOW(),
+             updated_at = NOW()`,
+          [
+            docNos,
+            docTypes,
+            branchCodes,
+            branchCodesTo,
+            lineNos,
+            productCodes,
+            unitCodes,
+            unitNames,
+            qtys,
+            qtyBases,
+            stockFactors,
+            costs,
+            costIns,
+            nets,
+            vats,
+            warehouseCodes,
+            warehouseCodesTo,
+            docDates,
+            rawPayloads,
+          ],
+        );
+      }
+
+      await client.query("COMMIT");
+      return {
+        acceptedHeaders: headers.length,
+        acceptedLines: lines.length,
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async close() {
     await closePool();
   }

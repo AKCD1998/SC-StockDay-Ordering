@@ -1,5 +1,6 @@
 import express from "express";
 import { config } from "./config.js";
+import { validateTransferPayload } from "./transferSync.js";
 import { parsePositiveNumber } from "./utils.js";
 
 function asyncHandler(fn) {
@@ -113,6 +114,14 @@ export function createRouter(repository) {
 
   router.post("/api/sync/run-log", asyncHandler(async (req, res) => {
     res.json(await repository.ingestRunLog(req.body || {}));
+  }));
+
+  router.post("/api/sync/ada/transfers", asyncHandler(async (req, res) => {
+    const validation = validateTransferPayload(req.body);
+    if (validation.error) {
+      return res.status(400).json({ message: validation.error });
+    }
+    res.json(await repository.ingestTransfers(validation.normalized));
   }));
 
   router.use((error, _req, res, _next) => {

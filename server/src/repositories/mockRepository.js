@@ -182,5 +182,22 @@ export class MockRepository {
     return { accepted: 1 };
   }
 
+  async ingestTransfers(payload) {
+    this.syncRuns.unshift({
+      id: makeId("sync"),
+      syncType: "ada-transfers",
+      startedAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+      status: "success",
+      recordsRead: (payload.headers?.length || 0) + (payload.lines?.length || 0),
+      recordsSent: (payload.headers?.length || 0) + (payload.lines?.length || 0),
+      message: "AdaPOS transfers received by mock API.",
+    });
+    return {
+      acceptedHeaders: payload.headers?.length || 0,
+      acceptedLines: payload.lines?.length || 0,
+    };
+  }
+
   async close() {}
 }
