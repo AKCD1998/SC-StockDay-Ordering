@@ -18,7 +18,8 @@
     "import:order-workbook": "npm run import:order-workbook -w server --",
     "db:migrate": "npm run db:migrate -w server",
     "db:seed": "npm run db:seed -w server",
-    "lint": "npm run lint -ws --if-present"
+    "lint": "npm run lint -ws --if-present",
+    "sync:ada-agent": "node apps/adapos-sync/src/index.js"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

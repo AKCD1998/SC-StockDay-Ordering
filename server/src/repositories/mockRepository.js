@@ -126,6 +126,14 @@ export class MockRepository {
     };
   }
 
+  async ingestBranches(payload) {
+    return { accepted: (payload.records || []).length };
+  }
+
+  async getTransfersByBranch(_branchCode, _periodDays) {
+    return [];
+  }
+
   async ingestProducts(payload) {
     this.syncRuns.unshift({
       id: makeId("sync"),
@@ -196,6 +204,8 @@ export class MockRepository {
     return {
       acceptedHeaders: payload.headers?.length || 0,
       acceptedLines: payload.lines?.length || 0,
+      headersAccepted: payload.headers?.length || 0,
+      linesAccepted: payload.lines?.length || 0,
     };
   }
 

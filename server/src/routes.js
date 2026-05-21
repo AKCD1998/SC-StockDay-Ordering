@@ -88,6 +88,14 @@ export function createRouter(repository) {
     res.json(await repository.getSyncStatus());
   }));
 
+  router.post("/api/sync/branches", asyncHandler(async (req, res) => {
+    const validationError = validateRecordsPayload(req.body);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+    res.json(await repository.ingestBranches(req.body || {}));
+  }));
+
   router.post("/api/sync/products", asyncHandler(async (req, res) => {
     const validationError = validateRecordsPayload(req.body);
     if (validationError) {
@@ -110,6 +118,26 @@ export function createRouter(repository) {
       return res.status(400).json({ message: validationError });
     }
     res.json(await repository.ingestPurchaseSummary(req.body || {}));
+  }));
+
+  router.post("/api/sync/transfers", asyncHandler(async (req, res) => {
+    const validation = validateTransferPayload(req.body);
+    if (validation.error) {
+      return res.status(400).json({ message: validation.error });
+    }
+    res.json(await repository.ingestTransfers(validation.normalized));
+  }));
+
+  router.get("/api/admin/transfers", asyncHandler(async (req, res) => {
+    const { branchCode } = req.query;
+    if (!branchCode) {
+      return res.status(400).json({ message: "branchCode query param required." });
+    }
+    const periodDays = Number(req.query.periodDays || config.defaultPeriodDays);
+    if (!Number.isFinite(periodDays) || periodDays <= 0) {
+      return res.status(400).json({ message: "periodDays must be a positive number." });
+    }
+    res.json(await repository.getTransfersByBranch(branchCode, periodDays));
   }));
 
   router.post("/api/sync/run-log", asyncHandler(async (req, res) => {
