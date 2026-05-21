@@ -137,14 +137,14 @@ export function createRouter(repository) {
     res.json(await repository.ingestTransfers(validation.normalized));
   }));
 
-  // Alias used by Codex-deployed backend — same handler, same response shape.
+  // Alias used by Codex-deployed backend — normalizes both raw AdaAcc and camelCase payloads.
   router.post("/api/sync/ada/transfers", asyncHandler(async (req, res) => {
-    const validationError = validateTransferPayload(req.body);
-    if (validationError) {
-      return res.status(400).json({ message: validationError });
+    const validation = validateTransferPayload(req.body);
+    if (validation.error) {
+      return res.status(400).json({ message: validation.error });
     }
-    const result = await repository.ingestTransfers(req.body);
-    // Respond with both field-name conventions so either client side works.
+    const result = await repository.ingestTransfers(validation.normalized);
+    // Respond with both field-name conventions so either client works.
     res.json({
       ...result,
       acceptedHeaders: result.headersAccepted,
@@ -166,14 +166,6 @@ export function createRouter(repository) {
 
   router.post("/api/sync/run-log", asyncHandler(async (req, res) => {
     res.json(await repository.ingestRunLog(req.body || {}));
-  }));
-
-  router.post("/api/sync/ada/transfers", asyncHandler(async (req, res) => {
-    const validation = validateTransferPayload(req.body);
-    if (validation.error) {
-      return res.status(400).json({ message: validation.error });
-    }
-    res.json(await repository.ingestTransfers(validation.normalized));
   }));
 
   router.use((error, _req, res, _next) => {
