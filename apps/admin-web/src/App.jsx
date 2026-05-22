@@ -800,10 +800,12 @@ export default function App() {
         <nav className="view-nav" aria-label="เมนูหลัก">
           <button
             type="button"
-            className={view === "dashboard" ? "view-nav-btn active" : "view-nav-btn"}
-            onClick={() => setView("dashboard")}
+            className="view-nav-btn view-nav-btn-disabled"
+            disabled
+            aria-disabled="true"
           >
             หน้าหลักแดชบอร์ด
+            <span className="view-nav-badge">เร็วๆนี้</span>
           </button>
           <button
             type="button"
