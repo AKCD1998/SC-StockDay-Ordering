@@ -118,7 +118,7 @@ function PurchaseReceiptsPanel({ branchCode }) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const sorted = [...(data.records || [])].sort(
-        (a, b) => new Date(b.doc_date) - new Date(a.doc_date),
+        (a, b) => new Date(b.docDate) - new Date(a.docDate),
       );
       setPendingRecords(sorted);
     } catch (err) {
@@ -168,7 +168,7 @@ function PurchaseReceiptsPanel({ branchCode }) {
   }
 
   function ReceiptCard({ record }) {
-    const docNo = record.doc_no;
+    const docNo = record.docNo;
     const isOpen = !!expandedDocs[docNo];
     return (
       <article className="receipt-card">
@@ -176,11 +176,11 @@ function PurchaseReceiptsPanel({ branchCode }) {
           <div className="receipt-card-meta">
             <strong className="receipt-doc-no">{docNo}</strong>
             <span className="receipt-supplier">
-              {record.supplier_name || record.supplier_code || "-"}
+              {record.supplierName || record.supplierCode || "-"}
             </span>
             <span className="meta-line">
-              {formatDocDate(record.doc_date)}
-              {record.doc_time ? ` · ${record.doc_time}` : ""}
+              {formatDocDate(record.docDate)}
+              {record.docTime ? ` · ${record.docTime}` : ""}
             </span>
           </div>
           <div className="receipt-card-side">
@@ -220,28 +220,28 @@ function PurchaseReceiptsPanel({ branchCode }) {
               <tbody>
                 {(record.lines || []).map((ln) => (
                   <tr
-                    key={ln.seq_no}
-                    className={isExpired(ln.expired_date) ? "row-expired" : ""}
+                    key={ln.seqNo}
+                    className={isExpired(ln.expiredDate) ? "row-expired" : ""}
                   >
-                    <td>{ln.seq_no}</td>
-                    <td>{ln.product_code || "-"}</td>
-                    <td>{ln.product_name || "-"}</td>
+                    <td>{ln.seqNo}</td>
+                    <td>{ln.productCode || "-"}</td>
+                    <td>{ln.productName || "-"}</td>
                     <td>
                       {Number(ln.qty || 0).toLocaleString("th-TH", {
                         minimumFractionDigits: 0,
                         maximumFractionDigits: 2,
                       })}
                     </td>
-                    <td>{ln.unit_name || ln.unit_code || "-"}</td>
+                    <td>{ln.unitName || ln.unitCode || "-"}</td>
                     <td>
-                      {Number(ln.set_price || 0).toLocaleString("th-TH", {
+                      {Number(ln.setPrice || 0).toLocaleString("th-TH", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
                     </td>
-                    <td>{ln.lot_no || "-"}</td>
-                    <td className={isExpired(ln.expired_date) ? "expired-date" : ""}>
-                      {formatDocDate(ln.expired_date)}
+                    <td>{ln.lotNo || "-"}</td>
+                    <td className={isExpired(ln.expiredDate) ? "expired-date" : ""}>
+                      {formatDocDate(ln.expiredDate)}
                     </td>
                   </tr>
                 ))}
