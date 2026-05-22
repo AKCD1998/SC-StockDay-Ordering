@@ -14,7 +14,20 @@ const adminDistPath = path.resolve(__dirname, "../../dist/admin-web");
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 app.use(createRouter(repository));
-app.use(express.static(adminDistPath));
+app.use(
+  express.static(adminDistPath, {
+    setHeaders(res, filePath) {
+      if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        return;
+      }
+
+      if (filePath.endsWith(".html")) {
+        res.setHeader("Cache-Control", "no-store");
+      }
+    },
+  }),
+);
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -29,6 +42,7 @@ app.get("*", (req, res, next) => {
     return next();
   }
 
+  res.setHeader("Cache-Control", "no-store");
   return res.sendFile(path.join(adminDistPath, "index.html"));
 });
 
