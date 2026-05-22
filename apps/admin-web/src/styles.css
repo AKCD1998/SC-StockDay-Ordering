@@ -404,3 +404,182 @@ select {
     align-items: start;
   }
 }
+
+/* ── View navigation ───────────────────────── */
+.view-nav {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.view-nav-btn {
+  border-radius: 999px;
+  padding: 10px 18px;
+  border: 1px solid #c8d3e2;
+  background: transparent;
+  color: #16344d;
+  font-size: 14px;
+}
+
+.view-nav-btn.active {
+  background: #16344d;
+  color: #fff;
+  border-color: #16344d;
+}
+
+/* ── Purchase Receipts Panel ────────────────── */
+.purchase-receipts-panel {
+  margin-top: 22px;
+}
+
+.receipt-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #e4e9f2;
+  padding-bottom: 0;
+}
+
+.receipt-tab {
+  padding: 10px 18px;
+  border: none;
+  background: transparent;
+  color: #526578;
+  font-size: 15px;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.receipt-tab.active {
+  color: #16344d;
+  border-bottom-color: #16344d;
+  font-weight: 700;
+}
+
+.tab-badge {
+  background: #f8d8dd;
+  color: #842029;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tab-badge-good {
+  background: #d8efdf;
+  color: #165b33;
+}
+
+.receipt-tab-content {
+  display: grid;
+  gap: 14px;
+}
+
+.tab-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.date-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #38506b;
+  font-size: 14px;
+}
+
+.date-input-inline {
+  width: auto;
+  min-width: 150px;
+  border: 1px solid #c8d3e2;
+  border-radius: 14px;
+  padding: 8px 12px;
+}
+
+.receipt-list {
+  display: grid;
+  gap: 12px;
+}
+
+.receipt-card {
+  border: 1px solid #d6deea;
+  border-radius: 18px;
+  background: #fbfcfe;
+  overflow: hidden;
+}
+
+.receipt-card-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  padding: 16px 18px;
+  align-items: start;
+}
+
+.receipt-card-meta {
+  display: grid;
+  gap: 4px;
+}
+
+.receipt-doc-no {
+  font-size: 15px;
+  color: #16344d;
+}
+
+.receipt-supplier {
+  color: #38506b;
+}
+
+.receipt-card-side {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
+.receipt-grand {
+  font-size: 16px;
+  font-weight: 700;
+  color: #16344d;
+}
+
+.receipt-toggle {
+  font-size: 13px;
+  padding: 6px 14px;
+}
+
+.receipt-lines-wrap {
+  border-top: 1px solid #e4e9f2;
+  overflow-x: auto;
+}
+
+.receipt-lines-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.receipt-lines-table th,
+.receipt-lines-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef2f8;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.receipt-lines-table th {
+  background: #f4f7fb;
+  color: #38506b;
+}
+
+.row-expired {
+  background: #fff5f5;
+}
+
+.expired-date {
+  color: #842029;
+  font-weight: 700;
+}

@@ -94,6 +94,263 @@ function LoginScreen({ authError, busy, username, password, onUsernameChange, on
   );
 }
 
+function PurchaseReceiptsPanel({ branchCode }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [activeTab, setActiveTab] = useState("pending");
+  const [pendingRecords, setPendingRecords] = useState([]);
+  const [approvedRecords, setApprovedRecords] = useState([]);
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [loadingPending, setLoadingPending] = useState(false);
+  const [loadingApproved, setLoadingApproved] = useState(false);
+  const [pendingError, setPendingError] = useState("");
+  const [approvedError, setApprovedError] = useState("");
+  const [expandedDocs, setExpandedDocs] = useState({});
+
+  function toggleDoc(docNo) {
+    setExpandedDocs((prev) => ({ ...prev, [docNo]: !prev[docNo] }));
+  }
+
+  async function fetchPending() {
+    setLoadingPending(true);
+    setPendingError("");
+    try {
+      const res = await apiFetch(`/api/admin/pending-receipts?branchCode=${branchCode}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const sorted = [...(data.records || [])].sort(
+        (a, b) => new Date(b.doc_date) - new Date(a.doc_date),
+      );
+      setPendingRecords(sorted);
+    } catch (err) {
+      setPendingError(err.message);
+    } finally {
+      setLoadingPending(false);
+    }
+  }
+
+  async function fetchApproved(date) {
+    setLoadingApproved(true);
+    setApprovedError("");
+    try {
+      const res = await apiFetch(
+        `/api/admin/approved-receipts?branchCode=${branchCode}&date=${date}`,
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setApprovedRecords(data.records || []);
+    } catch (err) {
+      setApprovedError(err.message);
+    } finally {
+      setLoadingApproved(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchPending();
+  }, [branchCode]);
+
+  useEffect(() => {
+    fetchApproved(selectedDate);
+  }, [branchCode, selectedDate]);
+
+  function formatDocDate(value) {
+    if (!value) return "-";
+    const d = new Date(value);
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+
+  function isExpired(expiredDate) {
+    if (!expiredDate) return false;
+    return new Date(expiredDate) < new Date();
+  }
+
+  function ReceiptCard({ record }) {
+    const docNo = record.doc_no;
+    const isOpen = !!expandedDocs[docNo];
+    return (
+      <article className="receipt-card">
+        <div className="receipt-card-header">
+          <div className="receipt-card-meta">
+            <strong className="receipt-doc-no">{docNo}</strong>
+            <span className="receipt-supplier">
+              {record.supplier_name || record.supplier_code || "-"}
+            </span>
+            <span className="meta-line">
+              {formatDocDate(record.doc_date)}
+              {record.doc_time ? ` · ${record.doc_time}` : ""}
+            </span>
+          </div>
+          <div className="receipt-card-side">
+            <span className="receipt-grand">
+              {Number(record.grand || 0).toLocaleString("th-TH", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              บาท
+            </span>
+            <span className="meta-line">{(record.lines || []).length} รายการ</span>
+            <button
+              type="button"
+              className="ghost-button receipt-toggle"
+              onClick={() => toggleDoc(docNo)}
+            >
+              {isOpen ? "▼ ซ่อนรายการ" : "▶ ดูรายการสินค้า"}
+            </button>
+          </div>
+        </div>
+
+        {isOpen && (
+          <div className="receipt-lines-wrap">
+            <table className="receipt-lines-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>รหัสสินค้า</th>
+                  <th>ชื่อสินค้า</th>
+                  <th>จำนวน</th>
+                  <th>หน่วย</th>
+                  <th>ราคา/หน่วย</th>
+                  <th>Lot</th>
+                  <th>หมดอายุ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(record.lines || []).map((ln) => (
+                  <tr
+                    key={ln.seq_no}
+                    className={isExpired(ln.expired_date) ? "row-expired" : ""}
+                  >
+                    <td>{ln.seq_no}</td>
+                    <td>{ln.product_code || "-"}</td>
+                    <td>{ln.product_name || "-"}</td>
+                    <td>
+                      {Number(ln.qty || 0).toLocaleString("th-TH", {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 2,
+                      })}
+                    </td>
+                    <td>{ln.unit_name || ln.unit_code || "-"}</td>
+                    <td>
+                      {Number(ln.set_price || 0).toLocaleString("th-TH", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </td>
+                    <td>{ln.lot_no || "-"}</td>
+                    <td className={isExpired(ln.expired_date) ? "expired-date" : ""}>
+                      {formatDocDate(ln.expired_date)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </article>
+    );
+  }
+
+  return (
+    <section className="panel purchase-receipts-panel">
+      <div className="panel-header">
+        <div>
+          <h2>ใบรับสินค้า</h2>
+          <p>ติดตามเอกสารรับของจากผู้จำหน่าย — รออนุมัติและอนุมัติแล้ววันนี้</p>
+        </div>
+      </div>
+
+      <div className="receipt-tabs">
+        <button
+          type="button"
+          className={activeTab === "pending" ? "receipt-tab active" : "receipt-tab"}
+          onClick={() => setActiveTab("pending")}
+        >
+          📋 รออนุมัติ
+          {pendingRecords.length > 0 && (
+            <span className="tab-badge">{pendingRecords.length}</span>
+          )}
+        </button>
+        <button
+          type="button"
+          className={activeTab === "approved" ? "receipt-tab active" : "receipt-tab"}
+          onClick={() => setActiveTab("approved")}
+        >
+          ✅ รับของวันนี้
+          {approvedRecords.length > 0 && (
+            <span className="tab-badge tab-badge-good">{approvedRecords.length}</span>
+          )}
+        </button>
+      </div>
+
+      {activeTab === "pending" && (
+        <div className="receipt-tab-content">
+          <div className="tab-toolbar">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={fetchPending}
+              disabled={loadingPending}
+            >
+              🔄 รีเฟรช
+            </button>
+          </div>
+          {loadingPending && <p className="empty-state">⏳ กำลังโหลด...</p>}
+          {pendingError && (
+            <p className="notice error compact">❌ เชื่อมต่อไม่ได้: {pendingError}</p>
+          )}
+          {!loadingPending && !pendingError && pendingRecords.length === 0 && (
+            <p className="empty-state">ไม่มีเอกสารรออนุมัติ</p>
+          )}
+          <div className="receipt-list">
+            {pendingRecords.map((rec) => (
+              <ReceiptCard key={rec.doc_no} record={rec} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "approved" && (
+        <div className="receipt-tab-content">
+          <div className="tab-toolbar">
+            <label className="date-label">
+              วันที่
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="date-input-inline"
+              />
+            </label>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => fetchApproved(selectedDate)}
+              disabled={loadingApproved}
+            >
+              🔄 รีเฟรช
+            </button>
+          </div>
+          {loadingApproved && <p className="empty-state">⏳ กำลังโหลด...</p>}
+          {approvedError && (
+            <p className="notice error compact">❌ เชื่อมต่อไม่ได้: {approvedError}</p>
+          )}
+          {!loadingApproved && !approvedError && approvedRecords.length === 0 && (
+            <p className="empty-state">ยังไม่มีเอกสารรับของสำหรับวันที่เลือก</p>
+          )}
+          <div className="receipt-list">
+            {approvedRecords.map((rec) => (
+              <ReceiptCard key={rec.doc_no} record={rec} />
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function App() {
   const pageSize = 50;
   const [stockDay, setStockDay] = useState([]);
@@ -109,6 +366,8 @@ export default function App() {
   const [authError, setAuthError] = useState("");
   const [session, setSession] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [view, setView] = useState("dashboard");
+  const branchCode = import.meta.env.VITE_BRANCH_CODE || "005";
 
   useEffect(() => {
     let active = true;
@@ -345,6 +604,22 @@ export default function App() {
               ออกจากระบบ
             </button>
           </div>
+          <nav className="view-nav">
+            <button
+              type="button"
+              className={view === "dashboard" ? "view-nav-btn active" : "view-nav-btn"}
+              onClick={() => setView("dashboard")}
+            >
+              📊 แดชบอร์ด
+            </button>
+            <button
+              type="button"
+              className={view === "receipts" ? "view-nav-btn active" : "view-nav-btn"}
+              onClick={() => setView("receipts")}
+            >
+              📦 ใบรับสินค้า
+            </button>
+          </nav>
         </div>
 
         <div className="sync-card">
@@ -377,202 +652,216 @@ export default function App() {
 
       {error && <div className="notice error">{error}</div>}
 
-      <section className="kpis">
-        <article className="kpi">
-          <span>ควรสั่งซื้อเพิ่ม</span>
-          <strong>{formatNumber(reorderCount)}</strong>
-        </article>
-        <article className="kpi">
-          <span>สต็อกปกติ</span>
-          <strong>{formatNumber(normalCount)}</strong>
-        </article>
-        <article className="kpi">
-          <span>ค้างสต็อก</span>
-          <strong>{formatNumber(overstockCount)}</strong>
-        </article>
-        <article className="kpi">
-          <span>ไม่มีข้อมูลขาย</span>
-          <strong>{formatNumber(noSalesCount)}</strong>
-        </article>
-        <article className="kpi">
-          <span>คำขอจากสาขา</span>
-          <strong>{formatNumber(submittedOrders)}</strong>
-        </article>
-        <article className="kpi">
-          <span>จำนวนที่สาขาขอรวม</span>
-          <strong>{formatNumber(totalPendingRequestedQty)}</strong>
-        </article>
-        <article className="kpi">
-          <span>สินค้าที่ถูกขอ</span>
-          <strong>{formatNumber(requestedProductsCount)}</strong>
-        </article>
-      </section>
+      {view === "receipts" ? (
+        <PurchaseReceiptsPanel branchCode={branchCode} />
+      ) : (
+        <>
+          <section className="kpis">
+            <article className="kpi">
+              <span>ควรสั่งซื้อเพิ่ม</span>
+              <strong>{formatNumber(reorderCount)}</strong>
+            </article>
+            <article className="kpi">
+              <span>สต็อกปกติ</span>
+              <strong>{formatNumber(normalCount)}</strong>
+            </article>
+            <article className="kpi">
+              <span>ค้างสต็อก</span>
+              <strong>{formatNumber(overstockCount)}</strong>
+            </article>
+            <article className="kpi">
+              <span>ไม่มีข้อมูลขาย</span>
+              <strong>{formatNumber(noSalesCount)}</strong>
+            </article>
+            <article className="kpi">
+              <span>คำขอจากสาขา</span>
+              <strong>{formatNumber(submittedOrders)}</strong>
+            </article>
+            <article className="kpi">
+              <span>จำนวนที่สาขาขอรวม</span>
+              <strong>{formatNumber(totalPendingRequestedQty)}</strong>
+            </article>
+            <article className="kpi">
+              <span>สินค้าที่ถูกขอ</span>
+              <strong>{formatNumber(requestedProductsCount)}</strong>
+            </article>
+          </section>
 
-      <section className="dashboard-grid">
-        <section className="panel spotlight">
-          <div className="panel-header stacked">
-            <div>
-              <h2>สินค้าที่ต้องดูทันที</h2>
-              <p>รายการที่มีความเสี่ยงด้าน stock day มากที่สุดในตอนนี้</p>
-            </div>
-          </div>
-
-          <div className="spotlight-list">
-            {riskItems.map((item) => (
-              <article className="spotlight-card" key={item.productCode}>
+          <section className="dashboard-grid">
+            <section className="panel spotlight">
+              <div className="panel-header stacked">
                 <div>
-                  <strong>{item.productName}</strong>
-                  <p className="meta-line">
-                    {item.productCode} · {item.supplier || "ไม่มีผู้จำหน่าย"}
-                  </p>
-                </div>
-                <div className="spotlight-metrics">
-                  <span>{formatNumber(item.projectedStockDay ?? item.stockDay, 1)} วัน</span>
-                  <span className={`status ${statusClass(item.status)}`}>
-                    {translateStatus(item.status)}
-                  </span>
-                </div>
-              </article>
-            ))}
-            {!riskItems.length && <p className="empty-state">ตอนนี้ยังไม่มีสินค้าที่ต้องเร่งจัดการ</p>}
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="panel-header stacked">
-            <div>
-              <h2>คำขอจากสาขาล่าสุด</h2>
-              <p>ดูปริมาณและเวลาในการส่งคำขอ ก่อนวางแผนโอนหรือจัดซื้อ</p>
-            </div>
-          </div>
-
-          <div className="request-list">
-            {orderRequests.map((request) => (
-              <article className="request-card" key={request.id}>
-                <div>
-                  <strong>{request.branchName}</strong>
-                  <p className="meta-line">{request.id}</p>
-                  <p className="meta-line">{formatDateTime(request.requestedAt)}</p>
-                </div>
-                <div className="request-side">
-                  <p>{request.items.length} รายการ</p>
-                  <span className={`status ${request.status === "submitted" ? "warning" : "good"}`}>
-                    {translateStatus(request.status || "submitted")}
-                  </span>
-                </div>
-              </article>
-            ))}
-            {!orderRequests.length && <p className="empty-state">ยังไม่มีคำขอสั่งสินค้าจากสาขา</p>}
-          </div>
-        </section>
-      </section>
-
-      <section className="panel">
-        <div className="panel-header">
-          <div>
-            <h2>ตาราง Stock Day</h2>
-            <p>ภาพรวมสุขภาพสต็อกของสินค้าทั้งหมดในช่วงเวลาที่กำลังดู</p>
-          </div>
-
-          <div className="toolbar">
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="ค้นหาชื่อสินค้า รหัสสินค้า หรือผู้จำหน่าย"
-            />
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="all">ทุกสถานะ</option>
-              <option value="Reorder soon">ควรสั่งซื้อเพิ่ม</option>
-              <option value="Normal">ปกติ</option>
-              <option value="Overstock / slow moving">ค้างสต็อก / เคลื่อนไหวช้า</option>
-              <option value="No sales">ยังไม่มีการขาย</option>
-            </select>
-          </div>
-        </div>
-
-        {loading ? (
-          <p className="empty-state">กำลังโหลดข้อมูลแดชบอร์ด...</p>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>สินค้า</th>
-                  <th>คงเหลือปัจจุบัน</th>
-                  <th>ขายสะสม</th>
-                  <th>เฉลี่ยต่อวัน</th>
-                  <th>Stock Day</th>
-                  <th>สาขาขอรวม</th>
-                  <th>คงเหลือหลังหักคำขอ</th>
-                  <th>Projected Day</th>
-                  <th>ซื้อเข้า</th>
-                  <th>Min</th>
-                  <th>Max</th>
-                  <th>Lead Time</th>
-                  <th>ผู้จำหน่าย</th>
-                  <th>สถานะ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagedStock.map((row) => (
-                  <tr key={row.productCode}>
-                    <td>
-                      <strong>{row.productName}</strong>
-                      <div className="meta">{row.productCode}</div>
-                    </td>
-                    <td>{formatNumber(row.currentStock)}</td>
-                    <td>{formatNumber(row.soldQtyPeriod)}</td>
-                    <td>{formatNumber(row.averageDailyUsage, 2)}</td>
-                    <td>{formatNumber(row.stockDay, 1)}</td>
-                    <td>{formatNumber(row.pendingRequestedQty)}</td>
-                    <td>{formatNumber(row.projectedStockAfterRequests)}</td>
-                    <td>{formatNumber(row.projectedStockDay, 1)}</td>
-                    <td>{formatNumber(row.purchasedQtyPeriod)}</td>
-                    <td>{formatNumber(row.minStock)}</td>
-                    <td>{formatNumber(row.maxStock)}</td>
-                    <td>{formatNumber(row.leadTimeDays, 1)}</td>
-                    <td>{row.supplier || "-"}</td>
-                    <td>
-                      <span className={`status ${statusClass(row.status)}`}>
-                        {translateStatus(row.status)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {filteredStock.length > 0 && (
-              <div className="pagination">
-                <p className="pagination-info">
-                  หน้า {formatNumber(safeCurrentPage)} / {formatNumber(totalPages)} · แสดง {formatNumber(pagedStock.length)} จาก{" "}
-                  {formatNumber(filteredStock.length)} รายการ
-                </p>
-                <div className="pagination-actions">
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                    disabled={safeCurrentPage === 1}
-                  >
-                    ก่อนหน้า
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                    disabled={safeCurrentPage === totalPages}
-                  >
-                    ถัดไป
-                  </button>
+                  <h2>สินค้าที่ต้องดูทันที</h2>
+                  <p>รายการที่มีความเสี่ยงด้าน stock day มากที่สุดในตอนนี้</p>
                 </div>
               </div>
-            )}
 
-            {!filteredStock.length && <p className="empty-state">ไม่พบสินค้าที่ตรงกับตัวกรองปัจจุบัน</p>}
-          </div>
-        )}
-      </section>
+              <div className="spotlight-list">
+                {riskItems.map((item) => (
+                  <article className="spotlight-card" key={item.productCode}>
+                    <div>
+                      <strong>{item.productName}</strong>
+                      <p className="meta-line">
+                        {item.productCode} · {item.supplier || "ไม่มีผู้จำหน่าย"}
+                      </p>
+                    </div>
+                    <div className="spotlight-metrics">
+                      <span>{formatNumber(item.projectedStockDay ?? item.stockDay, 1)} วัน</span>
+                      <span className={`status ${statusClass(item.status)}`}>
+                        {translateStatus(item.status)}
+                      </span>
+                    </div>
+                  </article>
+                ))}
+                {!riskItems.length && (
+                  <p className="empty-state">ตอนนี้ยังไม่มีสินค้าที่ต้องเร่งจัดการ</p>
+                )}
+              </div>
+            </section>
+
+            <section className="panel">
+              <div className="panel-header stacked">
+                <div>
+                  <h2>คำขอจากสาขาล่าสุด</h2>
+                  <p>ดูปริมาณและเวลาในการส่งคำขอ ก่อนวางแผนโอนหรือจัดซื้อ</p>
+                </div>
+              </div>
+
+              <div className="request-list">
+                {orderRequests.map((request) => (
+                  <article className="request-card" key={request.id}>
+                    <div>
+                      <strong>{request.branchName}</strong>
+                      <p className="meta-line">{request.id}</p>
+                      <p className="meta-line">{formatDateTime(request.requestedAt)}</p>
+                    </div>
+                    <div className="request-side">
+                      <p>{request.items.length} รายการ</p>
+                      <span
+                        className={`status ${request.status === "submitted" ? "warning" : "good"}`}
+                      >
+                        {translateStatus(request.status || "submitted")}
+                      </span>
+                    </div>
+                  </article>
+                ))}
+                {!orderRequests.length && (
+                  <p className="empty-state">ยังไม่มีคำขอสั่งสินค้าจากสาขา</p>
+                )}
+              </div>
+            </section>
+          </section>
+
+          <section className="panel">
+            <div className="panel-header">
+              <div>
+                <h2>ตาราง Stock Day</h2>
+                <p>ภาพรวมสุขภาพสต็อกของสินค้าทั้งหมดในช่วงเวลาที่กำลังดู</p>
+              </div>
+
+              <div className="toolbar">
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="ค้นหาชื่อสินค้า รหัสสินค้า หรือผู้จำหน่าย"
+                />
+                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                  <option value="all">ทุกสถานะ</option>
+                  <option value="Reorder soon">ควรสั่งซื้อเพิ่ม</option>
+                  <option value="Normal">ปกติ</option>
+                  <option value="Overstock / slow moving">ค้างสต็อก / เคลื่อนไหวช้า</option>
+                  <option value="No sales">ยังไม่มีการขาย</option>
+                </select>
+              </div>
+            </div>
+
+            {loading ? (
+              <p className="empty-state">กำลังโหลดข้อมูลแดชบอร์ด...</p>
+            ) : (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>สินค้า</th>
+                      <th>คงเหลือปัจจุบัน</th>
+                      <th>ขายสะสม</th>
+                      <th>เฉลี่ยต่อวัน</th>
+                      <th>Stock Day</th>
+                      <th>สาขาขอรวม</th>
+                      <th>คงเหลือหลังหักคำขอ</th>
+                      <th>Projected Day</th>
+                      <th>ซื้อเข้า</th>
+                      <th>Min</th>
+                      <th>Max</th>
+                      <th>Lead Time</th>
+                      <th>ผู้จำหน่าย</th>
+                      <th>สถานะ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedStock.map((row) => (
+                      <tr key={row.productCode}>
+                        <td>
+                          <strong>{row.productName}</strong>
+                          <div className="meta">{row.productCode}</div>
+                        </td>
+                        <td>{formatNumber(row.currentStock)}</td>
+                        <td>{formatNumber(row.soldQtyPeriod)}</td>
+                        <td>{formatNumber(row.averageDailyUsage, 2)}</td>
+                        <td>{formatNumber(row.stockDay, 1)}</td>
+                        <td>{formatNumber(row.pendingRequestedQty)}</td>
+                        <td>{formatNumber(row.projectedStockAfterRequests)}</td>
+                        <td>{formatNumber(row.projectedStockDay, 1)}</td>
+                        <td>{formatNumber(row.purchasedQtyPeriod)}</td>
+                        <td>{formatNumber(row.minStock)}</td>
+                        <td>{formatNumber(row.maxStock)}</td>
+                        <td>{formatNumber(row.leadTimeDays, 1)}</td>
+                        <td>{row.supplier || "-"}</td>
+                        <td>
+                          <span className={`status ${statusClass(row.status)}`}>
+                            {translateStatus(row.status)}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {filteredStock.length > 0 && (
+                  <div className="pagination">
+                    <p className="pagination-info">
+                      หน้า {formatNumber(safeCurrentPage)} / {formatNumber(totalPages)} · แสดง{" "}
+                      {formatNumber(pagedStock.length)} จาก {formatNumber(filteredStock.length)} รายการ
+                    </p>
+                    <div className="pagination-actions">
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                        disabled={safeCurrentPage === 1}
+                      >
+                        ก่อนหน้า
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                        disabled={safeCurrentPage === totalPages}
+                      >
+                        ถัดไป
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {!filteredStock.length && (
+                  <p className="empty-state">ไม่พบสินค้าที่ตรงกับตัวกรองปัจจุบัน</p>
+                )}
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 }
