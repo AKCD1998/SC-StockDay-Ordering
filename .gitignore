@@ -4,3 +4,8 @@ dist
 .env.local
 coverage
 npm-debug.log*
+.codex-*.log
+.codex-*.err.log
+output/
+SESSION_SUMMARY_*.md
+.claude/
