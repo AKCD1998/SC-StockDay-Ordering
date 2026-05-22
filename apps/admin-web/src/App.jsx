@@ -105,7 +105,7 @@ const SUPPLIER_BRANDS = [
     wordmark: "SPS",
     tagline: "SRIPRASIT",
     logoSrc: sriprasitLogoUrl,
-    patterns: ["ศรีประสิทธิ์", "SRIPRASIT", "SPS"],
+    patterns: ["ศรีประสิทธิ์", "เอสพีเอส", "SRIPRASIT", "SPS"],
   },
   {
     key: "bl-hua",
@@ -151,12 +151,13 @@ const SUPPLIER_BRANDS = [
   },
 ];
 
-// Lowercase and strip all whitespace so matching tolerates casing differences
-// and inconsistent spacing in Adasoft data (e.g. "ที เอ็น พี" vs "ทีเอ็นพี").
+// Lowercase and strip whitespace, dots, and hyphens so matching tolerates
+// casing, inconsistent spacing, and punctuation in Adasoft data
+// (e.g. "ที เอ็น พี" vs "ทีเอ็นพี", "พี.เค.เอส." vs "พีเคเอส").
 function normalizeSupplierText(value) {
   return String(value || "")
     .toLowerCase()
-    .replace(/\s+/g, "");
+    .replace(/[\s.-]+/g, "");
 }
 
 function getSupplierBrand(supplierName) {
