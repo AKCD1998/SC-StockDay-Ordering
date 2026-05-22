@@ -43,6 +43,14 @@ function getSupplierBrand(supplierName) {
   const name = String(supplierName || "").trim();
   if (!name) return null;
 
+  if (name.includes("ดีเคเอสเอช") || name.includes("DKSH")) {
+    return {
+      key: "dksh",
+      wordmark: "DKSH",
+      tagline: "Performance Materials",
+    };
+  }
+
   if (
     name.includes("หรรษา ฟาร์มาซูติคอล เซ็นเตอร์") ||
     name.includes("ZUELLIG") ||
@@ -207,8 +215,19 @@ function PurchaseReceiptsPanel({ branchCode }) {
             {supplierBrand ? (
               <div className={`supplier-brand supplier-brand-${supplierBrand.key}`}>
                 <div className="supplier-brand-mark" aria-hidden="true">
-                  <span className="supplier-brand-globe" />
-                  <span className="supplier-brand-slash" />
+                  {supplierBrand.key === "dksh" ? (
+                    <>
+                      <span className="supplier-brand-dksh-half" />
+                      <span className="supplier-brand-dksh-leaf supplier-brand-dksh-leaf-1" />
+                      <span className="supplier-brand-dksh-leaf supplier-brand-dksh-leaf-2" />
+                      <span className="supplier-brand-dksh-leaf supplier-brand-dksh-leaf-3" />
+                    </>
+                  ) : (
+                    <>
+                      <span className="supplier-brand-globe" />
+                      <span className="supplier-brand-slash" />
+                    </>
+                  )}
                 </div>
                 <div className="supplier-brand-copy">
                   <strong>{supplierBrand.wordmark}</strong>

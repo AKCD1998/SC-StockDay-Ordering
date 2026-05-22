@@ -783,6 +783,64 @@ select {
   color: #97a2b3;
 }
 
+.supplier-brand-dksh {
+  color: #b70d33;
+}
+
+.supplier-brand-dksh .supplier-brand-mark {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+.supplier-brand-dksh-half {
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  width: 38px;
+  height: 68px;
+  background: #c30a35;
+  border-radius: 38px 0 0 38px;
+}
+
+.supplier-brand-dksh-leaf {
+  position: absolute;
+  left: 22px;
+  width: 34px;
+  height: 11px;
+  border-radius: 999px 999px 999px 0;
+  border: 2px solid #c30a35;
+  border-left: 0;
+  border-bottom: 0;
+  transform-origin: left center;
+}
+
+.supplier-brand-dksh-leaf-1 {
+  top: 17px;
+  transform: rotate(-23deg);
+}
+
+.supplier-brand-dksh-leaf-2 {
+  top: 31px;
+  transform: rotate(5deg);
+}
+
+.supplier-brand-dksh-leaf-3 {
+  top: 45px;
+  transform: rotate(25deg);
+}
+
+.supplier-brand-dksh .supplier-brand-copy strong {
+  color: #c30a35;
+  font-size: 1.48rem;
+  letter-spacing: 0.06em;
+}
+
+.supplier-brand-dksh .supplier-brand-copy span {
+  color: #c97b8f;
+}
+
 .receipt-grand {
   font-size: 1.18rem;
   font-weight: 700;
