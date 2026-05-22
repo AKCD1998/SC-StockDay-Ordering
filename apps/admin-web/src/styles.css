@@ -106,7 +106,6 @@ button {
   color: #16344d;
 }
 
-.app-header,
 .panel,
 .kpi,
 .notice {
@@ -116,19 +115,8 @@ button {
   box-shadow: 0 18px 40px rgba(31, 41, 51, 0.08);
 }
 
-.app-header {
-  padding: 18px 20px 22px;
-  margin-bottom: 22px;
-}
-
-.header-intro h1,
 .panel h2 {
   margin: 0 0 8px;
-}
-
-.header-intro h1 {
-  font-size: 1.85rem;
-  line-height: 1.2;
 }
 
 .panel h2,
@@ -137,7 +125,6 @@ button {
   line-height: 1.2;
 }
 
-.header-intro p:last-child,
 .panel-header p {
   margin: 0;
   color: #526578;
@@ -158,6 +145,7 @@ button {
   align-items: center;
   gap: 22px;
   padding: 12px 18px;
+  margin-bottom: 22px;
   border-radius: 20px;
   border: 1px solid #d7dfeb;
   background: rgba(255, 255, 255, 0.98);
@@ -248,58 +236,6 @@ button {
 
 .logout-button {
   padding-inline: 16px;
-}
-
-.header-ribbon {
-  display: grid;
-  grid-template-columns: 1.3fr 1fr;
-  gap: 20px;
-  align-items: stretch;
-  margin-top: 16px;
-}
-
-.header-intro {
-  padding: 8px 4px 0;
-}
-
-.sync-strip {
-  border-radius: 20px;
-  padding: 18px 20px;
-  color: #fff;
-  background: linear-gradient(160deg, #17324c 0%, #0f2237 100%);
-}
-
-.sync-strip-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.sync-strip h2 {
-  margin: 0;
-  font-size: 1.3rem;
-}
-
-.sync-inline-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px 12px;
-  margin: 0;
-}
-
-.sync-inline-grid dt {
-  color: rgba(255, 255, 255, 0.74);
-  font-size: 0.82rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 4px;
-}
-
-.sync-inline-grid dd {
-  margin: 0;
-  font-size: 1.08rem;
 }
 
 .notice {
@@ -486,7 +422,6 @@ select {
 
 @media (max-width: 1100px) {
   .auth-shell,
-  .header-ribbon,
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
@@ -520,10 +455,6 @@ select {
   .request-side,
   .pagination-actions {
     justify-items: start;
-  }
-
-  .sync-inline-grid {
-    grid-template-columns: 1fr;
   }
 
   .topbar,

@@ -636,89 +636,49 @@ export default function App() {
 
   return (
     <div className="page">
-      <header className="app-header">
-        <div className="topbar">
-          <div className="brand-lockup">
-            <div className="brand-mark" aria-hidden="true">
-              SC
-            </div>
-            <div className="brand-copy">
-              <strong>SC Group 1989</strong>
-              <span>ศูนย์ควบคุม Stock Day</span>
-            </div>
+      <div className="topbar">
+        <div className="brand-lockup">
+          <div className="brand-mark" aria-hidden="true">
+            SC
           </div>
-
-          <nav className="view-nav" aria-label="เมนูหลัก">
-            <button
-              type="button"
-              className={view === "dashboard" ? "view-nav-btn active" : "view-nav-btn"}
-              onClick={() => setView("dashboard")}
-            >
-              หน้าหลักแดชบอร์ด
-            </button>
-            <button
-              type="button"
-              className={view === "receipts" ? "view-nav-btn active" : "view-nav-btn"}
-              onClick={() => setView("receipts")}
-            >
-              ใบรับสินค้า
-            </button>
-          </nav>
-
-          <div className="account-actions">
-            <div className="account-chip">
-              <span className="account-avatar" aria-hidden="true">
-                {String(session.user.id || "SC").slice(0, 2).toUpperCase()}
-              </span>
-              <div className="account-copy">
-                <strong>{session.user.id}</strong>
-                <span>{session.user.role}</span>
-              </div>
-            </div>
-            <button type="button" className="primary-button logout-button" onClick={handleLogout}>
-              ออกจากระบบ
-            </button>
+          <div className="brand-copy">
+            <strong>SC Group 1989</strong>
+            <span>ศูนย์ควบคุม Stock Day</span>
           </div>
         </div>
 
-        <div className="header-ribbon">
-          <div className="header-intro">
-            <p className="eyebrow">แดชบอร์ดภายใน</p>
-            <h1>มุมมองรวมสำหรับติดตามการซิงก์ข้อมูลและสต็อกสาขา</h1>
-            <p>
-              ใช้สำหรับติดตามภาพรวม Stock Day, คำขอจากสาขา และเอกสารรับสินค้าจากผู้จำหน่าย
-              ในรูปแบบที่อ่านเร็วและใช้งานจริงได้มากกว่าเดิม
-            </p>
-          </div>
+        <nav className="view-nav" aria-label="เมนูหลัก">
+          <button
+            type="button"
+            className={view === "dashboard" ? "view-nav-btn active" : "view-nav-btn"}
+            onClick={() => setView("dashboard")}
+          >
+            หน้าหลักแดชบอร์ด
+          </button>
+          <button
+            type="button"
+            className={view === "receipts" ? "view-nav-btn active" : "view-nav-btn"}
+            onClick={() => setView("receipts")}
+          >
+            ใบรับสินค้า
+          </button>
+        </nav>
 
-          <div className="sync-strip">
-            <div className="sync-strip-head">
-              <h2>สถานะซิงก์ล่าสุด</h2>
-              <span className={`status ${syncTone(latestRun?.status)}`}>
-                {translateStatus(latestRun?.status)}
-              </span>
+        <div className="account-actions">
+          <div className="account-chip">
+            <span className="account-avatar" aria-hidden="true">
+              {String(session.user.id || "SC").slice(0, 2).toUpperCase()}
+            </span>
+            <div className="account-copy">
+              <strong>{session.user.id}</strong>
+              <span>{session.user.role}</span>
             </div>
-            <dl className="sync-inline-grid">
-              <div>
-                <dt>โหมด</dt>
-                <dd>{syncStatus?.mode || "-"}</dd>
-              </div>
-              <div>
-                <dt>เริ่มเมื่อ</dt>
-                <dd>{formatDateTime(latestRun?.startedAt)}</dd>
-              </div>
-              <div>
-                <dt>เสร็จเมื่อ</dt>
-                <dd>{formatDateTime(latestRun?.finishedAt)}</dd>
-              </div>
-              <div>
-                <dt>จำนวนที่ส่ง</dt>
-                <dd>{formatNumber(latestRun?.recordsSent)}</dd>
-              </div>
-            </dl>
           </div>
+          <button type="button" className="primary-button logout-button" onClick={handleLogout}>
+            ออกจากระบบ
+          </button>
         </div>
-      </header>
+      </div>
 
       {error && <div className="notice error">{error}</div>}
 
