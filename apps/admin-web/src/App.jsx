@@ -9,6 +9,9 @@ import sriprasitLogoUrl from "./assets/sriprasit-logo.svg";
 import blHuaLogoUrl from "./assets/bl-hua-logo.svg";
 import bangkokDrugLogoUrl from "./assets/bangkok-drug-logo.svg";
 import royalDLogoUrl from "./assets/royal-d-logo.svg";
+import poseHealthCareLogoUrl from "./assets/pose-health-care-logo.svg";
+import pksMedicalCenterLogoUrl from "./assets/pks-medical-center-logo.svg";
+import mohmeeLogoUrl from "./assets/mohmee-logo.svg";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const adminViewStorageKey = "sc-stockday-admin-view";
@@ -124,6 +127,27 @@ const SUPPLIER_BRANDS = [
     tagline: "",
     logoSrc: royalDLogoUrl,
     patterns: ["รอแยล-ดี", "รอแยลดี", "ROYAL-D", "ROYAL D"],
+  },
+  {
+    key: "pose-health-care",
+    wordmark: "POSE",
+    tagline: "HEALTH CARE",
+    logoSrc: poseHealthCareLogoUrl,
+    patterns: ["โพสเฮลท์แคร์", "โพส เฮลท์แคร์", "POSE HEALTH CARE", "POSE HEALTHCARE", "POSE"],
+  },
+  {
+    key: "pks-medical-center",
+    wordmark: "PKS",
+    tagline: "MEDICAL CENTER",
+    logoSrc: pksMedicalCenterLogoUrl,
+    patterns: ["พีเคเอส", "PKS MEDICAL CENTER", "PKS MEDICAL", "PKS"],
+  },
+  {
+    key: "mohmee",
+    wordmark: "MOHMEE",
+    tagline: "หมอมี",
+    logoSrc: mohmeeLogoUrl,
+    patterns: ["หมอมี", "MOHMEE", "MOH MEE"],
   },
 ];
 
