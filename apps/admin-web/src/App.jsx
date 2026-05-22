@@ -46,65 +46,71 @@ function translateStatus(status) {
   return status || "-";
 }
 
+// Supplier-to-logo mapping. Add new suppliers here — `patterns` are matched
+// against the Adasoft supplier name (case- and whitespace-insensitive), so list
+// both Thai and English variants. First brand with any matching pattern wins.
+const SUPPLIER_BRANDS = [
+  {
+    key: "dksh",
+    wordmark: "DKSH",
+    tagline: "Performance Materials",
+    logoSrc: dkshLogoUrl,
+    patterns: ["ดีเคเอสเอช", "DKSH"],
+  },
+  {
+    key: "zuellig-pharma",
+    wordmark: "ZUELLIG",
+    tagline: "PHARMA",
+    logoSrc: zuelligPharmaLogoUrl,
+    patterns: ["ซิลลิค ฟาร์มา", "ซิลลิค", "ZUELLIG PHARMA", "ZUELLIG"],
+  },
+  {
+    key: "biopharm-chemicals",
+    wordmark: "BIOPHARM",
+    tagline: "CHEMICALS",
+    logoSrc: biopharmChemicalsLogoUrl,
+    patterns: ["ไบโอฟาร์ม เคมิคัลส์", "BIOPHARM CHEMICALS", "BIOPHARM"],
+  },
+  {
+    key: "tnp-healthcare",
+    wordmark: "TNP",
+    tagline: "HEALTHCARE",
+    logoSrc: tnpHealthcareLogoUrl,
+    patterns: ["ที เอ็น พี เฮลท์แคร์", "T N P HEALTH CARE", "TNP HEALTHCARE", "TNP"],
+  },
+  {
+    key: "hansa-pharmaceutical",
+    wordmark: "HANSA",
+    tagline: "PHARMACEUTICAL",
+    logoSrc: hansaLogoUrl,
+    patterns: ["หรรษา ฟาร์มาซูติคอล เซ็นเตอร์", "หรรษา", "HANSA"],
+  },
+];
+
+// Lowercase and strip all whitespace so matching tolerates casing differences
+// and inconsistent spacing in Adasoft data (e.g. "ที เอ็น พี" vs "ทีเอ็นพี").
+function normalizeSupplierText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\s+/g, "");
+}
+
 function getSupplierBrand(supplierName) {
-  const name = String(supplierName || "").trim();
-  if (!name) return null;
+  const normalized = normalizeSupplierText(supplierName);
+  if (!normalized) return null;
 
-  if (name.includes("ดีเคเอสเอช") || name.includes("DKSH")) {
-    return {
-      key: "dksh",
-      wordmark: "DKSH",
-      tagline: "Performance Materials",
-      logoSrc: dkshLogoUrl,
-    };
-  }
-
-  if (
-    name.includes("ซิลลิค ฟาร์มา") ||
-    name.includes("ZUELLIG PHARMA") ||
-    name.includes("ZUELLIG")
-  ) {
-    return {
-      key: "zuellig-pharma",
-      wordmark: "ZUELLIG",
-      tagline: "PHARMA",
-      logoSrc: zuelligPharmaLogoUrl,
-    };
-  }
-
-  if (
-    name.includes("ไบโอฟาร์ม เคมิคัลส์") ||
-    name.includes("BIOPHARM CHEMICALS") ||
-    name.includes("BIOPHARM")
-  ) {
-    return {
-      key: "biopharm-chemicals",
-      wordmark: "BIOPHARM",
-      tagline: "CHEMICALS",
-      logoSrc: biopharmChemicalsLogoUrl,
-    };
-  }
-
-  if (
-    name.includes("ที เอ็น พี เฮลท์แคร์") ||
-    name.includes("T N P HEALTH CARE") ||
-    name.includes("TNP HEALTHCARE")
-  ) {
-    return {
-      key: "tnp-healthcare",
-      wordmark: "TNP",
-      tagline: "HEALTHCARE",
-      logoSrc: tnpHealthcareLogoUrl,
-    };
-  }
-
-  if (name.includes("หรรษา ฟาร์มาซูติคอล เซ็นเตอร์") || name.includes("HANSA")) {
-    return {
-      key: "hansa-pharmaceutical",
-      wordmark: "HANSA",
-      tagline: "PHARMACEUTICAL",
-      logoSrc: hansaLogoUrl,
-    };
+  for (const brand of SUPPLIER_BRANDS) {
+    const matched = brand.patterns.some((pattern) =>
+      normalized.includes(normalizeSupplierText(pattern)),
+    );
+    if (matched) {
+      return {
+        key: brand.key,
+        wordmark: brand.wordmark,
+        tagline: brand.tagline,
+        logoSrc: brand.logoSrc,
+      };
+    }
   }
 
   return null;
@@ -176,7 +182,7 @@ function LoginScreen({ authError, busy, username, password, onUsernameChange, on
   );
 }
 
-function PurchaseReceiptsPanel({ branchCode }) {
+function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
   const today = new Date().toISOString().slice(0, 10);
   const [activeTab, setActiveTab] = useState("pending");
   const [pendingRecords, setPendingRecords] = useState([]);
@@ -350,13 +356,15 @@ function PurchaseReceiptsPanel({ branchCode }) {
             ) : null}
           </div>
           <div className="receipt-card-side">
-            <span className="receipt-grand">
-              {Number(record.grand || 0).toLocaleString("th-TH", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}{" "}
-              บาท
-            </span>
+            {canViewPrices && (
+              <span className="receipt-grand">
+                {Number(record.grand || 0).toLocaleString("th-TH", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{" "}
+                บาท
+              </span>
+            )}
             <span className="meta-line">{(record.lines || []).length} รายการ</span>
             <button
               type="button"
@@ -378,7 +386,7 @@ function PurchaseReceiptsPanel({ branchCode }) {
                   <th>ชื่อสินค้า</th>
                   <th>จำนวน</th>
                   <th>หน่วย</th>
-                  <th>ราคา/หน่วย</th>
+                  {canViewPrices && <th>ราคา/หน่วย</th>}
                   <th>Lot</th>
                   <th>หมดอายุ</th>
                 </tr>
@@ -399,12 +407,14 @@ function PurchaseReceiptsPanel({ branchCode }) {
                       })}
                     </td>
                     <td>{ln.unitName || ln.unitCode || "-"}</td>
-                    <td>
-                      {Number(ln.setPrice || 0).toLocaleString("th-TH", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </td>
+                    {canViewPrices && (
+                      <td>
+                        {Number(ln.setPrice || 0).toLocaleString("th-TH", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+                    )}
                     <td>{ln.lotNo || "-"}</td>
                     <td className={isExpired(ln.expiredDate) ? "expired-date" : ""}>
                       {formatDocDate(ln.expiredDate)}
@@ -892,7 +902,10 @@ export default function App() {
       {error && <div className="notice error">{error}</div>}
 
       {view === "receipts" ? (
-        <PurchaseReceiptsPanel branchCode={branchCode} />
+        <PurchaseReceiptsPanel
+          branchCode={branchCode}
+          canViewPrices={session.user.role === "admin"}
+        />
       ) : (
         <>
           <section className="kpis">
