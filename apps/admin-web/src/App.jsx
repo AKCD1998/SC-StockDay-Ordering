@@ -345,12 +345,6 @@ function PurchaseReceiptsPanel({ branchCode }) {
                     </>
                   )}
                 </div>
-                {supplierBrand.key !== "dksh" ? (
-                  <div className="supplier-brand-copy">
-                    <strong>{supplierBrand.wordmark}</strong>
-                    <span>{supplierBrand.tagline}</span>
-                  </div>
-                ) : null}
               </div>
             ) : null}
           </div>
