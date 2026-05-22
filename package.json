@@ -9,6 +9,7 @@
     "apps/adapos-sync"
   ],
   "scripts": {
+    "build": "npm run build -w apps/admin-web -- --outDir ../../dist/admin-web --emptyOutDir",
     "dev": "concurrently \"npm run dev -w server\" \"npm run dev -w apps/admin-web\" \"npm run dev -w apps/order-web\"",
     "dev:server": "npm run dev -w server",
     "dev:admin": "npm run dev -w apps/admin-web",
