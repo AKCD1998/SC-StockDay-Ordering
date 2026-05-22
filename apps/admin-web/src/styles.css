@@ -15,6 +15,10 @@
 body {
   margin: 0;
   font-size: 1rem;
+  min-height: 100vh;
+  color: inherit;
+  background: inherit;
+  transition: background 180ms ease, color 180ms ease;
 }
 
 input,
@@ -191,6 +195,20 @@ button {
   align-items: center;
   justify-content: end;
   gap: 12px;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-color: #d2dae8;
+  background: #f7f9fd;
+  color: #16344d;
+  white-space: nowrap;
+}
+
+.theme-toggle span:first-child {
+  font-size: 0.95rem;
 }
 
 .account-chip {
@@ -899,4 +917,129 @@ select {
   .receipt-card-side {
     justify-items: start;
   }
+}
+
+[data-theme="dark"] {
+  color: #e8edf6;
+  background:
+    radial-gradient(circle at top left, rgba(56, 88, 142, 0.28), transparent 24%),
+    linear-gradient(180deg, #0d1623 0%, #101927 42%, #0a111b 100%);
+}
+
+[data-theme="dark"] body {
+  color: #e8edf6;
+  background:
+    radial-gradient(circle at top left, rgba(56, 88, 142, 0.28), transparent 24%),
+    linear-gradient(180deg, #0d1623 0%, #101927 42%, #0a111b 100%);
+}
+
+[data-theme="dark"] .auth-copy,
+[data-theme="dark"] .auth-card,
+[data-theme="dark"] .topbar,
+[data-theme="dark"] .panel,
+[data-theme="dark"] .kpi,
+[data-theme="dark"] .notice,
+[data-theme="dark"] .spotlight-card,
+[data-theme="dark"] .request-card,
+[data-theme="dark"] .receipt-card {
+  border-color: #263547;
+  background: rgba(15, 24, 36, 0.92);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.32);
+}
+
+[data-theme="dark"] .auth-card-header p,
+[data-theme="dark"] .panel-header p,
+[data-theme="dark"] .meta,
+[data-theme="dark"] .meta-line,
+[data-theme="dark"] .pagination-info,
+[data-theme="dark"] .empty-state,
+[data-theme="dark"] .brand-copy span,
+[data-theme="dark"] .account-copy span,
+[data-theme="dark"] .date-label,
+[data-theme="dark"] .receipt-tab,
+[data-theme="dark"] .view-nav-btn,
+[data-theme="dark"] .kpi span,
+[data-theme="dark"] .auth-card label {
+  color: #9fb0c5;
+}
+
+[data-theme="dark"] .eyebrow {
+  color: #f7c77a;
+}
+
+[data-theme="dark"] .brand-copy strong,
+[data-theme="dark"] .panel h2,
+[data-theme="dark"] .auth-card-header h2,
+[data-theme="dark"] .receipt-grand,
+[data-theme="dark"] .receipt-doc-no,
+[data-theme="dark"] .view-nav-btn.active,
+[data-theme="dark"] .receipt-tab.active {
+  color: #f4f7fb;
+}
+
+[data-theme="dark"] .view-nav-btn.active {
+  background: rgba(115, 138, 255, 0.16);
+  border-color: rgba(115, 138, 255, 0.22);
+}
+
+[data-theme="dark"] .account-chip,
+[data-theme="dark"] .theme-toggle {
+  border-color: #2d3b4d;
+  background: linear-gradient(180deg, #162131 0%, #121c2a 100%);
+  color: #e8edf6;
+}
+
+[data-theme="dark"] .theme-toggle:hover,
+[data-theme="dark"] .ghost-button:hover {
+  background: #172231;
+}
+
+[data-theme="dark"] .ghost-button {
+  border-color: #314255;
+  color: #dbe5f3;
+}
+
+[data-theme="dark"] .receipt-refresh-button {
+  border-color: transparent;
+  background: transparent;
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] .receipt-search-input,
+[data-theme="dark"] .date-input-inline {
+  border-color: #314255;
+  background: #0d1724;
+  color: #edf3ff;
+}
+
+[data-theme="dark"] input::placeholder {
+  color: #7d90a8;
+}
+
+[data-theme="dark"] th,
+[data-theme="dark"] td,
+[data-theme="dark"] .receipt-lines-wrap,
+[data-theme="dark"] .receipt-tabs {
+  border-color: #263547;
+}
+
+[data-theme="dark"] th,
+[data-theme="dark"] .receipt-lines-table th {
+  background: #111d2b;
+  color: #b8c8db;
+}
+
+[data-theme="dark"] .receipt-lines-table td {
+  color: #e8edf6;
+}
+
+[data-theme="dark"] .row-expired {
+  background: rgba(132, 32, 41, 0.18);
+}
+
+[data-theme="dark"] .notice.error {
+  border-color: #69313d;
+  background: #321920;
+  color: #ffc7d0;
 }

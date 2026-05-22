@@ -7,6 +7,7 @@ import biopharmChemicalsLogoUrl from "./assets/biopharm-chemicals-logo.svg";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const adminViewStorageKey = "sc-stockday-admin-view";
+const adminThemeStorageKey = "sc-stockday-admin-theme";
 
 function statusClass(status) {
   if (status === "Reorder soon") return "danger";
@@ -546,6 +547,11 @@ export default function App() {
     const savedView = window.localStorage.getItem(adminViewStorageKey);
     return savedView === "receipts" ? "receipts" : "dashboard";
   });
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === "undefined") return "dark";
+    const savedTheme = window.localStorage.getItem(adminThemeStorageKey);
+    return savedTheme === "light" ? "light" : "dark";
+  });
   const branchCode = import.meta.env.VITE_BRANCH_CODE || "005";
 
   useEffect(() => {
@@ -720,6 +726,13 @@ export default function App() {
     window.localStorage.setItem(adminViewStorageKey, view);
   }, [view]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(adminThemeStorageKey, theme);
+    document.documentElement.dataset.theme = theme;
+    document.body.dataset.theme = theme;
+  }, [theme]);
+
   const riskItems = useMemo(() => {
     return [...stockDay]
       .filter((item) => item.status !== "Normal")
@@ -802,6 +815,15 @@ export default function App() {
         </nav>
 
         <div className="account-actions">
+          <button
+            type="button"
+            className="ghost-button theme-toggle"
+            onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+            aria-label={theme === "dark" ? "สลับเป็นโหมดสว่าง" : "สลับเป็นโหมดมืด"}
+          >
+            <span aria-hidden="true">{theme === "dark" ? "☀️" : "🌙"}</span>
+            <span>{theme === "dark" ? "โหมดสว่าง" : "โหมดมืด"}</span>
+          </button>
           <div className="account-chip">
             <span className="account-avatar" aria-hidden="true">
               {String(session.user.id || "SC").slice(0, 2).toUpperCase()}
