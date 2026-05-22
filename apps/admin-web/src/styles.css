@@ -952,6 +952,46 @@ select {
   background: transparent;
 }
 
+.supplier-brand-khaolaor .supplier-brand-mark {
+  width: 64px;
+  height: 64px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.supplier-brand-sriprasit .supplier-brand-mark {
+  width: 132px;
+  height: 70px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.supplier-brand-bl-hua .supplier-brand-mark {
+  width: 120px;
+  height: 60px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.supplier-brand-bangkok-drug .supplier-brand-mark {
+  width: 188px;
+  height: 66px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.supplier-brand-royal-d .supplier-brand-mark {
+  width: 188px;
+  height: 53px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
 .supplier-brand-dksh .supplier-brand-copy strong {
   color: #c30a35;
   font-size: 1.48rem;

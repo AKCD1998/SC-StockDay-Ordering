@@ -4,6 +4,11 @@ import hansaLogoUrl from "./assets/hansa-logo.svg";
 import tnpHealthcareLogoUrl from "./assets/tnp-healthcare-logo.svg";
 import zuelligPharmaLogoUrl from "./assets/zuellig-pharma-logo.svg";
 import biopharmChemicalsLogoUrl from "./assets/biopharm-chemicals-logo.svg";
+import khaolaorLogoUrl from "./assets/khaolaor-logo.svg";
+import sriprasitLogoUrl from "./assets/sriprasit-logo.svg";
+import blHuaLogoUrl from "./assets/bl-hua-logo.svg";
+import bangkokDrugLogoUrl from "./assets/bangkok-drug-logo.svg";
+import royalDLogoUrl from "./assets/royal-d-logo.svg";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const adminViewStorageKey = "sc-stockday-admin-view";
@@ -84,6 +89,41 @@ const SUPPLIER_BRANDS = [
     tagline: "PHARMACEUTICAL",
     logoSrc: hansaLogoUrl,
     patterns: ["หรรษา ฟาร์มาซูติคอล เซ็นเตอร์", "หรรษา", "HANSA"],
+  },
+  {
+    key: "khaolaor",
+    wordmark: "KLO",
+    tagline: "ขาวละออ",
+    logoSrc: khaolaorLogoUrl,
+    patterns: ["ขาวละออ", "KHAOLAOR"],
+  },
+  {
+    key: "sriprasit",
+    wordmark: "SPS",
+    tagline: "SRIPRASIT",
+    logoSrc: sriprasitLogoUrl,
+    patterns: ["ศรีประสิทธิ์", "SRIPRASIT", "SPS"],
+  },
+  {
+    key: "bl-hua",
+    wordmark: "HUA",
+    tagline: "B.L. HUA",
+    logoSrc: blHuaLogoUrl,
+    patterns: ["บี.แอล.ฮั้ว", "บีแอลฮั้ว", "ฮั้ว", "B.L. HUA", "BL HUA"],
+  },
+  {
+    key: "bangkok-drug",
+    wordmark: "BANGKOK",
+    tagline: "DRUG",
+    logoSrc: bangkokDrugLogoUrl,
+    patterns: ["บางกอก ดรัก", "บางกอกดรัก", "กรุงเทพดรัก", "BANGKOK DRUG"],
+  },
+  {
+    key: "royal-d",
+    wordmark: "Royal-D",
+    tagline: "",
+    logoSrc: royalDLogoUrl,
+    patterns: ["รอแยล-ดี", "รอแยลดี", "ROYAL-D", "ROYAL D"],
   },
 ];
 
