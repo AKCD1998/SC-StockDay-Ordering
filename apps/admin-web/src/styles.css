@@ -585,16 +585,22 @@ select {
 }
 
 .receipt-search-input {
+  width: 40%;
   min-width: 360px;
 }
 
 .receipt-refresh-button {
   white-space: nowrap;
   margin-bottom: 2px;
+  border-color: transparent;
+  background: transparent;
 }
 
 .receipt-search-button {
   white-space: nowrap;
+  border-color: #1f8f5f;
+  background: #1f8f5f;
+  color: #fff;
 }
 
 .receipt-date-label {
