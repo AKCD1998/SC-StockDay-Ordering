@@ -1,4 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import dkshLogoUrl from "./assets/dksh-logo.svg";
+import hansaLogoUrl from "./assets/hansa-logo.svg";
+import tnpHealthcareLogoUrl from "./assets/tnp-healthcare-logo.svg";
+import zuelligPharmaLogoUrl from "./assets/zuellig-pharma-logo.svg";
+import biopharmChemicalsLogoUrl from "./assets/biopharm-chemicals-logo.svg";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
@@ -48,18 +53,55 @@ function getSupplierBrand(supplierName) {
       key: "dksh",
       wordmark: "DKSH",
       tagline: "Performance Materials",
+      logoSrc: dkshLogoUrl,
     };
   }
 
   if (
-    name.includes("หรรษา ฟาร์มาซูติคอล เซ็นเตอร์") ||
-    name.includes("ZUELLIG") ||
-    name.includes("PHARMA")
+    name.includes("ซิลลิค ฟาร์มา") ||
+    name.includes("ZUELLIG PHARMA") ||
+    name.includes("ZUELLIG")
   ) {
     return {
       key: "zuellig-pharma",
-      wordmark: "ZUELLIG PHARMA",
-      tagline: "making healthcare more accessible",
+      wordmark: "ZUELLIG",
+      tagline: "PHARMA",
+      logoSrc: zuelligPharmaLogoUrl,
+    };
+  }
+
+  if (
+    name.includes("ไบโอฟาร์ม เคมิคัลส์") ||
+    name.includes("BIOPHARM CHEMICALS") ||
+    name.includes("BIOPHARM")
+  ) {
+    return {
+      key: "biopharm-chemicals",
+      wordmark: "BIOPHARM",
+      tagline: "CHEMICALS",
+      logoSrc: biopharmChemicalsLogoUrl,
+    };
+  }
+
+  if (
+    name.includes("ที เอ็น พี เฮลท์แคร์") ||
+    name.includes("T N P HEALTH CARE") ||
+    name.includes("TNP HEALTHCARE")
+  ) {
+    return {
+      key: "tnp-healthcare",
+      wordmark: "TNP",
+      tagline: "HEALTHCARE",
+      logoSrc: tnpHealthcareLogoUrl,
+    };
+  }
+
+  if (name.includes("หรรษา ฟาร์มาซูติคอล เซ็นเตอร์") || name.includes("HANSA")) {
+    return {
+      key: "hansa-pharmaceutical",
+      wordmark: "HANSA",
+      tagline: "PHARMACEUTICAL",
+      logoSrc: hansaLogoUrl,
     };
   }
 
@@ -215,7 +257,13 @@ function PurchaseReceiptsPanel({ branchCode }) {
             {supplierBrand ? (
               <div className={`supplier-brand supplier-brand-${supplierBrand.key}`}>
                 <div className="supplier-brand-mark" aria-hidden="true">
-                  {supplierBrand.key === "dksh" ? (
+                  {supplierBrand.logoSrc ? (
+                    <img
+                      className="supplier-brand-image"
+                      src={supplierBrand.logoSrc}
+                      alt=""
+                    />
+                  ) : supplierBrand.key === "dksh" ? (
                     <>
                       <span className="supplier-brand-dksh-half" />
                       <span className="supplier-brand-dksh-leaf supplier-brand-dksh-leaf-1" />
