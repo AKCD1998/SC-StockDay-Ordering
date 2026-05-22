@@ -844,6 +844,296 @@ export class PostgresRepository {
       totalQtyBase: Number(r.total_qty_base),
     }));
   }
+  async ingestPendingReceipts(payload) {
+    const headers = payload.headers || [];
+    const lines   = payload.lines   || [];
+    if (!headers.length) return { headersAccepted: 0, linesAccepted: 0 };
+
+    const branchCodes = [...new Set(headers.map((h) => h.branchCode).filter(Boolean))];
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      if (branchCodes.length) {
+        await client.query(
+          `DELETE FROM ada_pending_receipt_headers
+           WHERE branch_code = ANY($1::text[])`,
+          [branchCodes],
+        );
+      }
+
+      for (const h of headers) {
+        await client.query(
+          `INSERT INTO ada_pending_receipt_headers
+             (doc_no, branch_code, doc_type, doc_date, doc_time,
+              supplier_code, supplier_name, ref_ext, ref_ext_date,
+              warehouse_code, total, vat, grand,
+              usr_code, created_by, created_at_ada, sta_doc, synced_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,NOW())`,
+          [
+            h.docNo, h.branchCode, h.docType || null,
+            h.docDate || null, h.docTime || null,
+            h.supplierCode || null, h.supplierName || null,
+            h.refExt || null, h.refExtDate || null,
+            h.warehouseCode || null,
+            Number(h.total || 0), Number(h.vat || 0), Number(h.grand || 0),
+            h.usrCode || null, h.createdBy || null, h.createdAtAda || null,
+            h.staDoc || null,
+          ],
+        );
+      }
+
+      for (const l of lines) {
+        await client.query(
+          `INSERT INTO ada_pending_receipt_lines
+             (doc_no, seq_no, product_code, product_name, barcode,
+              unit_code, unit_name, factor, qty, qty_base, stock_factor,
+              set_price, net, vat, cost_in, lot_no, expired_date,
+              warehouse_code, synced_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW())`,
+          [
+            l.docNo, Number(l.seqNo),
+            l.productCode || null, l.productName || null, l.barcode || null,
+            l.unitCode || null, l.unitName || null,
+            Number(l.factor ?? 1), Number(l.qty || 0), Number(l.qtyBase || 0),
+            Number(l.stockFactor ?? 1), Number(l.setPrice || 0),
+            Number(l.net || 0), Number(l.vat || 0), Number(l.costIn || 0),
+            l.lotNo || null,
+            l.expiredDate ? new Date(l.expiredDate).toISOString().slice(0, 10) : null,
+            l.warehouseCode || null,
+          ],
+        );
+      }
+
+      await client.query("COMMIT");
+      return { headersAccepted: headers.length, linesAccepted: lines.length };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getPendingReceipts(branchCode = null) {
+    const params = branchCode ? [branchCode] : [null];
+    const { rows } = await this.pool.query(
+      `SELECT
+         h.doc_no, h.branch_code, h.doc_type, h.doc_date, h.doc_time,
+         h.supplier_code, h.supplier_name, h.ref_ext, h.ref_ext_date,
+         h.warehouse_code, h.total, h.vat, h.grand,
+         h.usr_code, h.created_by, h.created_at_ada, h.sta_doc, h.synced_at,
+         l.seq_no, l.product_code, l.product_name, l.barcode,
+         l.unit_code, l.unit_name, l.factor, l.qty, l.qty_base,
+         l.set_price, l.net, l.cost_in, l.lot_no, l.expired_date
+       FROM ada_pending_receipt_headers h
+       LEFT JOIN ada_pending_receipt_lines l ON l.doc_no = h.doc_no
+       WHERE ($1::text IS NULL OR h.branch_code = $1)
+       ORDER BY h.doc_date DESC, h.doc_time DESC, l.seq_no ASC`,
+      params,
+    );
+
+    const grouped = new Map();
+    for (const row of rows) {
+      if (!grouped.has(row.doc_no)) {
+        grouped.set(row.doc_no, {
+          docNo:         row.doc_no,
+          branchCode:    row.branch_code,
+          docType:       row.doc_type,
+          docDate:       row.doc_date,
+          docTime:       row.doc_time,
+          supplierCode:  row.supplier_code,
+          supplierName:  row.supplier_name,
+          refExt:        row.ref_ext,
+          refExtDate:    row.ref_ext_date,
+          warehouseCode: row.warehouse_code,
+          total:         Number(row.total  || 0),
+          vat:           Number(row.vat    || 0),
+          grand:         Number(row.grand  || 0),
+          usrCode:       row.usr_code,
+          createdBy:     row.created_by,
+          createdAtAda:  row.created_at_ada,
+          syncedAt:      row.synced_at,
+          lines:         [],
+        });
+      }
+      if (row.seq_no != null) {
+        grouped.get(row.doc_no).lines.push({
+          seqNo:        row.seq_no,
+          productCode:  row.product_code,
+          productName:  row.product_name,
+          barcode:      row.barcode,
+          unitCode:     row.unit_code,
+          unitName:     row.unit_name,
+          factor:       Number(row.factor   || 1),
+          qty:          Number(row.qty      || 0),
+          qtyBase:      Number(row.qty_base || 0),
+          setPrice:     Number(row.set_price || 0),
+          net:          Number(row.net      || 0),
+          costIn:       Number(row.cost_in  || 0),
+          lotNo:        row.lot_no,
+          expiredDate:  row.expired_date,
+        });
+      }
+    }
+    return [...grouped.values()];
+  }
+
+  async ingestApprovedReceipts(branchCode, records) {
+    if (!records.length) return { upserted: 0 };
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      for (const h of records) {
+        await client.query(
+          `INSERT INTO ada_approved_receipt_headers
+             (doc_no, branch_code, doc_type, doc_date, doc_time,
+              supplier_code, supplier_name, ref_ext, ref_ext_date,
+              warehouse_code, total, vat, grand,
+              usr_code, created_by, created_at_ada, sta_doc, sta_prc_doc, synced_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW())
+           ON CONFLICT (doc_no) DO UPDATE SET
+             branch_code    = EXCLUDED.branch_code,
+             doc_type       = EXCLUDED.doc_type,
+             doc_date       = EXCLUDED.doc_date,
+             doc_time       = EXCLUDED.doc_time,
+             supplier_code  = EXCLUDED.supplier_code,
+             supplier_name  = EXCLUDED.supplier_name,
+             ref_ext        = EXCLUDED.ref_ext,
+             ref_ext_date   = EXCLUDED.ref_ext_date,
+             warehouse_code = EXCLUDED.warehouse_code,
+             total          = EXCLUDED.total,
+             vat            = EXCLUDED.vat,
+             grand          = EXCLUDED.grand,
+             usr_code       = EXCLUDED.usr_code,
+             created_by     = EXCLUDED.created_by,
+             created_at_ada = EXCLUDED.created_at_ada,
+             sta_doc        = EXCLUDED.sta_doc,
+             sta_prc_doc    = EXCLUDED.sta_prc_doc,
+             synced_at      = NOW()`,
+          [
+            h.docNo, branchCode, h.docType || null,
+            h.docDate || null, h.docTime || null,
+            h.supplierCode || null, h.supplierName || null,
+            h.refExt || null, h.refExtDate || null,
+            h.warehouseCode || null,
+            Number(h.total || 0), Number(h.vat || 0), Number(h.grand || 0),
+            h.usrCode || null, h.createdBy || null, h.createdAtAda || null,
+            h.staDoc || null, h.staPrcDoc || null,
+          ],
+        );
+
+        // Replace lines for this doc
+        await client.query(
+          `DELETE FROM ada_approved_receipt_lines WHERE doc_no = $1`,
+          [h.docNo],
+        );
+
+        for (const l of h.lines || []) {
+          await client.query(
+            `INSERT INTO ada_approved_receipt_lines
+               (doc_no, seq_no, product_code, product_name, barcode,
+                unit_code, unit_name, factor, qty, qty_base, stock_factor,
+                set_price, net, vat, cost_in, lot_no, expired_date, warehouse_code)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+            [
+              h.docNo, Number(l.seqNo),
+              l.productCode || null, l.productName || null, l.barcode || null,
+              l.unitCode || null, l.unitName || null,
+              Number(l.factor ?? 1), Number(l.qty || 0), Number(l.qtyBase || 0),
+              Number(l.stockFactor ?? 1), Number(l.setPrice || 0),
+              Number(l.net || 0), Number(l.vat || 0), Number(l.costIn || 0),
+              l.lotNo || null,
+              l.expiredDate ? new Date(l.expiredDate).toISOString().slice(0, 10) : null,
+              l.warehouseCode || null,
+            ],
+          );
+        }
+      }
+
+      await client.query("COMMIT");
+      return { upserted: records.length };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getApprovedReceipts(branchCode, date = null) {
+    const params = [branchCode, date];
+    const { rows } = await this.pool.query(
+      `SELECT
+         h.doc_no, h.branch_code, h.doc_type, h.doc_date, h.doc_time,
+         h.supplier_code, h.supplier_name, h.ref_ext, h.ref_ext_date,
+         h.warehouse_code, h.total, h.vat, h.grand,
+         h.usr_code, h.created_by, h.created_at_ada, h.sta_doc, h.sta_prc_doc, h.synced_at,
+         l.seq_no, l.product_code, l.product_name, l.barcode,
+         l.unit_code, l.unit_name, l.factor, l.qty, l.qty_base, l.stock_factor,
+         l.set_price, l.net, l.vat AS line_vat, l.cost_in, l.lot_no, l.expired_date,
+         l.warehouse_code AS line_warehouse_code
+       FROM ada_approved_receipt_headers h
+       LEFT JOIN ada_approved_receipt_lines l ON l.doc_no = h.doc_no
+       WHERE h.branch_code = $1
+         AND ($2::text IS NULL OR CAST(h.doc_date AS DATE) = $2::date)
+       ORDER BY h.doc_date DESC, h.doc_time DESC, l.seq_no ASC`,
+      params,
+    );
+
+    const grouped = new Map();
+    for (const row of rows) {
+      if (!grouped.has(row.doc_no)) {
+        grouped.set(row.doc_no, {
+          docNo:         row.doc_no,
+          branchCode:    row.branch_code,
+          docType:       row.doc_type,
+          docDate:       row.doc_date,
+          docTime:       row.doc_time,
+          supplierCode:  row.supplier_code,
+          supplierName:  row.supplier_name,
+          refExt:        row.ref_ext,
+          refExtDate:    row.ref_ext_date,
+          warehouseCode: row.warehouse_code,
+          total:         Number(row.total  || 0),
+          vat:           Number(row.vat    || 0),
+          grand:         Number(row.grand  || 0),
+          usrCode:       row.usr_code,
+          createdBy:     row.created_by,
+          createdAtAda:  row.created_at_ada,
+          staPrcDoc:     row.sta_prc_doc,
+          syncedAt:      row.synced_at,
+          lines:         [],
+        });
+      }
+      if (row.seq_no != null) {
+        grouped.get(row.doc_no).lines.push({
+          seqNo:         row.seq_no,
+          productCode:   row.product_code,
+          productName:   row.product_name,
+          barcode:       row.barcode,
+          unitCode:      row.unit_code,
+          unitName:      row.unit_name,
+          factor:        Number(row.factor       || 1),
+          qty:           Number(row.qty          || 0),
+          qtyBase:       Number(row.qty_base     || 0),
+          stockFactor:   Number(row.stock_factor || 1),
+          setPrice:      Number(row.set_price    || 0),
+          net:           Number(row.net          || 0),
+          vat:           Number(row.line_vat     || 0),
+          costIn:        Number(row.cost_in      || 0),
+          lotNo:         row.lot_no,
+          expiredDate:   row.expired_date,
+          warehouseCode: row.line_warehouse_code,
+        });
+      }
+    }
+    return [...grouped.values()];
+  }
+
   async close() {
     await closePool();
   }

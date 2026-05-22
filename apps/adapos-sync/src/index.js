@@ -5,11 +5,16 @@ import {
   getSalesSummaryRows,
   getPurchaseSummaryRows,
   discoverTransferSchema,
+  discoverPurchaseSchema,
   getTransferHeaderRows,
   getTransferLineRows,
+  getPendingReceiptHeaderRows,
+  getPendingReceiptLineRows,
+  getTodayApprovedReceiptHeaderRows,
+  getTodayApprovedReceiptLineRows,
 } from "./queries.js";
 import { postJson } from "./client.js";
-import { toProductRecords, toSalesRecords, toTransferPayload } from "./transform.js";
+import { toProductRecords, toSalesRecords, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload } from "./transform.js";
 
 const PERIOD_DAYS = 30;
 
@@ -42,6 +47,9 @@ async function fetchDatasets(pool) {
   if (datasets.includes("schema_discovery")) {
     data.schema_discovery = await discoverTransferSchema(pool);
   }
+  if (datasets.includes("purchase_schema")) {
+    data.purchase_schema = await discoverPurchaseSchema(pool);
+  }
   if (datasets.includes("products")) {
     data.products = await getProductMasterRows(pool);
   }
@@ -56,6 +64,14 @@ async function fetchDatasets(pool) {
   }
   if (datasets.includes("transfer_lines")) {
     data.transfer_lines = await getTransferLineRows(pool, branchCode, PERIOD_DAYS);
+  }
+  if (datasets.includes("pending_receipts")) {
+    data.pending_receipt_headers = await getPendingReceiptHeaderRows(pool, branchCode);
+    data.pending_receipt_lines   = await getPendingReceiptLineRows(pool, branchCode);
+  }
+  if (datasets.includes("approved_receipts")) {
+    data.approved_receipt_headers = await getTodayApprovedReceiptHeaderRows(pool, branchCode);
+    data.approved_receipt_lines   = await getTodayApprovedReceiptLineRows(pool, branchCode);
   }
 
   return data;
@@ -93,18 +109,22 @@ async function runOnce() {
 
     const data = await fetchDatasets(pool);
 
-    // schema_discovery prints differently — show columns + sample, not a row count
-    if (data.schema_discovery) {
-      console.log("── Schema discovery results ──────────────────────────────");
-      for (const [table, info] of Object.entries(data.schema_discovery)) {
-        console.log(`\n[${table}] — ${info.columns.length} columns:`);
-        console.log(info.columns.join(", "));
-        if (info.sample) {
-          console.log("\nSample row:");
-          console.log(JSON.stringify(info.sample, null, 2));
+    // schema_discovery / purchase_schema print columns + sample, then exit
+    if (data.schema_discovery || data.purchase_schema) {
+      const discoveryKeys = ["schema_discovery", "purchase_schema"];
+      for (const key of discoveryKeys) {
+        if (!data[key]) continue;
+        console.log(`\n=== ${key} ===`);
+        for (const [table, info] of Object.entries(data[key])) {
+          console.log(`\n[${table}] — ${info.columns.length} columns:`);
+          console.log(info.columns.join(", "));
+          if (info.sample) {
+            console.log("\nSample row:");
+            console.log(JSON.stringify(info.sample, null, 2));
+          }
         }
       }
-      console.log("\n── Review column names above, then implement transfer queries. ──");
+      console.log("\n── Review column names above before implementing queries. ──");
       return;
     }
 
@@ -173,6 +193,39 @@ async function runOnce() {
         const lAccepted = result.acceptedLines   ?? result.linesAccepted   ?? 0;
         console.log(`  transfers: ${hAccepted} headers, ${lAccepted} lines accepted`);
         totalSent += hAccepted + lAccepted;
+      }
+
+      if (data.pending_receipt_headers?.length || data.pending_receipt_lines?.length) {
+        const hCount = data.pending_receipt_headers?.length ?? 0;
+        const lCount = data.pending_receipt_lines?.length   ?? 0;
+        console.log(`Posting ${hCount} pending receipt headers, ${lCount} lines...`);
+        const result = await postJson(
+          `${syncConfig.apiBaseUrl}/api/sync/ada/pending-receipts`,
+          toPendingReceiptPayload(
+            data.pending_receipt_headers ?? [],
+            data.pending_receipt_lines   ?? [],
+          ),
+        );
+        console.log(`  pending receipts: ${result.headersAccepted} headers, ${result.linesAccepted} lines accepted`);
+        totalSent += result.headersAccepted + result.linesAccepted;
+      }
+
+      if (data.approved_receipt_headers?.length || data.approved_receipt_lines?.length) {
+        const hCount = data.approved_receipt_headers?.length ?? 0;
+        const lCount = data.approved_receipt_lines?.length   ?? 0;
+        console.log(`Posting ${hCount} approved receipt headers, ${lCount} lines...`);
+        const result = await postJson(
+          `${syncConfig.apiBaseUrl}/api/sync/ada/approved-receipts`,
+          {
+            branchCode: syncConfig.branchCode,
+            records: toApprovedReceiptPayload(
+              data.approved_receipt_headers ?? [],
+              data.approved_receipt_lines   ?? [],
+            ),
+          },
+        );
+        console.log(`  approved-receipts synced: ${result.upserted ?? 0} upserted`);
+        totalSent += result.upserted ?? 0;
       }
 
       await postJson(`${syncConfig.apiBaseUrl}/api/sync/run-log`, {

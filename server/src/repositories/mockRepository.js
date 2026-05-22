@@ -209,5 +209,24 @@ export class MockRepository {
     };
   }
 
+  async ingestPendingReceipts(payload) {
+    return {
+      headersAccepted: (payload.headers || []).length,
+      linesAccepted:   (payload.lines   || []).length,
+    };
+  }
+
+  async getPendingReceipts(_branchCode) {
+    return [];
+  }
+
+  async ingestApprovedReceipts(_branchCode, _records) {
+    return { upserted: 0 };
+  }
+
+  async getApprovedReceipts(_branchCode, _date) {
+    return [];
+  }
+
   async close() {}
 }

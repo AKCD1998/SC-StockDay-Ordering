@@ -63,6 +63,99 @@ export function toTransferPayload(headerRows, lineRows) {
   };
 }
 
+// ── Pending purchase receipts ──────────────────────────────────────────────────
+export function toPendingReceiptPayload(hdRows, dtRows) {
+  return {
+    headers: hdRows.map((h) => ({
+      docNo:         h.FTXihDocNo,
+      docType:       h.FTXihDocType       || null,
+      docDate:       h.FDXihDocDate       || null,
+      docTime:       h.FTXihDocTime       || null,
+      branchCode:    h.FTBchCode,
+      supplierCode:  h.FTSplCode          || null,
+      supplierName:  h.FTXihCstName       || null,
+      refExt:        h.FTXihRefExt        || null,
+      refExtDate:    h.FDXihRefExtDate    || null,
+      warehouseCode: h.FTWahCode          || null,
+      total:         Number(h.FCXihTotal  || 0),
+      vat:           Number(h.FCXihVat    || 0),
+      grand:         Number(h.FCXihGrand  || 0),
+      usrCode:       h.FTUsrCode          || null,
+      createdBy:     h.FTWhoIns           || null,
+      createdAtAda:  h.FDDateIns          || null,
+      staDoc:        h.FTXihStaDoc        || null,
+    })),
+    lines: dtRows.map((d) => ({
+      docNo:         d.FTXihDocNo,
+      seqNo:         Number(d.FNXidSeqNo),
+      productCode:   d.FTPdtCode          || null,
+      productName:   d.FTPdtName          || null,
+      barcode:       d.FTXidBarCode       || null,
+      unitCode:      d.FTPunCode          || null,
+      unitName:      d.FTXidUnitName      || null,
+      factor:        Number(d.FCXidFactor    ?? 1),
+      qty:           Number(d.FCXidQty       || 0),
+      qtyBase:       Number(d.FCXidQtyAll    || 0),
+      stockFactor:   Number(d.FCXidStkFac    ?? 1),
+      setPrice:      Number(d.FCXidSetPrice  || 0),
+      net:           Number(d.FCXidNet       || 0),
+      vat:           Number(d.FCXidVat       || 0),
+      costIn:        Number(d.FCXidCostIn    || 0),
+      lotNo:         d.FTXidLotNo         || null,
+      expiredDate:   d.FDXidExpired       || null,
+      warehouseCode: d.FTWahCode          || null,
+    })),
+  };
+}
+
+// ── Approved purchase receipts (today) ────────────────────────────────────────
+export function toApprovedReceiptPayload(hdRows, dtRows) {
+  return hdRows.map((h) => {
+    const lines = dtRows
+      .filter((d) => d.FTXihDocNo === h.FTXihDocNo)
+      .map((d) => ({
+        seqNo:         Number(d.FNXidSeqNo    ?? 0),
+        productCode:   d.FTPdtCode            || null,
+        productName:   d.FTPdtName            || null,
+        barcode:       d.FTXidBarCode         || null,
+        unitCode:      d.FTPunCode            || null,
+        unitName:      d.FTXidUnitName        || null,
+        factor:        Number(d.FCXidFactor   ?? 1),
+        qty:           Number(d.FCXidQty      || 0),
+        qtyBase:       Number(d.FCXidQtyAll   || 0),
+        stockFactor:   Number(d.FCXidStkFac   ?? 1),
+        setPrice:      Number(d.FCXidSetPrice || 0),
+        net:           Number(d.FCXidNet      || 0),
+        vat:           Number(d.FCXidVat      || 0),
+        costIn:        Number(d.FCXidCostIn   || 0),
+        lotNo:         d.FTXidLotNo           || null,
+        expiredDate:   d.FDXidExpired         || null,
+        warehouseCode: d.FTWahCode            || null,
+      }));
+    return {
+      branchCode:    h.FTBchCode             || null,
+      docNo:         h.FTXihDocNo            || null,
+      docType:       h.FTXihDocType          || null,
+      docDate:       h.FDXihDocDate          || null,
+      docTime:       h.FTXihDocTime          || null,
+      supplierCode:  h.FTSplCode             || null,
+      supplierName:  h.FTXihCstName          || null,
+      refExt:        h.FTXihRefExt           || null,
+      refExtDate:    h.FDXihRefExtDate       || null,
+      warehouseCode: h.FTWahCode             || null,
+      total:         Number(h.FCXihTotal     || 0),
+      vat:           Number(h.FCXihVat       || 0),
+      grand:         Number(h.FCXihGrand     || 0),
+      usrCode:       h.FTUsrCode             || null,
+      createdBy:     h.FTWhoIns              || null,
+      createdAtAda:  h.FDDateIns             || null,
+      staDoc:        h.FTXihStaDoc           || null,
+      staPrcDoc:     h.FTXihStaPrcDoc        || null,
+      lines,
+    };
+  });
+}
+
 export function toSalesRecords(rows, branchCode, periodDays) {
   return rows.map((r) => ({
     productCode:   r.FTPdtCode,
