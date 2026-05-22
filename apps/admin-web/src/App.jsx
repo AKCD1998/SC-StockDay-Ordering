@@ -509,6 +509,7 @@ export default function App() {
       });
     } finally {
       setSession(null);
+      setLoading(false);
       setStockDay([]);
       setOrderRequests([]);
       setSyncStatus(null);
