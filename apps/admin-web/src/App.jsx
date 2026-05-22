@@ -39,6 +39,25 @@ function translateStatus(status) {
   return status || "-";
 }
 
+function getSupplierBrand(supplierName) {
+  const name = String(supplierName || "").trim();
+  if (!name) return null;
+
+  if (
+    name.includes("หรรษา ฟาร์มาซูติคอล เซ็นเตอร์") ||
+    name.includes("ZUELLIG") ||
+    name.includes("PHARMA")
+  ) {
+    return {
+      key: "zuellig-pharma",
+      wordmark: "ZUELLIG PHARMA",
+      tagline: "making healthcare more accessible",
+    };
+  }
+
+  return null;
+}
+
 async function apiFetch(path, options = {}) {
   return fetch(`${apiBaseUrl}${path}`, {
     credentials: "include",
@@ -170,6 +189,7 @@ function PurchaseReceiptsPanel({ branchCode }) {
   function ReceiptCard({ record }) {
     const docNo = record.docNo;
     const isOpen = !!expandedDocs[docNo];
+    const supplierBrand = getSupplierBrand(record.supplierName || record.supplierCode);
     return (
       <article className="receipt-card">
         <div className="receipt-card-header">
@@ -182,6 +202,20 @@ function PurchaseReceiptsPanel({ branchCode }) {
               {formatDocDate(record.docDate)}
               {record.docTime ? ` · ${record.docTime}` : ""}
             </span>
+          </div>
+          <div className="receipt-card-brand-slot">
+            {supplierBrand ? (
+              <div className={`supplier-brand supplier-brand-${supplierBrand.key}`}>
+                <div className="supplier-brand-mark" aria-hidden="true">
+                  <span className="supplier-brand-globe" />
+                  <span className="supplier-brand-slash" />
+                </div>
+                <div className="supplier-brand-copy">
+                  <strong>{supplierBrand.wordmark}</strong>
+                  <span>{supplierBrand.tagline}</span>
+                </div>
+              </div>
+            ) : null}
           </div>
           <div className="receipt-card-side">
             <span className="receipt-grand">
@@ -262,41 +296,43 @@ function PurchaseReceiptsPanel({ branchCode }) {
         </div>
       </div>
 
-      <div className="receipt-tabs">
+      <div className="receipt-tabs-row">
+        <div className="receipt-tabs">
+          <button
+            type="button"
+            className={activeTab === "pending" ? "receipt-tab active" : "receipt-tab"}
+            onClick={() => setActiveTab("pending")}
+          >
+            📋 รออนุมัติ
+            {pendingRecords.length > 0 && (
+              <span className="tab-badge">{pendingRecords.length}</span>
+            )}
+          </button>
+          <button
+            type="button"
+            className={activeTab === "approved" ? "receipt-tab active" : "receipt-tab"}
+            onClick={() => setActiveTab("approved")}
+          >
+            ✅ รับของวันนี้
+            {approvedRecords.length > 0 && (
+              <span className="tab-badge tab-badge-good">{approvedRecords.length}</span>
+            )}
+          </button>
+        </div>
         <button
           type="button"
-          className={activeTab === "pending" ? "receipt-tab active" : "receipt-tab"}
-          onClick={() => setActiveTab("pending")}
+          className="ghost-button receipt-refresh-button"
+          onClick={() =>
+            activeTab === "pending" ? fetchPending() : fetchApproved(selectedDate)
+          }
+          disabled={activeTab === "pending" ? loadingPending : loadingApproved}
         >
-          📋 รออนุมัติ
-          {pendingRecords.length > 0 && (
-            <span className="tab-badge">{pendingRecords.length}</span>
-          )}
-        </button>
-        <button
-          type="button"
-          className={activeTab === "approved" ? "receipt-tab active" : "receipt-tab"}
-          onClick={() => setActiveTab("approved")}
-        >
-          ✅ รับของวันนี้
-          {approvedRecords.length > 0 && (
-            <span className="tab-badge tab-badge-good">{approvedRecords.length}</span>
-          )}
+          🔄 รีเฟรช
         </button>
       </div>
 
       {activeTab === "pending" && (
         <div className="receipt-tab-content">
-          <div className="tab-toolbar">
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={fetchPending}
-              disabled={loadingPending}
-            >
-              🔄 รีเฟรช
-            </button>
-          </div>
           {loadingPending && <p className="empty-state">⏳ กำลังโหลด...</p>}
           {pendingError && (
             <p className="notice error compact">❌ เชื่อมต่อไม่ได้: {pendingError}</p>
@@ -324,14 +360,6 @@ function PurchaseReceiptsPanel({ branchCode }) {
                 className="date-input-inline"
               />
             </label>
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => fetchApproved(selectedDate)}
-              disabled={loadingApproved}
-            >
-              🔄 รีเฟรช
-            </button>
           </div>
           {loadingApproved && <p className="empty-state">⏳ กำลังโหลด...</p>}
           {approvedError && (
@@ -589,65 +617,87 @@ export default function App() {
 
   return (
     <div className="page">
-      <header className="hero">
-        <div className="hero-copy">
-          <p className="eyebrow">แดชบอร์ดภายใน</p>
-          <h1>ศูนย์ควบคุม Stock Day</h1>
-          <p>
-            มุมมองรวมสำหรับติดตามการซิงก์ข้อมูล ความต้องการจากสาขา และสินค้าที่ต้องรีบจัดการ
-            ก่อนเกิดของขาดหรือค้างสต็อก
-          </p>
-          <div className="session-strip">
-            <span className="status good">
-              {session.user.id} · {session.user.role}
-            </span>
-            <button type="button" className="ghost-button" onClick={handleLogout}>
-              ออกจากระบบ
-            </button>
+      <header className="app-header">
+        <div className="topbar">
+          <div className="brand-lockup">
+            <div className="brand-mark" aria-hidden="true">
+              SC
+            </div>
+            <div className="brand-copy">
+              <strong>SC Group 1989</strong>
+              <span>ศูนย์ควบคุม Stock Day</span>
+            </div>
           </div>
-          <nav className="view-nav">
+
+          <nav className="view-nav" aria-label="เมนูหลัก">
             <button
               type="button"
               className={view === "dashboard" ? "view-nav-btn active" : "view-nav-btn"}
               onClick={() => setView("dashboard")}
             >
-              📊 แดชบอร์ด
+              หน้าหลักแดชบอร์ด
             </button>
             <button
               type="button"
               className={view === "receipts" ? "view-nav-btn active" : "view-nav-btn"}
               onClick={() => setView("receipts")}
             >
-              📦 ใบรับสินค้า
+              ใบรับสินค้า
             </button>
           </nav>
+
+          <div className="account-actions">
+            <div className="account-chip">
+              <span className="account-avatar" aria-hidden="true">
+                {String(session.user.id || "SC").slice(0, 2).toUpperCase()}
+              </span>
+              <div className="account-copy">
+                <strong>{session.user.id}</strong>
+                <span>{session.user.role}</span>
+              </div>
+            </div>
+            <button type="button" className="primary-button logout-button" onClick={handleLogout}>
+              ออกจากระบบ
+            </button>
+          </div>
         </div>
 
-        <div className="sync-card">
-          <div className="sync-card-header">
-            <h2>สถานะซิงก์ล่าสุด</h2>
-            <span className={`status ${syncTone(latestRun?.status)}`}>
-              {translateStatus(latestRun?.status)}
-            </span>
+        <div className="header-ribbon">
+          <div className="header-intro">
+            <p className="eyebrow">แดชบอร์ดภายใน</p>
+            <h1>มุมมองรวมสำหรับติดตามการซิงก์ข้อมูลและสต็อกสาขา</h1>
+            <p>
+              ใช้สำหรับติดตามภาพรวม Stock Day, คำขอจากสาขา และเอกสารรับสินค้าจากผู้จำหน่าย
+              ในรูปแบบที่อ่านเร็วและใช้งานจริงได้มากกว่าเดิม
+            </p>
           </div>
-          <dl className="sync-grid">
-            <div>
-              <dt>โหมด</dt>
-              <dd>{syncStatus?.mode || "-"}</dd>
+
+          <div className="sync-strip">
+            <div className="sync-strip-head">
+              <h2>สถานะซิงก์ล่าสุด</h2>
+              <span className={`status ${syncTone(latestRun?.status)}`}>
+                {translateStatus(latestRun?.status)}
+              </span>
             </div>
-            <div>
-              <dt>เริ่มเมื่อ</dt>
-              <dd>{formatDateTime(latestRun?.startedAt)}</dd>
-            </div>
-            <div>
-              <dt>เสร็จเมื่อ</dt>
-              <dd>{formatDateTime(latestRun?.finishedAt)}</dd>
-            </div>
-            <div>
-              <dt>จำนวนที่ส่ง</dt>
-              <dd>{formatNumber(latestRun?.recordsSent)}</dd>
-            </div>
-          </dl>
+            <dl className="sync-inline-grid">
+              <div>
+                <dt>โหมด</dt>
+                <dd>{syncStatus?.mode || "-"}</dd>
+              </div>
+              <div>
+                <dt>เริ่มเมื่อ</dt>
+                <dd>{formatDateTime(latestRun?.startedAt)}</dd>
+              </div>
+              <div>
+                <dt>เสร็จเมื่อ</dt>
+                <dd>{formatDateTime(latestRun?.finishedAt)}</dd>
+              </div>
+              <div>
+                <dt>จำนวนที่ส่ง</dt>
+                <dd>{formatNumber(latestRun?.recordsSent)}</dd>
+              </div>
+            </dl>
+          </div>
         </div>
       </header>
 

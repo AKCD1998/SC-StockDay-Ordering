@@ -106,7 +106,7 @@ button {
   color: #16344d;
 }
 
-.hero,
+.app-header,
 .panel,
 .kpi,
 .notice {
@@ -116,22 +116,19 @@ button {
   box-shadow: 0 18px 40px rgba(31, 41, 51, 0.08);
 }
 
-.hero {
-  display: grid;
-  grid-template-columns: 2.1fr 1fr;
-  gap: 20px;
-  padding: 28px;
+.app-header {
+  padding: 18px 20px 22px;
   margin-bottom: 22px;
 }
 
-.hero h1,
+.header-intro h1,
 .panel h2 {
   margin: 0 0 8px;
 }
 
-.hero h1 {
-  font-size: 2.25rem;
-  line-height: 1.15;
+.header-intro h1 {
+  font-size: 1.85rem;
+  line-height: 1.2;
 }
 
 .panel h2,
@@ -140,18 +137,11 @@ button {
   line-height: 1.2;
 }
 
-.hero-copy p:last-child,
+.header-intro p:last-child,
 .panel-header p {
   margin: 0;
   color: #526578;
   font-size: 1.06rem;
-}
-
-.session-strip {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-top: 20px;
 }
 
 .eyebrow {
@@ -162,34 +152,144 @@ button {
   font-size: 0.76rem;
 }
 
-.sync-card {
-  background: linear-gradient(160deg, #17324c 0%, #0f2237 100%);
-  color: #fff;
+.topbar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 22px;
+  padding: 12px 18px;
   border-radius: 20px;
-  padding: 20px;
+  border: 1px solid #d7dfeb;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 14px 34px rgba(31, 41, 51, 0.08);
 }
 
-.sync-card-header {
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.brand-mark {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: #fff35b;
+  background: linear-gradient(180deg, #2a34ff 0%, #1518b5 100%);
+  box-shadow: inset 0 0 0 2px #fff35b;
+}
+
+.brand-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.brand-copy strong {
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.brand-copy span {
+  color: #66758a;
+  font-size: 0.96rem;
+}
+
+.account-actions {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  gap: 12px;
+}
+
+.account-chip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #eef1ff 0%, #f7f8ff 100%);
+  color: #1a22d8;
+}
+
+.account-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(180deg, #2a34ff 0%, #1518b5 100%);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.account-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.account-copy strong,
+.account-copy span {
+  display: block;
+}
+
+.account-copy strong {
+  font-size: 1rem;
+}
+
+.account-copy span {
+  color: #5d6880;
+  font-size: 0.84rem;
+}
+
+.logout-button {
+  padding-inline: 16px;
+}
+
+.header-ribbon {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 20px;
+  align-items: stretch;
+  margin-top: 16px;
+}
+
+.header-intro {
+  padding: 8px 4px 0;
+}
+
+.sync-strip {
+  border-radius: 20px;
+  padding: 18px 20px;
+  color: #fff;
+  background: linear-gradient(160deg, #17324c 0%, #0f2237 100%);
+}
+
+.sync-strip-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
-.sync-card h2 {
+.sync-strip h2 {
   margin: 0;
-  font-size: 1.55rem;
+  font-size: 1.3rem;
 }
 
-.sync-grid {
+.sync-inline-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px 12px;
   margin: 0;
 }
 
-.sync-grid dt {
+.sync-inline-grid dt {
   color: rgba(255, 255, 255, 0.74);
   font-size: 0.82rem;
   text-transform: uppercase;
@@ -197,7 +297,7 @@ button {
   margin-bottom: 4px;
 }
 
-.sync-grid dd {
+.sync-inline-grid dd {
   margin: 0;
   font-size: 1.08rem;
 }
@@ -386,11 +486,20 @@ select {
 
 @media (max-width: 1100px) {
   .auth-shell,
-  .hero,
+  .header-ribbon,
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
 
+  .topbar {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .account-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 
 @media (max-width: 760px) {
@@ -413,36 +522,52 @@ select {
     justify-items: start;
   }
 
-  .sync-grid {
+  .sync-inline-grid {
     grid-template-columns: 1fr;
   }
 
-  .session-strip {
-    flex-direction: column;
-    align-items: start;
+  .topbar,
+  .account-actions,
+  .view-nav,
+  .receipt-tabs-row {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .brand-lockup,
+  .account-chip {
+    width: 100%;
+  }
+
+  .logout-button,
+  .view-nav-btn,
+  .receipt-refresh-button {
+    width: 100%;
   }
 }
 
 /* ── View navigation ───────────────────────── */
 .view-nav {
   display: flex;
-  gap: 8px;
-  margin-top: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .view-nav-btn {
   border-radius: 999px;
-  padding: 10px 18px;
-  border: 1px solid #c8d3e2;
+  padding: 10px 16px;
+  border: 1px solid transparent;
   background: transparent;
-  color: #16344d;
+  color: #4f5d73;
   font-size: 1rem;
+  font-weight: 700;
 }
 
 .view-nav-btn.active {
-  background: #16344d;
-  color: #fff;
-  border-color: #16344d;
+  background: rgba(38, 52, 255, 0.1);
+  color: #2433d7;
+  border-color: rgba(38, 52, 255, 0.16);
 }
 
 /* ── Purchase Receipts Panel ────────────────── */
@@ -450,12 +575,20 @@ select {
   margin-top: 22px;
 }
 
+.receipt-tabs-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
 .receipt-tabs {
   display: flex;
   gap: 4px;
-  margin-bottom: 20px;
   border-bottom: 2px solid #e4e9f2;
   padding-bottom: 0;
+  flex: 1;
 }
 
 .receipt-tab {
@@ -501,6 +634,11 @@ select {
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.receipt-refresh-button {
+  white-space: nowrap;
+  margin-bottom: 2px;
 }
 
 .date-label {
