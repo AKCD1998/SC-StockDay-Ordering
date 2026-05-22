@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dkshLogoUrl from "./assets/dksh.svg";
 import hansaLogoUrl from "./assets/hansa-logo.svg";
 import tnpHealthcareLogoUrl from "./assets/tnp-healthcare-logo.svg";
@@ -547,11 +547,13 @@ export default function App() {
     const savedView = window.localStorage.getItem(adminViewStorageKey);
     return savedView === "receipts" ? "receipts" : "dashboard";
   });
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "dark";
     const savedTheme = window.localStorage.getItem(adminThemeStorageKey);
     return savedTheme === "light" ? "light" : "dark";
   });
+  const accountMenuRef = useRef(null);
   const branchCode = import.meta.env.VITE_BRANCH_CODE || "005";
 
   useEffect(() => {
@@ -693,6 +695,7 @@ export default function App() {
         },
       });
     } finally {
+      setAccountMenuOpen(false);
       setSession(null);
       setLoading(false);
       setStockDay([]);
@@ -732,6 +735,30 @@ export default function App() {
     document.documentElement.dataset.theme = theme;
     document.body.dataset.theme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    if (!accountMenuOpen || typeof window === "undefined") return undefined;
+
+    function handlePointerDown(event) {
+      if (!accountMenuRef.current?.contains(event.target)) {
+        setAccountMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setAccountMenuOpen(false);
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [accountMenuOpen]);
 
   const riskItems = useMemo(() => {
     return [...stockDay]
@@ -826,18 +853,39 @@ export default function App() {
             <span aria-hidden="true">{theme === "dark" ? "☀️" : "🌙"}</span>
             <span>{theme === "dark" ? "โหมดสว่าง" : "โหมดมืด"}</span>
           </button>
-          <div className="account-chip">
-            <span className="account-avatar" aria-hidden="true">
-              {String(session.user.id || "SC").slice(0, 2).toUpperCase()}
-            </span>
-            <div className="account-copy">
-              <strong>{session.user.id}</strong>
-              <span>{session.user.role}</span>
-            </div>
+          <div className="account-menu" ref={accountMenuRef}>
+            <button
+              type="button"
+              className={accountMenuOpen ? "account-chip account-chip-open" : "account-chip"}
+              onClick={() => setAccountMenuOpen((current) => !current)}
+              aria-haspopup="menu"
+              aria-expanded={accountMenuOpen}
+              aria-label="เปิดเมนูบัญชีผู้ใช้"
+            >
+              <span className="account-avatar" aria-hidden="true">
+                {String(session.user.id || "SC").slice(0, 2).toUpperCase()}
+              </span>
+              <span className="account-copy">
+                <strong>{session.user.id}</strong>
+                <span>{session.user.role}</span>
+              </span>
+              <span className="account-chevron" aria-hidden="true">
+                ▾
+              </span>
+            </button>
+            {accountMenuOpen ? (
+              <div className="account-menu-panel" role="menu" aria-label="เมนูบัญชีผู้ใช้">
+                <button
+                  type="button"
+                  className="primary-button logout-button"
+                  onClick={handleLogout}
+                  role="menuitem"
+                >
+                  ออกจากระบบ
+                </button>
+              </div>
+            ) : null}
           </div>
-          <button type="button" className="primary-button logout-button" onClick={handleLogout}>
-            ออกจากระบบ
-          </button>
         </div>
       </div>
 

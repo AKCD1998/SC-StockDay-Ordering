@@ -211,14 +211,36 @@ button {
   font-size: 0.95rem;
 }
 
+.account-menu {
+  position: relative;
+}
+
 .account-chip {
+  min-width: 220px;
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
+  border: 1px solid #d7def2;
   border-radius: 16px;
   background: linear-gradient(180deg, #eef1ff 0%, #f7f8ff 100%);
   color: #1a22d8;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.account-chip:hover,
+.account-chip:focus-visible,
+.account-chip-open {
+  border-color: #b9c7ff;
+  box-shadow: 0 14px 28px rgba(37, 61, 166, 0.12);
+}
+
+.account-chip:focus-visible {
+  outline: 2px solid rgba(42, 52, 255, 0.18);
+  outline-offset: 2px;
 }
 
 .account-avatar {
@@ -236,6 +258,8 @@ button {
 .account-copy {
   display: grid;
   gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .account-copy strong,
@@ -252,7 +276,32 @@ button {
   font-size: 0.84rem;
 }
 
+.account-chevron {
+  font-size: 0.95rem;
+  color: #5f6cf2;
+  transition: transform 0.2s ease;
+}
+
+.account-chip-open .account-chevron {
+  transform: rotate(180deg);
+}
+
+.account-menu-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 220px;
+  padding: 10px;
+  border: 1px solid #d7def2;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 20px 40px rgba(20, 33, 61, 0.16);
+  backdrop-filter: blur(16px);
+  z-index: 20;
+}
+
 .logout-button {
+  width: 100%;
   padding-inline: 16px;
 }
 
@@ -490,6 +539,7 @@ select {
   }
 
   .brand-lockup,
+  .account-menu,
   .account-chip {
     width: 100%;
   }
@@ -568,9 +618,9 @@ select {
 
 .receipt-tabs {
   display: flex;
-  gap: 4px;
+  gap: 10px;
   border-bottom: 2px solid #e4e9f2;
-  padding-bottom: 0;
+  padding-bottom: 8px;
   flex: 1;
 }
 
@@ -583,22 +633,52 @@ select {
 }
 
 .receipt-tab {
-  padding: 10px 18px;
-  border: none;
-  background: transparent;
-  color: #526578;
+  padding: 12px 20px;
+  border: 1px solid rgba(73, 101, 140, 0.16);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fbfcff 0%, #f1f5fb 100%);
+  color: #4f6276;
   font-size: 1.08rem;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
   display: flex;
   align-items: center;
   gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 10px 22px rgba(31, 49, 82, 0.08);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease,
+    background 0.22s ease,
+    color 0.22s ease;
+}
+
+.receipt-tab:hover,
+.receipt-tab:focus-visible {
+  color: #16344d;
+  border-color: rgba(61, 101, 255, 0.34);
+  background: linear-gradient(180deg, #ffffff 0%, #eef4ff 100%);
+  box-shadow:
+    0 0 0 4px rgba(80, 116, 255, 0.14),
+    0 18px 34px rgba(44, 72, 140, 0.18);
+  transform: translateY(-1px);
+}
+
+.receipt-tab:focus-visible {
+  outline: none;
 }
 
 .receipt-tab.active {
   color: #16344d;
-  border-bottom-color: #16344d;
+  border-color: rgba(29, 66, 205, 0.4);
+  background:
+    radial-gradient(circle at top, rgba(124, 157, 255, 0.55), transparent 62%),
+    linear-gradient(180deg, #ffffff 0%, #e7efff 100%);
   font-weight: 700;
+  box-shadow:
+    0 0 0 5px rgba(74, 111, 255, 0.18),
+    0 0 28px rgba(74, 111, 255, 0.42),
+    0 22px 40px rgba(46, 74, 156, 0.24);
+  transform: translateY(-2px);
 }
 
 .tab-badge {
@@ -1016,6 +1096,35 @@ select {
   border-color: rgba(115, 138, 255, 0.22);
 }
 
+[data-theme="dark"] .receipt-tab {
+  border-color: rgba(97, 120, 156, 0.28);
+  background: linear-gradient(180deg, #182332 0%, #111c2a 100%);
+  color: #b5c3d8;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+}
+
+[data-theme="dark"] .receipt-tab:hover,
+[data-theme="dark"] .receipt-tab:focus-visible {
+  color: #f4f7fb;
+  border-color: rgba(124, 157, 255, 0.44);
+  background: linear-gradient(180deg, #1a2940 0%, #132338 100%);
+  box-shadow:
+    0 0 0 4px rgba(92, 124, 255, 0.2),
+    0 18px 36px rgba(0, 0, 0, 0.34),
+    0 0 24px rgba(91, 123, 255, 0.16);
+}
+
+[data-theme="dark"] .receipt-tab.active {
+  border-color: rgba(137, 164, 255, 0.52);
+  background:
+    radial-gradient(circle at top, rgba(118, 146, 255, 0.46), transparent 58%),
+    linear-gradient(180deg, #1d2b46 0%, #15233a 100%);
+  box-shadow:
+    0 0 0 5px rgba(92, 124, 255, 0.22),
+    0 0 32px rgba(92, 124, 255, 0.42),
+    0 22px 42px rgba(0, 0, 0, 0.36);
+}
+
 [data-theme="dark"] .view-nav-badge {
   background: #503819;
   color: #ffd68f;
@@ -1026,6 +1135,24 @@ select {
   border-color: #2d3b4d;
   background: linear-gradient(180deg, #162131 0%, #121c2a 100%);
   color: #e8edf6;
+}
+
+[data-theme="dark"] .account-chip:hover,
+[data-theme="dark"] .account-chip:focus-visible,
+[data-theme="dark"] .account-chip-open {
+  border-color: #4b5f81;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
+}
+
+[data-theme="dark"] .account-copy span,
+[data-theme="dark"] .account-chevron {
+  color: #aebee0;
+}
+
+[data-theme="dark"] .account-menu-panel {
+  border-color: #2d3b4d;
+  background: rgba(15, 24, 37, 0.96);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.34);
 }
 
 [data-theme="dark"] .theme-toggle:hover,
