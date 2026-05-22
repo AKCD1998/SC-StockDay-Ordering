@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import dkshLogoUrl from "./assets/dksh-logo.png";
+import dkshLogoUrl from "./assets/dksh.svg";
 import hansaLogoUrl from "./assets/hansa-logo.svg";
 import tnpHealthcareLogoUrl from "./assets/tnp-healthcare-logo.svg";
 import zuelligPharmaLogoUrl from "./assets/zuellig-pharma-logo.svg";
