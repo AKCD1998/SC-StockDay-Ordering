@@ -118,6 +118,17 @@ async function apiFetch(path, options = {}) {
   });
 }
 
+function toDateKey(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value).slice(0, 10);
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function LoginScreen({ authError, busy, username, password, onUsernameChange, onPasswordChange, onSubmit }) {
   return (
     <div className="page auth-page">
@@ -169,6 +180,8 @@ function PurchaseReceiptsPanel({ branchCode }) {
   const [pendingRecords, setPendingRecords] = useState([]);
   const [approvedRecords, setApprovedRecords] = useState([]);
   const [selectedDate, setSelectedDate] = useState(today);
+  const [pendingDateFilter, setPendingDateFilter] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [loadingPending, setLoadingPending] = useState(false);
   const [loadingApproved, setLoadingApproved] = useState(false);
   const [pendingError, setPendingError] = useState("");
@@ -234,6 +247,60 @@ function PurchaseReceiptsPanel({ branchCode }) {
   function isExpired(expiredDate) {
     if (!expiredDate) return false;
     return new Date(expiredDate) < new Date();
+  }
+
+  function receiptMatchesSearch(record, term) {
+    const normalized = term.trim().toLowerCase();
+    if (!normalized) return true;
+
+    const lineText = (record.lines || [])
+      .flatMap((line) => [
+        line.productCode,
+        line.productName,
+        line.barcode,
+        line.lotNo,
+        line.unitName,
+      ])
+      .filter(Boolean)
+      .join(" ");
+
+    const haystack = [
+      record.docNo,
+      record.supplierName,
+      record.supplierCode,
+      record.refExt,
+      record.createdBy,
+      record.docTime,
+      formatDocDate(record.docDate),
+      lineText,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(normalized);
+  }
+
+  const filteredPendingRecords = useMemo(() => {
+    return pendingRecords.filter((record) => {
+      const matchesSearch = receiptMatchesSearch(record, searchTerm);
+      const matchesDate =
+        !pendingDateFilter || toDateKey(record.docDate) === pendingDateFilter;
+      return matchesSearch && matchesDate;
+    });
+  }, [pendingDateFilter, pendingRecords, searchTerm]);
+
+  const filteredApprovedRecords = useMemo(() => {
+    return approvedRecords.filter((record) => receiptMatchesSearch(record, searchTerm));
+  }, [approvedRecords, searchTerm]);
+
+  function handleSearchSubmit(event) {
+    event.preventDefault();
+    if (activeTab === "approved") {
+      fetchApproved(selectedDate);
+      return;
+    }
+    fetchPending();
   }
 
   function ReceiptCard({ record }) {
@@ -386,16 +453,43 @@ function PurchaseReceiptsPanel({ branchCode }) {
             )}
           </button>
         </div>
-        <button
-          type="button"
-          className="ghost-button receipt-refresh-button"
-          onClick={() =>
-            activeTab === "pending" ? fetchPending() : fetchApproved(selectedDate)
-          }
-          disabled={activeTab === "pending" ? loadingPending : loadingApproved}
-        >
-          🔄 รีเฟรช
-        </button>
+        <form className="receipt-filter-bar" onSubmit={handleSearchSubmit}>
+          <input
+            type="search"
+            className="receipt-search-input"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="ค้นหา SKU, ชื่อสินค้า, ผู้จำหน่าย, เลขที่เอกสาร"
+          />
+          <label className="date-label receipt-date-label">
+            วันที่
+            <input
+              type="date"
+              value={activeTab === "pending" ? pendingDateFilter : selectedDate}
+              onChange={(event) => {
+                if (activeTab === "pending") {
+                  setPendingDateFilter(event.target.value);
+                  return;
+                }
+                setSelectedDate(event.target.value);
+              }}
+              className="date-input-inline"
+            />
+          </label>
+          <button type="submit" className="ghost-button receipt-search-button">
+            ค้นหา
+          </button>
+          <button
+            type="button"
+            className="ghost-button receipt-refresh-button"
+            onClick={() =>
+              activeTab === "pending" ? fetchPending() : fetchApproved(selectedDate)
+            }
+            disabled={activeTab === "pending" ? loadingPending : loadingApproved}
+          >
+            🔄 รีเฟรช
+          </button>
+        </form>
       </div>
 
       {activeTab === "pending" && (
@@ -404,12 +498,12 @@ function PurchaseReceiptsPanel({ branchCode }) {
           {pendingError && (
             <p className="notice error compact">❌ เชื่อมต่อไม่ได้: {pendingError}</p>
           )}
-          {!loadingPending && !pendingError && pendingRecords.length === 0 && (
+          {!loadingPending && !pendingError && filteredPendingRecords.length === 0 && (
             <p className="empty-state">ไม่มีเอกสารรออนุมัติ</p>
           )}
           <div className="receipt-list">
-            {pendingRecords.map((rec) => (
-              <ReceiptCard key={rec.doc_no} record={rec} />
+            {filteredPendingRecords.map((rec) => (
+              <ReceiptCard key={rec.docNo || rec.doc_no} record={rec} />
             ))}
           </div>
         </div>
@@ -417,27 +511,16 @@ function PurchaseReceiptsPanel({ branchCode }) {
 
       {activeTab === "approved" && (
         <div className="receipt-tab-content">
-          <div className="tab-toolbar">
-            <label className="date-label">
-              วันที่
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="date-input-inline"
-              />
-            </label>
-          </div>
           {loadingApproved && <p className="empty-state">⏳ กำลังโหลด...</p>}
           {approvedError && (
             <p className="notice error compact">❌ เชื่อมต่อไม่ได้: {approvedError}</p>
           )}
-          {!loadingApproved && !approvedError && approvedRecords.length === 0 && (
+          {!loadingApproved && !approvedError && filteredApprovedRecords.length === 0 && (
             <p className="empty-state">ยังไม่มีเอกสารรับของสำหรับวันที่เลือก</p>
           )}
           <div className="receipt-list">
-            {approvedRecords.map((rec) => (
-              <ReceiptCard key={rec.doc_no} record={rec} />
+            {filteredApprovedRecords.map((rec) => (
+              <ReceiptCard key={rec.docNo || rec.doc_no} record={rec} />
             ))}
           </div>
         </div>
