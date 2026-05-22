@@ -6,6 +6,7 @@ import zuelligPharmaLogoUrl from "./assets/zuellig-pharma-logo.svg";
 import biopharmChemicalsLogoUrl from "./assets/biopharm-chemicals-logo.svg";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
+const adminViewStorageKey = "sc-stockday-admin-view";
 
 function statusClass(status) {
   if (status === "Reorder soon") return "danger";
@@ -344,10 +345,12 @@ function PurchaseReceiptsPanel({ branchCode }) {
                     </>
                   )}
                 </div>
-                <div className="supplier-brand-copy">
-                  <strong>{supplierBrand.wordmark}</strong>
-                  <span>{supplierBrand.tagline}</span>
-                </div>
+                {supplierBrand.key !== "dksh" ? (
+                  <div className="supplier-brand-copy">
+                    <strong>{supplierBrand.wordmark}</strong>
+                    <span>{supplierBrand.tagline}</span>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -544,7 +547,11 @@ export default function App() {
   const [authError, setAuthError] = useState("");
   const [session, setSession] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [view, setView] = useState("dashboard");
+  const [view, setView] = useState(() => {
+    if (typeof window === "undefined") return "dashboard";
+    const savedView = window.localStorage.getItem(adminViewStorageKey);
+    return savedView === "receipts" ? "receipts" : "dashboard";
+  });
   const branchCode = import.meta.env.VITE_BRANCH_CODE || "005";
 
   useEffect(() => {
@@ -713,6 +720,11 @@ export default function App() {
   useEffect(() => {
     setCurrentPage(1);
   }, [query, statusFilter, stockDay.length]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(adminViewStorageKey, view);
+  }, [view]);
 
   const riskItems = useMemo(() => {
     return [...stockDay]
