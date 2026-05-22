@@ -667,7 +667,8 @@ select {
 }
 
 .receipt-doc-no {
-  font-size: 1.12rem;
+  font-size: 2.08rem;
+  line-height: 1;
   color: #16344d;
 }
 
@@ -975,6 +976,10 @@ select {
 [data-theme="dark"] .view-nav-btn.active,
 [data-theme="dark"] .receipt-tab.active {
   color: #f4f7fb;
+}
+
+[data-theme="dark"] .receipt-supplier {
+  color: #d7e7ff;
 }
 
 [data-theme="dark"] .view-nav-btn.active {
