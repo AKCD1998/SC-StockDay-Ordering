@@ -520,7 +520,7 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
             className={activeTab === "approved" ? "receipt-tab active" : "receipt-tab"}
             onClick={() => setActiveTab("approved")}
           >
-            ✅ รับของวันนี้
+            ✅ CEO กดอนุมัติแล้ว
             {approvedRecords.length > 0 && (
               <span className="tab-badge tab-badge-good">{approvedRecords.length}</span>
             )}
