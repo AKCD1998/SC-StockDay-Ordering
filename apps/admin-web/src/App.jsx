@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import dkshLogoUrl from "./assets/dksh.svg";
-import hansaLogoUrl from "./assets/hansa-logo.svg";
+import hansaLogoUrl from "./assets/hansa-logo.png";
 import tnpHealthcareLogoUrl from "./assets/tnp-healthcare-logo.svg";
 import zuelligPharmaLogoUrl from "./assets/zuellig-pharma-logo.svg";
 import biopharmChemicalsLogoUrl from "./assets/biopharm-chemicals-logo.gif";
-import khaolaorLogoUrl from "./assets/khaolaor-logo.svg";
+import khaolaorLogoUrl from "./assets/khaolaor-logo.webp";
 import sriprasitLogoUrl from "./assets/sriprasit-logo.svg";
 import blHuaLogoUrl from "./assets/bl-hua-logo.svg";
 import bangkokDrugLogoUrl from "./assets/bangkok-drug-logo.svg";
-import royalDLogoUrl from "./assets/royal-d-logo.svg";
+import royalDLogoUrl from "./assets/royal-d-logo.png";
 import poseHealthCareLogoUrl from "./assets/pose-health-care-logo.svg";
 import pksMedicalCenterLogoUrl from "./assets/pks-medical-center-logo.svg";
 import mohmeeLogoUrl from "./assets/mohmee-logo.svg";
