@@ -5,7 +5,7 @@ import tnpHealthcareLogoUrl from "./assets/tnp-healthcare-logo.svg";
 import zuelligPharmaLogoUrl from "./assets/zuellig-pharma-logo.svg";
 import biopharmChemicalsLogoUrl from "./assets/biopharm-chemicals-logo.gif";
 import khaolaorLogoUrl from "./assets/khaolaor-logo.webp";
-import sriprasitLogoUrl from "./assets/sriprasit-logo.svg";
+import sriprasitLogoUrl from "./assets/sriprasit-logo.png";
 import blHuaLogoUrl from "./assets/bl-hua-logo.svg";
 import bangkokDrugLogoUrl from "./assets/bangkok-drug-logo.svg";
 import royalDLogoUrl from "./assets/royal-d-logo.png";
