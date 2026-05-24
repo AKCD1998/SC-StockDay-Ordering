@@ -1290,6 +1290,17 @@ select {
   background: transparent;
 }
 
+[data-theme="dark"] .supplier-brand-dksh .supplier-brand-mark,
+[data-theme="dark"] .supplier-brand-bangkok-drug .supplier-brand-mark,
+[data-theme="dark"] .supplier-brand-zuellig-pharma .supplier-brand-mark {
+  padding: 6px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow:
+    0 10px 20px rgba(0, 0, 0, 0.22),
+    inset 0 0 0 1px rgba(15, 24, 36, 0.08);
+}
+
 [data-theme="dark"] input,
 [data-theme="dark"] select,
 [data-theme="dark"] .receipt-search-input,
