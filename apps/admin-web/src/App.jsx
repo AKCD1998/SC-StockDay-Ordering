@@ -3,7 +3,7 @@ import dkshLogoUrl from "./assets/dksh.svg";
 import hansaLogoUrl from "./assets/hansa-logo.svg";
 import tnpHealthcareLogoUrl from "./assets/tnp-healthcare-logo.svg";
 import zuelligPharmaLogoUrl from "./assets/zuellig-pharma-logo.svg";
-import biopharmChemicalsLogoUrl from "./assets/biopharm-chemicals-logo.svg";
+import biopharmChemicalsLogoUrl from "./assets/biopharm-chemicals-logo.gif";
 import khaolaorLogoUrl from "./assets/khaolaor-logo.svg";
 import sriprasitLogoUrl from "./assets/sriprasit-logo.svg";
 import blHuaLogoUrl from "./assets/bl-hua-logo.svg";
