@@ -227,7 +227,14 @@ export function createRouter(repository) {
     res.json(await repository.ingestBranchStock(req.body));
   }));
 
+  // /api/admin/branch-stock requires Render Basic Auth credentials (browser handles this automatically).
+  // /api/branch-stock is the public alias used by the frontend SPA.
   router.get("/api/admin/branch-stock", asyncHandler(async (req, res) => {
+    const { productCode } = req.query;
+    res.json(await repository.getBranchStock(productCode || null));
+  }));
+
+  router.get("/api/branch-stock", asyncHandler(async (req, res) => {
     const { productCode } = req.query;
     res.json(await repository.getBranchStock(productCode || null));
   }));
