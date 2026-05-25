@@ -12,5 +12,6 @@ export const config = {
     String(process.env.DATABASE_SSL || "").toLowerCase() === "true" ||
     /render\.com/i.test(process.env.DATABASE_URL || ""),
   defaultPeriodDays: Number(process.env.DEFAULT_PERIOD_DAYS || 30),
+  branchStockSyncToken: process.env.BRANCH_STOCK_SYNC_TOKEN || "",
   isMockMode: dataMode === "mock",
 };

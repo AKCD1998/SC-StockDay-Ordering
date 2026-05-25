@@ -696,6 +696,187 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
   );
 }
 
+function BranchStockPanel() {
+  const pageSize = 25;
+  const [records, setRecords] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [pagination, setPagination] = useState({
+    limit: pageSize,
+    offset: 0,
+    total: 0,
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadBranchStock() {
+      setLoading(true);
+      setError("");
+      try {
+        const params = new URLSearchParams({
+          limit: String(pageSize),
+          offset: String(offset),
+        });
+        if (appliedSearchTerm) {
+          params.set("search", appliedSearchTerm);
+        }
+        const response = await apiFetch(`/api/branch-stock?${params.toString()}`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        if (!active) return;
+        setRecords(data.records || []);
+        setPagination(
+          data.pagination || {
+            limit: pageSize,
+            offset,
+            total: data.records?.length || 0,
+          },
+        );
+      } catch (loadError) {
+        if (!active) return;
+        setError(loadError.message || "โหลดข้อมูลสต็อกสาขาไม่สำเร็จ");
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadBranchStock();
+    return () => {
+      active = false;
+    };
+  }, [appliedSearchTerm, offset, refreshKey]);
+
+  function handleSearchSubmit(event) {
+    event.preventDefault();
+    const nextSearch = searchTerm.trim();
+    setAppliedSearchTerm(nextSearch);
+    setOffset(0);
+    if (nextSearch === appliedSearchTerm) {
+      setRefreshKey((value) => value + 1);
+    }
+  }
+
+  const total = pagination.total || 0;
+  const currentPage = Math.floor((pagination.offset || 0) / pageSize) + 1;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const start = total === 0 ? 0 : (pagination.offset || 0) + 1;
+  const end = total === 0 ? 0 : (pagination.offset || 0) + records.length;
+
+  return (
+    <section className="panel branch-stock-panel">
+      <div className="panel-header stacked">
+        <div>
+          <h2>สต็อกแยกตามสาขา</h2>
+          <p>ข้อมูล snapshot ล่าสุดที่ Mother PC ส่งเข้า Render สำหรับการติดตามยอดแต่ละสาขา</p>
+        </div>
+
+        <form className="toolbar branch-stock-toolbar" onSubmit={handleSearchSubmit}>
+          <input
+            type="search"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="ค้นหารหัสสินค้า ชื่อไทย ชื่ออังกฤษ หรือ Barcode"
+          />
+          <button type="submit" className="ghost-button">
+            ค้นหา
+          </button>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => setRefreshKey((value) => value + 1)}
+            disabled={loading}
+          >
+            รีเฟรช
+          </button>
+        </form>
+      </div>
+
+      {error && <p className="notice error compact">เชื่อมต่อไม่ได้: {error}</p>}
+      {loading && <p className="empty-state">กำลังโหลดข้อมูลสต็อกสาขา...</p>}
+      {!loading && !error && !records.length && (
+        <p className="empty-state">ไม่พบข้อมูลสต็อกสาขาตามเงื่อนไขที่ค้นหา</p>
+      )}
+
+      <div className="table-wrap">
+        <table className="branch-stock-table">
+          <thead>
+            <tr>
+              <th>รหัสสินค้า</th>
+              <th>ชื่อสินค้าไทย</th>
+              <th>ชื่ออังกฤษ</th>
+              <th>Barcode</th>
+              <th>หน่วย</th>
+              <th>สาขา 000</th>
+              <th>สาขา 001</th>
+              <th>สาขา 003</th>
+              <th>สาขา 004</th>
+              <th>สาขา 005</th>
+              <th>รวมทุกสาขา</th>
+              <th>synced_at</th>
+            </tr>
+          </thead>
+          <tbody>
+            {records.map((row) => (
+              <tr key={row.productCode}>
+                <td><strong>{row.productCode}</strong></td>
+                <td>{row.productNameThai || "-"}</td>
+                <td>{row.productNameEng || "-"}</td>
+                <td>{row.barcode || "-"}</td>
+                <td>{row.unit || "-"}</td>
+                <td>{formatNumber(row.qtyBranch000, 2)}</td>
+                <td>{formatNumber(row.qtyBranch001, 2)}</td>
+                <td>{formatNumber(row.qtyBranch003, 2)}</td>
+                <td>{formatNumber(row.qtyBranch004, 2)}</td>
+                <td>{formatNumber(row.qtyBranch005, 2)}</td>
+                <td>{formatNumber(row.qtyTotalAllBranches, 2)}</td>
+                <td>{formatDateTime(row.syncedAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="pagination">
+        <p className="pagination-info">
+          {total === 0
+            ? "0 รายการ"
+            : `${formatNumber(start)}-${formatNumber(end)} จาก ${formatNumber(total)} รายการ`}
+        </p>
+        <div className="pagination-actions">
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={loading || currentPage <= 1}
+            onClick={() => setOffset((current) => Math.max(0, current - pageSize))}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="receipt-page-indicator">
+            หน้า {formatNumber(currentPage)} / {formatNumber(totalPages)}
+          </span>
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={loading || currentPage >= totalPages}
+            onClick={() => setOffset((current) => current + pageSize)}
+          >
+            ถัดไป
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const pageSize = 50;
   const [stockDay, setStockDay] = useState([]);
@@ -714,7 +895,9 @@ export default function App() {
   const [view, setView] = useState(() => {
     if (typeof window === "undefined") return "dashboard";
     const savedView = window.localStorage.getItem(adminViewStorageKey);
-    return savedView === "receipts" ? "receipts" : "dashboard";
+    return ["dashboard", "receipts", "branch-stock"].includes(savedView)
+      ? savedView
+      : "dashboard";
   });
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [theme, setTheme] = useState(() => {
@@ -1010,6 +1193,13 @@ export default function App() {
           >
             ใบรับสินค้า
           </button>
+          <button
+            type="button"
+            className={view === "branch-stock" ? "view-nav-btn active" : "view-nav-btn"}
+            onClick={() => setView("branch-stock")}
+          >
+            สต็อกสาขา
+          </button>
         </nav>
 
         <div className="account-actions">
@@ -1065,6 +1255,8 @@ export default function App() {
           branchCode={branchCode}
           canViewPrices={session.user.role === "admin"}
         />
+      ) : view === "branch-stock" ? (
+        <BranchStockPanel />
       ) : (
         <>
           <section className="kpis">

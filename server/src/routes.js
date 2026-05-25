@@ -42,6 +42,89 @@ function parsePageParam(value, fallback) {
   return parsed;
 }
 
+function parseOffsetParam(value, fallback = 0) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+function normalizeOptionalText(value, maxLength = 255) {
+  if (value === null || value === undefined) return "";
+  return String(value).trim().replace(/\s+/g, " ").slice(0, maxLength);
+}
+
+function normalizeBranchStockNumber(value) {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeSyncedAt(value) {
+  const candidate = value ? new Date(value) : new Date();
+  if (Number.isNaN(candidate.getTime())) {
+    return null;
+  }
+  return candidate.toISOString();
+}
+
+function validateBranchStockSyncToken(req) {
+  const configuredToken = config.branchStockSyncToken;
+  if (!configuredToken) {
+    return "BRANCH_STOCK_SYNC_TOKEN is not configured on the server.";
+  }
+
+  const authHeader = req.headers.authorization || "";
+  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+  const headerToken = String(req.headers["x-sync-token"] || "").trim();
+  const providedToken = bearerToken || headerToken;
+
+  if (!providedToken || providedToken !== configuredToken) {
+    return "Unauthorized sync token.";
+  }
+
+  return null;
+}
+
+function validateAndNormalizeBranchStockRecords(body) {
+  if (!body || !Array.isArray(body.records)) {
+    return { error: "Payload must include a records array.", records: [] };
+  }
+
+  const records = [];
+  for (const [index, record] of body.records.entries()) {
+    const productCode = normalizeOptionalText(record?.product_code ?? record?.productCode, 120);
+    if (!productCode) {
+      return { error: `records[${index}].product_code is required.`, records: [] };
+    }
+
+    const syncedAt = normalizeSyncedAt(record?.synced_at ?? record?.syncedAt);
+    if (!syncedAt) {
+      return { error: `records[${index}].synced_at is invalid.`, records: [] };
+    }
+
+    records.push({
+      productCode,
+      productNameThai: normalizeOptionalText(record?.product_name_thai ?? record?.productNameThai),
+      productNameEng: normalizeOptionalText(record?.product_name_eng ?? record?.productNameEng),
+      barcode: normalizeOptionalText(record?.barcode, 120),
+      unit: normalizeOptionalText(record?.unit, 80),
+      qtyBranch000: normalizeBranchStockNumber(record?.qty_branch_000 ?? record?.qtyBranch000),
+      qtyBranch001: normalizeBranchStockNumber(record?.qty_branch_001 ?? record?.qtyBranch001),
+      qtyBranch002: normalizeBranchStockNumber(record?.qty_branch_002 ?? record?.qtyBranch002),
+      qtyBranch003: normalizeBranchStockNumber(record?.qty_branch_003 ?? record?.qtyBranch003),
+      qtyBranch004: normalizeBranchStockNumber(record?.qty_branch_004 ?? record?.qtyBranch004),
+      qtyBranch005: normalizeBranchStockNumber(record?.qty_branch_005 ?? record?.qtyBranch005),
+      qtyTotalAllBranches: normalizeBranchStockNumber(
+        record?.qty_total_all_branches ?? record?.qtyTotalAllBranches,
+      ),
+      syncedAt,
+    });
+  }
+
+  return { error: null, records };
+}
+
 export function createRouter(repository) {
   const router = express.Router();
 
@@ -230,6 +313,32 @@ export function createRouter(repository) {
   router.get("/api/admin/branch-stock", asyncHandler(async (req, res) => {
     const { productCode } = req.query;
     res.json(await repository.getBranchStock(productCode || null));
+  }));
+
+  router.post("/api/branch-stock/sync", asyncHandler(async (req, res) => {
+    const authError = validateBranchStockSyncToken(req);
+    if (authError) {
+      return res.status(401).json({ message: authError });
+    }
+
+    const validation = validateAndNormalizeBranchStockRecords(req.body);
+    if (validation.error) {
+      return res.status(400).json({ message: validation.error });
+    }
+
+    const result = await repository.ingestBranchStockSnapshots(validation.records);
+    res.json(result);
+  }));
+
+  router.get("/api/branch-stock", asyncHandler(async (req, res) => {
+    const limit = parsePageParam(req.query.limit, 25);
+    const offset = parseOffsetParam(req.query.offset, 0);
+    const result = await repository.getBranchStockSnapshots({
+      search: req.query.search || "",
+      limit,
+      offset,
+    });
+    res.json(result);
   }));
 
   router.post("/api/sync/run-log", asyncHandler(async (req, res) => {
