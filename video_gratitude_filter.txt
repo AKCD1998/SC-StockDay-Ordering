@@ -1,0 +1,15 @@
+[0:v]scale=540:960,format=yuv420p,
+eq=brightness=0.03:contrast=1.10:saturation=1.25:gamma=1.03,
+colorbalance=rs=0.04:gs=0.02:bs=-0.01,
+unsharp=5:5:0.7:3:3:0.25,
+split=2[base][glow];
+[glow]gblur=sigma=10[blurred];
+[base][blurred]blend=all_mode='screen':all_opacity=0.12,
+crop=w='iw/(1+if(gte(t,2.0),0.020*min(t-2.0,3.0),0))':h='ih/(1+if(gte(t,2.0),0.020*min(t-2.0,3.0),0))':x='(iw-ow)/2':y='(ih-oh)/2',
+scale=540:960,
+drawbox=x=20:y=38:w=500:h=118:color=0x2b160a@0.36:t=fill:enable='between(t,0.15,3.70)',
+drawbox=x=28:y=742:w=484:h=162:color=0x2b160a@0.33:t=fill:enable='between(t,4.10,7.55)',
+drawtext=fontfile='C\:/Windows/Fonts/segoesc.ttf':text='For my amazing wife':fontcolor=0xfff1dc:fontsize=34:x='(w-text_w)/2':y=58:alpha='if(lt(t,0.15),0, if(lt(t,0.75),(t-0.15)/0.6, if(lt(t,3.2),1, if(lt(t,3.7),(3.7-t)/0.5,0))))',
+drawtext=fontfile='C\:/Windows/Fonts/georgiab.ttf':text='Thank you for this delicious omelette':fontcolor=0xfff6e8:fontsize=24:x='(w-text_w)/2':y=108:alpha='if(lt(t,0.45),0, if(lt(t,1.15),(t-0.45)/0.7, if(lt(t,3.2),1, if(lt(t,3.7),(3.7-t)/0.5,0))))',
+drawtext=fontfile='C\:/Windows/Fonts/georgiab.ttf':text='It looks so delicious':fontcolor=0xffd36b:fontsize=26:x='(w-text_w)/2':y=780:alpha='if(lt(t,4.15),0, if(lt(t,4.75),(t-4.15)/0.6, if(lt(t,7.1),1, if(lt(t,7.55),(7.55-t)/0.45,0))))',
+drawtext=fontfile='C\:/Windows/Fonts/segoesc.ttf':text='Made with love, and I can tell':fontcolor=0xfffff4:fontsize=30:x='(w-text_w)/2':y=824:alpha='if(lt(t,4.45),0, if(lt(t,5.05),(t-4.45)/0.6, if(lt(t,7.1),1, if(lt(t,7.55),(7.55-t)/0.45,0))))'[vout]

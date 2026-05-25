@@ -7,6 +7,8 @@ async function seedPostgres(repository) {
     TRUNCATE TABLE
       sync_errors,
       sync_runs,
+      ada_transfer_lines,
+      ada_transfer_headers,
       branch_order_request_items,
       branch_order_requests,
       product_purchase_summary,

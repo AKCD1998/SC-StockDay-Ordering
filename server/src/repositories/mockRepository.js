@@ -126,6 +126,14 @@ export class MockRepository {
     };
   }
 
+  async ingestBranches(payload) {
+    return { accepted: (payload.records || []).length };
+  }
+
+  async getTransfersByBranch(_branchCode, _periodDays) {
+    return [];
+  }
+
   async ingestProducts(payload) {
     this.syncRuns.unshift({
       id: makeId("sync"),
@@ -180,6 +188,44 @@ export class MockRepository {
       message: payload.message || "",
     });
     return { accepted: 1 };
+  }
+
+  async ingestTransfers(payload) {
+    this.syncRuns.unshift({
+      id: makeId("sync"),
+      syncType: "ada-transfers",
+      startedAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+      status: "success",
+      recordsRead: (payload.headers?.length || 0) + (payload.lines?.length || 0),
+      recordsSent: (payload.headers?.length || 0) + (payload.lines?.length || 0),
+      message: "AdaPOS transfers received by mock API.",
+    });
+    return {
+      acceptedHeaders: payload.headers?.length || 0,
+      acceptedLines: payload.lines?.length || 0,
+      headersAccepted: payload.headers?.length || 0,
+      linesAccepted: payload.lines?.length || 0,
+    };
+  }
+
+  async ingestPendingReceipts(payload) {
+    return {
+      headersAccepted: (payload.headers || []).length,
+      linesAccepted:   (payload.lines   || []).length,
+    };
+  }
+
+  async getPendingReceipts(_branchCode) {
+    return [];
+  }
+
+  async ingestApprovedReceipts(_branchCode, _records) {
+    return { upserted: 0 };
+  }
+
+  async getApprovedReceipts(_branchCode, _date) {
+    return [];
   }
 
   async close() {}

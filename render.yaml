@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: sc-stockday-ordering
+    runtime: node
+    plan: starter
+    rootDir: .
+    buildCommand: npm install && npm run build
+    startCommand: npm run start -w server
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: DATA_MODE
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: PORT
+        sync: false

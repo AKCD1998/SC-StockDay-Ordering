@@ -8,6 +8,9 @@ export const config = {
   port: Number(process.env.SERVER_PORT || 4000),
   dataMode,
   databaseUrl: process.env.DATABASE_URL || "",
+  databaseSsl:
+    String(process.env.DATABASE_SSL || "").toLowerCase() === "true" ||
+    /render\.com/i.test(process.env.DATABASE_URL || ""),
   defaultPeriodDays: Number(process.env.DEFAULT_PERIOD_DAYS || 30),
   isMockMode: dataMode === "mock",
 };
