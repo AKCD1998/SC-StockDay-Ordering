@@ -77,7 +77,8 @@ function validateBranchStockSyncToken(req) {
   const authHeader = req.headers.authorization || "";
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
   const headerToken = String(req.headers["x-sync-token"] || "").trim();
-  const providedToken = bearerToken || headerToken;
+  const apiKeyToken = String(req.headers["x-api-key"] || "").trim();
+  const providedToken = bearerToken || headerToken || apiKeyToken;
 
   if (!providedToken || providedToken !== configuredToken) {
     return "Unauthorized sync token.";

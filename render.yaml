@@ -5,6 +5,7 @@ services:
     plan: starter
     rootDir: .
     buildCommand: npm install && npm run build
+    preDeployCommand: npm run db:migrate
     startCommand: npm run start -w server
     autoDeploy: true
     envVars:
@@ -15,4 +16,6 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: PORT
+        sync: false
+      - key: BRANCH_STOCK_SYNC_TOKEN
         sync: false
