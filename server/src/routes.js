@@ -34,6 +34,14 @@ function validateRecordsPayload(body) {
   return null;
 }
 
+function parsePageParam(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
 export function createRouter(repository) {
   const router = express.Router();
 
@@ -163,8 +171,16 @@ export function createRouter(repository) {
 
   // Admin view: pending purchase receipts grouped by document
   router.get("/api/admin/pending-receipts", asyncHandler(async (req, res) => {
-    const { branchCode } = req.query;
-    res.json(await repository.getPendingReceipts(branchCode || null));
+    const { branchCode, date, search } = req.query;
+    const page = parsePageParam(req.query.page, 1);
+    const pageSize = parsePageParam(req.query.pageSize, 10);
+    res.json(await repository.getPendingReceipts({
+      branchCode: branchCode || null,
+      date: date || null,
+      search: search || "",
+      page,
+      pageSize,
+    }));
   }));
 
   // Ingest approved purchase receipts from adapos-sync
@@ -179,10 +195,18 @@ export function createRouter(repository) {
 
   // Admin view: approved purchase receipts for today (or a specific date)
   router.get("/api/admin/approved-receipts", asyncHandler(async (req, res) => {
-    const { branchCode, date } = req.query;
+    const { branchCode, date, search } = req.query;
     if (!branchCode) return res.status(400).json({ error: "branchCode required" });
-    const records = await repository.getApprovedReceipts(branchCode, date ?? null);
-    res.json({ ok: true, records });
+    const page = parsePageParam(req.query.page, 1);
+    const pageSize = parsePageParam(req.query.pageSize, 10);
+    const result = await repository.getApprovedReceipts({
+      branchCode,
+      date: date ?? null,
+      search: search || "",
+      page,
+      pageSize,
+    });
+    res.json({ ok: true, ...result });
   }));
 
   router.get("/api/admin/transfers", asyncHandler(async (req, res) => {

@@ -921,68 +921,149 @@ export class PostgresRepository {
     }
   }
 
-  async getPendingReceipts(branchCode = null) {
-    const params = branchCode ? [branchCode] : [null];
-    const { rows } = await this.pool.query(
-      `SELECT
-         h.doc_no, h.branch_code, h.doc_type, h.doc_date, h.doc_time,
-         h.supplier_code, h.supplier_name, h.ref_ext, h.ref_ext_date,
-         h.warehouse_code, h.total, h.vat, h.grand,
-         h.usr_code, h.created_by, h.created_at_ada, h.sta_doc, h.synced_at,
-         l.seq_no, l.product_code, l.product_name, l.barcode,
-         l.unit_code, l.unit_name, l.factor, l.qty, l.qty_base,
-         l.set_price, l.net, l.cost_in, l.lot_no, l.expired_date
-       FROM ada_pending_receipt_headers h
-       LEFT JOIN ada_pending_receipt_lines l ON l.doc_no = h.doc_no
-       WHERE ($1::text IS NULL OR h.branch_code = $1)
-       ORDER BY h.doc_date DESC, h.doc_time DESC, l.seq_no ASC`,
-      params,
-    );
-
+  mapReceiptRows(rows) {
     const grouped = new Map();
     for (const row of rows) {
       if (!grouped.has(row.doc_no)) {
         grouped.set(row.doc_no, {
-          docNo:         row.doc_no,
-          branchCode:    row.branch_code,
-          docType:       row.doc_type,
-          docDate:       row.doc_date,
-          docTime:       row.doc_time,
-          supplierCode:  row.supplier_code,
-          supplierName:  row.supplier_name,
-          refExt:        row.ref_ext,
-          refExtDate:    row.ref_ext_date,
+          docNo: row.doc_no,
+          branchCode: row.branch_code,
+          docType: row.doc_type,
+          docDate: row.doc_date,
+          docTime: row.doc_time,
+          supplierCode: row.supplier_code,
+          supplierName: row.supplier_name,
+          refExt: row.ref_ext,
+          refExtDate: row.ref_ext_date,
           warehouseCode: row.warehouse_code,
-          total:         Number(row.total  || 0),
-          vat:           Number(row.vat    || 0),
-          grand:         Number(row.grand  || 0),
-          usrCode:       row.usr_code,
-          createdBy:     row.created_by,
-          createdAtAda:  row.created_at_ada,
-          syncedAt:      row.synced_at,
-          lines:         [],
+          total: Number(row.total || 0),
+          vat: Number(row.vat || 0),
+          grand: Number(row.grand || 0),
+          usrCode: row.usr_code,
+          createdBy: row.created_by,
+          createdAtAda: row.created_at_ada,
+          staPrcDoc: row.sta_prc_doc,
+          syncedAt: row.synced_at,
+          lines: [],
         });
       }
       if (row.seq_no != null) {
         grouped.get(row.doc_no).lines.push({
-          seqNo:        row.seq_no,
-          productCode:  row.product_code,
-          productName:  row.product_name,
-          barcode:      row.barcode,
-          unitCode:     row.unit_code,
-          unitName:     row.unit_name,
-          factor:       Number(row.factor   || 1),
-          qty:          Number(row.qty      || 0),
-          qtyBase:      Number(row.qty_base || 0),
-          setPrice:     Number(row.set_price || 0),
-          net:          Number(row.net      || 0),
-          costIn:       Number(row.cost_in  || 0),
-          lotNo:        row.lot_no,
-          expiredDate:  row.expired_date,
+          seqNo: row.seq_no,
+          productCode: row.product_code,
+          productName: row.product_name,
+          barcode: row.barcode,
+          unitCode: row.unit_code,
+          unitName: row.unit_name,
+          factor: Number(row.factor || 1),
+          qty: Number(row.qty || 0),
+          qtyBase: Number(row.qty_base || 0),
+          stockFactor: Number(row.stock_factor || 1),
+          setPrice: Number(row.set_price || 0),
+          net: Number(row.net || 0),
+          vat: Number(row.line_vat || 0),
+          costIn: Number(row.cost_in || 0),
+          lotNo: row.lot_no,
+          expiredDate: row.expired_date,
+          warehouseCode: row.line_warehouse_code || row.warehouse_code,
         });
       }
     }
     return [...grouped.values()];
+  }
+
+  async getReceiptPage({
+    headerTable,
+    lineTable,
+    branchCode = null,
+    date = null,
+    search = "",
+    page = 1,
+    pageSize = 10,
+  }) {
+    const normalizedSearch = normalizeQuery(search);
+    const safePage = Math.max(1, Number(page) || 1);
+    const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 10));
+    const offset = (safePage - 1) * safePageSize;
+    const params = [branchCode, date, normalizedSearch || null, safePageSize, offset];
+    const whereClause = `
+      WHERE ($1::text IS NULL OR h.branch_code = $1)
+        AND ($2::text IS NULL OR CAST(h.doc_date AS DATE) = $2::date)
+        AND (
+          $3::text IS NULL
+          OR LOWER(COALESCE(h.doc_no, '')) LIKE '%' || $3 || '%'
+          OR LOWER(COALESCE(h.supplier_name, '')) LIKE '%' || $3 || '%'
+          OR LOWER(COALESCE(h.supplier_code, '')) LIKE '%' || $3 || '%'
+          OR LOWER(COALESCE(h.ref_ext, '')) LIKE '%' || $3 || '%'
+          OR LOWER(COALESCE(h.created_by, '')) LIKE '%' || $3 || '%'
+          OR EXISTS (
+            SELECT 1
+            FROM ${lineTable} lx
+            WHERE lx.doc_no = h.doc_no
+              AND (
+                LOWER(COALESCE(lx.product_code, '')) LIKE '%' || $3 || '%'
+                OR LOWER(COALESCE(lx.product_name, '')) LIKE '%' || $3 || '%'
+                OR LOWER(COALESCE(lx.barcode, '')) LIKE '%' || $3 || '%'
+                OR LOWER(COALESCE(lx.lot_no, '')) LIKE '%' || $3 || '%'
+                OR LOWER(COALESCE(lx.unit_name, '')) LIKE '%' || $3 || '%'
+              )
+          )
+        )
+    `;
+
+    const countResult = await this.pool.query(
+      `
+      SELECT COUNT(*)::int AS total
+      FROM ${headerTable} h
+      ${whereClause}
+      `,
+      params.slice(0, 3),
+    );
+    const total = Number(countResult.rows[0]?.total || 0);
+
+    const { rows } = await this.pool.query(
+      `
+      WITH paged_docs AS (
+        SELECT h.doc_no
+        FROM ${headerTable} h
+        ${whereClause}
+        ORDER BY h.doc_date DESC, h.doc_time DESC, h.doc_no DESC
+        LIMIT $4 OFFSET $5
+      )
+      SELECT
+        h.doc_no, h.branch_code, h.doc_type, h.doc_date, h.doc_time,
+        h.supplier_code, h.supplier_name, h.ref_ext, h.ref_ext_date,
+        h.warehouse_code, h.total, h.vat, h.grand,
+        h.usr_code, h.created_by, h.created_at_ada, h.sta_doc, h.synced_at, h.sta_prc_doc,
+        l.seq_no, l.product_code, l.product_name, l.barcode,
+        l.unit_code, l.unit_name, l.factor, l.qty, l.qty_base, l.stock_factor,
+        l.set_price, l.net, l.vat AS line_vat, l.cost_in, l.lot_no, l.expired_date,
+        l.warehouse_code AS line_warehouse_code
+      FROM paged_docs d
+      JOIN ${headerTable} h ON h.doc_no = d.doc_no
+      LEFT JOIN ${lineTable} l ON l.doc_no = h.doc_no
+      ORDER BY h.doc_date DESC, h.doc_time DESC, h.doc_no DESC, l.seq_no ASC
+      `,
+      params,
+    );
+
+    return {
+      records: this.mapReceiptRows(rows),
+      pagination: {
+        page: safePage,
+        pageSize: safePageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / safePageSize)),
+      },
+    };
+  }
+
+  async getPendingReceipts(options = {}) {
+    return this.getReceiptPage({
+      headerTable: "ada_pending_receipt_headers",
+      lineTable: "ada_pending_receipt_lines",
+      ...options,
+    });
   }
 
   async ingestApprovedReceipts(branchCode, records) {
@@ -1069,74 +1150,12 @@ export class PostgresRepository {
     }
   }
 
-  async getApprovedReceipts(branchCode, date = null) {
-    const params = [branchCode, date];
-    const { rows } = await this.pool.query(
-      `SELECT
-         h.doc_no, h.branch_code, h.doc_type, h.doc_date, h.doc_time,
-         h.supplier_code, h.supplier_name, h.ref_ext, h.ref_ext_date,
-         h.warehouse_code, h.total, h.vat, h.grand,
-         h.usr_code, h.created_by, h.created_at_ada, h.sta_doc, h.sta_prc_doc, h.synced_at,
-         l.seq_no, l.product_code, l.product_name, l.barcode,
-         l.unit_code, l.unit_name, l.factor, l.qty, l.qty_base, l.stock_factor,
-         l.set_price, l.net, l.vat AS line_vat, l.cost_in, l.lot_no, l.expired_date,
-         l.warehouse_code AS line_warehouse_code
-       FROM ada_approved_receipt_headers h
-       LEFT JOIN ada_approved_receipt_lines l ON l.doc_no = h.doc_no
-       WHERE h.branch_code = $1
-         AND ($2::text IS NULL OR CAST(h.doc_date AS DATE) = $2::date)
-       ORDER BY h.doc_date DESC, h.doc_time DESC, l.seq_no ASC`,
-      params,
-    );
-
-    const grouped = new Map();
-    for (const row of rows) {
-      if (!grouped.has(row.doc_no)) {
-        grouped.set(row.doc_no, {
-          docNo:         row.doc_no,
-          branchCode:    row.branch_code,
-          docType:       row.doc_type,
-          docDate:       row.doc_date,
-          docTime:       row.doc_time,
-          supplierCode:  row.supplier_code,
-          supplierName:  row.supplier_name,
-          refExt:        row.ref_ext,
-          refExtDate:    row.ref_ext_date,
-          warehouseCode: row.warehouse_code,
-          total:         Number(row.total  || 0),
-          vat:           Number(row.vat    || 0),
-          grand:         Number(row.grand  || 0),
-          usrCode:       row.usr_code,
-          createdBy:     row.created_by,
-          createdAtAda:  row.created_at_ada,
-          staPrcDoc:     row.sta_prc_doc,
-          syncedAt:      row.synced_at,
-          lines:         [],
-        });
-      }
-      if (row.seq_no != null) {
-        grouped.get(row.doc_no).lines.push({
-          seqNo:         row.seq_no,
-          productCode:   row.product_code,
-          productName:   row.product_name,
-          barcode:       row.barcode,
-          unitCode:      row.unit_code,
-          unitName:      row.unit_name,
-          factor:        Number(row.factor       || 1),
-          qty:           Number(row.qty          || 0),
-          qtyBase:       Number(row.qty_base     || 0),
-          stockFactor:   Number(row.stock_factor || 1),
-          setPrice:      Number(row.set_price    || 0),
-          net:           Number(row.net          || 0),
-          vat:           Number(row.line_vat     || 0),
-          costIn:        Number(row.cost_in      || 0),
-          lotNo:         row.lot_no,
-          expiredDate:   row.expired_date,
-          warehouseCode: row.line_warehouse_code,
-        });
-      }
-    }
-    return [...grouped.values()];
+  async getApprovedReceipts(options = {}) {
+    return this.getReceiptPage({
+      headerTable: "ada_approved_receipt_headers",
+      lineTable: "ada_approved_receipt_lines",
+      ...options,
+    });
   }
 
   async ingestBranchStock(payload) {

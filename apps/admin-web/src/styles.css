@@ -664,6 +664,18 @@ select {
   gap: 10px;
 }
 
+.receipt-pagination {
+  margin-top: 18px;
+}
+
+.receipt-page-indicator {
+  display: inline-flex;
+  align-items: center;
+  color: #6f7f91;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
 .receipt-tab {
   padding: 12px 20px;
   border: 1px solid rgba(73, 101, 140, 0.16);
@@ -1016,6 +1028,54 @@ select {
   background: transparent;
 }
 
+.supplier-brand-fasicare .supplier-brand-mark {
+  width: 188px;
+  height: 62px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.supplier-brand-birich-thailand .supplier-brand-mark {
+  width: 188px;
+  height: 62px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.supplier-brand-boonsong-osot .supplier-brand-mark {
+  width: 188px;
+  height: 62px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.supplier-brand-macropharlab .supplier-brand-mark {
+  width: 188px;
+  height: 62px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.supplier-brand-ace-global .supplier-brand-mark {
+  width: 188px;
+  height: 70px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.supplier-brand-scharoen-pharma .supplier-brand-mark {
+  width: 188px;
+  height: 64px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
 .supplier-brand-dksh .supplier-brand-copy strong {
   color: #c30a35;
   font-size: 1.48rem;
@@ -1292,7 +1352,8 @@ select {
 
 [data-theme="dark"] .supplier-brand-dksh .supplier-brand-mark,
 [data-theme="dark"] .supplier-brand-bangkok-drug .supplier-brand-mark,
-[data-theme="dark"] .supplier-brand-zuellig-pharma .supplier-brand-mark {
+[data-theme="dark"] .supplier-brand-zuellig-pharma .supplier-brand-mark,
+[data-theme="dark"] .supplier-brand-boonsong-osot .supplier-brand-mark {
   padding: 6px 10px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.96);

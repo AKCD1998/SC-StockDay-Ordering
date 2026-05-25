@@ -216,16 +216,32 @@ export class MockRepository {
     };
   }
 
-  async getPendingReceipts(_branchCode) {
-    return [];
+  async getPendingReceipts(_options = {}) {
+    return {
+      records: [],
+      pagination: {
+        page: 1,
+        pageSize: 10,
+        total: 0,
+        totalPages: 1,
+      },
+    };
   }
 
   async ingestApprovedReceipts(_branchCode, _records) {
     return { upserted: 0 };
   }
 
-  async getApprovedReceipts(_branchCode, _date) {
-    return [];
+  async getApprovedReceipts(_options = {}) {
+    return {
+      records: [],
+      pagination: {
+        page: 1,
+        pageSize: 10,
+        total: 0,
+        totalPages: 1,
+      },
+    };
   }
 
   async ingestBranchStock(payload) {

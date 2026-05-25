@@ -12,6 +12,12 @@ import royalDLogoUrl from "./assets/royal-d-logo.png";
 import poseHealthCareLogoUrl from "./assets/pose-health-care-logo.svg";
 import pksMedicalCenterLogoUrl from "./assets/pks-medical-center-logo.svg";
 import mohmeeLogoUrl from "./assets/mohmee-logo.svg";
+import fasicareLogoUrl from "./assets/fasicare-logo.svg";
+import birichLogoUrl from "./assets/birich-logo.svg";
+import boonsongOsotLogoUrl from "./assets/boonsong-osot-logo.svg";
+import macropharlabLogoUrl from "./assets/macropharlab-logo.svg";
+import aceGlobalLogoUrl from "./assets/ace-global-logo.svg";
+import scharoenPharmaLogoUrl from "./assets/scharoen-pharma-logo.svg";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const adminViewStorageKey = "sc-stockday-admin-view";
@@ -149,6 +155,48 @@ const SUPPLIER_BRANDS = [
     logoSrc: mohmeeLogoUrl,
     patterns: ["หมอมี", "MOHMEE", "MOH MEE"],
   },
+  {
+    key: "fasicare",
+    wordmark: "FASICARE",
+    tagline: "",
+    logoSrc: fasicareLogoUrl,
+    patterns: ["ฟาซิแคร์", "FASICARE"],
+  },
+  {
+    key: "birich-thailand",
+    wordmark: "BIRICH",
+    tagline: "THAILAND",
+    logoSrc: birichLogoUrl,
+    patterns: ["บีริช", "BIRICH", "BIRICH THAILAND"],
+  },
+  {
+    key: "boonsong-osot",
+    wordmark: "บุญส่งโอสถ",
+    tagline: "",
+    logoSrc: boonsongOsotLogoUrl,
+    patterns: ["บุญส่งโอสถ", "BOONSONG OSOT", "BOONSONGOSOT"],
+  },
+  {
+    key: "macropharlab",
+    wordmark: "MACROPHARLAB",
+    tagline: "",
+    logoSrc: macropharlabLogoUrl,
+    patterns: ["แมคโครฟาร์แลบ", "MACROPHARLAB", "MACRO PHARLAB"],
+  },
+  {
+    key: "ace-global",
+    wordmark: "ACE GLOBAL",
+    tagline: "",
+    logoSrc: aceGlobalLogoUrl,
+    patterns: ["เอซีโกลบอล", "เอซีอีโกลบอล", "ACE GLOBAL", "ACEGLOBAL"],
+  },
+  {
+    key: "scharoen-pharma",
+    wordmark: "ส.เจริญเภสัช",
+    tagline: "เทรดดิ้ง",
+    logoSrc: scharoenPharmaLogoUrl,
+    patterns: ["ส.เจริญเภสัชเทรดดิ้ง", "สเจริญเภสัชเทรดดิ้ง", "S CHAROEN", "SCHAROEN"],
+  },
 ];
 
 // Lowercase and strip whitespace, dots, and hyphens so matching tolerates
@@ -189,17 +237,6 @@ async function apiFetch(path, options = {}) {
       ...(options.headers || {}),
     },
   });
-}
-
-function toDateKey(value) {
-  if (!value) return "";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return String(value).slice(0, 10);
-
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
-  const day = String(parsed.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 function LoginScreen({ authError, busy, username, password, onUsernameChange, onPasswordChange, onSubmit }) {
@@ -249,33 +286,63 @@ function LoginScreen({ authError, busy, username, password, onUsernameChange, on
 
 function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
   const today = new Date().toISOString().slice(0, 10);
+  const receiptPageSize = 10;
   const [activeTab, setActiveTab] = useState("pending");
   const [pendingRecords, setPendingRecords] = useState([]);
   const [approvedRecords, setApprovedRecords] = useState([]);
   const [selectedDate, setSelectedDate] = useState(today);
   const [pendingDateFilter, setPendingDateFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
   const [loadingPending, setLoadingPending] = useState(false);
   const [loadingApproved, setLoadingApproved] = useState(false);
   const [pendingError, setPendingError] = useState("");
   const [approvedError, setApprovedError] = useState("");
   const [expandedDocs, setExpandedDocs] = useState({});
+  const [pendingPage, setPendingPage] = useState(1);
+  const [approvedPage, setApprovedPage] = useState(1);
+  const [pendingPagination, setPendingPagination] = useState({
+    page: 1,
+    pageSize: receiptPageSize,
+    total: 0,
+    totalPages: 1,
+  });
+  const [approvedPagination, setApprovedPagination] = useState({
+    page: 1,
+    pageSize: receiptPageSize,
+    total: 0,
+    totalPages: 1,
+  });
+  const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
+  const [approvedRefreshKey, setApprovedRefreshKey] = useState(0);
 
   function toggleDoc(docNo) {
     setExpandedDocs((prev) => ({ ...prev, [docNo]: !prev[docNo] }));
   }
 
-  async function fetchPending() {
+  async function fetchPending({ page = pendingPage, search = appliedSearchTerm, date = pendingDateFilter } = {}) {
     setLoadingPending(true);
     setPendingError("");
     try {
-      const res = await apiFetch(`/api/admin/pending-receipts?branchCode=${branchCode}`);
+      const params = new URLSearchParams({
+        branchCode,
+        page: String(page),
+        pageSize: String(receiptPageSize),
+      });
+      if (search) params.set("search", search);
+      if (date) params.set("date", date);
+      const res = await apiFetch(`/api/admin/pending-receipts?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const sorted = [...(data.records || [])].sort(
-        (a, b) => new Date(b.docDate) - new Date(a.docDate),
+      setPendingRecords(data.records || []);
+      setPendingPagination(
+        data.pagination || {
+          page,
+          pageSize: receiptPageSize,
+          total: data.records?.length || 0,
+          totalPages: 1,
+        },
       );
-      setPendingRecords(sorted);
     } catch (err) {
       setPendingError(err.message);
     } finally {
@@ -283,16 +350,29 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
     }
   }
 
-  async function fetchApproved(date) {
+  async function fetchApproved({ date = selectedDate, page = approvedPage, search = appliedSearchTerm } = {}) {
     setLoadingApproved(true);
     setApprovedError("");
     try {
-      const res = await apiFetch(
-        `/api/admin/approved-receipts?branchCode=${branchCode}&date=${date}`,
-      );
+      const params = new URLSearchParams({
+        branchCode,
+        date,
+        page: String(page),
+        pageSize: String(receiptPageSize),
+      });
+      if (search) params.set("search", search);
+      const res = await apiFetch(`/api/admin/approved-receipts?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setApprovedRecords(data.records || []);
+      setApprovedPagination(
+        data.pagination || {
+          page,
+          pageSize: receiptPageSize,
+          total: data.records?.length || 0,
+          totalPages: 1,
+        },
+      );
     } catch (err) {
       setApprovedError(err.message);
     } finally {
@@ -302,11 +382,11 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
 
   useEffect(() => {
     fetchPending();
-  }, [branchCode]);
+  }, [appliedSearchTerm, branchCode, pendingDateFilter, pendingPage, pendingRefreshKey]);
 
   useEffect(() => {
-    fetchApproved(selectedDate);
-  }, [branchCode, selectedDate]);
+    fetchApproved();
+  }, [approvedPage, approvedRefreshKey, appliedSearchTerm, branchCode, selectedDate]);
 
   function formatDocDate(value) {
     if (!value) return "-";
@@ -322,58 +402,69 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
     return new Date(expiredDate) < new Date();
   }
 
-  function receiptMatchesSearch(record, term) {
-    const normalized = term.trim().toLowerCase();
-    if (!normalized) return true;
-
-    const lineText = (record.lines || [])
-      .flatMap((line) => [
-        line.productCode,
-        line.productName,
-        line.barcode,
-        line.lotNo,
-        line.unitName,
-      ])
-      .filter(Boolean)
-      .join(" ");
-
-    const haystack = [
-      record.docNo,
-      record.supplierName,
-      record.supplierCode,
-      record.refExt,
-      record.createdBy,
-      record.docTime,
-      formatDocDate(record.docDate),
-      lineText,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-
-    return haystack.includes(normalized);
-  }
-
-  const filteredPendingRecords = useMemo(() => {
-    return pendingRecords.filter((record) => {
-      const matchesSearch = receiptMatchesSearch(record, searchTerm);
-      const matchesDate =
-        !pendingDateFilter || toDateKey(record.docDate) === pendingDateFilter;
-      return matchesSearch && matchesDate;
-    });
-  }, [pendingDateFilter, pendingRecords, searchTerm]);
-
-  const filteredApprovedRecords = useMemo(() => {
-    return approvedRecords.filter((record) => receiptMatchesSearch(record, searchTerm));
-  }, [approvedRecords, searchTerm]);
-
   function handleSearchSubmit(event) {
     event.preventDefault();
+    const nextSearch = searchTerm.trim();
+    setAppliedSearchTerm(nextSearch);
     if (activeTab === "approved") {
-      fetchApproved(selectedDate);
+      if (approvedPage !== 1) {
+        setApprovedPage(1);
+      } else {
+        setApprovedRefreshKey((value) => value + 1);
+      }
       return;
     }
-    fetchPending();
+    if (pendingPage !== 1) {
+      setPendingPage(1);
+    } else {
+      setPendingRefreshKey((value) => value + 1);
+    }
+  }
+
+  function handleRefresh() {
+    if (activeTab === "pending") {
+      setPendingRefreshKey((value) => value + 1);
+      return;
+    }
+    setApprovedRefreshKey((value) => value + 1);
+  }
+
+  function renderPagination(pagination, setPage, loading, records) {
+    const total = pagination.total || 0;
+    const currentPage = pagination.page || 1;
+    const totalPages = pagination.totalPages || 1;
+    const start = total === 0 ? 0 : (currentPage - 1) * pagination.pageSize + 1;
+    const end = total === 0 ? 0 : start + (records.length || 0) - 1;
+    return (
+      <div className="pagination receipt-pagination">
+        <p className="pagination-info">
+          {total === 0
+            ? "0 รายการ"
+            : `${formatNumber(start)}-${formatNumber(end)} จาก ${formatNumber(total)} รายการ`}
+        </p>
+        <div className="pagination-actions">
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={loading || currentPage <= 1}
+            onClick={() => setPage((page) => Math.max(1, page - 1))}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="receipt-page-indicator">
+            หน้า {formatNumber(currentPage)} / {formatNumber(totalPages)}
+          </span>
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={loading || currentPage >= totalPages}
+            onClick={() => setPage((page) => Math.min(totalPages, page + 1))}
+          >
+            ถัดไป
+          </button>
+        </div>
+      </div>
+    );
   }
 
   function ReceiptCard({ record }) {
@@ -499,7 +590,7 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
       <div className="panel-header">
         <div>
           <h2>ใบรับสินค้า</h2>
-          <p>ติดตามเอกสารรับของจากผู้จำหน่าย — รออนุมัติและอนุมัติแล้ววันนี้</p>
+          <p>ติดตามเอกสารรับของจากผู้จำหน่าย พร้อมย้อนดูเอกสารเก่าด้วยการแบ่งหน้า</p>
         </div>
       </div>
 
@@ -542,9 +633,11 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
               onChange={(event) => {
                 if (activeTab === "pending") {
                   setPendingDateFilter(event.target.value);
+                  setPendingPage(1);
                   return;
                 }
                 setSelectedDate(event.target.value);
+                setApprovedPage(1);
               }}
               className="date-input-inline"
             />
@@ -555,9 +648,7 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
           <button
             type="button"
             className="ghost-button receipt-refresh-button"
-            onClick={() =>
-              activeTab === "pending" ? fetchPending() : fetchApproved(selectedDate)
-            }
+            onClick={handleRefresh}
             disabled={activeTab === "pending" ? loadingPending : loadingApproved}
           >
             🔄 รีเฟรช
@@ -571,14 +662,15 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
           {pendingError && (
             <p className="notice error compact">❌ เชื่อมต่อไม่ได้: {pendingError}</p>
           )}
-          {!loadingPending && !pendingError && filteredPendingRecords.length === 0 && (
+          {!loadingPending && !pendingError && pendingRecords.length === 0 && (
             <p className="empty-state">ไม่มีเอกสารรออนุมัติ</p>
           )}
           <div className="receipt-list">
-            {filteredPendingRecords.map((rec) => (
+            {pendingRecords.map((rec) => (
               <ReceiptCard key={rec.docNo || rec.doc_no} record={rec} />
             ))}
           </div>
+          {!pendingError && renderPagination(pendingPagination, setPendingPage, loadingPending, pendingRecords)}
         </div>
       )}
 
@@ -588,14 +680,16 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
           {approvedError && (
             <p className="notice error compact">❌ เชื่อมต่อไม่ได้: {approvedError}</p>
           )}
-          {!loadingApproved && !approvedError && filteredApprovedRecords.length === 0 && (
+          {!loadingApproved && !approvedError && approvedRecords.length === 0 && (
             <p className="empty-state">ยังไม่มีเอกสารรับของสำหรับวันที่เลือก</p>
           )}
           <div className="receipt-list">
-            {filteredApprovedRecords.map((rec) => (
+            {approvedRecords.map((rec) => (
               <ReceiptCard key={rec.docNo || rec.doc_no} record={rec} />
             ))}
           </div>
+          {!approvedError &&
+            renderPagination(approvedPagination, setApprovedPage, loadingApproved, approvedRecords)}
         </div>
       )}
     </section>
