@@ -276,21 +276,23 @@ export async function getTodayApprovedReceiptHeaderRows(pool, branchCode) {
 }
 
 // ── Branch-level stock from TCNTPdtInWha × TCNMBranch ─────────────────────────
-// Returns one row per active product × branch for branches 000, 001, 003, 004, 005.
+// Returns one row per active product × branch for branches 000, 001, 002, 003, 004, 005.
 // FCPdtQtyNow only reflects HQ (warehouse 001); this is the authoritative source.
 export async function getBranchStockRows(pool) {
   const result = await pool.request().query(`
     SELECT
-      w.FTPdtCode  AS product_code,
-      b.FTBchCode  AS branch_code,
-      w.FCWahQty   AS qty
+      w.FTPdtCode AS product_code,
+      p.FTPdtName AS product_name_thai,
+      p.FTPdtNameOth AS product_name_eng,
+      COALESCE(p.FTPdtBarCode1, p.FTPdtBarCode2, p.FTPdtBarCode3) AS barcode,
+      COALESCE(p.FTPdtSUnit, p.FTPdtMUnit, p.FTPdtLUnit) AS unit,
+      b.FTBchCode AS branch_code,
+      w.FCWahQty AS qty
     FROM TCNTPdtInWha w
     JOIN TCNMBranch b ON b.FTBchWheStk = w.FTWahCode
-    WHERE b.FTBchCode IN ('000','001','003','004','005')
-      AND EXISTS (
-        SELECT 1 FROM TCNMPdt p
-        WHERE p.FTPdtCode = w.FTPdtCode AND p.FTPdtStaActive = 1
-      )
+    JOIN TCNMPdt p ON p.FTPdtCode = w.FTPdtCode
+    WHERE b.FTBchCode IN ('000','001','002','003','004','005')
+      AND p.FTPdtStaActive = 1
     ORDER BY w.FTPdtCode, b.FTBchCode
   `);
   return result.recordset;

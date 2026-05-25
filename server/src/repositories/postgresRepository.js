@@ -19,6 +19,31 @@ function mapSearchRow(row) {
   };
 }
 
+function toBranchStockNumber(value) {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function mapBranchStockSnapshotRow(row) {
+  return {
+    productCode: row.product_code,
+    productNameThai: row.product_name_thai || "",
+    productNameEng: row.product_name_eng || "",
+    barcode: row.barcode || "",
+    unit: row.unit || "",
+    qtyBranch000: toBranchStockNumber(row.qty_branch_000),
+    qtyBranch001: toBranchStockNumber(row.qty_branch_001),
+    qtyBranch002: toBranchStockNumber(row.qty_branch_002),
+    qtyBranch003: toBranchStockNumber(row.qty_branch_003),
+    qtyBranch004: toBranchStockNumber(row.qty_branch_004),
+    qtyBranch005: toBranchStockNumber(row.qty_branch_005),
+    qtyTotalAllBranches: toBranchStockNumber(row.qty_total_all_branches),
+    syncedAt: row.synced_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export class PostgresRepository {
   constructor() {
     // pool may be overridden after construction (e.g. in tests with a mock pool)
@@ -1158,43 +1183,167 @@ export class PostgresRepository {
     });
   }
 
-  async ingestBranchStock(payload) {
-    const records = payload.records || [];
-    if (!records.length) return { accepted: 0 };
+  async ingestBranchStockSnapshots(records) {
+    if (!records.length) return { accepted: 0, insertedOrUpdated: 0 };
 
-    const codes = [], branches = [], qtys = [];
-    for (const r of records) {
-      codes.push(r.productCode);
-      branches.push(r.branchCode);
-      qtys.push(Number(r.qty ?? 0));
+    const productCodes = [];
+    const productNamesThai = [];
+    const productNamesEng = [];
+    const barcodes = [];
+    const units = [];
+    const qtyBranch000 = [];
+    const qtyBranch001 = [];
+    const qtyBranch002 = [];
+    const qtyBranch003 = [];
+    const qtyBranch004 = [];
+    const qtyBranch005 = [];
+    const qtyTotals = [];
+    const syncedAts = [];
+
+    for (const record of records) {
+      productCodes.push(record.productCode);
+      productNamesThai.push(record.productNameThai || null);
+      productNamesEng.push(record.productNameEng || null);
+      barcodes.push(record.barcode || null);
+      units.push(record.unit || null);
+      qtyBranch000.push(toBranchStockNumber(record.qtyBranch000));
+      qtyBranch001.push(toBranchStockNumber(record.qtyBranch001));
+      qtyBranch002.push(toBranchStockNumber(record.qtyBranch002));
+      qtyBranch003.push(toBranchStockNumber(record.qtyBranch003));
+      qtyBranch004.push(toBranchStockNumber(record.qtyBranch004));
+      qtyBranch005.push(toBranchStockNumber(record.qtyBranch005));
+      qtyTotals.push(toBranchStockNumber(record.qtyTotalAllBranches));
+      syncedAts.push(record.syncedAt);
     }
 
     await this.pool.query(
-      `INSERT INTO product_branch_stock (product_code, branch_code, qty, synced_at)
-       SELECT unnest($1::text[]), unnest($2::text[]), unnest($3::numeric[]), NOW()
-       ON CONFLICT (product_code, branch_code) DO UPDATE SET
-         qty       = EXCLUDED.qty,
-         synced_at = NOW()`,
-      [codes, branches, qtys],
+      `
+      INSERT INTO branch_stock_snapshots (
+        product_code,
+        product_name_thai,
+        product_name_eng,
+        barcode,
+        unit,
+        qty_branch_000,
+        qty_branch_001,
+        qty_branch_002,
+        qty_branch_003,
+        qty_branch_004,
+        qty_branch_005,
+        qty_total_all_branches,
+        synced_at
+      )
+      SELECT
+        unnest($1::text[]),
+        unnest($2::text[]),
+        unnest($3::text[]),
+        unnest($4::text[]),
+        unnest($5::text[]),
+        unnest($6::numeric[]),
+        unnest($7::numeric[]),
+        unnest($8::numeric[]),
+        unnest($9::numeric[]),
+        unnest($10::numeric[]),
+        unnest($11::numeric[]),
+        unnest($12::numeric[]),
+        unnest($13::timestamptz[])
+      ON CONFLICT (product_code) DO UPDATE SET
+        product_name_thai = EXCLUDED.product_name_thai,
+        product_name_eng = EXCLUDED.product_name_eng,
+        barcode = EXCLUDED.barcode,
+        unit = EXCLUDED.unit,
+        qty_branch_000 = EXCLUDED.qty_branch_000,
+        qty_branch_001 = EXCLUDED.qty_branch_001,
+        qty_branch_002 = EXCLUDED.qty_branch_002,
+        qty_branch_003 = EXCLUDED.qty_branch_003,
+        qty_branch_004 = EXCLUDED.qty_branch_004,
+        qty_branch_005 = EXCLUDED.qty_branch_005,
+        qty_total_all_branches = EXCLUDED.qty_total_all_branches,
+        synced_at = EXCLUDED.synced_at,
+        updated_at = NOW()
+      `,
+      [
+        productCodes,
+        productNamesThai,
+        productNamesEng,
+        barcodes,
+        units,
+        qtyBranch000,
+        qtyBranch001,
+        qtyBranch002,
+        qtyBranch003,
+        qtyBranch004,
+        qtyBranch005,
+        qtyTotals,
+        syncedAts,
+      ],
     );
-    return { accepted: records.length };
+
+    return {
+      accepted: records.length,
+      insertedOrUpdated: records.length,
+    };
   }
 
-  async getBranchStock(productCode = null) {
-    const params = productCode ? [productCode] : [];
-    const where  = productCode ? "WHERE product_code = $1" : "";
+  async getBranchStockSnapshots({ search = "", limit = 25, offset = 0 } = {}) {
+    const normalizedSearch = normalizeQuery(search);
+    const safeLimit = Math.min(200, Math.max(1, Number(limit) || 25));
+    const safeOffset = Math.max(0, Number(offset) || 0);
+    const params = [normalizedSearch || null, safeLimit, safeOffset];
+    const whereClause = `
+      WHERE (
+        $1::text IS NULL
+        OR LOWER(COALESCE(product_code, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(product_name_thai, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(product_name_eng, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(barcode, '')) LIKE '%' || $1 || '%'
+      )
+    `;
+
+    const countResult = await this.pool.query(
+      `
+      SELECT COUNT(*)::int AS total
+      FROM branch_stock_snapshots
+      ${whereClause}
+      `,
+      [normalizedSearch || null],
+    );
+    const total = Number(countResult.rows[0]?.total || 0);
+
     const { rows } = await this.pool.query(
-      `SELECT product_code, branch_code, qty, synced_at
-       FROM product_branch_stock ${where}
-       ORDER BY product_code, branch_code`,
+      `
+      SELECT
+        product_code,
+        product_name_thai,
+        product_name_eng,
+        barcode,
+        unit,
+        qty_branch_000,
+        qty_branch_001,
+        qty_branch_002,
+        qty_branch_003,
+        qty_branch_004,
+        qty_branch_005,
+        qty_total_all_branches,
+        synced_at,
+        created_at,
+        updated_at
+      FROM branch_stock_snapshots
+      ${whereClause}
+      ORDER BY product_code ASC
+      LIMIT $2 OFFSET $3
+      `,
       params,
     );
-    return rows.map((r) => ({
-      productCode: r.product_code,
-      branchCode:  r.branch_code,
-      qty:         Number(r.qty),
-      syncedAt:    r.synced_at,
-    }));
+
+    return {
+      records: rows.map(mapBranchStockSnapshotRow),
+      pagination: {
+        limit: safeLimit,
+        offset: safeOffset,
+        total,
+      },
+    };
   }
 
   async close() {

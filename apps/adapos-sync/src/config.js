@@ -33,6 +33,10 @@ export const syncConfig = {
              ? cliDryRun
              : String(process.env.ADAPOS_SYNC_DRY_RUN ?? "true") === "true",
   apiBaseUrl:  process.env.ADAPOS_SYNC_API_BASE_URL ?? "http://localhost:4000",
+  syncSharedToken:
+    process.env.ADAPOS_SYNC_SHARED_TOKEN
+    ?? process.env.BRANCH_STOCK_SYNC_TOKEN
+    ?? "",
   dateCutoff:  process.env.ADAPOS_SYNC_DATE_CUTOFF  ?? new Date().toISOString().slice(0, 10),
   branchCode: cliBranch || process.env.ADAPOS_SYNC_BRANCH_CODE || "",
   datasets: ((cliDatasets || process.env.ADAPOS_SYNC_DATASETS || "products,sales,transfers,transfer_lines"))

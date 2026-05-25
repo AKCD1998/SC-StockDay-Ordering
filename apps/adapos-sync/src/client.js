@@ -1,7 +1,14 @@
+import { syncConfig } from "./config.js";
+
 export async function postJson(url, payload) {
+  const headers = { "Content-Type": "application/json" };
+  if (syncConfig.syncSharedToken && /\/api\/branch-stock\/sync$/i.test(url)) {
+    headers.Authorization = `Bearer ${syncConfig.syncSharedToken}`;
+  }
+
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(payload),
   });
 

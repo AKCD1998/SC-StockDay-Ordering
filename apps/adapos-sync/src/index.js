@@ -216,11 +216,12 @@ async function runOnce() {
 
       if (data.branch_stock?.length) {
         console.log(`Posting ${data.branch_stock.length} branch-stock rows...`);
+        const branchStockRecords = toBranchStockRecords(data.branch_stock);
         const sent = await postBatches(
-          `${syncConfig.apiBaseUrl}/api/sync/ada/branch-stock`,
-          toBranchStockRecords(data.branch_stock),
+          `${syncConfig.apiBaseUrl}/api/branch-stock/sync`,
+          branchStockRecords,
         );
-        console.log(`  branch_stock: ${sent} sent`);
+        console.log(`  branch_stock: ${sent} snapshots sent`);
         totalSent += sent;
       }
 

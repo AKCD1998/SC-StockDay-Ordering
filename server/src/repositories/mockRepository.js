@@ -252,5 +252,23 @@ export class MockRepository {
     return [];
   }
 
+  async ingestBranchStockSnapshots(records) {
+    return {
+      accepted: records.length,
+      insertedOrUpdated: records.length,
+    };
+  }
+
+  async getBranchStockSnapshots(options = {}) {
+    return {
+      records: [],
+      pagination: {
+        limit: Number(options.limit) || 25,
+        offset: Number(options.offset) || 0,
+        total: 0,
+      },
+    };
+  }
+
   async close() {}
 }

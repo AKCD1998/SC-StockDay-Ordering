@@ -371,6 +371,15 @@ button {
   min-width: 220px;
 }
 
+.branch-stock-toolbar {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.branch-stock-toolbar input {
+  min-width: min(420px, 100%);
+}
+
 .spotlight-list,
 .request-list {
   display: grid;
@@ -404,6 +413,18 @@ button {
 
 .table-wrap {
   overflow: auto;
+}
+
+.branch-stock-table th,
+.branch-stock-table td {
+  min-width: 120px;
+}
+
+.branch-stock-table th:nth-child(1),
+.branch-stock-table td:nth-child(1),
+.branch-stock-table th:nth-child(2),
+.branch-stock-table td:nth-child(2) {
+  min-width: 180px;
 }
 
 .pagination {

@@ -158,10 +158,49 @@ export function toApprovedReceiptPayload(hdRows, dtRows) {
 }
 
 export function toBranchStockRecords(rows) {
-  return rows.map((r) => ({
-    productCode: r.product_code,
-    branchCode:  r.branch_code,
-    qty:         Number(r.qty ?? 0),
+  const snapshots = new Map();
+
+  for (const row of rows) {
+    const productCode = row.product_code;
+    if (!productCode) continue;
+
+    const branchCode = String(row.branch_code || "").padStart(3, "0");
+    const qty = Number(row.qty ?? 0);
+    const snapshot = snapshots.get(productCode) || {
+      product_code: productCode,
+      product_name_thai: row.product_name_thai || "",
+      product_name_eng: row.product_name_eng || "",
+      barcode: row.barcode || "",
+      unit: row.unit || "",
+      qty_branch_000: 0,
+      qty_branch_001: 0,
+      qty_branch_002: 0,
+      qty_branch_003: 0,
+      qty_branch_004: 0,
+      qty_branch_005: 0,
+      qty_total_all_branches: 0,
+      synced_at: new Date().toISOString(),
+    };
+
+    if (branchCode === "000") snapshot.qty_branch_000 = qty;
+    if (branchCode === "001") snapshot.qty_branch_001 = qty;
+    if (branchCode === "002") snapshot.qty_branch_002 = qty;
+    if (branchCode === "003") snapshot.qty_branch_003 = qty;
+    if (branchCode === "004") snapshot.qty_branch_004 = qty;
+    if (branchCode === "005") snapshot.qty_branch_005 = qty;
+
+    snapshots.set(productCode, snapshot);
+  }
+
+  return [...snapshots.values()].map((snapshot) => ({
+    ...snapshot,
+    qty_total_all_branches:
+      Number(snapshot.qty_branch_000 || 0) +
+      Number(snapshot.qty_branch_001 || 0) +
+      Number(snapshot.qty_branch_002 || 0) +
+      Number(snapshot.qty_branch_003 || 0) +
+      Number(snapshot.qty_branch_004 || 0) +
+      Number(snapshot.qty_branch_005 || 0),
   }));
 }
 
