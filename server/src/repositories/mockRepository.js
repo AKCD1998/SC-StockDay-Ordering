@@ -228,5 +228,13 @@ export class MockRepository {
     return [];
   }
 
+  async ingestBranchStock(payload) {
+    return { accepted: (payload.records || []).length };
+  }
+
+  async getBranchStock(_productCode) {
+    return [];
+  }
+
   async close() {}
 }

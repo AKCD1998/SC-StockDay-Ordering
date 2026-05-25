@@ -12,9 +12,10 @@ import {
   getPendingReceiptLineRows,
   getTodayApprovedReceiptHeaderRows,
   getTodayApprovedReceiptLineRows,
+  getBranchStockRows,
 } from "./queries.js";
 import { postJson } from "./client.js";
-import { toProductRecords, toSalesRecords, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload } from "./transform.js";
+import { toProductRecords, toSalesRecords, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords } from "./transform.js";
 
 const PERIOD_DAYS = 30;
 
@@ -72,6 +73,9 @@ async function fetchDatasets(pool) {
   if (datasets.includes("approved_receipts")) {
     data.approved_receipt_headers = await getTodayApprovedReceiptHeaderRows(pool, branchCode);
     data.approved_receipt_lines   = await getTodayApprovedReceiptLineRows(pool, branchCode);
+  }
+  if (datasets.includes("branch_stock")) {
+    data.branch_stock = await getBranchStockRows(pool);
   }
 
   return data;
@@ -208,6 +212,16 @@ async function runOnce() {
         );
         console.log(`  pending receipts: ${result.headersAccepted} headers, ${result.linesAccepted} lines accepted`);
         totalSent += result.headersAccepted + result.linesAccepted;
+      }
+
+      if (data.branch_stock?.length) {
+        console.log(`Posting ${data.branch_stock.length} branch-stock rows...`);
+        const sent = await postBatches(
+          `${syncConfig.apiBaseUrl}/api/sync/ada/branch-stock`,
+          toBranchStockRecords(data.branch_stock),
+        );
+        console.log(`  branch_stock: ${sent} sent`);
+        totalSent += sent;
       }
 
       if (data.approved_receipt_headers?.length || data.approved_receipt_lines?.length) {

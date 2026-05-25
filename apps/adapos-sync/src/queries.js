@@ -10,6 +10,7 @@ export async function getProductMasterRows(pool) {
     SELECT
       FTPdtCode,
       FTPdtName,
+      FTPdtNameOth,
       FTPdtBarCode1,
       FTPdtBarCode2,
       FTPdtBarCode3,
@@ -270,6 +271,27 @@ export async function getTodayApprovedReceiptHeaderRows(pool, branchCode) {
       AND FTXihStaPrcDoc = '1'
       AND CAST(FDXihDocDate AS DATE) = CAST(GETDATE() AS DATE)
     ORDER BY FDXihDocDate DESC, FTXihDocTime DESC
+  `);
+  return result.recordset;
+}
+
+// ── Branch-level stock from TCNTPdtInWha × TCNMBranch ─────────────────────────
+// Returns one row per active product × branch for branches 000, 001, 003, 004, 005.
+// FCPdtQtyNow only reflects HQ (warehouse 001); this is the authoritative source.
+export async function getBranchStockRows(pool) {
+  const result = await pool.request().query(`
+    SELECT
+      w.FTPdtCode  AS product_code,
+      b.FTBchCode  AS branch_code,
+      w.FCWahQty   AS qty
+    FROM TCNTPdtInWha w
+    JOIN TCNMBranch b ON b.FTBchWheStk = w.FTWahCode
+    WHERE b.FTBchCode IN ('000','001','003','004','005')
+      AND EXISTS (
+        SELECT 1 FROM TCNMPdt p
+        WHERE p.FTPdtCode = w.FTPdtCode AND p.FTPdtStaActive = 1
+      )
+    ORDER BY w.FTPdtCode, b.FTBchCode
   `);
   return result.recordset;
 }

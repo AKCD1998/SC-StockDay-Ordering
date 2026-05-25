@@ -197,6 +197,17 @@ export function createRouter(repository) {
     res.json(await repository.getTransfersByBranch(branchCode, periodDays));
   }));
 
+  router.post("/api/sync/ada/branch-stock", asyncHandler(async (req, res) => {
+    const validationError = validateRecordsPayload(req.body);
+    if (validationError) return res.status(400).json({ message: validationError });
+    res.json(await repository.ingestBranchStock(req.body));
+  }));
+
+  router.get("/api/admin/branch-stock", asyncHandler(async (req, res) => {
+    const { productCode } = req.query;
+    res.json(await repository.getBranchStock(productCode || null));
+  }));
+
   router.post("/api/sync/run-log", asyncHandler(async (req, res) => {
     res.json(await repository.ingestRunLog(req.body || {}));
   }));

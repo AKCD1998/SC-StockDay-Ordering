@@ -6,6 +6,7 @@ function mapSearchRow(row) {
   return {
     productCode: row.product_code,
     productName: row.product_name,
+    productNameEng: row.product_name_eng || null,
     barcode: row.barcode_1 || row.barcode_2 || row.barcode_3 || "",
     supplier: row.supplier_name || row.supplier_code || "",
     unit: row.unit_small || row.unit_medium || row.unit_large || "",
@@ -104,6 +105,7 @@ export class PostgresRepository {
       SELECT
         p.product_code,
         p.product_name,
+        p.product_name_eng,
         COALESCE(p.barcode_1, p.barcode_2, p.barcode_3, '') AS barcode,
         COALESCE(p.unit_small, p.unit_medium, p.unit_large, '') AS unit,
         p.stock_current,
@@ -129,6 +131,7 @@ export class PostgresRepository {
     return rows.map((row) => ({
       productCode: row.product_code,
       productName: row.product_name,
+      productNameEng: row.product_name_eng || null,
       barcode: row.barcode,
       unit: row.unit,
       currentStock: Number(row.stock_current || 0),
@@ -369,7 +372,7 @@ export class PostgresRepository {
     const records = payload.records || [];
     if (!records.length) return { accepted: 0 };
 
-    const codes = [], names = [], b1 = [], b2 = [], b3 = [];
+    const codes = [], names = [], namesEng = [], b1 = [], b2 = [], b3 = [];
     const sCodes = [], sNames = [];
     const uSmall = [], fSmall = [], uMed = [], fMed = [], uLarge = [], fLarge = [];
     const sCurr = [], sRet = [], sWhs = [], minS = [], maxS = [], lead = [];
@@ -378,6 +381,7 @@ export class PostgresRepository {
     for (const r of records) {
       codes.push(r.productCode);
       names.push(r.productName);
+      namesEng.push(r.productNameEng || null);
       b1.push(r.barcode1 || null);
       b2.push(r.barcode2 || null);
       b3.push(r.barcode3 || null);
@@ -404,24 +408,25 @@ export class PostgresRepository {
 
       await client.query(
         `INSERT INTO products
-           (product_code, product_name, barcode_1, barcode_2, barcode_3,
+           (product_code, product_name, product_name_eng, barcode_1, barcode_2, barcode_3,
             supplier_code, supplier_name,
             unit_small, factor_small, unit_medium, factor_medium,
             unit_large, factor_large,
             stock_current, stock_retail, stock_warehouse,
             min_stock, max_stock, lead_time_days, synced_at)
          SELECT
-           unnest($1::text[]), unnest($2::text[]),
-           unnest($3::text[]), unnest($4::text[]), unnest($5::text[]),
-           unnest($6::text[]), unnest($7::text[]),
-           unnest($8::text[]), unnest($9::numeric[]),
-           unnest($10::text[]), unnest($11::numeric[]),
-           unnest($12::text[]), unnest($13::numeric[]),
-           unnest($14::numeric[]), unnest($15::numeric[]), unnest($16::numeric[]),
-           unnest($17::numeric[]), unnest($18::numeric[]), unnest($19::numeric[]),
+           unnest($1::text[]), unnest($2::text[]), unnest($3::text[]),
+           unnest($4::text[]), unnest($5::text[]), unnest($6::text[]),
+           unnest($7::text[]), unnest($8::text[]),
+           unnest($9::text[]), unnest($10::numeric[]),
+           unnest($11::text[]), unnest($12::numeric[]),
+           unnest($13::text[]), unnest($14::numeric[]),
+           unnest($15::numeric[]), unnest($16::numeric[]), unnest($17::numeric[]),
+           unnest($18::numeric[]), unnest($19::numeric[]), unnest($20::numeric[]),
            NOW()
          ON CONFLICT (product_code) DO UPDATE SET
            product_name     = EXCLUDED.product_name,
+           product_name_eng = EXCLUDED.product_name_eng,
            barcode_1        = EXCLUDED.barcode_1,
            barcode_2        = EXCLUDED.barcode_2,
            barcode_3        = EXCLUDED.barcode_3,
@@ -441,7 +446,7 @@ export class PostgresRepository {
            lead_time_days   = EXCLUDED.lead_time_days,
            synced_at        = NOW(),
            updated_at       = NOW()`,
-        [codes, names, b1, b2, b3, sCodes, sNames,
+        [codes, names, namesEng, b1, b2, b3, sCodes, sNames,
           uSmall, fSmall, uMed, fMed, uLarge, fLarge,
           sCurr, sRet, sWhs, minS, maxS, lead],
       );
@@ -1132,6 +1137,45 @@ export class PostgresRepository {
       }
     }
     return [...grouped.values()];
+  }
+
+  async ingestBranchStock(payload) {
+    const records = payload.records || [];
+    if (!records.length) return { accepted: 0 };
+
+    const codes = [], branches = [], qtys = [];
+    for (const r of records) {
+      codes.push(r.productCode);
+      branches.push(r.branchCode);
+      qtys.push(Number(r.qty ?? 0));
+    }
+
+    await this.pool.query(
+      `INSERT INTO product_branch_stock (product_code, branch_code, qty, synced_at)
+       SELECT unnest($1::text[]), unnest($2::text[]), unnest($3::numeric[]), NOW()
+       ON CONFLICT (product_code, branch_code) DO UPDATE SET
+         qty       = EXCLUDED.qty,
+         synced_at = NOW()`,
+      [codes, branches, qtys],
+    );
+    return { accepted: records.length };
+  }
+
+  async getBranchStock(productCode = null) {
+    const params = productCode ? [productCode] : [];
+    const where  = productCode ? "WHERE product_code = $1" : "";
+    const { rows } = await this.pool.query(
+      `SELECT product_code, branch_code, qty, synced_at
+       FROM product_branch_stock ${where}
+       ORDER BY product_code, branch_code`,
+      params,
+    );
+    return rows.map((r) => ({
+      productCode: r.product_code,
+      branchCode:  r.branch_code,
+      qty:         Number(r.qty),
+      syncedAt:    r.synced_at,
+    }));
   }
 
   async close() {

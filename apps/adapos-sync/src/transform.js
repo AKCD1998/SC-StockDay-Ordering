@@ -4,6 +4,7 @@ export function toProductRecords(rows) {
   return rows.map((r) => ({
     productCode:    r.FTPdtCode,
     productName:    r.FTPdtName,
+    productNameEng: r.FTPdtNameOth || null,
     barcode1:       r.FTPdtBarCode1  || null,
     barcode2:       r.FTPdtBarCode2  || null,
     barcode3:       r.FTPdtBarCode3  || null,
@@ -154,6 +155,14 @@ export function toApprovedReceiptPayload(hdRows, dtRows) {
       lines,
     };
   });
+}
+
+export function toBranchStockRecords(rows) {
+  return rows.map((r) => ({
+    productCode: r.product_code,
+    branchCode:  r.branch_code,
+    qty:         Number(r.qty ?? 0),
+  }));
 }
 
 export function toSalesRecords(rows, branchCode, periodDays) {
