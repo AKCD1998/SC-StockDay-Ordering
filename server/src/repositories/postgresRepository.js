@@ -1003,10 +1003,12 @@ export class PostgresRepository {
     branchCode = null,
     date = null,
     search = "",
+    sort = "desc",
     page = 1,
     pageSize = 10,
   }) {
     const normalizedSearch = normalizeQuery(search);
+    const normalizedSort = String(sort || "desc").toLowerCase() === "asc" ? "ASC" : "DESC";
     const safePage = Math.max(1, Number(page) || 1);
     const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 10));
     const offset = (safePage - 1) * safePageSize;
@@ -1052,7 +1054,7 @@ export class PostgresRepository {
         SELECT h.doc_no
         FROM ${headerTable} h
         ${whereClause}
-        ORDER BY h.doc_date DESC, h.doc_time DESC, h.doc_no DESC
+        ORDER BY h.doc_date ${normalizedSort}, h.doc_time ${normalizedSort}, h.doc_no ${normalizedSort}
         LIMIT $4 OFFSET $5
       )
       SELECT
@@ -1067,7 +1069,7 @@ export class PostgresRepository {
       FROM paged_docs d
       JOIN ${headerTable} h ON h.doc_no = d.doc_no
       LEFT JOIN ${lineTable} l ON l.doc_no = h.doc_no
-      ORDER BY h.doc_date DESC, h.doc_time DESC, h.doc_no DESC, l.seq_no ASC
+      ORDER BY h.doc_date ${normalizedSort}, h.doc_time ${normalizedSort}, h.doc_no ${normalizedSort}, l.seq_no ASC
       `,
       params,
     );

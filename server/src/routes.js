@@ -279,7 +279,7 @@ export function createRouter(repository) {
 
   // Admin view: approved purchase receipts for today (or a specific date)
   router.get("/api/admin/approved-receipts", asyncHandler(async (req, res) => {
-    const { branchCode, date, search } = req.query;
+    const { branchCode, date, search, sort } = req.query;
     if (!branchCode) return res.status(400).json({ error: "branchCode required" });
     const page = parsePageParam(req.query.page, 1);
     const pageSize = parsePageParam(req.query.pageSize, 10);
@@ -287,6 +287,7 @@ export function createRouter(repository) {
       branchCode,
       date: date ?? null,
       search: search || "",
+      sort: sort || "desc",
       page,
       pageSize,
     });

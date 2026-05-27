@@ -285,12 +285,12 @@ function LoginScreen({ authError, busy, username, password, onUsernameChange, on
 }
 
 function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
-  const today = new Date().toISOString().slice(0, 10);
   const receiptPageSize = 10;
   const [activeTab, setActiveTab] = useState("pending");
   const [pendingRecords, setPendingRecords] = useState([]);
   const [approvedRecords, setApprovedRecords] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(today);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [approvedSortOrder, setApprovedSortOrder] = useState("desc");
   const [pendingDateFilter, setPendingDateFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
@@ -350,16 +350,22 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
     }
   }
 
-  async function fetchApproved({ date = selectedDate, page = approvedPage, search = appliedSearchTerm } = {}) {
+  async function fetchApproved({
+    date = selectedDate,
+    page = approvedPage,
+    search = appliedSearchTerm,
+    sort = approvedSortOrder,
+  } = {}) {
     setLoadingApproved(true);
     setApprovedError("");
     try {
       const params = new URLSearchParams({
         branchCode,
-        date,
         page: String(page),
         pageSize: String(receiptPageSize),
+        sort,
       });
+      if (date) params.set("date", date);
       if (search) params.set("search", search);
       const res = await apiFetch(`/api/admin/approved-receipts?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -386,7 +392,7 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
 
   useEffect(() => {
     fetchApproved();
-  }, [approvedPage, approvedRefreshKey, appliedSearchTerm, branchCode, selectedDate]);
+  }, [approvedPage, approvedRefreshKey, appliedSearchTerm, branchCode, selectedDate, approvedSortOrder]);
 
   function formatDocDate(value) {
     if (!value) return "-";
@@ -642,6 +648,18 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
               className="date-input-inline"
             />
           </label>
+          {activeTab === "approved" && (
+            <button
+              type="button"
+              className="ghost-button receipt-sort-button"
+              onClick={() => {
+                setApprovedSortOrder((current) => (current === "desc" ? "asc" : "desc"));
+                setApprovedPage(1);
+              }}
+            >
+              {approvedSortOrder === "desc" ? "ใหม่ -> เก่า" : "เก่า -> ใหม่"}
+            </button>
+          )}
           <button type="submit" className="ghost-button receipt-search-button">
             ค้นหา
           </button>
@@ -681,7 +699,9 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
             <p className="notice error compact">❌ เชื่อมต่อไม่ได้: {approvedError}</p>
           )}
           {!loadingApproved && !approvedError && approvedRecords.length === 0 && (
-            <p className="empty-state">ยังไม่มีเอกสารรับของสำหรับวันที่เลือก</p>
+            <p className="empty-state">
+              {selectedDate ? "ยังไม่มีเอกสารรับของสำหรับวันที่เลือก" : "ยังไม่มีเอกสารรับของ"}
+            </p>
           )}
           <div className="receipt-list">
             {approvedRecords.map((rec) => (

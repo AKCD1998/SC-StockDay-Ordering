@@ -791,6 +791,11 @@ select {
   color: #fff;
 }
 
+.receipt-sort-button {
+  min-width: 112px;
+  white-space: nowrap;
+}
+
 .receipt-date-label {
   min-width: 180px;
 }
