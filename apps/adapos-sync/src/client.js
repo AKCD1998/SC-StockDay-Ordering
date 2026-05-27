@@ -2,8 +2,9 @@ import { syncConfig } from "./config.js";
 
 export async function postJson(url, payload) {
   const headers = { "Content-Type": "application/json" };
-  if (syncConfig.syncSharedToken && /\/api\/branch-stock\/sync$/i.test(url)) {
+  if (syncConfig.syncSharedToken) {
     headers.Authorization = `Bearer ${syncConfig.syncSharedToken}`;
+    headers["x-api-key"] = syncConfig.syncSharedToken;
   }
 
   const response = await fetch(url, {
