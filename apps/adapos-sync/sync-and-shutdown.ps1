@@ -7,12 +7,12 @@
 #  1. Sends a startup heartbeat so the dashboard knows the laptop was on
 #  2. Runs the sync up to 3 times (retries on failure)
 #  3. Shuts down the PC after success or all retries exhausted
-#     (skipped when -NoShutdown is passed — use this for testing)
+#     (skipped when -NoShutdown is passed - use this for testing)
 
 param(
   [string]$Branch     = "005",
   [string]$NodeExe    = "C:\Program Files\nodejs\node.exe",
-  [switch]$NoShutdown                    # pass -NoShutdown to skip Stop-Computer
+  [switch]$NoShutdown                    # pass -NoShutdown to skip shutdown
 )
 
 $ScriptDir = $PSScriptRoot
@@ -23,7 +23,7 @@ $RetryWaitSeconds  = 120   # 2 minutes between retries
 $ShutdownDelaySec  = 60    # grace period before shutdown
 $LaptopName        = $env:COMPUTERNAME
 
-# ── Read .env values ────────────────────────────────────────────────────────
+# -- Read .env values --------------------------------------------------------
 function Get-EnvValue([string]$Key) {
   $line = Get-Content ".env" -ErrorAction SilentlyContinue |
           Where-Object { $_ -match "^$Key=" } |
@@ -39,7 +39,7 @@ $Token  = Get-EnvValue "ADAPOS_SYNC_SHARED_TOKEN"
 # Set ADAPOS_SC_ORDERING_URL in .env (e.g. https://sc-stockday-ordering.onrender.com).
 $ScUrl  = Get-EnvValue "ADAPOS_SC_ORDERING_URL"
 
-# ── Heartbeat ───────────────────────────────────────────────────────────────
+# -- Heartbeat ---------------------------------------------------------------
 Write-Output "[$(Get-Date -Format 'HH:mm:ss')] Starting sync for branch $Branch on $LaptopName"
 
 # Heartbeat goes to SC-StockDay-Ordering so the nightly-log dashboard can see it.
@@ -60,10 +60,10 @@ if ($HeartbeatUrl) {
     Write-Output "[$(Get-Date -Format 'HH:mm:ss')] Heartbeat failed (non-fatal): $($_.Exception.Message)"
   }
 } else {
-  Write-Output "[$(Get-Date -Format 'HH:mm:ss')] Skipping heartbeat — ADAPOS_SC_ORDERING_URL not set in .env"
+  Write-Output "[$(Get-Date -Format 'HH:mm:ss')] Skipping heartbeat - ADAPOS_SC_ORDERING_URL not set in .env"
 }
 
-# ── Sync with retries ───────────────────────────────────────────────────────
+# -- Sync with retries -------------------------------------------------------
 $Success = $false
 
 for ($Attempt = 1; $Attempt -le $MaxRetries; $Attempt++) {
@@ -85,15 +85,15 @@ for ($Attempt = 1; $Attempt -le $MaxRetries; $Attempt++) {
   }
 }
 
-# ── Shutdown ────────────────────────────────────────────────────────────────
+# -- Shutdown ----------------------------------------------------------------
 # shutdown.exe /s /f /t N
 #   /s  = shutdown (not restart)
-#   /f  = force-close every open application — no "please save your work" dialogs
+#   /f  = force-close every open application - no "please save your work" dialogs
 #   /t  = countdown in seconds before the PC goes off
 # This is more reliable than Stop-Computer -Force for dismissing app-blocking popups.
 
 if ($NoShutdown) {
-  Write-Output "[$(Get-Date -Format 'HH:mm:ss')] -NoShutdown flag set — skipping shutdown. Done."
+  Write-Output "[$(Get-Date -Format 'HH:mm:ss')] -NoShutdown flag set - skipping shutdown. Done."
 } elseif ($Success) {
   Write-Output "[$(Get-Date -Format 'HH:mm:ss')] Sync done. PC will shut down in $ShutdownDelaySec seconds (all apps force-closed)..."
   & shutdown.exe /s /f /t $ShutdownDelaySec
