@@ -10,8 +10,8 @@ import {
   getTransferLineRows,
   getPendingReceiptHeaderRows,
   getPendingReceiptLineRows,
-  getTodayApprovedReceiptHeaderRows,
-  getTodayApprovedReceiptLineRows,
+  getApprovedReceiptHeaderRows,
+  getApprovedReceiptLineRows,
   getBranchStockRows,
 } from "./queries.js";
 import { postJson } from "./client.js";
@@ -71,8 +71,17 @@ async function fetchDatasets(pool) {
     data.pending_receipt_lines   = await getPendingReceiptLineRows(pool, branchCode);
   }
   if (datasets.includes("approved_receipts")) {
-    data.approved_receipt_headers = await getTodayApprovedReceiptHeaderRows(pool, branchCode);
-    data.approved_receipt_lines   = await getTodayApprovedReceiptLineRows(pool, branchCode);
+    const dateOpts = {
+      lookbackDays: syncConfig.approvedReceiptsLookbackDays,
+      fromDate: syncConfig.dateFrom,
+      toDate:   syncConfig.dateTo,
+    };
+    const rangeLabel = syncConfig.dateFrom
+      ? `${syncConfig.dateFrom} → ${syncConfig.dateTo ?? "today"}`
+      : `last ${syncConfig.approvedReceiptsLookbackDays} days`;
+    console.log(`  approved_receipts date range: ${rangeLabel}`);
+    data.approved_receipt_headers = await getApprovedReceiptHeaderRows(pool, branchCode, dateOpts);
+    data.approved_receipt_lines   = await getApprovedReceiptLineRows(pool, branchCode, dateOpts);
   }
   if (datasets.includes("branch_stock")) {
     data.branch_stock = await getBranchStockRows(pool);
@@ -104,6 +113,13 @@ async function runOnce() {
   console.log(`Datasets:      ${syncConfig.datasets.join(", ")}`);
   console.log(`Dry-run:       ${syncConfig.dryRun}`);
   console.log(`Date cutoff:   ${syncConfig.dateCutoff}`);
+  if (syncConfig.datasets.includes("approved_receipts")) {
+    if (syncConfig.dateFrom) {
+      console.log(`Backfill:      approved_receipts ${syncConfig.dateFrom} → ${syncConfig.dateTo ?? "today"}`);
+    } else {
+      console.log(`Approved lookback: last ${syncConfig.approvedReceiptsLookbackDays} days`);
+    }
+  }
   console.log("");
 
   let pool;
@@ -228,19 +244,42 @@ async function runOnce() {
       if (data.approved_receipt_headers?.length || data.approved_receipt_lines?.length) {
         const hCount = data.approved_receipt_headers?.length ?? 0;
         const lCount = data.approved_receipt_lines?.length   ?? 0;
-        console.log(`Posting ${hCount} approved receipt headers, ${lCount} lines...`);
-        const result = await postJson(
-          `${syncConfig.apiBaseUrl}/api/sync/ada/approved-receipts`,
-          {
-            branchCode: syncConfig.branchCode,
-            records: toApprovedReceiptPayload(
-              data.approved_receipt_headers ?? [],
-              data.approved_receipt_lines   ?? [],
-            ),
-          },
+        const rangeLabel = syncConfig.dateFrom
+          ? `${syncConfig.dateFrom} → ${syncConfig.dateTo ?? "today"}`
+          : `last ${syncConfig.approvedReceiptsLookbackDays} days`;
+        console.log(`Posting ${hCount} approved receipt headers, ${lCount} lines (${rangeLabel})...`);
+
+        const records = toApprovedReceiptPayload(
+          data.approved_receipt_headers ?? [],
+          data.approved_receipt_lines   ?? [],
         );
-        console.log(`  approved-receipts synced: ${result.upserted ?? 0} upserted`);
-        totalSent += result.upserted ?? 0;
+
+        const docNosToPost = records.map((r) => r.docNo).filter(Boolean);
+        console.log(`  Doc nos: ${docNosToPost.join(", ") || "(none)"}`);
+
+        let approvedUpserted = 0;
+        let approvedFailed = 0;
+        const failedDocNos = [];
+
+        for (const record of records) {
+          try {
+            const result = await postJson(
+              `${syncConfig.apiBaseUrl}/api/sync/ada/approved-receipts`,
+              { branchCode: syncConfig.branchCode, records: [record] },
+            );
+            approvedUpserted += result.upserted ?? 1;
+          } catch (postDocErr) {
+            approvedFailed++;
+            failedDocNos.push(record.docNo ?? "?");
+            console.warn(`  WARN: failed to post ${record.docNo}: ${postDocErr.message}`);
+          }
+        }
+
+        console.log(`  approved-receipts: ${approvedUpserted} upserted, ${approvedFailed} failed`);
+        if (failedDocNos.length) {
+          console.log(`  Failed doc nos: ${failedDocNos.join(", ")}`);
+        }
+        totalSent += approvedUpserted;
       }
 
       await postJson(`${syncConfig.apiBaseUrl}/api/sync/run-log`, {

@@ -11,11 +11,15 @@ function parseHost(raw) {
   return { server: raw.slice(0, slash), instanceName: raw.slice(slash + 1) };
 }
 
-// CLI overrides: --dry-run, --execute, --branch=005, --datasets=transfers,transfer_lines
+// CLI overrides: --dry-run, --execute, --branch=005, --datasets=...
+// Backfill: --date-from=YYYY-MM-DD --date-to=YYYY-MM-DD --lookback-days=N
 const args = process.argv.slice(2);
-const cliDryRun   = args.includes("--dry-run") ? true : args.includes("--execute") ? false : null;
-const cliBranch   = (args.find((a) => a.startsWith("--branch="))   ?? "").replace("--branch=",   "") || null;
-const cliDatasets = (args.find((a) => a.startsWith("--datasets=")) ?? "").replace("--datasets=", "") || null;
+const cliDryRun     = args.includes("--dry-run") ? true : args.includes("--execute") ? false : null;
+const cliBranch     = (args.find((a) => a.startsWith("--branch="))        ?? "").replace("--branch=",        "") || null;
+const cliDatasets   = (args.find((a) => a.startsWith("--datasets="))      ?? "").replace("--datasets=",      "") || null;
+const cliDateFrom   = (args.find((a) => a.startsWith("--date-from="))     ?? "").replace("--date-from=",     "") || null;
+const cliDateTo     = (args.find((a) => a.startsWith("--date-to="))       ?? "").replace("--date-to=",       "") || null;
+const cliLookback   = (args.find((a) => a.startsWith("--lookback-days=")) ?? "").replace("--lookback-days=", "") || null;
 
 const { server, instanceName } = parseHost(process.env.ADAPOS_SQLSERVER_HOST ?? "");
 
@@ -43,6 +47,13 @@ export const syncConfig = {
     .split(",")
     .map((d) => d.trim())
     .filter(Boolean),
+  // Approved receipts window — default 14 days so missed-day syncs self-heal.
+  // Override with --lookback-days=N or env APPROVED_RECEIPTS_LOOKBACK_DAYS.
+  approvedReceiptsLookbackDays: Number(cliLookback || process.env.APPROVED_RECEIPTS_LOOKBACK_DAYS || 14),
+  // Explicit backfill date range (overrides lookback when both are set).
+  // Pass --date-from=YYYY-MM-DD --date-to=YYYY-MM-DD to backfill a specific window.
+  dateFrom: cliDateFrom || process.env.SYNC_DATE_FROM || null,
+  dateTo:   cliDateTo   || process.env.SYNC_DATE_TO   || null,
 };
 
 // ── Safety guards ─────────────────────────────────────────────────────────────

@@ -254,11 +254,28 @@ export async function getTransferLineRows(pool, branchCode, periodDays) {
   return result.recordset;
 }
 
-// ── Today's approved purchase receipt headers ──────────────────────────────────
+// ── Approved purchase receipt headers ─────────────────────────────────────────
 // FTXihStaPrcDoc = '1' means approved by management.
-export async function getTodayApprovedReceiptHeaderRows(pool, branchCode) {
+// Default: last 14 days so missed-day syncs self-heal on the next run.
+// Pass fromDate/toDate (YYYY-MM-DD strings) for an explicit backfill range.
+export async function getApprovedReceiptHeaderRows(
+  pool,
+  branchCode,
+  { lookbackDays = 14, fromDate = null, toDate = null } = {},
+) {
   const req = pool.request();
   req.input("branchCode", sql.VarChar(3), branchCode);
+
+  let dateFilter;
+  if (fromDate && toDate) {
+    req.input("fromDate", sql.VarChar(10), fromDate);
+    req.input("toDate",   sql.VarChar(10), toDate);
+    dateFilter = "AND CAST(FDXihDocDate AS DATE) >= @fromDate AND CAST(FDXihDocDate AS DATE) <= @toDate";
+  } else {
+    req.input("lookbackDays", sql.Int, lookbackDays);
+    dateFilter = "AND FDXihDocDate >= DATEADD(day, -@lookbackDays, CAST(GETDATE() AS DATE))";
+  }
+
   const result = await req.query(`
     SELECT
       FTBchCode, FTXihDocNo, FTXihDocType,
@@ -269,7 +286,7 @@ export async function getTodayApprovedReceiptHeaderRows(pool, branchCode) {
     FROM TACTPiHD
     WHERE FTBchCode = @branchCode
       AND FTXihStaPrcDoc = '1'
-      AND CAST(FDXihDocDate AS DATE) = CAST(GETDATE() AS DATE)
+      ${dateFilter}
     ORDER BY FDXihDocDate DESC, FTXihDocTime DESC
   `);
   return result.recordset;
@@ -298,10 +315,26 @@ export async function getBranchStockRows(pool) {
   return result.recordset;
 }
 
-// ── Today's approved purchase receipt lines ────────────────────────────────────
-export async function getTodayApprovedReceiptLineRows(pool, branchCode) {
+// ── Approved purchase receipt lines ───────────────────────────────────────────
+// Date filter mirrors getApprovedReceiptHeaderRows — pass same options.
+export async function getApprovedReceiptLineRows(
+  pool,
+  branchCode,
+  { lookbackDays = 14, fromDate = null, toDate = null } = {},
+) {
   const req = pool.request();
   req.input("branchCode", sql.VarChar(3), branchCode);
+
+  let dateFilter;
+  if (fromDate && toDate) {
+    req.input("fromDate", sql.VarChar(10), fromDate);
+    req.input("toDate",   sql.VarChar(10), toDate);
+    dateFilter = "AND CAST(h.FDXihDocDate AS DATE) >= @fromDate AND CAST(h.FDXihDocDate AS DATE) <= @toDate";
+  } else {
+    req.input("lookbackDays", sql.Int, lookbackDays);
+    dateFilter = "AND h.FDXihDocDate >= DATEADD(day, -@lookbackDays, CAST(GETDATE() AS DATE))";
+  }
+
   const result = await req.query(`
     SELECT
       d.FTBchCode, d.FTXihDocNo, d.FNXidSeqNo,
@@ -317,7 +350,7 @@ export async function getTodayApprovedReceiptLineRows(pool, branchCode) {
       AND h.FTXihDocNo = d.FTXihDocNo
     WHERE d.FTBchCode = @branchCode
       AND h.FTXihStaPrcDoc = '1'
-      AND CAST(h.FDXihDocDate AS DATE) = CAST(GETDATE() AS DATE)
+      ${dateFilter}
     ORDER BY d.FTXihDocNo, d.FNXidSeqNo
   `);
   return result.recordset;
