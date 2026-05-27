@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import { config } from "./config.js";
 import { createRepository } from "./repositories/index.js";
 import { createRouter } from "./routes.js";
+import { createOcrRouter } from "./ocrRoutes.js";
 
 const app = express();
 const repository = await createRepository();
@@ -14,6 +15,9 @@ const adminDistPath = path.resolve(__dirname, "../../dist/admin-web");
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 app.use(createRouter(repository));
+if (!config.isMockMode) {
+  app.use(createOcrRouter());
+}
 app.use(
   express.static(adminDistPath, {
     setHeaders(res, filePath) {

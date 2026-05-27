@@ -1,0 +1,10 @@
+paddleocr==2.7.3
+paddlepaddle==2.6.1
+opencv-python-headless==4.9.0.80
+Pillow==10.3.0
+pyzbar==0.1.9
+rapidfuzz==3.9.0
+watchdog==4.0.0
+requests==2.31.0
+python-dotenv==1.0.1
+pdf2image==1.17.0
