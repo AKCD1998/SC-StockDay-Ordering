@@ -86,14 +86,18 @@ for ($Attempt = 1; $Attempt -le $MaxRetries; $Attempt++) {
 }
 
 # ── Shutdown ────────────────────────────────────────────────────────────────
+# shutdown.exe /s /f /t N
+#   /s  = shutdown (not restart)
+#   /f  = force-close every open application — no "please save your work" dialogs
+#   /t  = countdown in seconds before the PC goes off
+# This is more reliable than Stop-Computer -Force for dismissing app-blocking popups.
+
 if ($NoShutdown) {
   Write-Output "[$(Get-Date -Format 'HH:mm:ss')] -NoShutdown flag set — skipping shutdown. Done."
 } elseif ($Success) {
-  Write-Output "[$(Get-Date -Format 'HH:mm:ss')] All done. Shutting down in $ShutdownDelaySec seconds..."
-  Start-Sleep -Seconds $ShutdownDelaySec
-  Stop-Computer -Force
+  Write-Output "[$(Get-Date -Format 'HH:mm:ss')] Sync done. PC will shut down in $ShutdownDelaySec seconds (all apps force-closed)..."
+  & shutdown.exe /s /f /t $ShutdownDelaySec
 } else {
-  Write-Output "[$(Get-Date -Format 'HH:mm:ss')] All $MaxRetries attempts failed. Shutting down in $ShutdownDelaySec seconds..."
-  Start-Sleep -Seconds $ShutdownDelaySec
-  Stop-Computer -Force
+  Write-Output "[$(Get-Date -Format 'HH:mm:ss')] All $MaxRetries attempts failed. PC will shut down in $ShutdownDelaySec seconds (all apps force-closed)..."
+  & shutdown.exe /s /f /t $ShutdownDelaySec
 }
