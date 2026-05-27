@@ -302,12 +302,13 @@ export async function getBranchStockRows(pool) {
       p.FTPdtName AS product_name_thai,
       p.FTPdtNameOth AS product_name_eng,
       COALESCE(p.FTPdtBarCode1, p.FTPdtBarCode2, p.FTPdtBarCode3) AS barcode,
-      COALESCE(p.FTPdtSUnit, p.FTPdtMUnit, p.FTPdtLUnit) AS unit,
+      COALESCE(u.FTPunName, p.FTPdtSUnit, p.FTPdtMUnit, p.FTPdtLUnit) AS unit,
       b.FTBchCode AS branch_code,
       w.FCWahQty AS qty
     FROM TCNTPdtInWha w
     JOIN TCNMBranch b ON b.FTBchWheStk = w.FTWahCode
     JOIN TCNMPdt p ON p.FTPdtCode = w.FTPdtCode
+    LEFT JOIN TCNMPdtUnit u ON u.FTPunCode = COALESCE(p.FTPdtSUnit, p.FTPdtMUnit, p.FTPdtLUnit)
     WHERE b.FTBchCode IN ('000','001','002','003','004','005')
       AND p.FTPdtStaActive = 1
     ORDER BY w.FTPdtCode, b.FTBchCode
