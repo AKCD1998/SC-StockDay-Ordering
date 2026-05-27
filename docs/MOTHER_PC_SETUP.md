@@ -50,27 +50,30 @@ Important mistake to remember:
 How we found the real SQL endpoint:
 
 ```powershell
-Get-CimInstance Win32_Process |
-  Where-Object { $_.Name -like '*Ada*' -or $_.ExecutablePath -like '*AdaSoft*' } |
-  Select-Object ProcessId, Name, ExecutablePath, CommandLine
-
 Get-NetTCPConnection -State Established |
   ForEach-Object {
     $p = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue
     [pscustomobject]@{
-      LocalAddress  = $_.LocalAddress
-      LocalPort     = $_.LocalPort
       RemoteAddress = $_.RemoteAddress
       RemotePort    = $_.RemotePort
       Process       = $p.ProcessName
-      Pid           = $_.OwningProcess
     }
   } |
   Where-Object { $_.Process -like '*Ada*' -or $_.RemotePort -in 1433,1434 } |
   Format-Table -AutoSize
 ```
 
+Open the main AdaPOS app first and run the command on the same computer after AdaPOS has connected to its database. The `RemoteAddress` is `ADAPOS_SQLSERVER_HOST`, and `RemotePort` is `ADAPOS_SQLSERVER_PORT`.
+
 For branch `005`, that showed AdaPOS connected to `192.168.0.127:49684`.
+For branch `004`, a later check showed:
+
+```text
+RemoteAddress RemotePort Process
+------------- ---------- -------
+192.168.1.106      49976 AdaPosBack
+```
+
 Testing that endpoint confirmed:
 
 ```text

@@ -6,6 +6,11 @@ Internal pharmacy stock-ordering scaffold for replacing manual Excel-based branc
 - an admin stock-day dashboard
 - a read-only adaPOS sync service intended to run on the mother PC
 
+For branch laptop data transmitter installation, use:
+
+- [apps/adapos-sync/installer/BRANCH-INSTALL.md](apps/adapos-sync/installer/BRANCH-INSTALL.md)
+- [docs/MOTHER_PC_SETUP.md](docs/MOTHER_PC_SETUP.md)
+
 This repository supports two server data modes:
 
 - `DATA_MODE=mock` for scaffold/demo mode with in-memory sample data

@@ -35,6 +35,48 @@ cd "C:\path\to\SC-StockDay-Ordering\apps\adapos-sync\installer"
 - `ADAPOS_SYNC_API_BASE_URL` = usually `https://paasrtsm-project.onrender.com`
 - `ADAPOS_SYNC_SHARED_TOKEN` = the shared API token
 
+## Find the AdaPOS SQL host and port
+
+If you do not know `ADAPOS_SQLSERVER_HOST` or `ADAPOS_SQLSERVER_PORT`, open the main AdaPOS app first and wait until it has connected to its database. Then run this in PowerShell on the same computer:
+
+```powershell
+Get-NetTCPConnection -State Established |
+  ForEach-Object {
+    $p = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue
+    [pscustomobject]@{
+      RemoteAddress = $_.RemoteAddress
+      RemotePort    = $_.RemotePort
+      Process       = $p.ProcessName
+    }
+  } |
+  Where-Object { $_.Process -like '*Ada*' -or $_.RemotePort -in 1433,1434 } |
+  Format-Table -AutoSize
+```
+
+Look for the row where `Process` is AdaPOS or AdaSoft. Use that row like this:
+
+```env
+ADAPOS_SQLSERVER_HOST=<RemoteAddress>
+ADAPOS_SQLSERVER_PORT=<RemotePort>
+ADAPOS_SQLSERVER_DATABASE=AdaAcc
+```
+
+For example, if the command shows:
+
+```text
+RemoteAddress RemotePort Process
+------------- ---------- -------
+192.168.1.106      49976 AdaPosBack
+```
+
+Use:
+
+```env
+ADAPOS_SQLSERVER_HOST=192.168.1.106
+ADAPOS_SQLSERVER_PORT=49976
+ADAPOS_SQLSERVER_DATABASE=AdaAcc
+```
+
 After that the script will:
 
 - install dependencies
