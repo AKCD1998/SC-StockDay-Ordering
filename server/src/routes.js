@@ -349,6 +349,52 @@ export function createRouter(repository) {
     res.json(await repository.ingestRunLog(req.body || {}));
   }));
 
+  // ── Nightly sync log ────────────────────────────────────────────────────────
+  // POST /api/sync/heartbeat — branch laptop sends this when the PS1 wrapper starts.
+  // Records a row in ingest.laptop_heartbeats so the dashboard can distinguish
+  // "sync failed" from "laptop was off".
+  router.post("/api/sync/heartbeat", asyncHandler(async (req, res) => {
+    const { branchCode, laptopName, event } = req.body || {};
+    if (!branchCode) {
+      return res.status(400).json({ message: "branchCode is required." });
+    }
+    const result = await repository.saveHeartbeat(
+      String(branchCode).trim(),
+      String(laptopName || "").trim() || null,
+      String(event || "startup").trim(),
+    );
+    return res.json(result);
+  }));
+
+  // POST /api/sync/nightly-run-log — adapos-sync agent mirrors run-log here so
+  // the nightly log dashboard can correlate branch_code + date + status.
+  router.post("/api/sync/nightly-run-log", asyncHandler(async (req, res) => {
+    const body = req.body || {};
+    if (!body.branchCode) {
+      return res.status(400).json({ message: "branchCode is required." });
+    }
+    const result = await repository.saveNightlyRunLog({
+      branchCode:  String(body.branchCode).trim(),
+      syncType:    String(body.syncType  || "adapos_sync").trim(),
+      startedAt:   body.startedAt  || new Date().toISOString(),
+      finishedAt:  body.finishedAt || null,
+      status:      String(body.status    || "success").trim(),
+      recordsRead: Number(body.recordsRead  || 0),
+      recordsSent: Number(body.recordsSent  || 0),
+      message:     String(body.message   || "").trim(),
+    });
+    return res.json(result);
+  }));
+
+  // GET /api/sync/nightly-log — admin UI: calendar grid of per-branch per-night status.
+  // Returns last `days` calendar days (default 14).
+  // Response shape: { dates: ["YYYY-MM-DD",...], branches: ["000",...], rows: { "000": { "2026-05-20": "success" } } }
+  router.get("/api/sync/nightly-log", asyncHandler(async (req, res) => {
+    const days = parsePageParam(req.query.days, 14);
+    const result = await repository.getNightlySyncLog(days);
+    res.json(result);
+  }));
+
   router.use((error, _req, res, _next) => {
     console.error(error);
     res.status(500).json({ message: error.message || "Internal server error." });

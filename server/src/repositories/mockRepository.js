@@ -270,5 +270,17 @@ export class MockRepository {
     };
   }
 
+  async saveHeartbeat(_branchCode, _laptopName, _event) {
+    return { ok: true, heartbeatId: null };
+  }
+
+  async saveNightlyRunLog(_payload) {
+    return { ok: true, syncRunId: null };
+  }
+
+  async getNightlySyncLog(_days) {
+    return { dates: [], branches: [], rows: {} };
+  }
+
   async close() {}
 }

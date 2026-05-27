@@ -1427,3 +1427,84 @@ select {
   background: #321920;
   color: #ffc7d0;
 }
+
+/* ── Nightly Sync Log panel ──────────────────────────────────────────────── */
+.sync-log-table-wrap {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+
+.sync-log-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+}
+
+.sync-log-table th,
+.sync-log-table td {
+  border: 1px solid #d0dae6;
+  padding: 6px 8px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.sync-log-branch-col {
+  min-width: 140px;
+  text-align: left !important;
+}
+
+.sync-log-date-col {
+  min-width: 48px;
+  font-size: 0.78rem;
+  color: #526578;
+}
+
+.sync-log-branch-label {
+  text-align: left !important;
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.sync-log-cell {
+  font-size: 1.1rem;
+  cursor: default;
+}
+
+/* Status tones */
+.sl-success { background: rgba(0,  180, 100, 0.08); }
+.sl-failed  { background: rgba(220, 40,  60,  0.08); }
+.sl-running { background: rgba(240,160,  20,  0.10); }
+.sl-pending { background: rgba(100,140, 200, 0.07); }
+.sl-offline { background: transparent; opacity: 0.5; }
+.sl-unknown { background: transparent; opacity: 0.3; }
+
+/* Legend row */
+.sync-log-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-top: 16px;
+  font-size: 0.82rem;
+  color: #526578;
+}
+
+.sync-log-legend-item {
+  white-space: nowrap;
+}
+
+/* Dark mode */
+[data-theme="dark"] .sync-log-table th,
+[data-theme="dark"] .sync-log-table td {
+  border-color: #263547;
+}
+
+[data-theme="dark"] .sync-log-date-col,
+[data-theme="dark"] .sync-log-legend {
+  color: #7d90a8;
+}
+
+[data-theme="dark"] .sl-success { background: rgba(0,  200, 120, 0.10); }
+[data-theme="dark"] .sl-failed  { background: rgba(240, 50,  70,  0.12); }
+[data-theme="dark"] .sl-running { background: rgba(240,175,  30,  0.12); }
+[data-theme="dark"] .sl-pending { background: rgba(100,160, 240, 0.08); }
+

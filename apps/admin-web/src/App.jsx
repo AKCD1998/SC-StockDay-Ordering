@@ -897,6 +897,153 @@ function BranchStockPanel() {
   );
 }
 
+// ── Nightly Sync Log ─────────────────────────────────────────────────────────
+const BRANCH_LABELS = {
+  "000": "สาขา 000 (HQ)",
+  "001": "สาขา 001",
+  "003": "สาขา 003",
+  "004": "สาขา 004",
+  "005": "สาขา 005",
+};
+
+function syncLogStatusIcon(status) {
+  if (status === "success") return { icon: "✅", label: "สำเร็จ", cls: "sl-success" };
+  if (status === "failed")  return { icon: "❌", label: "ล้มเหลว", cls: "sl-failed" };
+  if (status === "running") return { icon: "⏳", label: "กำลังรัน", cls: "sl-running" };
+  if (status === "pending") return { icon: "🌙", label: "รอคืนนี้", cls: "sl-pending" };
+  if (status === "offline") return { icon: "💤", label: "ปิดเครื่อง", cls: "sl-offline" };
+  return { icon: "—",  label: "ไม่มีข้อมูล", cls: "sl-unknown" };
+}
+
+function formatShortDate(isoDate) {
+  const d = new Date(isoDate + "T00:00:00");
+  return `${d.getDate()}/${d.getMonth() + 1}`;
+}
+
+function SyncLogPanel() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [days, setDays] = useState(14);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+    apiFetch(`/api/sync/nightly-log?days=${days}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((json) => {
+        if (!active) return;
+        setData(json);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(err.message);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [days, refreshKey]);
+
+  const dates    = data?.dates    ?? [];
+  const branches = data?.branches ?? ["000", "001", "003", "004", "005"];
+  const rows     = data?.rows     ?? {};
+
+  return (
+    <section className="panel sync-log-panel">
+      <div className="panel-header">
+        <div>
+          <h2>ประวัติ Sync รายคืน</h2>
+          <p>สถานะการซิงก์ข้อมูลจาก Mother PC แต่ละสาขา — ✅ สำเร็จ · ❌ ล้มเหลว · 💤 ปิดเครื่อง · 🌙 รอคืนนี้</p>
+        </div>
+        <div className="toolbar">
+          <label className="date-label">
+            ย้อนหลัง
+            <select
+              value={days}
+              onChange={(e) => { setDays(Number(e.target.value)); }}
+              className="date-input-inline"
+              style={{ marginLeft: "6px" }}
+            >
+              <option value={7}>7 วัน</option>
+              <option value={14}>14 วัน</option>
+              <option value={30}>30 วัน</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => setRefreshKey((k) => k + 1)}
+            disabled={loading}
+          >
+            🔄 รีเฟรช
+          </button>
+        </div>
+      </div>
+
+      {error && <p className="notice error compact">❌ โหลดไม่ได้: {error}</p>}
+      {loading && <p className="empty-state">⏳ กำลังโหลด...</p>}
+
+      {!loading && (
+        <div className="table-wrap sync-log-table-wrap">
+          <table className="sync-log-table">
+            <thead>
+              <tr>
+                <th className="sync-log-branch-col">สาขา</th>
+                {dates.map((d) => (
+                  <th key={d} className="sync-log-date-col" title={d}>
+                    {formatShortDate(d)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {branches.map((branch) => (
+                <tr key={branch}>
+                  <td className="sync-log-branch-label">
+                    {BRANCH_LABELS[branch] ?? `สาขา ${branch}`}
+                  </td>
+                  {dates.map((d) => {
+                    const status = rows[branch]?.[d] ?? "offline";
+                    const { icon, label, cls } = syncLogStatusIcon(status);
+                    return (
+                      <td key={d} className={`sync-log-cell ${cls}`} title={`${BRANCH_LABELS[branch] ?? branch} · ${d} · ${label}`}>
+                        <span aria-label={label}>{icon}</span>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {!loading && !error && dates.length === 0 && (
+        <p className="empty-state">ยังไม่มีข้อมูล sync — รอให้ laptop สาขารันครั้งแรกก่อน</p>
+      )}
+
+      <div className="sync-log-legend">
+        {[
+          { icon: "✅", label: "สำเร็จ" },
+          { icon: "❌", label: "ล้มเหลว (laptop เปิด แต่ sync error)" },
+          { icon: "💤", label: "ปิดเครื่อง (ไม่มี heartbeat)" },
+          { icon: "🌙", label: "วันนี้ — รอ sync คืนนี้" },
+        ].map(({ icon, label }) => (
+          <span key={label} className="sync-log-legend-item">
+            {icon} {label}
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const pageSize = 50;
   const [stockDay, setStockDay] = useState([]);
@@ -915,7 +1062,7 @@ export default function App() {
   const [view, setView] = useState(() => {
     if (typeof window === "undefined") return "dashboard";
     const savedView = window.localStorage.getItem(adminViewStorageKey);
-    return ["dashboard", "receipts", "branch-stock"].includes(savedView)
+    return ["dashboard", "receipts", "branch-stock", "sync-log"].includes(savedView)
       ? savedView
       : "dashboard";
   });
@@ -1220,6 +1367,13 @@ export default function App() {
           >
             สต็อกสาขา
           </button>
+          <button
+            type="button"
+            className={view === "sync-log" ? "view-nav-btn active" : "view-nav-btn"}
+            onClick={() => setView("sync-log")}
+          >
+            ประวัติ Sync
+          </button>
         </nav>
 
         <div className="account-actions">
@@ -1277,6 +1431,8 @@ export default function App() {
         />
       ) : view === "branch-stock" ? (
         <BranchStockPanel />
+      ) : view === "sync-log" ? (
+        <SyncLogPanel />
       ) : (
         <>
           <section className="kpis">

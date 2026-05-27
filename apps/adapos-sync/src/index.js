@@ -282,29 +282,62 @@ async function runOnce() {
         totalSent += approvedUpserted;
       }
 
+      const finishedAt = new Date().toISOString();
       await postJson(`${syncConfig.apiBaseUrl}/api/sync/run-log`, {
         id: runId,
         syncType: `adapos_branch_${syncConfig.branchCode}`,
         startedAt,
-        finishedAt: new Date().toISOString(),
+        finishedAt,
         status: "success",
         recordsRead: totalRead,
         recordsSent: totalSent,
         message: `products+sales+transfers posted for branch ${syncConfig.branchCode}.`,
       });
 
+      // Mirror run-log to SC-StockDay-Ordering so the nightly-log dashboard can
+      // show per-branch per-night status. Only fires when ADAPOS_SC_ORDERING_URL is set.
+      if (syncConfig.scOrderingApiUrl) {
+        await postJson(`${syncConfig.scOrderingApiUrl}/api/sync/nightly-run-log`, {
+          branchCode:  syncConfig.branchCode,
+          syncType:    `adapos_branch_${syncConfig.branchCode}`,
+          startedAt,
+          finishedAt,
+          status:      "success",
+          recordsRead: totalRead,
+          recordsSent: totalSent,
+          message:     `Nightly sync OK for branch ${syncConfig.branchCode}.`,
+        }).catch((mirrorErr) => {
+          console.warn(`[nightly-run-log mirror] ${mirrorErr.message}`);
+        });
+      }
+
       console.log(`\nDone. ${totalSent} records sent to API.`);
     } catch (postErr) {
+      const failedAt = new Date().toISOString();
       await postJson(`${syncConfig.apiBaseUrl}/api/sync/run-log`, {
         id: runId,
         syncType: `adapos_branch_${syncConfig.branchCode}`,
         startedAt,
-        finishedAt: new Date().toISOString(),
+        finishedAt: failedAt,
         status: "failed",
         recordsRead: totalRead,
         recordsSent: totalSent,
         message: postErr.message,
       }).catch(() => {});
+
+      if (syncConfig.scOrderingApiUrl) {
+        await postJson(`${syncConfig.scOrderingApiUrl}/api/sync/nightly-run-log`, {
+          branchCode:  syncConfig.branchCode,
+          syncType:    `adapos_branch_${syncConfig.branchCode}`,
+          startedAt,
+          finishedAt:  failedAt,
+          status:      "failed",
+          recordsRead: totalRead,
+          recordsSent: totalSent,
+          message:     postErr.message,
+        }).catch(() => {});
+      }
+
       throw postErr;
     }
 

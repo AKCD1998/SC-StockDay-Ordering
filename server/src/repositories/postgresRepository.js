@@ -1348,6 +1348,134 @@ export class PostgresRepository {
     };
   }
 
+  // ── Nightly sync log ─────────────────────────────────────────────────────────
+
+  // Record that a branch laptop started up and kicked off the sync wrapper.
+  // Called by POST /api/sync/heartbeat from the PS1 script on each branch.
+  async saveHeartbeat(branchCode, laptopName, event = "startup") {
+    const { rows } = await this.pool.query(
+      `
+      INSERT INTO ingest.laptop_heartbeats (branch_code, laptop_name, event, created_at)
+      VALUES ($1, $2, $3, now())
+      RETURNING heartbeat_id, branch_code, laptop_name, event, created_at
+      `,
+      [branchCode, laptopName || null, event || "startup"],
+    );
+    return { ok: true, heartbeatId: rows[0]?.heartbeat_id ?? null };
+  }
+
+  // Mirror a sync run result into ingest.sync_runs (includes branch_code).
+  // Called by POST /api/sync/nightly-run-log from the adapos-sync agent.
+  async saveNightlyRunLog({ branchCode, syncType, startedAt, finishedAt, status, recordsRead, recordsSent, message }) {
+    const safeStatus = ["queued", "running", "success", "failed"].includes(status) ? status : "success";
+    const { rows } = await this.pool.query(
+      `
+      INSERT INTO ingest.sync_runs
+        (sync_type, branch_code, started_at, finished_at, status, records_read, records_sent, message, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
+      RETURNING sync_run_id
+      `,
+      [
+        syncType   || "adapos_sync",
+        branchCode,
+        startedAt  || new Date().toISOString(),
+        finishedAt || null,
+        safeStatus,
+        Math.max(0, Math.floor(Number(recordsRead  || 0))),
+        Math.max(0, Math.floor(Number(recordsSent  || 0))),
+        message    || "",
+      ],
+    );
+    return { ok: true, syncRunId: rows[0]?.sync_run_id ?? null };
+  }
+
+  // Return a calendar-grid summary for the last `days` days.
+  // For each (branch, date) slot the status is one of:
+  //   "success"  — at least one run finished with status=success
+  //   "failed"   — run exists but none succeeded, OR heartbeat with no run
+  //   "offline"  — no heartbeat and no run (laptop was off / never set up)
+  //   "pending"  — the date is today (sync hasn't happened yet tonight)
+  async getNightlySyncLog(days = 14) {
+    const safeDays = Math.max(1, Math.min(Number(days) || 14, 90));
+
+    const { rows } = await this.pool.query(
+      `
+      WITH date_series AS (
+        SELECT generate_series(
+          CURRENT_DATE - ($1 - 1) * INTERVAL '1 day',
+          CURRENT_DATE,
+          INTERVAL '1 day'
+        )::date AS sync_date
+      ),
+      known_branches(branch_code) AS (
+        VALUES ('000'),('001'),('003'),('004'),('005')
+      ),
+      runs_agg AS (
+        SELECT
+          branch_code,
+          started_at::date AS sync_date,
+          CASE
+            WHEN bool_or(status = 'success') THEN 'success'
+            WHEN bool_or(status = 'running') THEN 'running'
+            ELSE 'failed'
+          END AS run_status
+        FROM ingest.sync_runs
+        WHERE started_at >= CURRENT_DATE - $1 * INTERVAL '1 day'
+          AND branch_code IS NOT NULL
+        GROUP BY branch_code, started_at::date
+      ),
+      heartbeats_agg AS (
+        SELECT
+          branch_code,
+          created_at::date AS sync_date,
+          true AS had_heartbeat
+        FROM ingest.laptop_heartbeats
+        WHERE created_at >= CURRENT_DATE - $1 * INTERVAL '1 day'
+        GROUP BY branch_code, created_at::date
+      )
+      SELECT
+        b.branch_code,
+        d.sync_date,
+        CASE
+          WHEN d.sync_date = CURRENT_DATE THEN 'pending'
+          WHEN r.run_status IS NOT NULL    THEN r.run_status
+          WHEN h.had_heartbeat             THEN 'failed'
+          ELSE                                  'offline'
+        END AS status
+      FROM known_branches b
+      CROSS JOIN date_series d
+      LEFT JOIN runs_agg       r ON r.branch_code = b.branch_code AND r.sync_date = d.sync_date
+      LEFT JOIN heartbeats_agg h ON h.branch_code = b.branch_code AND h.sync_date = d.sync_date
+      ORDER BY b.branch_code, d.sync_date
+      `,
+      [safeDays],
+    );
+
+    // Build dates array (ascending)
+    const datesSet = new Set();
+    const branchesSet = new Set();
+    for (const row of rows) {
+      datesSet.add(row.sync_date instanceof Date
+        ? row.sync_date.toISOString().slice(0, 10)
+        : String(row.sync_date).slice(0, 10));
+      branchesSet.add(row.branch_code);
+    }
+    const dates    = Array.from(datesSet).sort();
+    const branches = Array.from(branchesSet).sort();
+
+    // Build rows: { "000": { "2026-05-20": "success", ... }, ... }
+    const resultRows = {};
+    for (const row of rows) {
+      const dateKey = row.sync_date instanceof Date
+        ? row.sync_date.toISOString().slice(0, 10)
+        : String(row.sync_date).slice(0, 10);
+      if (!resultRows[row.branch_code]) resultRows[row.branch_code] = {};
+      resultRows[row.branch_code][dateKey] = row.status;
+    }
+
+    return { dates, branches, rows: resultRows };
+  }
+
   async close() {
     await closePool();
   }
