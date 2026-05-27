@@ -77,7 +77,8 @@ function validateBranchStockSyncToken(req) {
   const authHeader = req.headers.authorization || "";
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
   const headerToken = String(req.headers["x-sync-token"] || "").trim();
-  const providedToken = bearerToken || headerToken;
+  const apiKeyToken = String(req.headers["x-api-key"] || "").trim();
+  const providedToken = bearerToken || headerToken || apiKeyToken;
 
   if (!providedToken || providedToken !== configuredToken) {
     return "Unauthorized sync token.";
@@ -311,6 +312,8 @@ export function createRouter(repository) {
     res.json(await repository.ingestBranchStock(req.body));
   }));
 
+  // /api/admin/branch-stock requires Render Basic Auth credentials (browser handles this automatically).
+  // /api/branch-stock is the public alias used by the frontend SPA.
   router.get("/api/admin/branch-stock", asyncHandler(async (req, res) => {
     const { productCode } = req.query;
     res.json(await repository.getBranchStock(productCode || null));
