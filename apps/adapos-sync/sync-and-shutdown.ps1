@@ -35,32 +35,27 @@ function Get-EnvValue([string]$Key) {
 $ApiUrl = Get-EnvValue "ADAPOS_SYNC_API_BASE_URL"
 $Token  = Get-EnvValue "ADAPOS_SYNC_SHARED_TOKEN"
 
-# SC-StockDay-Ordering URL for heartbeat + nightly-log dashboard.
-# Set ADAPOS_SC_ORDERING_URL in .env (e.g. https://sc-stockday-ordering.onrender.com).
-$ScUrl  = Get-EnvValue "ADAPOS_SC_ORDERING_URL"
-
 # -- Heartbeat ---------------------------------------------------------------
 Write-Output "[$(Get-Date -Format 'HH:mm:ss')] Starting sync for branch $Branch on $LaptopName"
 
-# Heartbeat goes to SC-StockDay-Ordering so the nightly-log dashboard can see it.
-# Falls back to ADAPOS_SYNC_API_BASE_URL if ADAPOS_SC_ORDERING_URL is not set.
-$HeartbeatUrl = if ($ScUrl) { $ScUrl } else { $ApiUrl }
-
-if ($HeartbeatUrl) {
+# Heartbeat goes to the shared backend (PaaSRTSM), same place the sync
+# agent posts its run-log. Requires the x-api-key header just like /run-log.
+if ($ApiUrl -and $Token) {
   try {
     $Body = @{ branchCode = $Branch; laptopName = $LaptopName; event = "startup" } | ConvertTo-Json
     Invoke-RestMethod `
-      -Uri "$HeartbeatUrl/api/sync/heartbeat" `
+      -Uri "$ApiUrl/api/sync/heartbeat" `
       -Method POST `
+      -Headers @{ "x-api-key" = $Token } `
       -Body $Body `
       -ContentType "application/json" `
       -TimeoutSec 15 | Out-Null
-    Write-Output "[$(Get-Date -Format 'HH:mm:ss')] Heartbeat sent OK -> $HeartbeatUrl"
+    Write-Output "[$(Get-Date -Format 'HH:mm:ss')] Heartbeat sent OK -> $ApiUrl"
   } catch {
     Write-Output "[$(Get-Date -Format 'HH:mm:ss')] Heartbeat failed (non-fatal): $($_.Exception.Message)"
   }
 } else {
-  Write-Output "[$(Get-Date -Format 'HH:mm:ss')] Skipping heartbeat - ADAPOS_SC_ORDERING_URL not set in .env"
+  Write-Output "[$(Get-Date -Format 'HH:mm:ss')] Skipping heartbeat - ADAPOS_SYNC_API_BASE_URL or ADAPOS_SYNC_SHARED_TOKEN not set in .env"
 }
 
 # -- Sync with retries -------------------------------------------------------

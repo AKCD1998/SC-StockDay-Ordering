@@ -39,9 +39,6 @@ export const syncConfig = {
              ? cliDryRun
              : String(process.env.ADAPOS_SYNC_DRY_RUN ?? "true") === "true",
   apiBaseUrl:       process.env.ADAPOS_SYNC_API_BASE_URL ?? "http://localhost:4000",
-  // Optional: URL of sc-stockday-ordering server for heartbeat + nightly run-log.
-  // Set ADAPOS_SC_ORDERING_URL in .env to enable mirroring.
-  scOrderingApiUrl: process.env.ADAPOS_SC_ORDERING_URL ?? "",
   syncSharedToken:
     process.env.ADAPOS_SYNC_SHARED_TOKEN
     ?? process.env.BRANCH_STOCK_SYNC_TOKEN
