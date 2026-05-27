@@ -1,15 +1,18 @@
 # sync-and-shutdown.ps1
 # Runs the AdaPOS sync agent with retry logic, then shuts down the laptop.
 # Usage: powershell -ExecutionPolicy Bypass -File sync-and-shutdown.ps1 -Branch 005
+# Test:  powershell -ExecutionPolicy Bypass -File sync-and-shutdown.ps1 -Branch 005 -NoShutdown
 #
 # The script:
 #  1. Sends a startup heartbeat so the dashboard knows the laptop was on
 #  2. Runs the sync up to 3 times (retries on failure)
 #  3. Shuts down the PC after success or all retries exhausted
+#     (skipped when -NoShutdown is passed — use this for testing)
 
 param(
-  [string]$Branch   = "005",
-  [string]$NodeExe  = "C:\Program Files\nodejs\node.exe"
+  [string]$Branch     = "005",
+  [string]$NodeExe    = "C:\Program Files\nodejs\node.exe",
+  [switch]$NoShutdown                    # pass -NoShutdown to skip Stop-Computer
 )
 
 $ScriptDir = $PSScriptRoot
@@ -83,11 +86,14 @@ for ($Attempt = 1; $Attempt -le $MaxRetries; $Attempt++) {
 }
 
 # ── Shutdown ────────────────────────────────────────────────────────────────
-if ($Success) {
+if ($NoShutdown) {
+  Write-Output "[$(Get-Date -Format 'HH:mm:ss')] -NoShutdown flag set — skipping shutdown. Done."
+} elseif ($Success) {
   Write-Output "[$(Get-Date -Format 'HH:mm:ss')] All done. Shutting down in $ShutdownDelaySec seconds..."
+  Start-Sleep -Seconds $ShutdownDelaySec
+  Stop-Computer -Force
 } else {
   Write-Output "[$(Get-Date -Format 'HH:mm:ss')] All $MaxRetries attempts failed. Shutting down in $ShutdownDelaySec seconds..."
+  Start-Sleep -Seconds $ShutdownDelaySec
+  Stop-Computer -Force
 }
-
-Start-Sleep -Seconds $ShutdownDelaySec
-Stop-Computer -Force
