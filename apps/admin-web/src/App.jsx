@@ -20,10 +20,6 @@ import aceGlobalLogoUrl from "./assets/ace-global-logo.svg";
 import scharoenPharmaLogoUrl from "./assets/scharoen-pharma-logo.svg";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
-// SC-StockDay-Ordering's OWN backend (separate from PaaSRTSM which apiBaseUrl points to).
-// Used for nightly-sync-log which lives in this repo's ingest schema.
-// Defaults to same-origin ("") so the admin SPA calls its own host.
-const scOrderingApiUrl = import.meta.env.VITE_SC_ORDERING_API_URL ?? "";
 const adminViewStorageKey = "sc-stockday-admin-view";
 const adminThemeStorageKey = "sc-stockday-admin-theme";
 
@@ -935,10 +931,7 @@ function SyncLogPanel() {
     let active = true;
     setLoading(true);
     setError("");
-    // Nightly-log route lives on SC-StockDay-Ordering's backend, not PaaSRTSM.
-    // Use scOrderingApiUrl (defaults to same-origin) instead of the global apiFetch
-    // which targets VITE_API_BASE_URL = PaaSRTSM.
-    fetch(`${scOrderingApiUrl}/api/sync/nightly-log?days=${days}`, { credentials: "include" })
+    apiFetch(`/api/sync/nightly-log?days=${days}`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
