@@ -7,8 +7,10 @@ dotenv.config();
 // If no backslash, instanceName is null and port is used directly.
 function parseHost(raw) {
   const slash = raw.indexOf("\\");
-  if (slash === -1) return { server: raw, instanceName: null };
-  return { server: raw.slice(0, slash), instanceName: raw.slice(slash + 1) };
+  const normalizeLocalHost = (server) =>
+    server === "." || server.toLowerCase() === "(local)" ? "localhost" : server;
+  if (slash === -1) return { server: normalizeLocalHost(raw), instanceName: null };
+  return { server: normalizeLocalHost(raw.slice(0, slash)), instanceName: raw.slice(slash + 1) };
 }
 
 // CLI overrides: --dry-run, --execute, --branch=005, --datasets=...
