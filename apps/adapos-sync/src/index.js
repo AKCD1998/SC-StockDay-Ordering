@@ -84,7 +84,7 @@ async function fetchDatasets(pool) {
     data.approved_receipt_lines   = await getApprovedReceiptLineRows(pool, branchCode, dateOpts);
   }
   if (datasets.includes("branch_stock")) {
-    data.branch_stock = await getBranchStockRows(pool);
+    data.branch_stock = await getBranchStockRows(pool, branchCode);
   }
 
   return data;

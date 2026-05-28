@@ -292,26 +292,28 @@ export async function getApprovedReceiptHeaderRows(
   return result.recordset;
 }
 
-// ── Branch-level stock from TCNTPdtInWha × TCNMBranch ─────────────────────────
-// Returns one row per active product × branch for branches 000, 001, 002, 003, 004, 005.
-// FCPdtQtyNow only reflects HQ (warehouse 001); this is the authoritative source.
-export async function getBranchStockRows(pool) {
-  const result = await pool.request().query(`
+// ── Branch-level stock from local branch product master ───────────────────────
+// On branch laptops, TCNTPdtInWha warehouse mappings are not reliable for
+// inferring "which branch owns this qty". The local branch's actual on-hand
+// stock is reflected in TCNMPdt.FCPdtQtyNow on that machine, so emit one row
+// per active product and tag it with the syncing branch code directly.
+export async function getBranchStockRows(pool, branchCode) {
+  const req = pool.request();
+  req.input("branchCode", sql.VarChar(3), branchCode);
+
+  const result = await req.query(`
     SELECT
-      w.FTPdtCode AS product_code,
+      p.FTPdtCode AS product_code,
       p.FTPdtName AS product_name_thai,
       p.FTPdtNameOth AS product_name_eng,
       COALESCE(p.FTPdtBarCode1, p.FTPdtBarCode2, p.FTPdtBarCode3) AS barcode,
       COALESCE(u.FTPunName, p.FTPdtSUnit, p.FTPdtMUnit, p.FTPdtLUnit) AS unit,
-      b.FTBchCode AS branch_code,
-      w.FCWahQty AS qty
-    FROM TCNTPdtInWha w
-    JOIN TCNMBranch b ON b.FTBchWheStk = w.FTWahCode
-    JOIN TCNMPdt p ON p.FTPdtCode = w.FTPdtCode
+      @branchCode AS branch_code,
+      COALESCE(p.FCPdtQtyNow, 0) AS qty
+    FROM TCNMPdt p
     LEFT JOIN TCNMPdtUnit u ON u.FTPunCode = COALESCE(p.FTPdtSUnit, p.FTPdtMUnit, p.FTPdtLUnit)
-    WHERE b.FTBchCode IN ('000','001','002','003','004','005')
-      AND p.FTPdtStaActive = 1
-    ORDER BY w.FTPdtCode, b.FTBchCode
+    WHERE p.FTPdtStaActive = 1
+    ORDER BY p.FTPdtCode
   `);
   return result.recordset;
 }
