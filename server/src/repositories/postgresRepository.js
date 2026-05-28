@@ -1476,6 +1476,85 @@ export class PostgresRepository {
     return { dates, branches, rows: resultRows };
   }
 
+  // Return an hourly-grid summary for the last `hours` hours (Bangkok time).
+  // For each (branch, hour-slot) the status is one of:
+  //   "success"  — at least one run finished with status=success in that slot
+  //   "failed"   — run(s) exist but none succeeded
+  //   "offline"  — no run recorded in that hour slot
+  //   "pending"  — current hour slot with no run yet (sync hasn't fired yet)
+  async getHourlySyncLog(hours = 24) {
+    const safeHours = Math.max(1, Math.min(Number(hours) || 24, 168)); // cap at 7 days
+
+    const { rows } = await this.pool.query(
+      `
+      WITH
+      hour_series AS (
+        SELECT generate_series(
+          date_trunc('hour', NOW() AT TIME ZONE 'Asia/Bangkok') - ($1 - 1) * INTERVAL '1 hour',
+          date_trunc('hour', NOW() AT TIME ZONE 'Asia/Bangkok'),
+          INTERVAL '1 hour'
+        ) AS hour_slot
+      ),
+      known_branches(branch_code) AS (
+        VALUES ('000'),('001'),('003'),('004'),('005')
+      ),
+      runs_agg AS (
+        SELECT
+          branch_code,
+          date_trunc('hour', started_at AT TIME ZONE 'Asia/Bangkok') AS hour_slot,
+          CASE
+            WHEN bool_or(status = 'success') THEN 'success'
+            WHEN bool_or(status = 'running') THEN 'running'
+            ELSE 'failed'
+          END AS run_status,
+          SUM(records_sent)::integer AS total_sent
+        FROM ingest.sync_runs
+        WHERE started_at >= NOW() - $1 * INTERVAL '1 hour'
+          AND branch_code IS NOT NULL
+        GROUP BY branch_code, date_trunc('hour', started_at AT TIME ZONE 'Asia/Bangkok')
+      )
+      SELECT
+        b.branch_code,
+        TO_CHAR(h.hour_slot, 'YYYY-MM-DD HH24:00') AS hour_key,
+        CASE
+          WHEN h.hour_slot = date_trunc('hour', NOW() AT TIME ZONE 'Asia/Bangkok')
+               AND r.run_status IS NULL THEN 'pending'
+          WHEN r.run_status IS NOT NULL  THEN r.run_status
+          ELSE 'offline'
+        END AS status,
+        COALESCE(r.total_sent, 0) AS total_sent
+      FROM known_branches b
+      CROSS JOIN hour_series h
+      LEFT JOIN runs_agg r
+        ON r.branch_code = b.branch_code AND r.hour_slot = h.hour_slot
+      ORDER BY b.branch_code, h.hour_slot ASC
+      `,
+      [safeHours],
+    );
+
+    // Collect ordered hour keys (ascending) and branches
+    const hoursSet    = new Set();
+    const branchesSet = new Set();
+    for (const row of rows) {
+      hoursSet.add(row.hour_key);
+      branchesSet.add(row.branch_code);
+    }
+    const hourKeys = Array.from(hoursSet).sort();
+    const branches = Array.from(branchesSet).sort();
+
+    // Build rows: { "005": { "2026-05-28 14:00": { status, totalSent }, ... } }
+    const resultRows = {};
+    for (const row of rows) {
+      if (!resultRows[row.branch_code]) resultRows[row.branch_code] = {};
+      resultRows[row.branch_code][row.hour_key] = {
+        status:    row.status,
+        totalSent: Number(row.total_sent ?? 0),
+      };
+    }
+
+    return { hours: hourKeys, branches, rows: resultRows };
+  }
+
   async close() {
     await closePool();
   }

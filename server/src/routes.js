@@ -395,6 +395,15 @@ export function createRouter(repository) {
     res.json(result);
   }));
 
+  // GET /api/sync/hourly-log — admin UI: hourly grid of per-branch sync status.
+  // Returns last `hours` hour slots in Bangkok time (default 24, max 168).
+  // Response shape: { hours: ["YYYY-MM-DD HH:00",...], branches: [...], rows: { "005": { "2026-05-28 14:00": { status, totalSent } } } }
+  router.get("/api/sync/hourly-log", asyncHandler(async (req, res) => {
+    const hours = parsePageParam(req.query.hours, 24);
+    const result = await repository.getHourlySyncLog(hours);
+    res.json(result);
+  }));
+
   router.use((error, _req, res, _next) => {
     console.error(error);
     res.status(500).json({ message: error.message || "Internal server error." });

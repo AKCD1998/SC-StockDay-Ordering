@@ -907,11 +907,12 @@ const BRANCH_LABELS = {
 };
 
 function syncLogStatusIcon(status) {
-  if (status === "success") return { icon: "✅", label: "สำเร็จ", cls: "sl-success" };
-  if (status === "failed")  return { icon: "❌", label: "ล้มเหลว", cls: "sl-failed" };
-  if (status === "running") return { icon: "⏳", label: "กำลังรัน", cls: "sl-running" };
-  if (status === "pending") return { icon: "🌙", label: "รอคืนนี้", cls: "sl-pending" };
-  if (status === "offline") return { icon: "💤", label: "ปิดเครื่อง", cls: "sl-offline" };
+  if (status === "success") return { icon: "✅", label: "สำเร็จ",              cls: "sl-success" };
+  if (status === "failed")  return { icon: "❌", label: "ล้มเหลว",             cls: "sl-failed"  };
+  if (status === "running") return { icon: "⏳", label: "กำลังรัน",            cls: "sl-running" };
+  if (status === "pending") return { icon: "🌙", label: "รอคืนนี้",            cls: "sl-pending" };
+  if (status === "waiting") return { icon: "🕐", label: "รอ sync ชั่วโมงนี้",  cls: "sl-pending" };
+  if (status === "offline") return { icon: "💤", label: "ปิดเครื่อง",          cls: "sl-offline" };
   return { icon: "—",  label: "ไม่มีข้อมูล", cls: "sl-unknown" };
 }
 
@@ -920,33 +921,21 @@ function formatShortDate(isoDate) {
   return `${d.getDate()}/${d.getMonth() + 1}`;
 }
 
-function SyncLogPanel() {
-  const [data, setData] = useState(null);
+// ── Nightly sub-tab ───────────────────────────────────────────────────────
+function NightlySyncGrid({ days, refreshKey }) {
+  const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [days, setDays] = useState(14);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [error, setError]     = useState("");
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError("");
     apiFetch(`/api/sync/nightly-log?days=${days}`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((json) => {
-        if (!active) return;
-        setData(json);
-      })
-      .catch((err) => {
-        if (!active) return;
-        setError(err.message);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .then((json) => { if (active) setData(json); })
+      .catch((err) => { if (active) setError(err.message); })
+      .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [days, refreshKey]);
 
@@ -954,80 +943,44 @@ function SyncLogPanel() {
   const branches = data?.branches ?? ["000", "001", "003", "004", "005"];
   const rows     = data?.rows     ?? {};
 
+  if (error)   return <p className="notice error compact">❌ โหลดไม่ได้: {error}</p>;
+  if (loading) return <p className="empty-state">⏳ กำลังโหลด...</p>;
+  if (dates.length === 0)
+    return <p className="empty-state">ยังไม่มีข้อมูล sync — รอให้ laptop สาขารันครั้งแรกก่อน</p>;
+
   return (
-    <section className="panel sync-log-panel">
-      <div className="panel-header">
-        <div>
-          <h2>ประวัติ Sync รายคืน</h2>
-          <p>สถานะการซิงก์ข้อมูลจาก Mother PC แต่ละสาขา — ✅ สำเร็จ · ❌ ล้มเหลว · 💤 ปิดเครื่อง · 🌙 รอคืนนี้</p>
-        </div>
-        <div className="toolbar">
-          <label className="date-label">
-            ย้อนหลัง
-            <select
-              value={days}
-              onChange={(e) => { setDays(Number(e.target.value)); }}
-              className="date-input-inline"
-              style={{ marginLeft: "6px" }}
-            >
-              <option value={7}>7 วัน</option>
-              <option value={14}>14 วัน</option>
-              <option value={30}>30 วัน</option>
-            </select>
-          </label>
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={() => setRefreshKey((k) => k + 1)}
-            disabled={loading}
-          >
-            🔄 รีเฟรช
-          </button>
-        </div>
-      </div>
-
-      {error && <p className="notice error compact">❌ โหลดไม่ได้: {error}</p>}
-      {loading && <p className="empty-state">⏳ กำลังโหลด...</p>}
-
-      {!loading && (
-        <div className="table-wrap sync-log-table-wrap">
-          <table className="sync-log-table">
-            <thead>
-              <tr>
-                <th className="sync-log-branch-col">สาขา</th>
-                {dates.map((d) => (
-                  <th key={d} className="sync-log-date-col" title={d}>
-                    {formatShortDate(d)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {branches.map((branch) => (
-                <tr key={branch}>
-                  <td className="sync-log-branch-label">
-                    {BRANCH_LABELS[branch] ?? `สาขา ${branch}`}
-                  </td>
-                  {dates.map((d) => {
-                    const status = rows[branch]?.[d] ?? "offline";
-                    const { icon, label, cls } = syncLogStatusIcon(status);
-                    return (
-                      <td key={d} className={`sync-log-cell ${cls}`} title={`${BRANCH_LABELS[branch] ?? branch} · ${d} · ${label}`}>
-                        <span aria-label={label}>{icon}</span>
-                      </td>
-                    );
-                  })}
-                </tr>
+    <>
+      <div className="table-wrap sync-log-table-wrap">
+        <table className="sync-log-table">
+          <thead>
+            <tr>
+              <th className="sync-log-branch-col">สาขา</th>
+              {dates.map((d) => (
+                <th key={d} className="sync-log-date-col" title={d}>
+                  {formatShortDate(d)}
+                </th>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {!loading && !error && dates.length === 0 && (
-        <p className="empty-state">ยังไม่มีข้อมูล sync — รอให้ laptop สาขารันครั้งแรกก่อน</p>
-      )}
-
+            </tr>
+          </thead>
+          <tbody>
+            {branches.map((branch) => (
+              <tr key={branch}>
+                <td className="sync-log-branch-label">{BRANCH_LABELS[branch] ?? `สาขา ${branch}`}</td>
+                {dates.map((d) => {
+                  const status = rows[branch]?.[d] ?? "offline";
+                  const { icon, label, cls } = syncLogStatusIcon(status);
+                  return (
+                    <td key={d} className={`sync-log-cell ${cls}`}
+                        title={`${BRANCH_LABELS[branch] ?? branch} · ${d} · ${label}`}>
+                      <span aria-label={label}>{icon}</span>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <div className="sync-log-legend">
         {[
           { icon: "✅", label: "สำเร็จ" },
@@ -1035,11 +988,192 @@ function SyncLogPanel() {
           { icon: "💤", label: "ปิดเครื่อง (ไม่มี heartbeat)" },
           { icon: "🌙", label: "วันนี้ — รอ sync คืนนี้" },
         ].map(({ icon, label }) => (
-          <span key={label} className="sync-log-legend-item">
-            {icon} {label}
-          </span>
+          <span key={label} className="sync-log-legend-item">{icon} {label}</span>
         ))}
       </div>
+    </>
+  );
+}
+
+// ── Hourly sub-tab ─────────────────────────────────────────────────────────
+function formatHourLabel(hourKey) {
+  // hourKey = "2026-05-28 14:00"  →  two-line: "14:00" / "28/5"
+  if (!hourKey) return "";
+  const [datePart, timePart] = hourKey.split(" ");
+  if (!datePart || !timePart) return hourKey;
+  const [, mm, dd] = datePart.split("-");
+  return `${timePart}\n${Number(dd)}/${Number(mm)}`;
+}
+
+function HourlySyncGrid({ hours, refreshKey }) {
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState("");
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+    apiFetch(`/api/sync/hourly-log?hours=${hours}`)
+      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .then((json) => { if (active) setData(json); })
+      .catch((err) => { if (active) setError(err.message); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [hours, refreshKey]);
+
+  const hourKeys = data?.hours    ?? [];
+  const branches = data?.branches ?? ["000", "001", "003", "004", "005"];
+  const rows     = data?.rows     ?? {};
+
+  // Show most-recent hours on the LEFT → reverse for display
+  const displayHours = [...hourKeys].reverse();
+
+  if (error)   return <p className="notice error compact">❌ โหลดไม่ได้: {error}</p>;
+  if (loading) return <p className="empty-state">⏳ กำลังโหลด...</p>;
+  if (hourKeys.length === 0)
+    return <p className="empty-state">ยังไม่มีข้อมูล sync — รอให้รันครั้งแรกก่อน</p>;
+
+  return (
+    <>
+      <div className="table-wrap sync-log-table-wrap">
+        <table className="sync-log-table">
+          <thead>
+            <tr>
+              <th className="sync-log-branch-col">สาขา</th>
+              {displayHours.map((h) => {
+                const lines = formatHourLabel(h).split("\n");
+                return (
+                  <th key={h} className="sync-log-hour-col" title={h}>
+                    <span style={{ display: "block" }}>{lines[0]}</span>
+                    <span style={{ display: "block", opacity: 0.65 }}>{lines[1]}</span>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {branches.map((branch) => (
+              <tr key={branch}>
+                <td className="sync-log-branch-label">{BRANCH_LABELS[branch] ?? `สาขา ${branch}`}</td>
+                {displayHours.map((h) => {
+                  const cell   = rows[branch]?.[h];
+                  const rawStatus = cell?.status ?? "offline";
+                  // Remap to hourly-specific icons
+                  const status = rawStatus === "pending" ? "waiting"
+                               : rawStatus === "offline" ? "unknown"
+                               : rawStatus;
+                  const sent   = cell?.totalSent ?? 0;
+                  const { icon, label, cls } = syncLogStatusIcon(status);
+                  return (
+                    <td key={h}
+                        className={`sync-log-cell-hour ${cls}`}
+                        title={`${BRANCH_LABELS[branch] ?? branch} · ${h} · ${label}${sent > 0 ? ` · ${sent} รายการ` : ""}`}>
+                      <span aria-label={label}>{icon}</span>
+                      {status === "success" && sent > 0 && (
+                        <span className="sync-log-total-sent">{sent}</span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="sync-log-legend">
+        {[
+          { icon: "✅", label: "ส่งข้อมูลสำเร็จ" },
+          { icon: "❌", label: "ส่งไม่สำเร็จ (มี error)" },
+          { icon: "—",  label: "ไม่มีการส่ง (ชั่วโมงนั้น)" },
+          { icon: "🕐", label: "ชั่วโมงปัจจุบัน — รอ sync" },
+        ].map(({ icon, label }) => (
+          <span key={label} className="sync-log-legend-item">{icon} {label}</span>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// ── SyncLogPanel — outer shell with sub-tabs ───────────────────────────────
+function SyncLogPanel() {
+  const [subTab, setSubTab]       = useState("nightly");
+  const [nightlyDays, setNightlyDays] = useState(14);
+  const [hourlyHours, setHourlyHours] = useState(24);
+  const [refreshKey, setRefreshKey]   = useState(0);
+
+  const isNightly = subTab === "nightly";
+
+  return (
+    <section className="panel sync-log-panel">
+      <div className="panel-header">
+        <div>
+          <h2>ประวัติ Sync</h2>
+          <div className="sync-log-subtabs" style={{ marginTop: "8px" }}>
+            <button
+              type="button"
+              className={`sync-log-subtab${isNightly ? " active" : ""}`}
+              onClick={() => setSubTab("nightly")}
+            >
+              🌙 รายคืน
+            </button>
+            <button
+              type="button"
+              className={`sync-log-subtab${!isNightly ? " active" : ""}`}
+              onClick={() => setSubTab("hourly")}
+            >
+              ⏱ รายชั่วโมง
+            </button>
+          </div>
+          <p style={{ marginTop: "6px" }}>
+            {isNightly
+              ? "สถานะการซิงก์ข้อมูลจาก Mother PC แต่ละสาขา — ✅ สำเร็จ · ❌ ล้มเหลว · 💤 ปิดเครื่อง · 🌙 รอคืนนี้"
+              : "สถานะการส่งข้อมูลรายชั่วโมงจาก Mother PC (Task Scheduler) — ✅ ส่งสำเร็จ · ❌ error · — ไม่มีการส่ง · 🕐 กำลังรอ"}
+          </p>
+        </div>
+        <div className="toolbar">
+          {isNightly ? (
+            <label className="date-label">
+              ย้อนหลัง
+              <select
+                value={nightlyDays}
+                onChange={(e) => setNightlyDays(Number(e.target.value))}
+                className="date-input-inline"
+                style={{ marginLeft: "6px" }}
+              >
+                <option value={7}>7 วัน</option>
+                <option value={14}>14 วัน</option>
+                <option value={30}>30 วัน</option>
+              </select>
+            </label>
+          ) : (
+            <label className="date-label">
+              ย้อนหลัง
+              <select
+                value={hourlyHours}
+                onChange={(e) => setHourlyHours(Number(e.target.value))}
+                className="date-input-inline"
+                style={{ marginLeft: "6px" }}
+              >
+                <option value={12}>12 ชั่วโมง</option>
+                <option value={24}>24 ชั่วโมง</option>
+                <option value={48}>48 ชั่วโมง</option>
+              </select>
+            </label>
+          )}
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => setRefreshKey((k) => k + 1)}
+          >
+            🔄 รีเฟรช
+          </button>
+        </div>
+      </div>
+
+      {isNightly
+        ? <NightlySyncGrid days={nightlyDays} refreshKey={refreshKey} />
+        : <HourlySyncGrid  hours={hourlyHours} refreshKey={refreshKey} />}
     </section>
   );
 }

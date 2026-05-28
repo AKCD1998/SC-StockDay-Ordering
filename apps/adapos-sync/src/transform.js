@@ -1,5 +1,16 @@
 // Maps raw AdaAcc rows to the API payload shapes expected by the server.
 
+/**
+ * Format a SQL Server DATE value (JS Date object from mssql) as a plain
+ * 'YYYY-MM-DD' string in Bangkok timezone, so that it is stored in the
+ * PostgreSQL DATE column with the correct calendar date regardless of the
+ * UTC offset of the mother PC or the Render server.
+ */
+function toBangkokDateString(value) {
+  if (value == null) return null;
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date(value));
+}
+
 export function toProductRecords(rows) {
   return rows.map((r) => ({
     productCode:    r.FTPdtCode,
@@ -29,8 +40,8 @@ export function toTransferPayload(headerRows, lineRows) {
     headers: headerRows.map((h) => ({
       docNo:     h.FTPthDocNo,
       docType:   h.FTPthDocType   || null,
-      docDate:   h.FDPthDocDate,
-      tnfDate:   h.FDPthTnfDate   || null,
+      docDate:   toBangkokDateString(h.FDPthDocDate),
+      tnfDate:   toBangkokDateString(h.FDPthTnfDate),
       branchFrm: h.FTPthBchFrm,
       branchTo:  h.FTPthBchTo,
       whFrm:     h.FTPthWhFrm     || null,
@@ -59,7 +70,7 @@ export function toTransferPayload(headerRows, lineRows) {
       branchTo:    l.FTPthBchTo     || null,
       whFrm:       l.FTPthWhFrm     || null,
       whTo:        l.FTPthWhTo      || null,
-      docDate:     l.FDPthDocDate   || null,
+      docDate:     toBangkokDateString(l.FDPthDocDate),
     })),
   };
 }
@@ -70,13 +81,13 @@ export function toPendingReceiptPayload(hdRows, dtRows) {
     headers: hdRows.map((h) => ({
       docNo:         h.FTXihDocNo,
       docType:       h.FTXihDocType       || null,
-      docDate:       h.FDXihDocDate       || null,
+      docDate:       toBangkokDateString(h.FDXihDocDate),
       docTime:       h.FTXihDocTime       || null,
       branchCode:    h.FTBchCode,
       supplierCode:  h.FTSplCode          || null,
       supplierName:  h.FTXihCstName       || null,
       refExt:        h.FTXihRefExt        || null,
-      refExtDate:    h.FDXihRefExtDate    || null,
+      refExtDate:    toBangkokDateString(h.FDXihRefExtDate),
       warehouseCode: h.FTWahCode          || null,
       total:         Number(h.FCXihTotal  || 0),
       vat:           Number(h.FCXihVat    || 0),
@@ -103,7 +114,7 @@ export function toPendingReceiptPayload(hdRows, dtRows) {
       vat:           Number(d.FCXidVat       || 0),
       costIn:        Number(d.FCXidCostIn    || 0),
       lotNo:         d.FTXidLotNo         || null,
-      expiredDate:   d.FDXidExpired       || null,
+      expiredDate:   toBangkokDateString(d.FDXidExpired),
       warehouseCode: d.FTWahCode          || null,
     })),
   };
@@ -130,19 +141,19 @@ export function toApprovedReceiptPayload(hdRows, dtRows) {
         vat:           Number(d.FCXidVat      || 0),
         costIn:        Number(d.FCXidCostIn   || 0),
         lotNo:         d.FTXidLotNo           || null,
-        expiredDate:   d.FDXidExpired         || null,
+        expiredDate:   toBangkokDateString(d.FDXidExpired),
         warehouseCode: d.FTWahCode            || null,
       }));
     return {
       branchCode:    h.FTBchCode             || null,
       docNo:         h.FTXihDocNo            || null,
       docType:       h.FTXihDocType          || null,
-      docDate:       h.FDXihDocDate          || null,
+      docDate:       toBangkokDateString(h.FDXihDocDate),
       docTime:       h.FTXihDocTime          || null,
       supplierCode:  h.FTSplCode             || null,
       supplierName:  h.FTXihCstName          || null,
       refExt:        h.FTXihRefExt           || null,
-      refExtDate:    h.FDXihRefExtDate       || null,
+      refExtDate:    toBangkokDateString(h.FDXihRefExtDate),
       warehouseCode: h.FTWahCode             || null,
       total:         Number(h.FCXihTotal     || 0),
       vat:           Number(h.FCXihVat       || 0),

@@ -1428,6 +1428,51 @@ select {
   color: #ffc7d0;
 }
 
+/* ── Sync Log panel sub-tabs ─────────────────────────────────────────────── */
+.sync-log-subtabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.sync-log-subtab {
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(73, 101, 140, 0.22);
+  background: transparent;
+  font-size: 0.83rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: #526578;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.sync-log-subtab:hover {
+  border-color: rgba(61, 101, 255, 0.34);
+  color: #16344d;
+}
+
+.sync-log-subtab.active {
+  background: rgba(61, 101, 255, 0.10);
+  border-color: rgba(29, 66, 205, 0.40);
+  color: #16344d;
+}
+
+[data-theme="dark"] .sync-log-subtab {
+  border-color: rgba(97, 120, 156, 0.28);
+  color: #7d90a8;
+}
+
+[data-theme="dark"] .sync-log-subtab:hover,
+[data-theme="dark"] .sync-log-subtab.active {
+  border-color: rgba(137, 164, 255, 0.52);
+  color: #f4f7fb;
+}
+
+[data-theme="dark"] .sync-log-subtab.active {
+  background: rgba(100, 140, 255, 0.12);
+}
+
 /* ── Nightly Sync Log panel ──────────────────────────────────────────────── */
 .sync-log-table-wrap {
   overflow-x: auto;
@@ -1507,4 +1552,28 @@ select {
 [data-theme="dark"] .sl-failed  { background: rgba(240, 50,  70,  0.12); }
 [data-theme="dark"] .sl-running { background: rgba(240,175,  30,  0.12); }
 [data-theme="dark"] .sl-pending { background: rgba(100,160, 240, 0.08); }
+
+/* Hourly grid — narrower hour columns */
+.sync-log-hour-col {
+  min-width: 52px;
+  font-size: 0.72rem;
+  color: #526578;
+  line-height: 1.25;
+}
+
+[data-theme="dark"] .sync-log-hour-col {
+  color: #7d90a8;
+}
+
+.sync-log-cell-hour {
+  font-size: 0.95rem;
+  cursor: default;
+}
+
+.sync-log-total-sent {
+  display: block;
+  font-size: 0.62rem;
+  color: #7d93aa;
+  margin-top: 1px;
+}
 
