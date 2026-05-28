@@ -179,6 +179,7 @@ export function toBranchStockRecords(rows) {
     const qty = Number(row.qty ?? 0);
     const snapshot = snapshots.get(productCode) || {
       product_code: productCode,
+      branch_code: branchCode,
       product_name_thai: row.product_name_thai || "",
       product_name_eng: row.product_name_eng || "",
       barcode: row.barcode || "",
@@ -192,6 +193,8 @@ export function toBranchStockRecords(rows) {
       qty_total_all_branches: 0,
       synced_at: new Date().toISOString(),
     };
+
+    snapshot.branch_code = branchCode;
 
     if (branchCode === "000") snapshot.qty_branch_000 = qty;
     if (branchCode === "001") snapshot.qty_branch_001 = qty;
