@@ -533,6 +533,98 @@ button {
   min-width: 120px;
 }
 
+.branch-stock-table th {
+  position: relative;
+  vertical-align: top;
+}
+
+.branch-stock-header-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.branch-stock-filter-button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #c8d3e2;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #38506b;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.branch-stock-filter-button.active,
+.branch-stock-filter-button.filtered {
+  border-color: #7396be;
+  background: #edf4ff;
+  color: #16344d;
+}
+
+.branch-stock-filter-menu {
+  position: absolute;
+  top: calc(100% - 4px);
+  right: 0;
+  z-index: 20;
+  width: min(280px, 80vw);
+  padding: 10px;
+  border: 1px solid #d6deea;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 40px rgba(31, 41, 51, 0.18);
+  display: grid;
+  gap: 8px;
+}
+
+.branch-stock-filter-action {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #16344d;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.branch-stock-filter-action:hover:not(:disabled) {
+  background: #edf4ff;
+}
+
+.branch-stock-filter-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.branch-stock-filter-search {
+  min-width: 0;
+}
+
+.branch-stock-filter-options {
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid #dfe7f2;
+  border-radius: 12px;
+  padding: 6px;
+  background: rgba(247, 250, 255, 0.92);
+}
+
+.branch-stock-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  color: #16344d;
+  font-size: 0.92rem;
+}
+
+.branch-stock-filter-option input {
+  width: 16px;
+  min-width: 16px;
+}
+
 .branch-stock-table th:nth-child(1),
 .branch-stock-table td:nth-child(1),
 .branch-stock-table th:nth-child(2),
@@ -1647,6 +1739,39 @@ select {
   border-color: #24533a;
   background: #14261c;
   color: #bce7c9;
+}
+
+[data-theme="dark"] .branch-stock-filter-button {
+  border-color: #334a65;
+  background: rgba(17, 29, 43, 0.96);
+  color: #b8c8db;
+}
+
+[data-theme="dark"] .branch-stock-filter-button.active,
+[data-theme="dark"] .branch-stock-filter-button.filtered {
+  border-color: #6c8eb8;
+  background: #1b324b;
+  color: #eff6ff;
+}
+
+[data-theme="dark"] .branch-stock-filter-menu {
+  border-color: #2a3b50;
+  background: rgba(10, 18, 28, 0.98);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="dark"] .branch-stock-filter-action,
+[data-theme="dark"] .branch-stock-filter-option {
+  color: #e8edf6;
+}
+
+[data-theme="dark"] .branch-stock-filter-action:hover:not(:disabled) {
+  background: #17304a;
+}
+
+[data-theme="dark"] .branch-stock-filter-options {
+  border-color: #263547;
+  background: rgba(17, 29, 43, 0.9);
 }
 
 /* ── Sync Log panel sub-tabs ─────────────────────────────────────────────── */

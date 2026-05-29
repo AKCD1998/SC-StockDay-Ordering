@@ -82,6 +82,65 @@ function compactFileName(value) {
   return parts[parts.length - 1] || value;
 }
 
+const BRANCH_STOCK_COLUMNS = [
+  { key: "productCode", label: "รหัสสินค้า", type: "text" },
+  { key: "productNameThai", label: "ชื่อสินค้าไทย", type: "text" },
+  { key: "productNameEng", label: "ชื่ออังกฤษ", type: "text" },
+  { key: "barcode", label: "Barcode", type: "text" },
+  { key: "unit", label: "หน่วย", type: "text" },
+  { key: "category", label: "หมวดหมู่", type: "text" },
+  { key: "categoryStatus", label: "สถานะหมวดหมู่", type: "text" },
+  { key: "qtyBranch000", label: "สาขา 000", type: "number" },
+  { key: "qtyBranch001", label: "สาขา 001", type: "number" },
+  { key: "qtyBranch003", label: "สาขา 003", type: "number" },
+  { key: "qtyBranch004", label: "สาขา 004", type: "number" },
+  { key: "qtyBranch005", label: "สาขา 005", type: "number" },
+  { key: "qtyTotalAllBranches", label: "รวมทุกสาขา", type: "number" },
+  { key: "syncedAt", label: "synced_at", type: "date" },
+];
+
+function normalizeFilterValue(value) {
+  return String(value == null ? "" : value).trim();
+}
+
+function getBranchStockColumnValue(row, key) {
+  if (key === "categoryStatus") {
+    return translateCategoryReviewStatus(row.categoryStatus || "needs_review");
+  }
+  if (key === "syncedAt") {
+    return row.syncedAt || "";
+  }
+  if (key === "category") {
+    return row.category || "";
+  }
+  return row[key] ?? "";
+}
+
+function compareBranchStockValues(leftValue, rightValue, type, direction) {
+  const order = direction === "desc" ? -1 : 1;
+
+  if (type === "number") {
+    const leftNumber = Number(leftValue || 0);
+    const rightNumber = Number(rightValue || 0);
+    if (leftNumber === rightNumber) return 0;
+    return leftNumber > rightNumber ? order : -order;
+  }
+
+  if (type === "date") {
+    const leftTime = leftValue ? new Date(leftValue).getTime() : 0;
+    const rightTime = rightValue ? new Date(rightValue).getTime() : 0;
+    if (leftTime === rightTime) return 0;
+    return leftTime > rightTime ? order : -order;
+  }
+
+  const leftText = normalizeFilterValue(leftValue);
+  const rightText = normalizeFilterValue(rightValue);
+  if (!leftText && !rightText) return 0;
+  if (!leftText) return 1;
+  if (!rightText) return -1;
+  return leftText.localeCompare(rightText, "th", { numeric: true, sensitivity: "base" }) * order;
+}
+
 // Supplier-to-logo mapping. Add new suppliers here — `patterns` are matched
 // against the Adasoft supplier name (case- and whitespace-insensitive), so list
 // both Thai and English variants. First brand with any matching pattern wins.
@@ -740,14 +799,19 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
 
 function BranchStockPanel({ csrfToken }) {
   const pageSize = 25;
+  const pageFetchLimit = 10000;
   const [records, setRecords] = useState([]);
   const [matchReport, setMatchReport] = useState(null);
   const [matchPreview, setMatchPreview] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
   const [offset, setOffset] = useState(0);
+  const [sortConfig, setSortConfig] = useState({ key: "productCode", direction: "asc" });
+  const [columnFilters, setColumnFilters] = useState({});
+  const [openFilterKey, setOpenFilterKey] = useState("");
+  const [filterSearchTerm, setFilterSearchTerm] = useState("");
   const [pagination, setPagination] = useState({
-    limit: pageSize,
+    limit: pageFetchLimit,
     offset: 0,
     total: 0,
   });
@@ -760,6 +824,7 @@ function BranchStockPanel({ csrfToken }) {
   const [previewError, setPreviewError] = useState("");
   const [applyMessage, setApplyMessage] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const filterMenuRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -769,8 +834,8 @@ function BranchStockPanel({ csrfToken }) {
       setError("");
       try {
         const params = new URLSearchParams({
-          limit: String(pageSize),
-          offset: String(offset),
+          limit: String(pageFetchLimit),
+          offset: "0",
         });
         if (appliedSearchTerm) {
           params.set("search", appliedSearchTerm);
@@ -784,8 +849,8 @@ function BranchStockPanel({ csrfToken }) {
         setRecords(data.records || []);
         setPagination(
           data.pagination || {
-            limit: pageSize,
-            offset,
+            limit: pageFetchLimit,
+            offset: 0,
             total: data.records?.length || 0,
           },
         );
@@ -803,7 +868,7 @@ function BranchStockPanel({ csrfToken }) {
     return () => {
       active = false;
     };
-  }, [appliedSearchTerm, offset, refreshKey]);
+  }, [appliedSearchTerm, refreshKey]);
 
   useEffect(() => {
     let active = true;
@@ -840,6 +905,22 @@ function BranchStockPanel({ csrfToken }) {
       active = false;
     };
   }, [refreshKey]);
+
+  useEffect(() => {
+    if (!openFilterKey) return undefined;
+
+    function handlePointerDown(event) {
+      if (filterMenuRef.current && !filterMenuRef.current.contains(event.target)) {
+        setOpenFilterKey("");
+        setFilterSearchTerm("");
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [openFilterKey]);
 
   useEffect(() => {
     let active = true;
@@ -888,6 +969,59 @@ function BranchStockPanel({ csrfToken }) {
     }
   }
 
+  function openColumnFilter(columnKey) {
+    setOpenFilterKey((current) => (current === columnKey ? "" : columnKey));
+    setFilterSearchTerm("");
+  }
+
+  function updateColumnSort(columnKey, direction) {
+    setSortConfig({ key: columnKey, direction });
+    setOpenFilterKey("");
+  }
+
+  function clearColumnFilter(columnKey) {
+    setColumnFilters((current) => {
+      const next = { ...current };
+      delete next[columnKey];
+      return next;
+    });
+  }
+
+  function toggleColumnFilterValue(columnKey, optionValue, optionValues) {
+    setColumnFilters((current) => {
+      const activeValues = current[columnKey] ? [...current[columnKey]] : [...optionValues];
+      const nextValues = activeValues.includes(optionValue)
+        ? activeValues.filter((value) => value !== optionValue)
+        : [...activeValues, optionValue];
+
+      if (nextValues.length === 0 || nextValues.length === optionValues.length) {
+        const next = { ...current };
+        delete next[columnKey];
+        return next;
+      }
+
+      return {
+        ...current,
+        [columnKey]: nextValues,
+      };
+    });
+    setOffset(0);
+  }
+
+  function toggleAllColumnFilterValues(columnKey, optionValues) {
+    setColumnFilters((current) => {
+      const currentValues = current[columnKey] ? [...current[columnKey]] : [...optionValues];
+      const next = { ...current };
+      if (currentValues.length === optionValues.length) {
+        delete next[columnKey];
+      } else {
+        next[columnKey] = [...optionValues];
+      }
+      return next;
+    });
+    setOffset(0);
+  }
+
   async function handleApplySafeMatches() {
     setApplyingPreview(true);
     setPreviewError("");
@@ -916,14 +1050,84 @@ function BranchStockPanel({ csrfToken }) {
     }
   }
 
-  const total = pagination.total || 0;
-  const currentPage = Math.floor((pagination.offset || 0) / pageSize) + 1;
+  const columnOptions = useMemo(() => {
+    return Object.fromEntries(
+      BRANCH_STOCK_COLUMNS.map((column) => {
+        const values = [...new Set(records.map((row) => normalizeFilterValue(getBranchStockColumnValue(row, column.key))))].sort(
+          (left, right) => left.localeCompare(right, "th", { numeric: true, sensitivity: "base" }),
+        );
+        return [column.key, values];
+      }),
+    );
+  }, [records]);
+
+  const visibleRecords = useMemo(() => {
+    const filtered = records.filter((row) => {
+      return BRANCH_STOCK_COLUMNS.every((column) => {
+        const activeValues = columnFilters[column.key];
+        if (!activeValues || activeValues.length === 0) {
+          return true;
+        }
+        const value = normalizeFilterValue(getBranchStockColumnValue(row, column.key));
+        return activeValues.includes(value);
+      });
+    });
+
+    const sortColumn = BRANCH_STOCK_COLUMNS.find((column) => column.key === sortConfig.key) || BRANCH_STOCK_COLUMNS[0];
+    return [...filtered].sort((left, right) =>
+      compareBranchStockValues(
+        getBranchStockColumnValue(left, sortColumn.key),
+        getBranchStockColumnValue(right, sortColumn.key),
+        sortColumn.type,
+        sortConfig.direction,
+      ),
+    );
+  }, [records, columnFilters, sortConfig]);
+
+  const total = visibleRecords.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const start = total === 0 ? 0 : (pagination.offset || 0) + 1;
-  const end = total === 0 ? 0 : (pagination.offset || 0) + records.length;
+  const safeOffset = Math.min(offset, Math.max(0, (totalPages - 1) * pageSize));
+  const currentPage = Math.floor(safeOffset / pageSize) + 1;
+  const start = total === 0 ? 0 : safeOffset + 1;
+  const pagedRecords = visibleRecords.slice(safeOffset, safeOffset + pageSize);
+  const end = total === 0 ? 0 : safeOffset + pagedRecords.length;
   const reportSummary = matchReport?.summary || null;
   const reportStats = matchReport?.stats || null;
   const previewSummary = matchPreview?.summary || null;
+
+  useEffect(() => {
+    if (safeOffset !== offset) {
+      setOffset(safeOffset);
+    }
+  }, [offset, safeOffset]);
+
+  function renderBranchStockCell(row, column) {
+    if (column.key === "productCode") {
+      return <strong>{row.productCode}</strong>;
+    }
+    if (column.key === "category") {
+      return (
+        <>
+          <strong>{row.category || "-"}</strong>
+          {row.categoryRationale ? <div className="meta">{row.categoryRationale}</div> : null}
+        </>
+      );
+    }
+    if (column.key === "categoryStatus") {
+      return (
+        <span className={`status ${categoryStatusClass(row.categoryStatus)}`}>
+          {translateCategoryReviewStatus(row.categoryStatus || "needs_review")}
+        </span>
+      );
+    }
+    if (column.type === "number") {
+      return formatNumber(row[column.key], 2);
+    }
+    if (column.key === "syncedAt") {
+      return formatDateTime(row.syncedAt);
+    }
+    return row[column.key] || "-";
+  }
 
   return (
     <section className="panel branch-stock-panel">
@@ -1210,53 +1414,107 @@ function BranchStockPanel({ csrfToken }) {
         <table className="branch-stock-table">
           <thead>
             <tr>
-              <th>รหัสสินค้า</th>
-              <th>ชื่อสินค้าไทย</th>
-              <th>ชื่ออังกฤษ</th>
-              <th>Barcode</th>
-              <th>หน่วย</th>
-              <th>หมวดหมู่</th>
-              <th>สถานะหมวดหมู่</th>
-              <th>สาขา 000</th>
-              <th>สาขา 001</th>
-              <th>สาขา 003</th>
-              <th>สาขา 004</th>
-              <th>สาขา 005</th>
-              <th>รวมทุกสาขา</th>
-              <th>synced_at</th>
+              {BRANCH_STOCK_COLUMNS.map((column) => {
+                const optionValues = columnOptions[column.key] || [];
+                const activeValues = columnFilters[column.key] ? [...columnFilters[column.key]] : optionValues;
+                const allSelected = activeValues.length === optionValues.length;
+                const hasActiveFilter = Boolean(columnFilters[column.key]?.length);
+                const filteredOptions = optionValues.filter((value) =>
+                  normalizeFilterValue(value).toLowerCase().includes(filterSearchTerm.trim().toLowerCase()),
+                );
+
+                return (
+                  <th key={column.key}>
+                    <div className="branch-stock-header-cell">
+                      <span>{column.label}</span>
+                      <button
+                        type="button"
+                        className={`branch-stock-filter-button ${openFilterKey === column.key ? "active" : ""} ${
+                          hasActiveFilter ? "filtered" : ""
+                        }`}
+                        onClick={() => openColumnFilter(column.key)}
+                        aria-label={`Sort and filter ${column.label}`}
+                      >
+                        ▾
+                      </button>
+                    </div>
+
+                    {openFilterKey === column.key ? (
+                      <div className="branch-stock-filter-menu" ref={filterMenuRef}>
+                        <button
+                          type="button"
+                          className="branch-stock-filter-action"
+                          onClick={() => updateColumnSort(column.key, "asc")}
+                        >
+                          Sort A to Z
+                        </button>
+                        <button
+                          type="button"
+                          className="branch-stock-filter-action"
+                          onClick={() => updateColumnSort(column.key, "desc")}
+                        >
+                          Sort Z to A
+                        </button>
+                        <button
+                          type="button"
+                          className="branch-stock-filter-action"
+                          onClick={() => {
+                            clearColumnFilter(column.key);
+                            setOpenFilterKey("");
+                          }}
+                          disabled={!hasActiveFilter}
+                        >
+                          Clear Filter
+                        </button>
+                        <input
+                          type="search"
+                          value={filterSearchTerm}
+                          onChange={(event) => setFilterSearchTerm(event.target.value)}
+                          placeholder="Search"
+                          className="branch-stock-filter-search"
+                        />
+                        <div className="branch-stock-filter-options">
+                          <label className="branch-stock-filter-option">
+                            <input
+                              type="checkbox"
+                              checked={allSelected}
+                              onChange={() => toggleAllColumnFilterValues(column.key, optionValues)}
+                            />
+                            <span>(Select All)</span>
+                          </label>
+                          {filteredOptions.map((value) => (
+                            <label key={`${column.key}-${value || "blank"}`} className="branch-stock-filter-option">
+                              <input
+                                type="checkbox"
+                                checked={activeValues.includes(value)}
+                                onChange={() => toggleColumnFilterValue(column.key, value, optionValues)}
+                              />
+                              <span>{value || "(Blank)"}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-            {records.map((row) => (
+            {pagedRecords.map((row) => (
               <tr key={row.productCode}>
-                <td><strong>{row.productCode}</strong></td>
-                <td>{row.productNameThai || "-"}</td>
-                <td>{row.productNameEng || "-"}</td>
-                <td>{row.barcode || "-"}</td>
-                <td>{row.unit || "-"}</td>
-                <td>
-                  <strong>{row.category || "-"}</strong>
-                  {row.categoryRationale ? (
-                    <div className="meta">{row.categoryRationale}</div>
-                  ) : null}
-                </td>
-                <td>
-                  <span className={`status ${categoryStatusClass(row.categoryStatus)}`}>
-                    {translateCategoryReviewStatus(row.categoryStatus || "needs_review")}
-                  </span>
-                </td>
-                <td>{formatNumber(row.qtyBranch000, 2)}</td>
-                <td>{formatNumber(row.qtyBranch001, 2)}</td>
-                <td>{formatNumber(row.qtyBranch003, 2)}</td>
-                <td>{formatNumber(row.qtyBranch004, 2)}</td>
-                <td>{formatNumber(row.qtyBranch005, 2)}</td>
-                <td>{formatNumber(row.qtyTotalAllBranches, 2)}</td>
-                <td>{formatDateTime(row.syncedAt)}</td>
+                {BRANCH_STOCK_COLUMNS.map((column) => (
+                  <td key={`${row.productCode}-${column.key}`}>{renderBranchStockCell(row, column)}</td>
+                ))}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {!loading && !error && records.length > 0 && pagedRecords.length === 0 && (
+        <p className="empty-state">ไม่พบข้อมูลหลังใช้ตัวกรองที่หัวตาราง</p>
+      )}
 
       <div className="pagination">
         <p className="pagination-info">
@@ -1280,7 +1538,7 @@ function BranchStockPanel({ csrfToken }) {
             type="button"
             className="ghost-button"
             disabled={loading || currentPage >= totalPages}
-            onClick={() => setOffset((current) => current + pageSize)}
+            onClick={() => setOffset((current) => Math.min(Math.max(0, total - 1), current + pageSize))}
           >
             ถัดไป
           </button>
