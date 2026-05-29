@@ -75,6 +75,12 @@ function categoryStatusClass(status) {
   return "muted";
 }
 
+function compactFileName(value) {
+  if (!value) return "-";
+  const parts = String(value).split(/[\\/]/);
+  return parts[parts.length - 1] || value;
+}
+
 // Supplier-to-logo mapping. Add new suppliers here — `patterns` are matched
 // against the Adasoft supplier name (case- and whitespace-insensitive), so list
 // both Thai and English variants. First brand with any matching pattern wins.
@@ -734,6 +740,7 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
 function BranchStockPanel() {
   const pageSize = 25;
   const [records, setRecords] = useState([]);
+  const [matchReport, setMatchReport] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
   const [offset, setOffset] = useState(0);
@@ -743,7 +750,9 @@ function BranchStockPanel() {
     total: 0,
   });
   const [loading, setLoading] = useState(false);
+  const [loadingReport, setLoadingReport] = useState(false);
   const [error, setError] = useState("");
+  const [reportError, setReportError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -790,6 +799,42 @@ function BranchStockPanel() {
     };
   }, [appliedSearchTerm, offset, refreshKey]);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadMatchReport() {
+      setLoadingReport(true);
+      setReportError("");
+      try {
+        const response = await apiFetch("/api/admin/taxonomy-match-report");
+        if (response.status === 404) {
+          if (!active) return;
+          setMatchReport(null);
+          setReportError("ยังไม่มีรายงานเทียบ taxonomy ใน docs/");
+          return;
+        }
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        if (!active) return;
+        setMatchReport(data);
+      } catch (loadError) {
+        if (!active) return;
+        setReportError(loadError.message || "โหลดรายงานเทียบ taxonomy ไม่สำเร็จ");
+      } finally {
+        if (active) {
+          setLoadingReport(false);
+        }
+      }
+    }
+
+    loadMatchReport();
+    return () => {
+      active = false;
+    };
+  }, [refreshKey]);
+
   function handleSearchSubmit(event) {
     event.preventDefault();
     const nextSearch = searchTerm.trim();
@@ -805,6 +850,8 @@ function BranchStockPanel() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const start = total === 0 ? 0 : (pagination.offset || 0) + 1;
   const end = total === 0 ? 0 : (pagination.offset || 0) + records.length;
+  const reportSummary = matchReport?.summary || null;
+  const reportStats = matchReport?.stats || null;
 
   return (
     <section className="panel branch-stock-panel">
@@ -834,6 +881,187 @@ function BranchStockPanel() {
           </button>
         </form>
       </div>
+
+      <section className="taxonomy-report-card">
+        <div className="taxonomy-report-header">
+          <div>
+            <h3>รายงานเทียบ taxonomy ล่าสุด</h3>
+            <p>
+              เทียบ workbook กับ live product export ตามกติกา column C only เพื่อดูความพร้อมก่อนใช้จริง
+            </p>
+          </div>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => setRefreshKey((value) => value + 1)}
+            disabled={loadingReport}
+          >
+            {loadingReport ? "กำลังโหลด..." : "รีโหลดรายงาน"}
+          </button>
+        </div>
+
+        {reportError && <p className="notice error compact">รายงาน: {reportError}</p>}
+
+        {matchReport ? (
+          <>
+            <div className="taxonomy-report-meta">
+              <span>ไฟล์รายงาน: {matchReport.fileName}</span>
+              <span>สร้างเมื่อ: {formatDateTime(matchReport.generatedAt)}</span>
+              <span>Workbook: {compactFileName(matchReport.args?.workbookFile)}</span>
+              <span>Live source: {compactFileName(matchReport.args?.liveFile)}</span>
+            </div>
+
+            <div className="taxonomy-report-metrics">
+              <article className="taxonomy-report-metric">
+                <span>Live rows</span>
+                <strong>{formatNumber(reportSummary?.totalLiveRowsExamined || 0)}</strong>
+                {reportStats?.liveCodeStats ? (
+                  <small>{formatNumber(reportStats.liveCodeStats.uniqueValues || 0)} unique codes</small>
+                ) : null}
+              </article>
+              <article className="taxonomy-report-metric">
+                <span>Workbook rows</span>
+                <strong>{formatNumber(reportSummary?.totalWorkbookRowsExamined || 0)}</strong>
+                {reportStats?.workbookCodeStats ? (
+                  <small>{formatNumber(reportStats.workbookCodeStats.uniqueValues || 0)} unique C codes</small>
+                ) : null}
+              </article>
+              <article className="taxonomy-report-metric">
+                <span>Exact code</span>
+                <strong>{formatNumber(reportSummary?.exactCodeMatches || 0)}</strong>
+              </article>
+              <article className="taxonomy-report-metric">
+                <span>Barcode</span>
+                <strong>{formatNumber(reportSummary?.barcodeMatches || 0)}</strong>
+              </article>
+              <article className="taxonomy-report-metric">
+                <span>Unmatched live</span>
+                <strong>{formatNumber(reportSummary?.unmatchedLiveRows || 0)}</strong>
+              </article>
+              <article className="taxonomy-report-metric">
+                <span>Conflicts</span>
+                <strong>{formatNumber(reportSummary?.conflictRows || 0)}</strong>
+              </article>
+            </div>
+
+            <div className="taxonomy-report-source-status">
+              <span className={`status ${
+                Number(matchReport.backendEvidence?.productsRows || 0) > 0 &&
+                Number(matchReport.backendEvidence?.branchStockSnapshotRows || 0) > 0
+                  ? "good"
+                  : "warning"
+              }`}>
+                {Number(matchReport.backendEvidence?.productsRows || 0) > 0 &&
+                Number(matchReport.backendEvidence?.branchStockSnapshotRows || 0) > 0
+                  ? "ใช้ backend source"
+                  : "ใช้ file-backed fallback"}
+              </span>
+              <span className="meta-line">
+                products={formatNumber(matchReport.backendEvidence?.productsRows || 0)} ·
+                branch_stock_snapshots={formatNumber(matchReport.backendEvidence?.branchStockSnapshotRows || 0)}
+              </span>
+            </div>
+
+            <div className="taxonomy-report-grid">
+              <details className="taxonomy-report-section" open>
+                <summary>ตัวอย่าง exact code match</summary>
+                <div className="table-wrap taxonomy-mini-table-wrap">
+                  <table className="taxonomy-mini-table">
+                    <thead>
+                      <tr>
+                        <th>Live code</th>
+                        <th>Workbook C</th>
+                        <th>ชื่อสินค้า</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(matchReport.samples?.exactCodeMatches || []).slice(0, 5).map((row) => (
+                        <tr key={`${row.liveProductCode}-${row.workbookRowNumber}`}>
+                          <td>{row.liveProductCode}</td>
+                          <td>{row.workbookProductCode}</td>
+                          <td>{row.liveProductNameThai || row.workbookProductNameThai || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+
+              <details className="taxonomy-report-section">
+                <summary>ตัวอย่าง unmatched live</summary>
+                <div className="table-wrap taxonomy-mini-table-wrap">
+                  <table className="taxonomy-mini-table">
+                    <thead>
+                      <tr>
+                        <th>Live code</th>
+                        <th>Barcode</th>
+                        <th>ชื่อสินค้า</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(matchReport.samples?.unmatchedLiveRows || []).slice(0, 5).map((row) => (
+                        <tr key={`${row.liveProductCode}-${row.liveRowNumber}`}>
+                          <td>{row.liveProductCode}</td>
+                          <td>{row.liveBarcode || "-"}</td>
+                          <td>{row.liveProductNameThai || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+
+              <details className="taxonomy-report-section">
+                <summary>ตัวอย่าง unmatched workbook</summary>
+                <div className="table-wrap taxonomy-mini-table-wrap">
+                  <table className="taxonomy-mini-table">
+                    <thead>
+                      <tr>
+                        <th>Workbook C</th>
+                        <th>Barcode</th>
+                        <th>ชื่อสินค้า</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(matchReport.samples?.unmatchedWorkbookRows || []).slice(0, 5).map((row) => (
+                        <tr key={`${row.workbookProductCode}-${row.workbookRowNumber}`}>
+                          <td>{row.workbookProductCode}</td>
+                          <td>{row.workbookBarcode || "-"}</td>
+                          <td>{row.workbookProductNameThai || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+
+              <details className="taxonomy-report-section">
+                <summary>ตัวอย่าง conflict</summary>
+                <div className="table-wrap taxonomy-mini-table-wrap">
+                  <table className="taxonomy-mini-table">
+                    <thead>
+                      <tr>
+                        <th>Type</th>
+                        <th>Value</th>
+                        <th>Code</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(matchReport.samples?.conflicts || []).slice(0, 5).map((row, index) => (
+                        <tr key={`${row.type}-${row.value}-${row.productCode || index}`}>
+                          <td>{row.type}</td>
+                          <td>{row.value || "-"}</td>
+                          <td>{row.productCode || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </div>
+          </>
+        ) : null}
+      </section>
 
       {error && <p className="notice error compact">เชื่อมต่อไม่ได้: {error}</p>}
       {loading && <p className="empty-state">กำลังโหลดข้อมูลสต็อกสาขา...</p>}

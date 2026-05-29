@@ -1,7 +1,13 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express from "express";
 import { config } from "./config.js";
 import { validateTransferPayload } from "./transferSync.js";
 import { parsePositiveNumber } from "./utils.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const docsDir = path.resolve(__dirname, "../../docs");
 
 function asyncHandler(fn) {
   return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -66,6 +72,50 @@ function normalizeSyncedAt(value) {
     return null;
   }
   return candidate.toISOString();
+}
+
+function locateLatestTaxonomyReportPath() {
+  if (!fs.existsSync(docsDir)) return null;
+  const files = fs.readdirSync(docsDir)
+    .filter((name) => /^taxonomy-match-report-.*\.json$/i.test(name))
+    .map((name) => {
+      const fullPath = path.join(docsDir, name);
+      const stats = fs.statSync(fullPath);
+      return {
+        name,
+        fullPath,
+        mtimeMs: stats.mtimeMs,
+        mtimeIso: stats.mtime.toISOString(),
+      };
+    })
+    .sort((left, right) => right.mtimeMs - left.mtimeMs);
+  return files[0] || null;
+}
+
+function loadLatestTaxonomyReportSummary() {
+  const fileEntry = locateLatestTaxonomyReportPath();
+  if (!fileEntry) return null;
+
+  const payload = JSON.parse(fs.readFileSync(fileEntry.fullPath, "utf8"));
+  const results = payload.results || {};
+  const stats = payload.stats || {};
+
+  return {
+    fileName: fileEntry.name,
+    generatedAt: fileEntry.mtimeIso,
+    args: payload.args || null,
+    liveMeta: payload.liveMeta || null,
+    backendEvidence: payload.backendEvidence || null,
+    stats,
+    summary: results.summary || null,
+    samples: {
+      exactCodeMatches: (results.exactCodeMatches || []).slice(0, 10),
+      barcodeMatches: (results.barcodeMatches || []).slice(0, 10),
+      unmatchedLiveRows: (results.unmatchedLiveRows || []).slice(0, 10),
+      unmatchedWorkbookRows: (results.unmatchedWorkbookRows || []).slice(0, 10),
+      conflicts: (results.conflicts || []).slice(0, 10),
+    },
+  };
 }
 
 function validateBranchStockSyncToken(req) {
@@ -343,6 +393,14 @@ export function createRouter(repository) {
       offset,
     });
     res.json(result);
+  }));
+
+  router.get("/api/admin/taxonomy-match-report", asyncHandler(async (_req, res) => {
+    const report = loadLatestTaxonomyReportSummary();
+    if (!report) {
+      return res.status(404).json({ message: "No taxonomy match report found under docs/." });
+    }
+    res.json(report);
   }));
 
   router.get("/api/admin/category-review", asyncHandler(async (req, res) => {

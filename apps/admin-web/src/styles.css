@@ -380,6 +380,109 @@ button {
   min-width: min(420px, 100%);
 }
 
+.taxonomy-report-card {
+  margin-bottom: 20px;
+  padding: 18px 20px;
+  border: 1px solid #d6deea;
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(247, 250, 255, 0.96) 0%, rgba(241, 246, 255, 0.92) 100%);
+}
+
+.taxonomy-report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.taxonomy-report-header h3 {
+  margin: 0 0 6px;
+  font-size: 1.25rem;
+  color: #16344d;
+}
+
+.taxonomy-report-header p {
+  margin: 0;
+  color: #5d7087;
+}
+
+.taxonomy-report-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-bottom: 14px;
+  color: #607287;
+  font-size: 0.9rem;
+}
+
+.taxonomy-report-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.taxonomy-report-metric {
+  padding: 12px 14px;
+  border: 1px solid #d6deea;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+  display: grid;
+  gap: 4px;
+}
+
+.taxonomy-report-metric span,
+.taxonomy-report-metric small {
+  color: #607287;
+}
+
+.taxonomy-report-metric strong {
+  font-size: 1.45rem;
+  color: #16344d;
+}
+
+.taxonomy-report-source-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.taxonomy-report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.taxonomy-report-section {
+  border: 1px solid #d6deea;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.74);
+  overflow: hidden;
+}
+
+.taxonomy-report-section summary {
+  padding: 12px 14px;
+  font-weight: 700;
+  color: #16344d;
+  cursor: pointer;
+}
+
+.taxonomy-mini-table-wrap {
+  padding: 0 12px 12px;
+}
+
+.taxonomy-mini-table th,
+.taxonomy-mini-table td {
+  padding: 9px 8px;
+  white-space: normal;
+  vertical-align: top;
+  font-size: 0.9rem;
+}
+
 .spotlight-list,
 .request-list {
   display: grid;
@@ -633,6 +736,7 @@ select {
   .account-actions,
   .view-nav,
   .receipt-tabs-row,
+  .taxonomy-report-header,
   .category-review-grid,
   .category-review-main,
   .category-review-actions {
@@ -1318,7 +1422,10 @@ select {
 [data-theme="dark"] .category-review-card,
 [data-theme="dark"] .spotlight-card,
 [data-theme="dark"] .request-card,
-[data-theme="dark"] .receipt-card {
+[data-theme="dark"] .receipt-card,
+[data-theme="dark"] .taxonomy-report-card,
+[data-theme="dark"] .taxonomy-report-metric,
+[data-theme="dark"] .taxonomy-report-section {
   border-color: #263547;
   background: rgba(15, 24, 36, 0.92);
   box-shadow: 0 20px 44px rgba(0, 0, 0, 0.32);
@@ -1326,6 +1433,10 @@ select {
 
 [data-theme="dark"] .auth-card-header p,
 [data-theme="dark"] .panel-header p,
+[data-theme="dark"] .taxonomy-report-header p,
+[data-theme="dark"] .taxonomy-report-meta,
+[data-theme="dark"] .taxonomy-report-metric span,
+[data-theme="dark"] .taxonomy-report-metric small,
 [data-theme="dark"] .meta,
 [data-theme="dark"] .meta-line,
 [data-theme="dark"] .pagination-info,
@@ -1369,6 +1480,9 @@ select {
 }
 
 [data-theme="dark"] .panel h2,
+[data-theme="dark"] .taxonomy-report-header h3,
+[data-theme="dark"] .taxonomy-report-metric strong,
+[data-theme="dark"] .taxonomy-report-section summary,
 [data-theme="dark"] .auth-card-header h2,
 [data-theme="dark"] .category-metric strong,
 [data-theme="dark"] .receipt-grand,

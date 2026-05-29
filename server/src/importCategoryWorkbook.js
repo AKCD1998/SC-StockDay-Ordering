@@ -2,6 +2,7 @@ import path from "node:path";
 import xlsx from "xlsx";
 import { getPool, closePool } from "./db/pool.js";
 import { parseCategoryLabel } from "./categoryUtils.js";
+import { readTaxonomyWorkbookRows } from "./taxonomyWorkbook.js";
 
 function parseArgs(argv) {
   const result = {
@@ -29,65 +30,6 @@ function parseArgs(argv) {
   }
 
   return result;
-}
-
-function normalizeHeader(value) {
-  return String(value || "").trim().replace(/\s+/g, "").toLowerCase();
-}
-
-function findHeaderRowIndex(rows) {
-  return rows.findIndex((row) => {
-    const headers = row.map((cell) => normalizeHeader(cell));
-    return headers.includes("รหัส") &&
-      headers.includes("ชื่อสินค้า") &&
-      headers.includes("barcode") &&
-      headers.includes("ประเภท");
-  });
-}
-
-function findHeaderIndex(headers, candidates) {
-  const normalizedCandidates = candidates.map((item) => normalizeHeader(item));
-  return headers.findIndex((header) =>
-    normalizedCandidates.some((candidate) => normalizeHeader(header).includes(candidate)),
-  );
-}
-
-function readRows(worksheet) {
-  const rows = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: "" });
-  if (!rows.length) {
-    throw new Error("Worksheet is empty.");
-  }
-
-  const headerRowIndex = findHeaderRowIndex(rows);
-  if (headerRowIndex < 0) {
-    throw new Error("Worksheet must include รหัส, ชื่อสินค้า, BARCODE, และ ประเภท columns.");
-  }
-
-  const headers = rows[headerRowIndex];
-  const codeIndex = findHeaderIndex(headers, ["รหัส"]);
-  const thaiNameIndex = findHeaderIndex(headers, ["ชื่อสินค้า"]);
-  const barcodeIndex = findHeaderIndex(headers, ["barcode", "bar code"]);
-  const categoryIndex = findHeaderIndex(headers, ["ประเภท"]);
-  const alternateCodeIndex = codeIndex > 0 ? codeIndex - 1 : -1;
-
-  if ([codeIndex, thaiNameIndex, barcodeIndex, categoryIndex].some((index) => index < 0)) {
-    throw new Error("Worksheet must include รหัส, ชื่อสินค้า, BARCODE, และ ประเภท columns.");
-  }
-
-  return rows.slice(headerRowIndex + 1).map((row, rowOffset) => {
-    const preferredCode = String(row[codeIndex] || "").trim();
-    const alternateCode = alternateCodeIndex >= 0 ? String(row[alternateCodeIndex] || "").trim() : "";
-    const productCode = preferredCode || alternateCode;
-
-    return {
-      sourceRowNumber: headerRowIndex + rowOffset + 2,
-      productCode,
-      alternateProductCode: alternateCode,
-      productNameThai: String(row[thaiNameIndex] || "").trim(),
-      barcode: String(row[barcodeIndex] || "").trim(),
-      rawLabel: String(row[categoryIndex] || "").trim(),
-    };
-  }).filter((row) => row.rawLabel && (row.productCode || row.barcode));
 }
 
 async function refreshCategories(pool, productCodes) {
@@ -183,7 +125,7 @@ async function run() {
     throw new Error(`Worksheet not found: ${args.sheet}`);
   }
 
-  const parsedRows = readRows(worksheet);
+  const parsedRows = readTaxonomyWorkbookRows(worksheet);
   if (!parsedRows.length) {
     throw new Error("No category rows found in the worksheet.");
   }
