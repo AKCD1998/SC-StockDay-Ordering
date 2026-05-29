@@ -388,11 +388,69 @@ button {
 
 .taxonomy-report-card {
   margin-bottom: 20px;
-  padding: 18px 20px;
   border: 1px solid #d6deea;
-  border-radius: 20px;
+  border-radius: 12px;
   background:
     linear-gradient(180deg, rgba(247, 250, 255, 0.96) 0%, rgba(241, 246, 255, 0.92) 100%);
+  overflow: hidden;
+}
+
+.taxonomy-report-card.taxonomy-open {
+  border-radius: 16px;
+}
+
+/* collapsed: the whole card is just the toggle bar */
+.taxonomy-toggle-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: #5a6a85;
+  text-align: left;
+}
+.taxonomy-toggle-bar:hover {
+  background: rgba(99, 130, 200, 0.07);
+}
+
+.taxonomy-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.taxonomy-toggle-icon {
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+.taxonomy-toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: rgba(99, 130, 200, 0.1);
+  font-size: 0.73rem;
+  color: #3a5080;
+  font-weight: 400;
+}
+.taxonomy-toggle-warn {
+  color: #b35a00;
+}
+.taxonomy-toggle-hint {
+  font-size: 0.7rem;
+  opacity: 0.4;
+}
+
+/* expanded body */
+.taxonomy-report-body {
+  padding: 4px 20px 18px;
+  border-top: 1px solid rgba(0,0,0,0.05);
 }
 
 .taxonomy-report-header {
@@ -1531,6 +1589,22 @@ select {
   border-color: #263547;
   background: rgba(15, 24, 36, 0.92);
   box-shadow: 0 20px 44px rgba(0, 0, 0, 0.32);
+}
+[data-theme="dark"] .taxonomy-toggle-bar {
+  color: #7a90b0;
+}
+[data-theme="dark"] .taxonomy-toggle-bar:hover {
+  background: rgba(99, 130, 200, 0.1);
+}
+[data-theme="dark"] .taxonomy-toggle-pill {
+  background: rgba(99, 130, 200, 0.15);
+  color: #9ab0d0;
+}
+[data-theme="dark"] .taxonomy-toggle-warn {
+  color: #e09050;
+}
+[data-theme="dark"] .taxonomy-report-body {
+  border-top-color: #263547;
 }
 
 [data-theme="dark"] .auth-card-header p,

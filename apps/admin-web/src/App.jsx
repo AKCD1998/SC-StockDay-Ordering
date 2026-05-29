@@ -824,6 +824,7 @@ function BranchStockPanel({ csrfToken }) {
   const [previewError, setPreviewError] = useState("");
   const [applyMessage, setApplyMessage] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [taxonomyOpen, setTaxonomyOpen] = useState(false);
   const filterMenuRef = useRef(null);
 
   useEffect(() => {
@@ -1158,7 +1159,32 @@ function BranchStockPanel({ csrfToken }) {
         </form>
       </div>
 
-      <section className="taxonomy-report-card">
+      <section className={`taxonomy-report-card${taxonomyOpen ? " taxonomy-open" : " taxonomy-collapsed"}`}>
+        <button
+          type="button"
+          className="taxonomy-toggle-bar"
+          onClick={() => setTaxonomyOpen((v) => !v)}
+          aria-expanded={taxonomyOpen}
+        >
+          <span className="taxonomy-toggle-label">
+            <span className="taxonomy-toggle-icon">{taxonomyOpen ? "▾" : "▸"}</span>
+            <span>Taxonomy</span>
+            {!taxonomyOpen && reportSummary && (
+              <span className="taxonomy-toggle-pill">
+                {formatNumber(reportSummary.exactCodeMatches || 0)} matched
+                {(reportSummary.conflictRows || 0) > 0 && (
+                  <span className="taxonomy-toggle-warn"> · {formatNumber(reportSummary.conflictRows)} conflicts</span>
+                )}
+              </span>
+            )}
+          </span>
+          {!taxonomyOpen && (
+            <span className="taxonomy-toggle-hint">คลิกเพื่อดูรายงาน</span>
+          )}
+        </button>
+
+        {taxonomyOpen && (
+        <div className="taxonomy-report-body">
         <div className="taxonomy-report-header">
           <div>
             <h3>รายงานเทียบ taxonomy ล่าสุด</h3>
@@ -1402,6 +1428,8 @@ function BranchStockPanel({ csrfToken }) {
             </div>
           </>
         ) : null}
+        </div>
+        )}
       </section>
 
       {error && <p className="notice error compact">เชื่อมต่อไม่ได้: {error}</p>}
