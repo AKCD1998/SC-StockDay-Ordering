@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dkshLogoUrl from "./assets/dksh.svg";
 import hansaLogoUrl from "./assets/hansa-logo.png";
 import tnpHealthcareLogoUrl from "./assets/tnp-healthcare-logo.svg";
@@ -1922,6 +1922,417 @@ function CategoryReviewPanel({ decidedBy }) {
   );
 }
 
+// ── Review Queue — fast keyboard-driven human category verification ───────────
+function ReviewQueuePanel({ csrfToken }) {
+  // phase: idle → reviewing → summary → done
+  const [phase, setPhase]           = useState("idle");
+  const [queue, setQueue]           = useState([]);          // current batch of products
+  const [allCategories, setAllCats] = useState([]);          // every known confirmed category
+  const [totalInQueue, setTotal]    = useState(null);
+  const [loading, setLoading]       = useState(false);
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  // Per-session state
+  const [decisions, setDecisions]   = useState([]);          // [{productCode,productNameThai,categoryName,isNew?,skipped?}]
+  const [currentIdx, setCurrentIdx] = useState(0);           // index into queue[]
+  const [search, setSearch]         = useState("");
+  const [showNewCat, setShowNewCat] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitMsg, setSubmitMsg]   = useState("");
+
+  const searchRef  = useRef(null);
+  const newCatRef  = useRef(null);
+
+  // ── Load queue ──────────────────────────────────────────────────────────────
+  const loadQueue = useCallback(async (filter) => {
+    setLoading(true);
+    try {
+      const f = filter || statusFilter;
+      const data = await apiFetch(`/api/admin/review-queue?limit=80&status=${f}`);
+      setQueue(data.records || []);
+      setAllCats(data.allCategories || []);
+      setTotal(data.total || 0);
+    } catch (e) {
+      setSubmitMsg("โหลดคิวไม่สำเร็จ: " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter]);
+
+  // ── Current product ─────────────────────────────────────────────────────────
+  const product = queue[currentIdx] || null;
+
+  // Category options sorted: proposed first (if any), then by similarity
+  const options = useMemo(() => {
+    if (!product) return [];
+    const opts = [...(product.options || [])];
+    if (product.currentCategory && !opts.find(o => o.category_name === product.currentCategory)) {
+      opts.unshift({ category_name: product.currentCategory, similarity: null, isProposed: true });
+    }
+    return opts;
+  }, [product]);
+
+  // Filtered options for search
+  const filteredOptions = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return options.slice(0, 9);
+    return allCategories
+      .filter(c => c.toLowerCase().includes(q))
+      .slice(0, 9)
+      .map(c => ({ category_name: c, similarity: null }));
+  }, [search, options, allCategories]);
+
+  // ── Decision helpers ────────────────────────────────────────────────────────
+  const pickCategory = useCallback((categoryName, isNew = false) => {
+    if (!product) return;
+    setDecisions(prev => {
+      const next = prev.filter(d => d.productCode !== product.productCode);
+      next.push({ productCode: product.productCode, productNameThai: product.productNameThai, categoryName, isNew, skipped: false });
+      return next;
+    });
+    setSearch("");
+    setShowNewCat(false);
+    setNewCatName("");
+    if (currentIdx + 1 >= queue.length) {
+      setPhase("summary");
+    } else {
+      setCurrentIdx(i => i + 1);
+    }
+  }, [product, currentIdx, queue.length]);
+
+  const skipProduct = useCallback(() => {
+    if (!product) return;
+    setDecisions(prev => {
+      const next = prev.filter(d => d.productCode !== product.productCode);
+      next.push({ productCode: product.productCode, productNameThai: product.productNameThai, categoryName: null, skipped: true });
+      return next;
+    });
+    setSearch("");
+    if (currentIdx + 1 >= queue.length) {
+      setPhase("summary");
+    } else {
+      setCurrentIdx(i => i + 1);
+    }
+  }, [product, currentIdx, queue.length]);
+
+  const goBack = useCallback(() => {
+    if (currentIdx === 0) return;
+    setDecisions(prev => prev.filter(d => d.productCode !== (queue[currentIdx - 1]?.productCode)));
+    setSearch("");
+    setShowNewCat(false);
+    setCurrentIdx(i => i - 1);
+  }, [currentIdx, queue]);
+
+  const createNewCategory = useCallback(() => {
+    const name = newCatName.trim();
+    if (!name) return;
+    apiFetch("/api/admin/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken || "" },
+      body: JSON.stringify({ name }),
+    }).catch(() => {});
+    setAllCats(prev => [...new Set([...prev, name])].sort());
+    pickCategory(name, true);
+  }, [newCatName, csrfToken, pickCategory]);
+
+  // ── Keyboard handler ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== "reviewing") return;
+    function onKey(e) {
+      const tag = e.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const n = parseInt(e.key, 10);
+      if (n >= 1 && n <= 9 && filteredOptions[n - 1]) {
+        e.preventDefault();
+        pickCategory(filteredOptions[n - 1].category_name);
+      } else if (e.key === "ArrowLeft" || e.key === "Backspace") {
+        e.preventDefault();
+        goBack();
+      } else if ((e.key === "s" || e.key === "S") && !e.ctrlKey) {
+        e.preventDefault();
+        skipProduct();
+      } else if ((e.key === "n" || e.key === "N") && !e.ctrlKey) {
+        e.preventDefault();
+        setShowNewCat(true);
+        setTimeout(() => newCatRef.current?.focus(), 50);
+      } else if (e.key === "/") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase, filteredOptions, pickCategory, goBack, skipProduct]);
+
+  // ── Confirm batch ───────────────────────────────────────────────────────────
+  async function confirmAll() {
+    const toConfirm = decisions.filter(d => !d.skipped && d.categoryName);
+    if (!toConfirm.length) return;
+    setSubmitting(true);
+    setSubmitMsg("");
+    try {
+      await apiFetch("/api/admin/review-queue/confirm-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken || "" },
+        body: JSON.stringify({ decisions: toConfirm.map(d => ({ productCode: d.productCode, categoryName: d.categoryName, isNewCategory: d.isNew || false })) }),
+      });
+      setSubmitMsg(`ยืนยันสำเร็จ ${toConfirm.length} รายการ`);
+      setPhase("done");
+    } catch (e) {
+      setSubmitMsg("เกิดข้อผิดพลาด: " + e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function startSession() {
+    setDecisions([]);
+    setCurrentIdx(0);
+    setSearch("");
+    setShowNewCat(false);
+    setNewCatName("");
+    setSubmitMsg("");
+    setPhase("reviewing");
+  }
+
+  function resetAll() {
+    setPhase("idle");
+    setQueue([]);
+    setDecisions([]);
+    setCurrentIdx(0);
+    setTotal(null);
+    setSubmitMsg("");
+  }
+
+  const confirmed  = decisions.filter(d => !d.skipped && d.categoryName).length;
+  const skipped    = decisions.filter(d => d.skipped).length;
+  const progress   = queue.length ? Math.round(((confirmed + skipped) / queue.length) * 100) : 0;
+
+  // ── IDLE ────────────────────────────────────────────────────────────────────
+  if (phase === "idle" || phase === "done") {
+    return (
+      <section className="panel rq-panel">
+        <div className="panel-header">
+          <h2>ตรวจหมวดสินค้า</h2>
+          <p>ยืนยันหมวดของสินค้าที่ระบบยังไม่แน่ใจ — แต่ละรายการใช้เวลาไม่กี่วินาที</p>
+        </div>
+
+        {submitMsg && <p className="notice success compact">{submitMsg}</p>}
+
+        <div className="rq-start-grid">
+          {[
+            { key: "all",          label: "ทั้งหมด",                desc: "รอตรวจ + ต้องทบทวน" },
+            { key: "proposed",     label: "รอตรวจ",                  desc: "ระบบเดาไว้ รอ approve" },
+            { key: "needs_review", label: "ต้องทบทวน",               desc: "ระบบไม่รู้ ต้องหาเอง" },
+          ].map(opt => (
+            <button
+              key={opt.key}
+              type="button"
+              className={`rq-start-card${statusFilter === opt.key ? " active" : ""}`}
+              onClick={() => setStatusFilter(opt.key)}
+            >
+              <strong>{opt.label}</strong>
+              <span>{opt.desc}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="rq-start-actions">
+          <button
+            type="button"
+            className="primary-button"
+            onClick={async () => { await loadQueue(statusFilter); startSession(); }}
+            disabled={loading}
+          >
+            {loading ? "กำลังโหลด..." : "เริ่มตรวจ →"}
+          </button>
+          {totalInQueue !== null && (
+            <span className="rq-queue-count">
+              {totalInQueue.toLocaleString()} รายการในคิว
+            </span>
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  // ── SUMMARY ─────────────────────────────────────────────────────────────────
+  if (phase === "summary") {
+    return (
+      <section className="panel rq-panel">
+        <div className="rq-summary-header">
+          <h2>สรุปก่อนยืนยัน</h2>
+          <p>ตรวจสอบรายการด้านล่าง แก้ไขได้ก่อนกด "ยืนยันทั้งหมด"</p>
+        </div>
+
+        {submitMsg && <p className={`notice ${submitMsg.includes("ผิด") ? "error" : "success"} compact`}>{submitMsg}</p>}
+
+        <div className="rq-summary-stats">
+          <span className="rq-stat good">{confirmed} รายการพร้อม</span>
+          {skipped > 0 && <span className="rq-stat muted">{skipped} ข้าม</span>}
+        </div>
+
+        <div className="rq-summary-list">
+          {decisions.filter(d => !d.skipped).map((d, i) => (
+            <div key={d.productCode} className="rq-summary-row">
+              <span className="rq-summary-name">{d.productNameThai}</span>
+              <span className={`rq-summary-cat${d.isNew ? " new" : ""}`}>
+                {d.categoryName}
+                {d.isNew && <span className="rq-new-badge">ใหม่</span>}
+              </span>
+              <button
+                type="button"
+                className="ghost-button rq-edit-btn"
+                onClick={() => {
+                  setCurrentIdx(i);
+                  setDecisions(prev => prev.filter((_, idx) => idx !== i));
+                  setPhase("reviewing");
+                }}
+              >
+                แก้
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="rq-summary-actions">
+          <button type="button" className="ghost-button" onClick={() => setPhase("reviewing")}>
+            ← กลับตรวจต่อ
+          </button>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={confirmAll}
+            disabled={submitting || confirmed === 0}
+          >
+            {submitting ? "กำลังบันทึก..." : `✓ ยืนยัน ${confirmed} รายการ`}
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  // ── REVIEWING ───────────────────────────────────────────────────────────────
+  if (!product) {
+    return (
+      <section className="panel rq-panel">
+        <p className="empty-state">คิวว่าง — ไม่มีสินค้าที่ต้องตรวจ</p>
+        <button type="button" className="ghost-button" onClick={resetAll}>กลับ</button>
+      </section>
+    );
+  }
+
+  return (
+    <section className="panel rq-panel rq-reviewing">
+      {/* ── top bar ── */}
+      <div className="rq-topbar">
+        <button type="button" className="ghost-button rq-back-btn" onClick={goBack} disabled={currentIdx === 0} title="← กลับ (ArrowLeft)">
+          ←
+        </button>
+        <div className="rq-progress-wrap">
+          <div className="rq-progress-bar" style={{ width: `${progress}%` }} />
+        </div>
+        <span className="rq-counter">{currentIdx + 1} / {queue.length}</span>
+        <button type="button" className="ghost-button rq-summary-btn" onClick={() => setPhase("summary")}>
+          สรุป ({confirmed})
+        </button>
+      </div>
+
+      {/* ── product name ── */}
+      <div className="rq-product">
+        <div className="rq-product-name">{product.productNameThai}</div>
+        {product.productNameEng && <div className="rq-product-eng">{product.productNameEng}</div>}
+        <div className="rq-product-meta">
+          {product.productCode}
+          {product.barcode && <> · {product.barcode}</>}
+          {product.reviewStatus === "proposed" && product.currentCategory && (
+            <span className="rq-proposed-badge">ระบบเดา: {product.currentCategory}</span>
+          )}
+        </div>
+      </div>
+
+      {/* ── category buttons ── */}
+      {!showNewCat && (
+        <div className="rq-options">
+          {filteredOptions.map((opt, i) => (
+            <button
+              key={opt.category_name}
+              type="button"
+              className={`rq-option${opt.category_name === product.currentCategory ? " rq-option-proposed" : ""}`}
+              onClick={() => pickCategory(opt.category_name)}
+              title={opt.similarity ? `${Math.round(opt.similarity * 100)}% similarity` : ""}
+            >
+              <span className="rq-option-key">{i + 1}</span>
+              <span className="rq-option-name">{opt.category_name}</span>
+              {opt.similarity != null && (
+                <span className="rq-option-sim">{Math.round(opt.similarity * 100)}%</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── search ── */}
+      {!showNewCat && (
+        <div className="rq-search-row">
+          <input
+            ref={searchRef}
+            type="text"
+            className="rq-search"
+            placeholder="/ ค้นหาหมวด..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Escape") { setSearch(""); e.target.blur(); }
+              if (e.key === "Enter" && filteredOptions.length === 1) pickCategory(filteredOptions[0].category_name);
+            }}
+          />
+        </div>
+      )}
+
+      {/* ── new category ── */}
+      {showNewCat ? (
+        <div className="rq-newcat-row">
+          <input
+            ref={newCatRef}
+            type="text"
+            className="rq-search"
+            placeholder="ชื่อหมวดใหม่..."
+            value={newCatName}
+            onChange={e => setNewCatName(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter") createNewCategory();
+              if (e.key === "Escape") { setShowNewCat(false); setNewCatName(""); }
+            }}
+            autoFocus
+          />
+          <button type="button" className="primary-button" onClick={createNewCategory} disabled={!newCatName.trim()}>
+            สร้าง + เลือก
+          </button>
+          <button type="button" className="ghost-button" onClick={() => { setShowNewCat(false); setNewCatName(""); }}>
+            ยกเลิก
+          </button>
+        </div>
+      ) : (
+        <div className="rq-footer-actions">
+          <button type="button" className="ghost-button rq-newcat-btn" onClick={() => { setShowNewCat(true); setTimeout(() => newCatRef.current?.focus(), 50); }} title="N">
+            + สร้างหมวดใหม่
+          </button>
+          <button type="button" className="ghost-button rq-skip-btn" onClick={skipProduct} title="S">
+            ข้ามไปก่อน
+          </button>
+        </div>
+      )}
+
+      {/* ── keyboard hint ── */}
+      <div className="rq-hints">
+        <span>1–9 เลือก</span><span>/ ค้นหา</span><span>N หมวดใหม่</span><span>S ข้าม</span><span>← กลับ</span>
+      </div>
+    </section>
+  );
+}
+
 // ── Nightly Sync Log ─────────────────────────────────────────────────────────
 const BRANCH_LABELS = {
   "000": "สาขา 000 (HQ)",
@@ -2531,7 +2942,7 @@ export default function App() {
             className={view === "category-review" ? "view-nav-btn active" : "view-nav-btn"}
             onClick={() => setView("category-review")}
           >
-            หมวดหมู่สินค้า
+            ตรวจหมวดสินค้า
           </button>
           <button
             type="button"
@@ -2598,7 +3009,7 @@ export default function App() {
       ) : view === "branch-stock" ? (
         <BranchStockPanel csrfToken={session.csrfToken} />
       ) : view === "category-review" ? (
-        <CategoryReviewPanel decidedBy={session.user.id || "admin"} />
+        <ReviewQueuePanel csrfToken={session.csrfToken} />
       ) : view === "sync-log" ? (
         <SyncLogPanel />
       ) : (
