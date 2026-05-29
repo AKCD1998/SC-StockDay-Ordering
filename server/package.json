@@ -8,6 +8,8 @@
     "start": "node src/index.js",
     "seed": "node src/seed.js",
     "import:order-workbook": "node src/importOrderWorkbook.js",
+    "import:category-workbook": "node src/importCategoryWorkbook.js",
+    "categories:refresh": "node src/refreshProductCategories.js",
     "db:migrate": "node src/db/migrate.js",
     "db:seed": "node src/seed.js",
     "test": "node --test src/tests/*.test.js"

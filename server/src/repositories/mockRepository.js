@@ -270,6 +270,44 @@ export class MockRepository {
     };
   }
 
+  async getCategoryReviewQueue(options = {}) {
+    return {
+      records: [],
+      pagination: {
+        limit: Number(options.limit) || 25,
+        offset: Number(options.offset) || 0,
+        total: 0,
+      },
+    };
+  }
+
+  async getCategoryMetrics() {
+    return {
+      totalProducts: this.products.length,
+      thaiNameCoverage: 1,
+      englishNameCoverage: 0,
+      barcodeCoverage: 1,
+      dummyBarcodeRate: 0,
+    };
+  }
+
+  async refreshProductCategories(productCodes = []) {
+    return {
+      processed: productCodes.length,
+      confirmed: 0,
+      needsReview: productCodes.length,
+      reverify: 0,
+    };
+  }
+
+  async confirmProductCategory({ productCode, cleanCategory, shelfNo = null }) {
+    return {
+      ok: true,
+      productCode,
+      category: shelfNo === null ? cleanCategory : `${shelfNo}${cleanCategory}`,
+    };
+  }
+
   async saveHeartbeat(_branchCode, _laptopName, _event) {
     return { ok: true, heartbeatId: null };
   }

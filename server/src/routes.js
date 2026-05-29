@@ -345,6 +345,43 @@ export function createRouter(repository) {
     res.json(result);
   }));
 
+  router.get("/api/admin/category-review", asyncHandler(async (req, res) => {
+    const limit = parsePageParam(req.query.limit, 25);
+    const offset = parseOffsetParam(req.query.offset, 0);
+    const result = await repository.getCategoryReviewQueue({
+      search: req.query.search || "",
+      status: req.query.status || "open",
+      limit,
+      offset,
+    });
+    res.json(result);
+  }));
+
+  router.get("/api/admin/category-metrics", asyncHandler(async (_req, res) => {
+    res.json(await repository.getCategoryMetrics());
+  }));
+
+  router.post("/api/admin/categories/run", asyncHandler(async (req, res) => {
+    const productCodes = Array.isArray(req.body?.productCodes) ? req.body.productCodes : [];
+    res.json(await repository.refreshProductCategories(productCodes));
+  }));
+
+  router.post("/api/admin/category-review/:productCode/confirm", asyncHandler(async (req, res) => {
+    const body = req.body || {};
+    if (!body.cleanCategory) {
+      return res.status(400).json({ message: "cleanCategory is required." });
+    }
+    const result = await repository.confirmProductCategory({
+      productCode: req.params.productCode,
+      cleanCategory: body.cleanCategory,
+      shelfNo: body.shelfNo ?? null,
+      isColdChain: body.isColdChain ?? false,
+      decidedBy: body.decidedBy || "admin",
+      note: body.note || "",
+    });
+    res.json(result);
+  }));
+
   router.post("/api/sync/run-log", asyncHandler(async (req, res) => {
     res.json(await repository.ingestRunLog(req.body || {}));
   }));

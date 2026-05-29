@@ -1,4 +1,10 @@
 import { getPool, closePool } from "../db/pool.js";
+import {
+  buildCategoryDecision,
+  buildDisplayCategory,
+  inferKeywordCategory,
+  isRealBarcode,
+} from "../categoryUtils.js";
 import { buildStockDayRow } from "../stockDay.js";
 import { makeId, normalizeQuery } from "../utils.js";
 
@@ -24,6 +30,17 @@ function toBranchStockNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function pickBestBarcode(row) {
+  const candidates = [row.barcode_1, row.barcode_2, row.barcode_3];
+  return candidates.find((value) => isRealBarcode(value)) || candidates.find(Boolean) || null;
+}
+
+function toOptionalInteger(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
 function mapBranchStockSnapshotRow(row) {
   return {
     productCode: row.product_code,
@@ -31,6 +48,12 @@ function mapBranchStockSnapshotRow(row) {
     productNameEng: row.product_name_eng || "",
     barcode: row.barcode || "",
     unit: row.unit || "",
+    category: row.category || "",
+    categoryStatus: row.category_review_status || "",
+    categorySource: row.category_source || "",
+    categoryConfidence: Number(row.category_confidence || 0),
+    placementConfidence: Number(row.placement_confidence || 0),
+    categoryRationale: row.category_rationale || "",
     qtyBranch000: toBranchStockNumber(row.qty_branch_000),
     qtyBranch001: toBranchStockNumber(row.qty_branch_001),
     qtyBranch002: toBranchStockNumber(row.qty_branch_002),
@@ -375,6 +398,448 @@ export class PostgresRepository {
     };
   }
 
+  async loadCategoryReferenceData(client = this.pool) {
+    const [aliasResult, ruleResult] = await Promise.all([
+      client.query("SELECT raw_variant, canonical_category FROM typo_aliases ORDER BY raw_variant ASC"),
+      client.query(
+        `SELECT
+           clean_category,
+           allowed_shelves,
+           allowed_unprefixed,
+           is_cold_chain_possible,
+           is_controlled,
+           always_human_confirm
+         FROM category_shelf_rules`,
+      ),
+    ]);
+
+    return {
+      aliasRows: aliasResult.rows,
+      shelfRules: new Map(ruleResult.rows.map((row) => [row.clean_category, row])),
+    };
+  }
+
+  async refreshProductCategories(productCodes = []) {
+    const normalizedCodes = [...new Set((productCodes || []).filter(Boolean))];
+    const client = await this.pool.connect();
+    let inTransaction = false;
+
+    try {
+      const whereClause = normalizedCodes.length
+        ? "WHERE p.product_code = ANY($1::text[])"
+        : "";
+      const params = normalizedCodes.length ? [normalizedCodes] : [];
+
+      const { rows: productsToClassify } = await client.query(
+        `
+        SELECT
+          p.product_code,
+          p.product_name,
+          p.product_name_eng,
+          p.barcode_1,
+          p.barcode_2,
+          p.barcode_3,
+          pc.review_status AS existing_review_status
+        FROM products p
+        LEFT JOIN product_category pc ON pc.product_code = p.product_code
+        ${whereClause}
+        ORDER BY p.product_code ASC
+        `,
+        params,
+      );
+
+      if (!productsToClassify.length) {
+        return { processed: 0, confirmed: 0, needsReview: 0, reverify: 0 };
+      }
+
+      const { aliasRows, shelfRules } = await this.loadCategoryReferenceData(client);
+      const realBarcodes = [...new Set(productsToClassify.map(pickBestBarcode).filter(isRealBarcode))];
+      const productCodesForMatch = productsToClassify.map((row) => row.product_code);
+      const taxonomyResult = await client.query(
+        `
+        SELECT
+          product_code,
+          barcode,
+          raw_label,
+          clean_category,
+          shelf_no,
+          pharmacist_zone,
+          status
+        FROM taxonomy_map
+        WHERE status <> 'ignored'
+          AND (
+            product_code = ANY($1::text[])
+            OR ($2::text[] <> '{}'::text[] AND barcode = ANY($2::text[]))
+          )
+        ORDER BY
+          CASE WHEN status = 'reverify' THEN 0 ELSE 1 END,
+          source_row_number NULLS LAST,
+          taxonomy_id ASC
+        `,
+        [productCodesForMatch, realBarcodes],
+      );
+
+      const taxonomyByCode = new Map();
+      const taxonomyByBarcode = new Map();
+      for (const row of taxonomyResult.rows) {
+        if (row.product_code && !taxonomyByCode.has(row.product_code)) {
+          taxonomyByCode.set(row.product_code, row);
+        }
+        if (row.barcode && !taxonomyByBarcode.has(row.barcode)) {
+          taxonomyByBarcode.set(row.barcode, row);
+        }
+      }
+
+      await client.query("BEGIN");
+      inTransaction = true;
+
+      let confirmed = 0;
+      let needsReview = 0;
+      let reverify = 0;
+
+      for (const product of productsToClassify) {
+        const bestBarcode = pickBestBarcode(product);
+        const exactMatch =
+          taxonomyByCode.get(product.product_code) ||
+          (isRealBarcode(bestBarcode) ? taxonomyByBarcode.get(bestBarcode) : null) ||
+          null;
+        const keywordMatch = exactMatch
+          ? null
+          : inferKeywordCategory({
+              productNameThai: product.product_name,
+              productNameEng: product.product_name_eng,
+              barcode: bestBarcode,
+            });
+        const categoryKey = exactMatch?.clean_category || keywordMatch?.cleanCategory || null;
+        const decision = buildCategoryDecision({
+          product: {
+            productCode: product.product_code,
+            productNameThai: product.product_name,
+            productNameEng: product.product_name_eng,
+            barcode: bestBarcode,
+          },
+          exactMatch,
+          keywordMatch,
+          shelfRule: categoryKey ? shelfRules.get(categoryKey) || null : null,
+          aliasRows,
+        });
+
+        await client.query(
+          `
+          INSERT INTO product_category (
+            product_code,
+            clean_category,
+            shelf_no,
+            pharmacist_zone,
+            is_cold_chain,
+            requires_signoff,
+            category_confidence,
+            placement_confidence,
+            source,
+            review_status,
+            rationale,
+            needs_reverification,
+            matched_from_product_code,
+            matched_from_barcode,
+            raw_label_source,
+            decided_at,
+            updated_at
+          )
+          VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+            $11, $12, $13, $14, $15,
+            CASE WHEN $10 = 'confirmed' THEN NOW() ELSE NULL END,
+            NOW()
+          )
+          ON CONFLICT (product_code) DO UPDATE SET
+            clean_category = EXCLUDED.clean_category,
+            shelf_no = EXCLUDED.shelf_no,
+            pharmacist_zone = EXCLUDED.pharmacist_zone,
+            is_cold_chain = EXCLUDED.is_cold_chain,
+            requires_signoff = EXCLUDED.requires_signoff,
+            category_confidence = EXCLUDED.category_confidence,
+            placement_confidence = EXCLUDED.placement_confidence,
+            source = EXCLUDED.source,
+            review_status = EXCLUDED.review_status,
+            rationale = EXCLUDED.rationale,
+            needs_reverification = EXCLUDED.needs_reverification,
+            matched_from_product_code = EXCLUDED.matched_from_product_code,
+            matched_from_barcode = EXCLUDED.matched_from_barcode,
+            raw_label_source = EXCLUDED.raw_label_source,
+            updated_at = NOW(),
+            decided_at = CASE
+              WHEN EXCLUDED.review_status = 'confirmed' THEN NOW()
+              ELSE product_category.decided_at
+            END
+          `,
+          [
+            product.product_code,
+            decision.cleanCategory,
+            decision.shelfNo,
+            decision.pharmacistZone,
+            decision.isColdChain,
+            decision.requiresSignoff,
+            decision.categoryConfidence,
+            decision.placementConfidence,
+            decision.source,
+            decision.reviewStatus,
+            decision.rationale,
+            decision.needsReverification,
+            decision.matchedFromProductCode,
+            decision.matchedFromBarcode,
+            decision.rawLabelSource,
+          ],
+        );
+
+        await client.query(
+          "UPDATE products SET category = $2, updated_at = NOW() WHERE product_code = $1",
+          [product.product_code, decision.displayCategory || null],
+        );
+
+        if (decision.reviewStatus === "confirmed") confirmed += 1;
+        else if (decision.reviewStatus === "reverify") reverify += 1;
+        else needsReview += 1;
+      }
+
+      await client.query("COMMIT");
+      inTransaction = false;
+      return {
+        processed: productsToClassify.length,
+        confirmed,
+        needsReview,
+        reverify,
+      };
+    } catch (error) {
+      if (inTransaction) {
+        await client.query("ROLLBACK");
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getCategoryReviewQueue({ search = "", status = "open", limit = 25, offset = 0 } = {}) {
+    const normalizedSearch = normalizeQuery(search);
+    const safeLimit = Math.min(100, Math.max(1, Number(limit) || 25));
+    const safeOffset = Math.max(0, Number(offset) || 0);
+    const statusFilter = status === "all" ? null : status;
+    const params = [normalizedSearch || null, statusFilter, safeLimit, safeOffset];
+    const whereClause = `
+      WHERE (
+        $1::text IS NULL
+        OR LOWER(COALESCE(p.product_code, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(p.product_name, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(p.product_name_eng, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(pc.clean_category, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(p.category, '')) LIKE '%' || $1 || '%'
+      )
+      AND (
+        $2::text IS NULL
+        OR ($2 = 'open' AND COALESCE(pc.review_status, 'needs_review') <> 'confirmed')
+        OR COALESCE(pc.review_status, 'needs_review') = $2
+      )
+    `;
+
+    const countResult = await this.pool.query(
+      `
+      SELECT COUNT(*)::int AS total
+      FROM products p
+      LEFT JOIN product_category pc ON pc.product_code = p.product_code
+      ${whereClause}
+      `,
+      params.slice(0, 2),
+    );
+
+    const { rows } = await this.pool.query(
+      `
+      SELECT
+        p.product_code,
+        p.product_name,
+        p.product_name_eng,
+        COALESCE(p.barcode_1, p.barcode_2, p.barcode_3, '') AS barcode,
+        p.category,
+        pc.clean_category,
+        pc.shelf_no,
+        pc.pharmacist_zone,
+        pc.is_cold_chain,
+        pc.requires_signoff,
+        pc.category_confidence,
+        pc.placement_confidence,
+        pc.source,
+        pc.review_status,
+        pc.rationale,
+        pc.needs_reverification,
+        pc.raw_label_source,
+        pc.decided_by,
+        pc.decided_at
+      FROM products p
+      LEFT JOIN product_category pc ON pc.product_code = p.product_code
+      ${whereClause}
+      ORDER BY
+        CASE COALESCE(pc.review_status, 'needs_review')
+          WHEN 'reverify' THEN 0
+          WHEN 'needs_review' THEN 1
+          WHEN 'proposed' THEN 2
+          ELSE 3
+        END,
+        p.product_code ASC
+      LIMIT $3 OFFSET $4
+      `,
+      params,
+    );
+
+    return {
+      records: rows.map((row) => ({
+        productCode: row.product_code,
+        productNameThai: row.product_name || "",
+        productNameEng: row.product_name_eng || "",
+        barcode: row.barcode || "",
+        category: row.category || "",
+        cleanCategory: row.clean_category || "",
+        shelfNo: row.shelf_no,
+        pharmacistZone: row.pharmacist_zone ?? false,
+        isColdChain: row.is_cold_chain ?? false,
+        requiresSignoff: row.requires_signoff ?? false,
+        categoryConfidence: Number(row.category_confidence || 0),
+        placementConfidence: Number(row.placement_confidence || 0),
+        source: row.source || "",
+        reviewStatus: row.review_status || "needs_review",
+        rationale: row.rationale || "",
+        needsReverification: row.needs_reverification ?? false,
+        rawLabelSource: row.raw_label_source || "",
+        decidedBy: row.decided_by || "",
+        decidedAt: row.decided_at,
+      })),
+      pagination: {
+        limit: safeLimit,
+        offset: safeOffset,
+        total: Number(countResult.rows[0]?.total || 0),
+      },
+    };
+  }
+
+  async confirmProductCategory({
+    productCode,
+    cleanCategory,
+    shelfNo,
+    isColdChain = false,
+    decidedBy = "admin",
+    note = "",
+  }) {
+    const normalizedCategory = String(cleanCategory || "").trim();
+    if (!normalizedCategory) {
+      throw new Error("cleanCategory is required.");
+    }
+
+    const safeShelfNo = toOptionalInteger(shelfNo);
+    const requiresSignoff = safeShelfNo === 9;
+    const displayCategory = buildDisplayCategory(normalizedCategory, safeShelfNo);
+
+    const client = await this.pool.connect();
+    let inTransaction = false;
+    try {
+      await client.query("BEGIN");
+      inTransaction = true;
+      await client.query(
+        `
+        INSERT INTO product_category (
+          product_code,
+          clean_category,
+          shelf_no,
+          pharmacist_zone,
+          is_cold_chain,
+          requires_signoff,
+          category_confidence,
+          placement_confidence,
+          source,
+          review_status,
+          rationale,
+          needs_reverification,
+          decided_by,
+          decided_at,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, 1, 1, 'human', 'confirmed', $7, FALSE, $8, NOW(), NOW())
+        ON CONFLICT (product_code) DO UPDATE SET
+          clean_category = EXCLUDED.clean_category,
+          shelf_no = EXCLUDED.shelf_no,
+          pharmacist_zone = EXCLUDED.pharmacist_zone,
+          is_cold_chain = EXCLUDED.is_cold_chain,
+          requires_signoff = EXCLUDED.requires_signoff,
+          category_confidence = 1,
+          placement_confidence = 1,
+          source = 'human',
+          review_status = 'confirmed',
+          rationale = EXCLUDED.rationale,
+          needs_reverification = FALSE,
+          decided_by = EXCLUDED.decided_by,
+          decided_at = NOW(),
+          updated_at = NOW()
+        `,
+        [
+          productCode,
+          normalizedCategory,
+          safeShelfNo,
+          safeShelfNo !== null,
+          Boolean(isColdChain),
+          requiresSignoff,
+          note || "Confirmed by admin review queue.",
+          decidedBy,
+        ],
+      );
+      await client.query(
+        "UPDATE products SET category = $2, updated_at = NOW() WHERE product_code = $1",
+        [productCode, displayCategory],
+      );
+      await client.query("COMMIT");
+      return { ok: true, productCode, category: displayCategory };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getCategoryMetrics() {
+    const { rows } = await this.pool.query(
+      `
+      SELECT
+        COUNT(*)::int AS total_products,
+        COUNT(*) FILTER (WHERE COALESCE(product_name, '') <> '')::int AS thai_name_count,
+        COUNT(*) FILTER (WHERE COALESCE(product_name_eng, '') <> '')::int AS english_name_count,
+        COUNT(*) FILTER (
+          WHERE COALESCE(barcode_1, '') ~ '^[0-9]{6,}$'
+             OR COALESCE(barcode_2, '') ~ '^[0-9]{6,}$'
+             OR COALESCE(barcode_3, '') ~ '^[0-9]{6,}$'
+        )::int AS barcode_like_count,
+        COUNT(*) FILTER (
+          WHERE COALESCE(barcode_1, '') ~ '^9{5,}'
+             OR COALESCE(barcode_2, '') ~ '^9{5,}'
+             OR COALESCE(barcode_3, '') ~ '^9{5,}'
+        )::int AS dummy_barcode_count
+      FROM products
+      `,
+    );
+    const metrics = rows[0] || {};
+    return {
+      totalProducts: Number(metrics.total_products || 0),
+      thaiNameCoverage: Number(metrics.total_products || 0)
+        ? Number(metrics.thai_name_count || 0) / Number(metrics.total_products || 1)
+        : 0,
+      englishNameCoverage: Number(metrics.total_products || 0)
+        ? Number(metrics.english_name_count || 0) / Number(metrics.total_products || 1)
+        : 0,
+      barcodeCoverage: Number(metrics.total_products || 0)
+        ? Number(metrics.barcode_like_count || 0) / Number(metrics.total_products || 1)
+        : 0,
+      dummyBarcodeRate: Number(metrics.total_products || 0)
+        ? Number(metrics.dummy_barcode_count || 0) / Number(metrics.total_products || 1)
+        : 0,
+    };
+  }
+
   async ingestBranches(payload) {
     let accepted = 0;
     for (const record of payload.records || []) {
@@ -488,9 +953,13 @@ export class PostgresRepository {
       );
 
       await client.query("COMMIT");
-      return { accepted: records.length };
+      inTransaction = false;
+      const categoryResult = await this.refreshProductCategories(codes);
+      return { accepted: records.length, categoryRefresh: categoryResult };
     } catch (error) {
-      await client.query("ROLLBACK");
+      if (inTransaction) {
+        await client.query("ROLLBACK");
+      }
       throw error;
     } finally {
       client.release();
@@ -1295,17 +1764,21 @@ export class PostgresRepository {
     const whereClause = `
       WHERE (
         $1::text IS NULL
-        OR LOWER(COALESCE(product_code, '')) LIKE '%' || $1 || '%'
-        OR LOWER(COALESCE(product_name_thai, '')) LIKE '%' || $1 || '%'
-        OR LOWER(COALESCE(product_name_eng, '')) LIKE '%' || $1 || '%'
-        OR LOWER(COALESCE(barcode, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(bs.product_code, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(bs.product_name_thai, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(bs.product_name_eng, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(bs.barcode, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(p.category, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(pc.clean_category, '')) LIKE '%' || $1 || '%'
       )
     `;
 
     const countResult = await this.pool.query(
       `
       SELECT COUNT(*)::int AS total
-      FROM branch_stock_snapshots
+      FROM branch_stock_snapshots bs
+      LEFT JOIN products p ON p.product_code = bs.product_code
+      LEFT JOIN product_category pc ON pc.product_code = bs.product_code
       ${whereClause}
       `,
       [normalizedSearch || null],
@@ -1315,24 +1788,32 @@ export class PostgresRepository {
     const { rows } = await this.pool.query(
       `
       SELECT
-        product_code,
-        product_name_thai,
-        product_name_eng,
-        barcode,
-        unit,
-        qty_branch_000,
-        qty_branch_001,
-        qty_branch_002,
-        qty_branch_003,
-        qty_branch_004,
-        qty_branch_005,
-        qty_total_all_branches,
-        synced_at,
-        created_at,
-        updated_at
-      FROM branch_stock_snapshots
+        bs.product_code,
+        bs.product_name_thai,
+        bs.product_name_eng,
+        bs.barcode,
+        bs.unit,
+        COALESCE(p.category, '') AS category,
+        COALESCE(pc.review_status, '') AS category_review_status,
+        COALESCE(pc.source, '') AS category_source,
+        COALESCE(pc.category_confidence, 0) AS category_confidence,
+        COALESCE(pc.placement_confidence, 0) AS placement_confidence,
+        COALESCE(pc.rationale, '') AS category_rationale,
+        bs.qty_branch_000,
+        bs.qty_branch_001,
+        bs.qty_branch_002,
+        bs.qty_branch_003,
+        bs.qty_branch_004,
+        bs.qty_branch_005,
+        bs.qty_total_all_branches,
+        bs.synced_at,
+        bs.created_at,
+        bs.updated_at
+      FROM branch_stock_snapshots bs
+      LEFT JOIN products p ON p.product_code = bs.product_code
+      LEFT JOIN product_category pc ON pc.product_code = bs.product_code
       ${whereClause}
-      ORDER BY product_code ASC
+      ORDER BY bs.product_code ASC
       LIMIT $2 OFFSET $3
       `,
       params,

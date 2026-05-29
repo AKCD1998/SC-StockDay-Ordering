@@ -60,6 +60,21 @@ function translateStatus(status) {
   return status || "-";
 }
 
+function translateCategoryReviewStatus(status) {
+  if (status === "confirmed") return "ยืนยันแล้ว";
+  if (status === "proposed") return "รอตรวจ";
+  if (status === "needs_review") return "ต้องทบทวน";
+  if (status === "reverify") return "ต้องตรวจซ้ำ";
+  return status || "-";
+}
+
+function categoryStatusClass(status) {
+  if (status === "confirmed") return "good";
+  if (status === "proposed") return "warning";
+  if (status === "reverify") return "danger";
+  return "muted";
+}
+
 // Supplier-to-logo mapping. Add new suppliers here — `patterns` are matched
 // against the Adasoft supplier name (case- and whitespace-insensitive), so list
 // both Thai and English variants. First brand with any matching pattern wins.
@@ -835,6 +850,8 @@ function BranchStockPanel() {
               <th>ชื่ออังกฤษ</th>
               <th>Barcode</th>
               <th>หน่วย</th>
+              <th>หมวดหมู่</th>
+              <th>สถานะหมวดหมู่</th>
               <th>สาขา 000</th>
               <th>สาขา 001</th>
               <th>สาขา 003</th>
@@ -852,6 +869,17 @@ function BranchStockPanel() {
                 <td>{row.productNameEng || "-"}</td>
                 <td>{row.barcode || "-"}</td>
                 <td>{row.unit || "-"}</td>
+                <td>
+                  <strong>{row.category || "-"}</strong>
+                  {row.categoryRationale ? (
+                    <div className="meta">{row.categoryRationale}</div>
+                  ) : null}
+                </td>
+                <td>
+                  <span className={`status ${categoryStatusClass(row.categoryStatus)}`}>
+                    {translateCategoryReviewStatus(row.categoryStatus || "needs_review")}
+                  </span>
+                </td>
                 <td>{formatNumber(row.qtyBranch000, 2)}</td>
                 <td>{formatNumber(row.qtyBranch001, 2)}</td>
                 <td>{formatNumber(row.qtyBranch003, 2)}</td>
@@ -888,6 +916,352 @@ function BranchStockPanel() {
             className="ghost-button"
             disabled={loading || currentPage >= totalPages}
             onClick={() => setOffset((current) => current + pageSize)}
+          >
+            ถัดไป
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CategoryReviewPanel({ decidedBy }) {
+  const pageSize = 20;
+  const [records, setRecords] = useState([]);
+  const [metrics, setMetrics] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("open");
+  const [pagination, setPagination] = useState({ limit: pageSize, offset: 0, total: 0 });
+  const [loading, setLoading] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState("");
+  const [savingCode, setSavingCode] = useState("");
+  const [drafts, setDrafts] = useState({});
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadReviewQueue() {
+      setLoading(true);
+      setError("");
+      try {
+        const params = new URLSearchParams({
+          limit: String(pageSize),
+          offset: String(pagination.offset || 0),
+          status: statusFilter,
+        });
+        if (appliedSearchTerm) {
+          params.set("search", appliedSearchTerm);
+        }
+
+        const [queueResponse, metricsResponse] = await Promise.all([
+          apiFetch(`/api/admin/category-review?${params.toString()}`),
+          apiFetch("/api/admin/category-metrics"),
+        ]);
+
+        if (!queueResponse.ok) {
+          throw new Error(`HTTP ${queueResponse.status}`);
+        }
+        if (!metricsResponse.ok) {
+          throw new Error(`HTTP ${metricsResponse.status}`);
+        }
+
+        const [queueData, metricsData] = await Promise.all([
+          queueResponse.json(),
+          metricsResponse.json(),
+        ]);
+
+        if (!active) return;
+        setRecords(queueData.records || []);
+        setMetrics(metricsData);
+        setPagination(
+          queueData.pagination || {
+            limit: pageSize,
+            offset: 0,
+            total: queueData.records?.length || 0,
+          },
+        );
+        setDrafts((current) => {
+          const next = { ...current };
+          for (const row of queueData.records || []) {
+            if (!next[row.productCode]) {
+              next[row.productCode] = {
+                cleanCategory: row.cleanCategory || "",
+                shelfNo: row.shelfNo ?? "",
+                isColdChain: Boolean(row.isColdChain),
+              };
+            }
+          }
+          return next;
+        });
+      } catch (loadError) {
+        if (active) {
+          setError(loadError.message || "โหลดคิวหมวดหมู่ไม่สำเร็จ");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadReviewQueue();
+    return () => {
+      active = false;
+    };
+  }, [appliedSearchTerm, pagination.offset, refreshKey, statusFilter]);
+
+  function handleSearchSubmit(event) {
+    event.preventDefault();
+    setAppliedSearchTerm(searchTerm.trim());
+    setPagination((current) => ({ ...current, offset: 0 }));
+  }
+
+  async function handleRunCategorizer() {
+    setRunning(true);
+    setError("");
+    try {
+      const response = await apiFetch("/api/admin/categories/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      setPagination((current) => ({ ...current, offset: 0 }));
+      setRefreshKey((value) => value + 1);
+    } catch (runError) {
+      setError(runError.message || "สั่งประมวลผลหมวดหมู่ไม่สำเร็จ");
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  async function handleConfirm(productCode) {
+    const draft = drafts[productCode] || {};
+    setSavingCode(productCode);
+    setError("");
+    try {
+      const response = await apiFetch(`/api/admin/category-review/${productCode}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cleanCategory: draft.cleanCategory,
+          shelfNo: draft.shelfNo === "" ? null : Number(draft.shelfNo),
+          isColdChain: Boolean(draft.isColdChain),
+          decidedBy,
+        }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.message || `HTTP ${response.status}`);
+      }
+      setRefreshKey((value) => value + 1);
+    } catch (saveError) {
+      setError(saveError.message || "บันทึกการยืนยันหมวดหมู่ไม่สำเร็จ");
+    } finally {
+      setSavingCode("");
+    }
+  }
+
+  const total = pagination.total || 0;
+  const currentPage = Math.floor((pagination.offset || 0) / pageSize) + 1;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const start = total === 0 ? 0 : (pagination.offset || 0) + 1;
+  const end = total === 0 ? 0 : (pagination.offset || 0) + records.length;
+
+  return (
+    <section className="panel category-review-panel">
+      <div className="panel-header stacked">
+        <div>
+          <h2>คิวตรวจหมวดหมู่สินค้า</h2>
+          <p>ตรวจรายการที่ระบบจัดหมวดหมู่ได้ไม่ชัด หรือรายการที่ต้องยืนยันจากเภสัช</p>
+        </div>
+
+        <form className="toolbar branch-stock-toolbar" onSubmit={handleSearchSubmit}>
+          <input
+            type="search"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="ค้นหารหัสสินค้า ชื่อ หรือหมวดหมู่"
+          />
+          <select value={statusFilter} onChange={(event) => {
+            setStatusFilter(event.target.value);
+            setPagination((current) => ({ ...current, offset: 0 }));
+          }}>
+            <option value="open">คิวที่ยังไม่ยืนยัน</option>
+            <option value="needs_review">ต้องทบทวน</option>
+            <option value="reverify">ต้องตรวจซ้ำ</option>
+            <option value="proposed">รอตรวจ</option>
+            <option value="confirmed">ยืนยันแล้ว</option>
+            <option value="all">ทั้งหมด</option>
+          </select>
+          <button type="submit" className="ghost-button">
+            ค้นหา
+          </button>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={handleRunCategorizer}
+            disabled={running}
+          >
+            {running ? "กำลังประมวลผล..." : "ประมวลผลใหม่"}
+          </button>
+        </form>
+      </div>
+
+      {metrics ? (
+        <div className="category-metrics">
+          <article className="category-metric">
+            <span>สินค้าทั้งหมด</span>
+            <strong>{formatNumber(metrics.totalProducts)}</strong>
+          </article>
+          <article className="category-metric">
+            <span>ชื่อไทยพร้อมใช้</span>
+            <strong>{formatNumber((metrics.thaiNameCoverage || 0) * 100, 1)}%</strong>
+          </article>
+          <article className="category-metric">
+            <span>ชื่ออังกฤษพร้อมใช้</span>
+            <strong>{formatNumber((metrics.englishNameCoverage || 0) * 100, 1)}%</strong>
+          </article>
+          <article className="category-metric">
+            <span>Barcode ใช้งานได้</span>
+            <strong>{formatNumber((metrics.barcodeCoverage || 0) * 100, 1)}%</strong>
+          </article>
+          <article className="category-metric">
+            <span>Dummy barcode</span>
+            <strong>{formatNumber((metrics.dummyBarcodeRate || 0) * 100, 1)}%</strong>
+          </article>
+        </div>
+      ) : null}
+
+      {error && <p className="notice error compact">{error}</p>}
+      {loading && <p className="empty-state">กำลังโหลดคิวหมวดหมู่...</p>}
+      {!loading && !records.length ? (
+        <p className="empty-state">ไม่มีรายการในคิวตามตัวกรองปัจจุบัน</p>
+      ) : null}
+
+      <div className="category-review-list">
+        {records.map((row) => {
+          const draft = drafts[row.productCode] || {
+            cleanCategory: row.cleanCategory || "",
+            shelfNo: row.shelfNo ?? "",
+            isColdChain: Boolean(row.isColdChain),
+          };
+          return (
+            <article className="category-review-card" key={row.productCode}>
+              <div className="category-review-main">
+                <div>
+                  <strong>{row.productNameThai || row.productCode}</strong>
+                  <p className="meta-line">{row.productCode} · {row.productNameEng || "-"}</p>
+                  <p className="meta-line">
+                    Barcode: {row.barcode || "-"} · source: {row.source || "-"}
+                  </p>
+                </div>
+                <span className={`status ${categoryStatusClass(row.reviewStatus)}`}>
+                  {translateCategoryReviewStatus(row.reviewStatus)}
+                </span>
+              </div>
+
+              <div className="category-review-grid">
+                <label>
+                  หมวดหมู่
+                  <input
+                    value={draft.cleanCategory}
+                    onChange={(event) => setDrafts((current) => ({
+                      ...current,
+                      [row.productCode]: {
+                        ...draft,
+                        cleanCategory: event.target.value,
+                      },
+                    }))}
+                  />
+                </label>
+                <label>
+                  Shelf
+                  <input
+                    value={draft.shelfNo}
+                    onChange={(event) => setDrafts((current) => ({
+                      ...current,
+                      [row.productCode]: {
+                        ...draft,
+                        shelfNo: event.target.value,
+                      },
+                    }))}
+                  />
+                </label>
+                <label className="checkbox-field">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(draft.isColdChain)}
+                    onChange={(event) => setDrafts((current) => ({
+                      ...current,
+                      [row.productCode]: {
+                        ...draft,
+                        isColdChain: event.target.checked,
+                      },
+                    }))}
+                  />
+                  <span>Cold chain</span>
+                </label>
+              </div>
+
+              <div className="category-review-meta">
+                <span>แสดงผล: <strong>{row.category || "-"}</strong></span>
+                <span>Category conf. {formatNumber((row.categoryConfidence || 0) * 100, 1)}%</span>
+                <span>Placement conf. {formatNumber((row.placementConfidence || 0) * 100, 1)}%</span>
+              </div>
+
+              <p className="meta-line">{row.rationale || "ไม่มีคำอธิบายจากระบบ"}</p>
+              {row.rawLabelSource ? <p className="meta-line">ประวัติอ้างอิง: {row.rawLabelSource}</p> : null}
+
+              <div className="category-review-actions">
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled={savingCode === row.productCode || !draft.cleanCategory.trim()}
+                  onClick={() => handleConfirm(row.productCode)}
+                >
+                  {savingCode === row.productCode ? "กำลังบันทึก..." : "ยืนยันหมวดหมู่"}
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      <div className="pagination">
+        <p className="pagination-info">
+          {total === 0
+            ? "0 รายการ"
+            : `${formatNumber(start)}-${formatNumber(end)} จาก ${formatNumber(total)} รายการ`}
+        </p>
+        <div className="pagination-actions">
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={loading || currentPage <= 1}
+            onClick={() => setPagination((current) => ({
+              ...current,
+              offset: Math.max(0, (current.offset || 0) - pageSize),
+            }))}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="receipt-page-indicator">
+            หน้า {formatNumber(currentPage)} / {formatNumber(totalPages)}
+          </span>
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={loading || currentPage >= totalPages}
+            onClick={() => setPagination((current) => ({
+              ...current,
+              offset: (current.offset || 0) + pageSize,
+            }))}
           >
             ถัดไป
           </button>
@@ -1196,7 +1570,7 @@ export default function App() {
   const [view, setView] = useState(() => {
     if (typeof window === "undefined") return "dashboard";
     const savedView = window.localStorage.getItem(adminViewStorageKey);
-    return ["dashboard", "receipts", "branch-stock", "sync-log"].includes(savedView)
+    return ["dashboard", "receipts", "branch-stock", "category-review", "sync-log"].includes(savedView)
       ? savedView
       : "dashboard";
   });
@@ -1503,6 +1877,13 @@ export default function App() {
           </button>
           <button
             type="button"
+            className={view === "category-review" ? "view-nav-btn active" : "view-nav-btn"}
+            onClick={() => setView("category-review")}
+          >
+            หมวดหมู่สินค้า
+          </button>
+          <button
+            type="button"
             className={view === "sync-log" ? "view-nav-btn active" : "view-nav-btn"}
             onClick={() => setView("sync-log")}
           >
@@ -1565,6 +1946,8 @@ export default function App() {
         />
       ) : view === "branch-stock" ? (
         <BranchStockPanel />
+      ) : view === "category-review" ? (
+        <CategoryReviewPanel decidedBy={session.user.id || "admin"} />
       ) : view === "sync-log" ? (
         <SyncLogPanel />
       ) : (
