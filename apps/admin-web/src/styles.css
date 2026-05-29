@@ -316,6 +316,12 @@ button {
   color: #842029;
 }
 
+.notice.success {
+  border-color: #bfe3c9;
+  background: #edf9f1;
+  color: #165b33;
+}
+
 .kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -449,6 +455,10 @@ button {
   align-items: center;
   gap: 10px;
   margin-bottom: 14px;
+}
+
+.taxonomy-report-preview-header {
+  margin-top: 6px;
 }
 
 .taxonomy-report-grid {
@@ -1631,6 +1641,12 @@ select {
   border-color: #69313d;
   background: #321920;
   color: #ffc7d0;
+}
+
+[data-theme="dark"] .notice.success {
+  border-color: #24533a;
+  background: #14261c;
+  color: #bce7c9;
 }
 
 /* ── Sync Log panel sub-tabs ─────────────────────────────────────────────── */

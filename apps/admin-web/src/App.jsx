@@ -62,6 +62,7 @@ function translateStatus(status) {
 
 function translateCategoryReviewStatus(status) {
   if (status === "confirmed") return "ยืนยันแล้ว";
+  if (status === "imported_exact_match") return "นำเข้าจาก exact code";
   if (status === "proposed") return "รอตรวจ";
   if (status === "needs_review") return "ต้องทบทวน";
   if (status === "reverify") return "ต้องตรวจซ้ำ";
@@ -69,7 +70,7 @@ function translateCategoryReviewStatus(status) {
 }
 
 function categoryStatusClass(status) {
-  if (status === "confirmed") return "good";
+  if (status === "confirmed" || status === "imported_exact_match") return "good";
   if (status === "proposed") return "warning";
   if (status === "reverify") return "danger";
   return "muted";
@@ -737,10 +738,11 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
   );
 }
 
-function BranchStockPanel() {
+function BranchStockPanel({ csrfToken }) {
   const pageSize = 25;
   const [records, setRecords] = useState([]);
   const [matchReport, setMatchReport] = useState(null);
+  const [matchPreview, setMatchPreview] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
   const [offset, setOffset] = useState(0);
@@ -751,8 +753,12 @@ function BranchStockPanel() {
   });
   const [loading, setLoading] = useState(false);
   const [loadingReport, setLoadingReport] = useState(false);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [applyingPreview, setApplyingPreview] = useState(false);
   const [error, setError] = useState("");
   const [reportError, setReportError] = useState("");
+  const [previewError, setPreviewError] = useState("");
+  const [applyMessage, setApplyMessage] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -835,6 +841,43 @@ function BranchStockPanel() {
     };
   }, [refreshKey]);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadMatchPreview() {
+      setLoadingPreview(true);
+      setPreviewError("");
+      setApplyMessage("");
+      try {
+        const response = await apiFetch("/api/admin/taxonomy-match-preview?limit=10&offset=0");
+        if (response.status === 404) {
+          if (!active) return;
+          setMatchPreview(null);
+          setPreviewError("ยังไม่มี preview สำหรับ taxonomy report");
+          return;
+        }
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        if (!active) return;
+        setMatchPreview(data);
+      } catch (loadError) {
+        if (!active) return;
+        setPreviewError(loadError.message || "โหลด preview taxonomy ไม่สำเร็จ");
+      } finally {
+        if (active) {
+          setLoadingPreview(false);
+        }
+      }
+    }
+
+    loadMatchPreview();
+    return () => {
+      active = false;
+    };
+  }, [refreshKey]);
+
   function handleSearchSubmit(event) {
     event.preventDefault();
     const nextSearch = searchTerm.trim();
@@ -845,6 +888,34 @@ function BranchStockPanel() {
     }
   }
 
+  async function handleApplySafeMatches() {
+    setApplyingPreview(true);
+    setPreviewError("");
+    setApplyMessage("");
+    try {
+      const response = await apiFetch("/api/admin/taxonomy-match-apply", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken || "",
+        },
+        body: JSON.stringify({}),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || `HTTP ${response.status}`);
+      }
+      setApplyMessage(
+        `apply แล้ว ${formatNumber(data.appliedCount || 0)} รายการ ข้าม ${formatNumber(data.skippedCount || 0)} รายการ`,
+      );
+      setRefreshKey((value) => value + 1);
+    } catch (applyError) {
+      setPreviewError(applyError.message || "apply taxonomy exact matches ไม่สำเร็จ");
+    } finally {
+      setApplyingPreview(false);
+    }
+  }
+
   const total = pagination.total || 0;
   const currentPage = Math.floor((pagination.offset || 0) / pageSize) + 1;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -852,6 +923,7 @@ function BranchStockPanel() {
   const end = total === 0 ? 0 : (pagination.offset || 0) + records.length;
   const reportSummary = matchReport?.summary || null;
   const reportStats = matchReport?.stats || null;
+  const previewSummary = matchPreview?.summary || null;
 
   return (
     <section className="panel branch-stock-panel">
@@ -901,6 +973,8 @@ function BranchStockPanel() {
         </div>
 
         {reportError && <p className="notice error compact">รายงาน: {reportError}</p>}
+        {previewError && <p className="notice error compact">Preview: {previewError}</p>}
+        {applyMessage && <p className="notice success compact">{applyMessage}</p>}
 
         {matchReport ? (
           <>
@@ -961,6 +1035,69 @@ function BranchStockPanel() {
                 branch_stock_snapshots={formatNumber(matchReport.backendEvidence?.branchStockSnapshotRows || 0)}
               </span>
             </div>
+
+            {matchPreview ? (
+              <>
+                <div className="taxonomy-report-metrics taxonomy-report-preview-metrics">
+                  <article className="taxonomy-report-metric">
+                    <span>Safe to apply</span>
+                    <strong>{formatNumber(previewSummary?.safeToApply || 0)}</strong>
+                  </article>
+                  <article className="taxonomy-report-metric">
+                    <span>Category conflict</span>
+                    <strong>{formatNumber(previewSummary?.category_conflict || 0)}</strong>
+                  </article>
+                  <article className="taxonomy-report-metric">
+                    <span>Already confirmed</span>
+                    <strong>{formatNumber(previewSummary?.already_confirmed || 0)}</strong>
+                  </article>
+                  <article className="taxonomy-report-metric">
+                    <span>Needs review</span>
+                    <strong>{formatNumber(previewSummary?.needs_review || 0)}</strong>
+                  </article>
+                </div>
+
+                <div className="taxonomy-report-header taxonomy-report-preview-header">
+                  <div>
+                    <h3>Preview ก่อน apply</h3>
+                    <p>ใช้ exact code match เพื่อสร้าง category overlay แบบปลอดภัยก่อนแตะ source data จริง</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={handleApplySafeMatches}
+                    disabled={applyingPreview || loadingPreview || !csrfToken}
+                  >
+                    {applyingPreview ? "กำลัง apply..." : "Apply safe exact matches"}
+                  </button>
+                </div>
+
+                <div className="table-wrap taxonomy-mini-table-wrap">
+                  <table className="taxonomy-mini-table">
+                    <thead>
+                      <tr>
+                        <th>Code</th>
+                        <th>Current</th>
+                        <th>Proposed</th>
+                        <th>Safe</th>
+                        <th>Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(matchPreview.records || []).map((row) => (
+                        <tr key={`${row.productCode}-${row.workbookRowNumber}`}>
+                          <td>{row.productCode}</td>
+                          <td>{row.currentCategory || "-"}</td>
+                          <td>{row.proposedCategory || "-"}</td>
+                          <td>{row.safeToApply ? "yes" : "no"}</td>
+                          <td>{row.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : null}
 
             <div className="taxonomy-report-grid">
               <details className="taxonomy-report-section" open>
@@ -2173,7 +2310,7 @@ export default function App() {
           canViewPrices={session.user.role === "admin"}
         />
       ) : view === "branch-stock" ? (
-        <BranchStockPanel />
+        <BranchStockPanel csrfToken={session.csrfToken} />
       ) : view === "category-review" ? (
         <CategoryReviewPanel decidedBy={session.user.id || "admin"} />
       ) : view === "sync-log" ? (
