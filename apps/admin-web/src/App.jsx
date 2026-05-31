@@ -103,6 +103,10 @@ function normalizeFilterValue(value) {
   return String(value == null ? "" : value).trim();
 }
 
+function normalizeCategorySearchValue(value) {
+  return normalizeFilterValue(value).toLowerCase();
+}
+
 function getBranchStockColumnValue(row, key) {
   if (key === "categoryStatus") {
     return translateCategoryReviewStatus(row.categoryStatus || "needs_review");
@@ -1979,15 +1983,47 @@ function ReviewQueuePanel({ csrfToken }) {
     return opts;
   }, [product]);
 
+  const searchableCategories = useMemo(() => {
+    const byName = new Map();
+
+    for (const option of options) {
+      const name = normalizeFilterValue(option?.category_name);
+      if (!name) continue;
+      byName.set(name, {
+        category_name: name,
+        similarity: option?.similarity ?? null,
+        isProposed: Boolean(option?.isProposed),
+      });
+    }
+
+    for (const category of allCategories) {
+      const name = normalizeFilterValue(category);
+      if (!name || byName.has(name)) continue;
+      byName.set(name, {
+        category_name: name,
+        similarity: null,
+        isProposed: false,
+      });
+    }
+
+    return [...byName.values()].sort((left, right) => {
+      if (left.isProposed && !right.isProposed) return -1;
+      if (!left.isProposed && right.isProposed) return 1;
+      return left.category_name.localeCompare(right.category_name, "th", {
+        sensitivity: "base",
+        numeric: true,
+      });
+    });
+  }, [options, allCategories]);
+
   // Filtered options for search
   const filteredOptions = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = normalizeCategorySearchValue(search);
     if (!q) return options.slice(0, 9);
-    return allCategories
-      .filter(c => c.toLowerCase().includes(q))
-      .slice(0, 9)
-      .map(c => ({ category_name: c, similarity: null }));
-  }, [search, options, allCategories]);
+    return searchableCategories
+      .filter((option) => normalizeCategorySearchValue(option.category_name).includes(q))
+      .slice(0, 9);
+  }, [search, options, searchableCategories]);
 
   // ── Decision helpers ────────────────────────────────────────────────────────
   const pickCategory = useCallback((categoryName, isNew = false) => {
@@ -2286,6 +2322,11 @@ function ReviewQueuePanel({ csrfToken }) {
               )}
             </button>
           ))}
+          {!filteredOptions.length && (
+            <div className="rq-option-empty">
+              ไม่พบหมวดที่ตรงกับคำค้น ลองพิมพ์คำอื่นหรือสร้างหมวดใหม่
+            </div>
+          )}
         </div>
       )}
 

@@ -805,6 +805,14 @@ button {
 }
 .rq-option-name { flex: 1; color: #1a2840; font-weight: 500; }
 .rq-option-sim  { font-size: 0.7rem; color: #8090a8; }
+.rq-option-empty {
+  grid-column: 1 / -1;
+  padding: 12px 14px;
+  border: 1.5px dashed #d6deea;
+  border-radius: 10px;
+  color: #8090a8;
+  font-size: 0.82rem;
+}
 
 /* search + footer */
 .rq-search-row { margin-bottom: 10px; }
@@ -880,6 +888,7 @@ button {
 [data-theme="dark"] .rq-option-proposed   { border-color: #4a7ce4; background: rgba(74,124,228,0.1); }
 [data-theme="dark"] .rq-option-key        { background: #1e2e42; color: #7090aa; }
 [data-theme="dark"] .rq-option-name       { color: #c8d8ec; }
+[data-theme="dark"] .rq-option-empty      { border-color: #263547; color: #7090aa; }
 [data-theme="dark"] .rq-search            { border-color: #263547; background: #0f1824; color: #c8d8ec; }
 [data-theme="dark"] .rq-search:focus      { border-color: #4a7ce4; }
 [data-theme="dark"] .rq-summary-row       { background: #111e2d; }
