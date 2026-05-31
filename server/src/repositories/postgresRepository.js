@@ -719,6 +719,19 @@ export class PostgresRepository {
     };
   }
 
+  async getAllCleanCategories() {
+    const { rows } = await this.pool.query(`
+      SELECT DISTINCT clean_category AS name
+      FROM (
+        SELECT clean_category FROM category_shelf_rules WHERE clean_category IS NOT NULL
+        UNION
+        SELECT clean_category FROM product_category WHERE clean_category IS NOT NULL
+      ) t
+      ORDER BY name ASC
+    `);
+    return rows.map((r) => r.name);
+  }
+
   async confirmProductCategory({
     productCode,
     cleanCategory,

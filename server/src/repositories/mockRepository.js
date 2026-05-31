@@ -281,6 +281,10 @@ export class MockRepository {
     };
   }
 
+  async getAllCleanCategories() {
+    return [];
+  }
+
   async getCategoryMetrics() {
     return {
       totalProducts: this.products.length,

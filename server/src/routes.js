@@ -415,6 +415,43 @@ export function createRouter(repository) {
     res.json(result);
   }));
 
+  // ── Review Queue (used by ReviewQueuePanel in admin-web) ────────────────────
+  router.get("/api/admin/review-queue", asyncHandler(async (req, res) => {
+    const limit = parsePageParam(req.query.limit, 80);
+    const offset = parseOffsetParam(req.query.offset, 0);
+    const statusParam = req.query.status || "all";
+    const backendStatus = statusParam === "all" ? "open" : statusParam;
+
+    const [result, allCategories] = await Promise.all([
+      repository.getCategoryReviewQueue({ status: backendStatus, limit, offset }),
+      repository.getAllCleanCategories(),
+    ]);
+
+    const records = result.records.map((r) => ({ ...r, currentCategory: r.cleanCategory, options: [] }));
+    res.json({ records, allCategories, total: result.pagination.total });
+  }));
+
+  router.post("/api/admin/review-queue/confirm-batch", asyncHandler(async (req, res) => {
+    const { decisions } = req.body || {};
+    if (!Array.isArray(decisions) || !decisions.length) {
+      return res.status(400).json({ message: "decisions array is required." });
+    }
+    const results = await Promise.all(
+      decisions.map((d) =>
+        repository.confirmProductCategory({
+          productCode: d.productCode,
+          cleanCategory: d.categoryName,
+          shelfNo: null,
+          isColdChain: false,
+          decidedBy: "admin",
+          note: d.isNewCategory ? "New category created via review queue." : "Confirmed via review queue.",
+        }),
+      ),
+    );
+    const failed = results.filter((r) => !r.ok).length;
+    res.json({ ok: true, confirmed: results.length - failed, failed });
+  }));
+
   router.get("/api/admin/category-metrics", asyncHandler(async (_req, res) => {
     res.json(await repository.getCategoryMetrics());
   }));
