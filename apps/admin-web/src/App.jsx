@@ -1949,12 +1949,18 @@ function ReviewQueuePanel({ csrfToken }) {
     setLoading(true);
     try {
       const f = filter || statusFilter;
-      const data = await apiFetch(`/api/admin/review-queue?limit=80&status=${f}`);
+      const response = await apiFetch(`/api/admin/review-queue?limit=80&status=${f}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const data = await response.json();
       setQueue(data.records || []);
       setAllCats(data.allCategories || []);
       setTotal(data.total || 0);
+      return (data.records || []).length;
     } catch (e) {
       setSubmitMsg("โหลดคิวไม่สำเร็จ: " + e.message);
+      return 0;
     } finally {
       setLoading(false);
     }
@@ -2072,11 +2078,14 @@ function ReviewQueuePanel({ csrfToken }) {
     setSubmitting(true);
     setSubmitMsg("");
     try {
-      await apiFetch("/api/admin/review-queue/confirm-batch", {
+      const response = await apiFetch("/api/admin/review-queue/confirm-batch", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken || "" },
         body: JSON.stringify({ decisions: toConfirm.map(d => ({ productCode: d.productCode, categoryName: d.categoryName, isNewCategory: d.isNew || false })) }),
       });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
       setSubmitMsg(`ยืนยันสำเร็จ ${toConfirm.length} รายการ`);
       setPhase("done");
     } catch (e) {
@@ -2142,7 +2151,14 @@ function ReviewQueuePanel({ csrfToken }) {
           <button
             type="button"
             className="primary-button"
-            onClick={async () => { await loadQueue(statusFilter); startSession(); }}
+            onClick={async () => {
+              const loaded = await loadQueue(statusFilter);
+              if (loaded > 0) {
+                startSession();
+              } else {
+                setSubmitMsg("ไม่พบสินค้าในคิวสำหรับตัวกรองนี้");
+              }
+            }}
             disabled={loading}
           >
             {loading ? "กำลังโหลด..." : "เริ่มตรวจ →"}
