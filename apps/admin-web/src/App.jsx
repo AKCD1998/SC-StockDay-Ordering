@@ -804,6 +804,13 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
 function BranchStockPanel({ csrfToken }) {
   const pageSize = 25;
   const pageFetchLimit = 10000;
+  const branchExportOptions = [
+    { branchCode: "000", label: "สาขา 000 (HQ)" },
+    { branchCode: "001", label: "สาขา 001" },
+    { branchCode: "003", label: "สาขา 003" },
+    { branchCode: "004", label: "สาขา 004" },
+    { branchCode: "005", label: "สาขา 005" },
+  ];
   const [records, setRecords] = useState([]);
   const [matchReport, setMatchReport] = useState(null);
   const [matchPreview, setMatchPreview] = useState(null);
@@ -829,6 +836,10 @@ function BranchStockPanel({ csrfToken }) {
   const [applyMessage, setApplyMessage] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [taxonomyOpen, setTaxonomyOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [selectedExportBranch, setSelectedExportBranch] = useState("001");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
   const filterMenuRef = useRef(null);
 
   useEffect(() => {
@@ -1055,6 +1066,48 @@ function BranchStockPanel({ csrfToken }) {
     }
   }
 
+  async function handleExportExcel() {
+    setExporting(true);
+    setExportError("");
+    try {
+      const params = new URLSearchParams({
+        branchCode: selectedExportBranch,
+      });
+      const exportSearch = searchTerm.trim() || appliedSearchTerm;
+      if (exportSearch) {
+        params.set("search", exportSearch);
+      }
+
+      const response = await apiFetch(`/api/branch-stock/export.xlsx?${params.toString()}`);
+      if (!response.ok) {
+        let message = `HTTP ${response.status}`;
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const payload = await response.json();
+          message = payload.message || payload.error || message;
+        }
+        throw new Error(message);
+      }
+
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const disposition = response.headers.get("content-disposition") || "";
+      const fileNameMatch = disposition.match(/filename=\"?([^"]+)\"?/i);
+      anchor.href = objectUrl;
+      anchor.download = fileNameMatch?.[1] || `branch-stock-${selectedExportBranch}.xlsx`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(objectUrl);
+      setExportModalOpen(false);
+    } catch (downloadError) {
+      setExportError(downloadError.message || "ส่งออก Excel ไม่สำเร็จ");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const columnOptions = useMemo(() => {
     return Object.fromEntries(
       BRANCH_STOCK_COLUMNS.map((column) => {
@@ -1149,6 +1202,16 @@ function BranchStockPanel({ csrfToken }) {
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="ค้นหารหัสสินค้า ชื่อไทย ชื่ออังกฤษ หรือ Barcode"
           />
+          <button
+            type="button"
+            className="excel-export-button"
+            onClick={() => {
+              setExportError("");
+              setExportModalOpen(true);
+            }}
+          >
+            ส่งออก Excel
+          </button>
           <button type="submit" className="ghost-button">
             ค้นหา
           </button>
@@ -1576,6 +1639,69 @@ function BranchStockPanel({ csrfToken }) {
           </button>
         </div>
       </div>
+
+      {exportModalOpen && (
+        <div className="dialog-overlay" onClick={() => !exporting && setExportModalOpen(false)}>
+          <div
+            className="dialog-card export-dialog"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="branch-export-title"
+          >
+            <div className="dialog-header">
+              <div>
+                <h3 id="branch-export-title">ส่งออก Excel แยกตามสาขา</h3>
+                <p>เลือกสาขาที่ต้องการดาวน์โหลดเพื่อให้ไฟล์แสดงเฉพาะยอดของสาขานั้น</p>
+              </div>
+              <button
+                type="button"
+                className="ghost-button dialog-close-button"
+                onClick={() => setExportModalOpen(false)}
+                disabled={exporting}
+              >
+                ปิด
+              </button>
+            </div>
+
+            <div className="export-branch-grid">
+              {branchExportOptions.map((option) => (
+                <button
+                  key={option.branchCode}
+                  type="button"
+                  className={`export-branch-option${selectedExportBranch === option.branchCode ? " active" : ""}`}
+                  onClick={() => setSelectedExportBranch(option.branchCode)}
+                  disabled={exporting}
+                >
+                  <strong>{option.label}</strong>
+                  <span>ดึงเฉพาะคอลัมน์จำนวนของ {option.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {exportError && <p className="notice error compact">{exportError}</p>}
+
+            <div className="dialog-actions">
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => setExportModalOpen(false)}
+                disabled={exporting}
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                className="excel-export-button"
+                onClick={handleExportExcel}
+                disabled={exporting}
+              >
+                {exporting ? "กำลังสร้างไฟล์..." : `ดาวน์โหลด ${selectedExportBranch}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

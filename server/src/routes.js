@@ -2,12 +2,20 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
+import xlsx from "xlsx";
 import { config } from "./config.js";
 import { validateTransferPayload } from "./transferSync.js";
 import { parsePositiveNumber } from "./utils.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const docsDir = path.resolve(__dirname, "../../docs");
+const BRANCH_EXPORT_CONFIG = {
+  "000": { label: "สาขา 000 (HQ)", qtyKey: "qtyBranch000", title: "บริษัท เอสซีกรุ๊ป (1989) จำกัด สาขา 000" },
+  "001": { label: "สาขา 001", qtyKey: "qtyBranch001", title: "บริษัท เอสซีกรุ๊ป (1989) จำกัด สาขา 001" },
+  "003": { label: "สาขา 003", qtyKey: "qtyBranch003", title: "บริษัท เอสซีกรุ๊ป (1989) จำกัด สาขา 003" },
+  "004": { label: "สาขา 004", qtyKey: "qtyBranch004", title: "บริษัท เอสซีกรุ๊ป (1989) จำกัด สาขา 004" },
+  "005": { label: "สาขา 005", qtyKey: "qtyBranch005", title: "บริษัท เอสซีกรุ๊ป (1989) จำกัด สาขา 005" },
+};
 
 function asyncHandler(fn) {
   return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -72,6 +80,47 @@ function normalizeSyncedAt(value) {
     return null;
   }
   return candidate.toISOString();
+}
+
+function buildBranchStockExportWorkbook(records, branchCode) {
+  const branchConfig = BRANCH_EXPORT_CONFIG[branchCode];
+  const qtyKey = branchConfig.qtyKey;
+  const rows = [
+    [branchConfig.title],
+    ["ลำดับ", "รหัส", "ชื่อสินค้า", "BARCODE", "หน่วย", "จำนวน", "ประเภท", "รวมเงินช่องนี้", "นับ1", "นับ2", "นับ3"],
+    ...records.map((row, index) => ([
+      index + 1,
+      row.productCode || "",
+      row.productNameThai || "",
+      row.barcode || "",
+      row.unit || "",
+      Number(row[qtyKey] || 0),
+      row.category || "",
+      "",
+      "",
+      "",
+      "",
+    ])),
+  ];
+
+  const workbook = xlsx.utils.book_new();
+  const worksheet = xlsx.utils.aoa_to_sheet(rows);
+  worksheet["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 10 } }];
+  worksheet["!cols"] = [
+    { wch: 8 },
+    { wch: 14 },
+    { wch: 72 },
+    { wch: 18 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 18 },
+    { wch: 20 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 10 },
+  ];
+  xlsx.utils.book_append_sheet(workbook, worksheet, `Stock ${branchCode}`);
+  return xlsx.write(workbook, { type: "buffer", bookType: "xlsx" });
 }
 
 function locateLatestTaxonomyReportPath() {
@@ -393,6 +442,24 @@ export function createRouter(repository) {
       offset,
     });
     res.json(result);
+  }));
+
+  router.get("/api/branch-stock/export.xlsx", asyncHandler(async (req, res) => {
+    const branchCode = String(req.query.branchCode || "").trim();
+    if (!BRANCH_EXPORT_CONFIG[branchCode]) {
+      return res.status(400).json({ message: "branchCode must be one of 000, 001, 003, 004, 005." });
+    }
+
+    const records = await repository.getBranchStockExportRows({
+      search: req.query.search || "",
+    });
+    const buffer = buildBranchStockExportWorkbook(records, branchCode);
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    const fileName = `branch-stock-${branchCode}-${dateStamp}.xlsx`;
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.send(buffer);
   }));
 
   router.get("/api/admin/taxonomy-match-report", asyncHandler(async (_req, res) => {

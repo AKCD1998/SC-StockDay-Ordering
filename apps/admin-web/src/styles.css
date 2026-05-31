@@ -386,6 +386,21 @@ button {
   min-width: min(420px, 100%);
 }
 
+.excel-export-button {
+  border: 1px solid #1f8f45;
+  background: linear-gradient(180deg, #2fb15a 0%, #1f8f45 100%);
+  color: #fff;
+}
+
+.excel-export-button:hover:not(:disabled) {
+  background: linear-gradient(180deg, #34bc61 0%, #237f43 100%);
+}
+
+.excel-export-button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
 .taxonomy-report-card {
   margin-bottom: 20px;
   border: 1px solid #d6deea;
@@ -895,6 +910,14 @@ button {
 [data-theme="dark"] .rq-summary-name      { color: #c8d8ec; }
 [data-theme="dark"] .rq-summary-actions   { border-top-color: #263547; }
 [data-theme="dark"] .rq-stat.muted        { background: #1e2e42; color: #7090aa; }
+[data-theme="dark"] .dialog-card          { border-color: #263547; background: #101a28; }
+[data-theme="dark"] .dialog-header p      { color: #7f95ae; }
+[data-theme="dark"] .export-branch-option { border-color: #263547; background: #0f1824; color: #d6e4f2; }
+[data-theme="dark"] .export-branch-option span { color: #87a0bb; }
+[data-theme="dark"] .export-branch-option.active {
+  border-color: #34bc61;
+  background: rgba(47, 177, 90, 0.14);
+}
 
 /* ───────────────────────────────────────────────────────────────────────────── */
 .category-metric,
@@ -1043,6 +1066,85 @@ th {
 
 .empty-state {
   color: #6f7f91;
+}
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 16, 29, 0.62);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  z-index: 50;
+}
+
+.dialog-card {
+  width: min(680px, 100%);
+  border: 1px solid #d6deea;
+  border-radius: 20px;
+  background: #fdfefe;
+  box-shadow: 0 28px 60px rgba(4, 12, 24, 0.28);
+  padding: 22px;
+}
+
+.dialog-header,
+.dialog-actions {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dialog-header h3 {
+  margin: 0 0 6px;
+}
+
+.dialog-header p {
+  margin: 0;
+  color: #607286;
+}
+
+.dialog-close-button {
+  white-space: nowrap;
+}
+
+.export-branch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 20px 0 16px;
+}
+
+.export-branch-option {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  padding: 14px 16px;
+  border: 1px solid #d6deea;
+  border-radius: 14px;
+  background: #f7fbff;
+  color: #16344d;
+  cursor: pointer;
+}
+
+.export-branch-option strong {
+  font-size: 0.96rem;
+}
+
+.export-branch-option span {
+  font-size: 0.8rem;
+  color: #61758b;
+}
+
+.export-branch-option.active {
+  border-color: #1f8f45;
+  background: rgba(47, 177, 90, 0.09);
+  box-shadow: inset 0 0 0 1px rgba(31, 143, 69, 0.12);
+}
+
+.dialog-actions {
+  margin-top: 18px;
+  justify-content: flex-end;
 }
 
 input,

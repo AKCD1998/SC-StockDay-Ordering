@@ -1842,6 +1842,52 @@ export class PostgresRepository {
     };
   }
 
+  async getBranchStockExportRows({ search = "" } = {}) {
+    const normalizedSearch = normalizeQuery(search);
+    const { rows } = await this.pool.query(
+      `
+      SELECT
+        bs.product_code,
+        bs.product_name_thai,
+        bs.product_name_eng,
+        bs.barcode,
+        bs.unit,
+        COALESCE(p.category, '') AS category,
+        COALESCE(pc.review_status, '') AS category_review_status,
+        COALESCE(pc.source, '') AS category_source,
+        COALESCE(pc.category_confidence, 0) AS category_confidence,
+        COALESCE(pc.placement_confidence, 0) AS placement_confidence,
+        COALESCE(pc.rationale, '') AS category_rationale,
+        bs.qty_branch_000,
+        bs.qty_branch_001,
+        bs.qty_branch_002,
+        bs.qty_branch_003,
+        bs.qty_branch_004,
+        bs.qty_branch_005,
+        bs.qty_total_all_branches,
+        bs.synced_at,
+        bs.created_at,
+        bs.updated_at
+      FROM branch_stock_snapshots bs
+      LEFT JOIN products p ON p.product_code = bs.product_code
+      LEFT JOIN product_category pc ON pc.product_code = bs.product_code
+      WHERE (
+        $1::text IS NULL
+        OR LOWER(COALESCE(bs.product_code, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(bs.product_name_thai, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(bs.product_name_eng, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(bs.barcode, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(p.category, '')) LIKE '%' || $1 || '%'
+        OR LOWER(COALESCE(pc.clean_category, '')) LIKE '%' || $1 || '%'
+      )
+      ORDER BY bs.product_code ASC
+      `,
+      [normalizedSearch || null],
+    );
+
+    return rows.map(mapBranchStockSnapshotRow);
+  }
+
   // ── Nightly sync log ─────────────────────────────────────────────────────────
 
   // Record that a branch laptop started up and kicked off the sync wrapper.

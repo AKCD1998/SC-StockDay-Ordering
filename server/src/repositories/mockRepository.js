@@ -270,6 +270,10 @@ export class MockRepository {
     };
   }
 
+  async getBranchStockExportRows(_options = {}) {
+    return [];
+  }
+
   async getCategoryReviewQueue(options = {}) {
     return {
       records: [],
