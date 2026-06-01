@@ -21,8 +21,8 @@ const fileEnv = {
 };
 
 const env = {
-  ...process.env,
   ...fileEnv,
+  ...process.env,
 };
 
 const dataMode = env.DATA_MODE || (String(env.USE_MOCK_DATA || "true") === "true" ? "mock" : "postgres");
