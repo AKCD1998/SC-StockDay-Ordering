@@ -6,11 +6,8 @@ echo ========================================
 echo   AdaPOS Back Office Sync Launcher
 echo ========================================
 echo.
-echo This will:
-echo 1. Open AdaPOS Back
-echo 2. Try to log in
-echo 3. Wait 60 seconds
-echo 4. Run the branch sync
+echo Make sure AdaPOS Back Office is already open and logged in.
+echo This will run the branch sync now.
 echo.
 
 powershell -ExecutionPolicy Bypass -NoProfile -File "%~dp0open-adapos-and-sync.ps1"
