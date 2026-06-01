@@ -931,6 +931,7 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
   const filterMenuRef = useRef(null);
+  const [filterMenuAnchor, setFilterMenuAnchor] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -1025,14 +1026,24 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
     function handlePointerDown(event) {
       if (filterMenuRef.current && !filterMenuRef.current.contains(event.target)) {
         setOpenFilterKey("");
+        setFilterMenuAnchor(null);
         setPendingFilterValues([]);
         setFilterSearchTerm("");
       }
     }
 
+    function handleScroll() {
+      setOpenFilterKey("");
+      setFilterMenuAnchor(null);
+      setPendingFilterValues([]);
+      setFilterSearchTerm("");
+    }
+
     document.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("scroll", handleScroll, true);
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("scroll", handleScroll, true);
     };
   }, [openFilterKey]);
 
@@ -1091,14 +1102,17 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
     }
   }
 
-  function openColumnFilter(columnKey) {
+  function openColumnFilter(columnKey, event) {
     if (openFilterKey === columnKey) {
       setOpenFilterKey("");
+      setFilterMenuAnchor(null);
       setPendingFilterValues([]);
       setFilterSearchTerm("");
       return;
     }
 
+    const rect = event.currentTarget.getBoundingClientRect();
+    setFilterMenuAnchor({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
     const optionValues = columnOptions[columnKey] || [];
     const currentValues = columnFilters[columnKey] ? [...columnFilters[columnKey]] : [...optionValues];
     setPendingFilterValues(currentValues);
@@ -1651,7 +1665,7 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
                         className={`branch-stock-filter-button ${openFilterKey === column.key ? "active" : ""} ${
                           hasActiveFilter ? "filtered" : ""
                         }`}
-                        onClick={() => openColumnFilter(column.key)}
+                        onClick={(e) => openColumnFilter(column.key, e)}
                         aria-label={`Sort and filter ${column.label}`}
                       >
                         ▾
@@ -1659,7 +1673,11 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
                     </div>
 
                     {openFilterKey === column.key ? (
-                      <div className="branch-stock-filter-menu" ref={filterMenuRef}>
+                      <div
+                        className="branch-stock-filter-menu"
+                        ref={filterMenuRef}
+                        style={filterMenuAnchor ? { top: filterMenuAnchor.top, right: filterMenuAnchor.right } : undefined}
+                      >
                         <button
                           type="button"
                           className="branch-stock-filter-action"

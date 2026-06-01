@@ -717,10 +717,8 @@ button {
 }
 
 .branch-stock-filter-menu {
-  position: absolute;
-  top: calc(100% - 4px);
-  right: 0;
-  z-index: 20;
+  position: fixed;
+  z-index: 1000;
   width: min(280px, 80vw);
   padding: 10px;
   border: 1px solid #d6deea;
