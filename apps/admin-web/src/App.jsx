@@ -1790,7 +1790,7 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
             <div className="dialog-actions">
               <button
                 type="button"
-                className="excel-export-button"
+                className="excel-export-button export-cancel-button"
                 onClick={() => setExportModalOpen(false)}
                 disabled={exporting}
               >
