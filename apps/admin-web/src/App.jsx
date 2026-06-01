@@ -18,6 +18,11 @@ import boonsongOsotLogoUrl from "./assets/boonsong-osot-logo.svg";
 import macropharlabLogoUrl from "./assets/macropharlab-logo.svg";
 import aceGlobalLogoUrl from "./assets/ace-global-logo.svg";
 import scharoenPharmaLogoUrl from "./assets/scharoen-pharma-logo.svg";
+import polipharmLogoUrl from "./assets/polipharm-logo.svg";
+import tmanLogoUrl from "./assets/tman-logo.svg";
+import berlinpharmLogoUrl from "./assets/berlinpharm-logo.svg";
+import anbLabLogoUrl from "./assets/anb-lab-logo.svg";
+import pacificHealthcareLogoUrl from "./assets/pacific-healthcare-logo.svg";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const adminViewStorageKey = "sc-stockday-admin-view";
@@ -74,6 +79,23 @@ function categoryStatusClass(status) {
   if (status === "proposed") return "warning";
   if (status === "reverify") return "danger";
   return "muted";
+}
+
+function getCategoryGroupStyle(category) {
+  const label = String(category || "").trim();
+  if (!label) return undefined;
+
+  let hash = 0;
+  for (let index = 0; index < label.length; index += 1) {
+    hash = ((hash << 5) - hash) + label.charCodeAt(index);
+    hash |= 0;
+  }
+
+  const hue = Math.abs(hash) % 360;
+  return {
+    "--category-group-bg": `hsla(${hue}, 68%, 56%, 0.12)`,
+    "--category-group-border": `hsla(${hue}, 58%, 45%, 0.24)`,
+  };
 }
 
 function compactFileName(value) {
@@ -281,6 +303,73 @@ const SUPPLIER_BRANDS = [
     tagline: "เทรดดิ้ง",
     logoSrc: scharoenPharmaLogoUrl,
     patterns: ["ส.เจริญเภสัชเทรดดิ้ง", "สเจริญเภสัชเทรดดิ้ง", "S CHAROEN", "SCHAROEN"],
+  },
+  {
+    key: "polipharm",
+    wordmark: "POLIPHARM",
+    tagline: "",
+    logoSrc: polipharmLogoUrl,
+    patterns: [
+      "บริษัท โปลิฟาร์ม จำกัด (สำนักงานใหญ่)",
+      "โปลิฟาร์ม",
+      "POLIPHARM",
+    ],
+  },
+  {
+    key: "tman-pharmaceutical",
+    wordmark: "T.MAN",
+    tagline: "PHARMACEUTICAL",
+    logoSrc: tmanLogoUrl,
+    patterns: [
+      "บริษัท ที. แมน ฟาร์มาซูติคอล จำกัด (มหาชน)",
+      "ที. แมน ฟาร์มาซูติคอล",
+      "ทีแมน ฟาร์มาซูติคอล",
+      "T MAN PHARMACEUTICAL",
+      "TMAN PHARMACEUTICAL",
+      "TMAN",
+    ],
+  },
+  {
+    key: "berlin-pharmaceutical",
+    wordmark: "BERLIN",
+    tagline: "PHARMACEUTICAL",
+    logoSrc: berlinpharmLogoUrl,
+    patterns: [
+      "บริษัท เบอร์ลินฟาร์มาซูติคอลอินดัสตรี้ จำกัด",
+      "เบอร์ลินฟาร์มาซูติคอลอินดัสตรี้",
+      "เบอร์ลินฟาร์มาซูติคอล",
+      "BERLIN PHARMACEUTICAL",
+      "BERLINPHARMACEUTICAL",
+      "BERLIN",
+    ],
+  },
+  {
+    key: "anb-laboratory",
+    wordmark: "A.N.B.",
+    tagline: "LABORATORY",
+    logoSrc: anbLabLogoUrl,
+    patterns: [
+      "บริษัท เอ.เอ็น.บี. ลาบอราตอรี่ (อำนวยเภสัช) จำกัด",
+      "เอ.เอ็น.บี. ลาบอราตอรี่",
+      "เอ็นบี ลาบอราตอรี่",
+      "ANB LABORATORY",
+      "A N B LABORATORY",
+      "ANB LAB",
+    ],
+  },
+  {
+    key: "pacific-healthcare-thailand",
+    wordmark: "PACIFIC",
+    tagline: "HEALTHCARE",
+    logoSrc: pacificHealthcareLogoUrl,
+    patterns: [
+      "บริษัท แปซิฟิค เฮลธ์แคร์ (ไทยแลนด์) จำกัด",
+      "แปซิฟิค เฮลธ์แคร์",
+      "แปซิฟิคเฮลธ์แคร์",
+      "PACIFIC HEALTHCARE",
+      "PACIFIC HEALTH CARE",
+      "PACIFIC HEALTHCARE THAILAND",
+    ],
   },
 ];
 
@@ -801,7 +890,7 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
   );
 }
 
-function BranchStockPanel({ csrfToken }) {
+function BranchStockPanel({ csrfToken, isAdminUser }) {
   const pageSize = 25;
   const pageFetchLimit = 10000;
   const branchExportOptions = [
@@ -843,6 +932,13 @@ function BranchStockPanel({ csrfToken }) {
   const filterMenuRef = useRef(null);
 
   useEffect(() => {
+    if (!isAdminUser) {
+      setMatchReport(null);
+      setReportError("");
+      setLoadingReport(false);
+      return undefined;
+    }
+
     let active = true;
 
     async function loadBranchStock() {
@@ -920,7 +1016,7 @@ function BranchStockPanel({ csrfToken }) {
     return () => {
       active = false;
     };
-  }, [refreshKey]);
+  }, [isAdminUser, refreshKey]);
 
   useEffect(() => {
     if (!openFilterKey) return undefined;
@@ -939,6 +1035,14 @@ function BranchStockPanel({ csrfToken }) {
   }, [openFilterKey]);
 
   useEffect(() => {
+    if (!isAdminUser) {
+      setMatchPreview(null);
+      setPreviewError("");
+      setApplyMessage("");
+      setLoadingPreview(false);
+      return undefined;
+    }
+
     let active = true;
 
     async function loadMatchPreview() {
@@ -973,7 +1077,7 @@ function BranchStockPanel({ csrfToken }) {
     return () => {
       active = false;
     };
-  }, [refreshKey]);
+  }, [isAdminUser, refreshKey]);
 
   function handleSearchSubmit(event) {
     event.preventDefault();
@@ -1165,15 +1269,15 @@ function BranchStockPanel({ csrfToken }) {
     }
     if (column.key === "category") {
       return (
-        <>
+        <div className="category-group-card" style={getCategoryGroupStyle(row.category)}>
           <strong>{row.category || "-"}</strong>
-          {row.categoryRationale ? <div className="meta">{row.categoryRationale}</div> : null}
-        </>
+          {isAdminUser && row.categoryRationale ? <div className="meta">{row.categoryRationale}</div> : null}
+        </div>
       );
     }
     if (column.key === "categoryStatus") {
       return (
-        <span className={`status ${categoryStatusClass(row.categoryStatus)}`}>
+        <span className={`status category-status-pill ${categoryStatusClass(row.categoryStatus)}`}>
           {translateCategoryReviewStatus(row.categoryStatus || "needs_review")}
         </span>
       );
@@ -1212,12 +1316,12 @@ function BranchStockPanel({ csrfToken }) {
           >
             ส่งออก Excel
           </button>
-          <button type="submit" className="ghost-button">
+          <button type="submit" className="ghost-button branch-stock-search-button">
             ค้นหา
           </button>
           <button
             type="button"
-            className="ghost-button"
+            className="ghost-button branch-stock-refresh-button"
             onClick={() => setRefreshKey((value) => value + 1)}
             disabled={loading}
           >
@@ -1226,6 +1330,7 @@ function BranchStockPanel({ csrfToken }) {
         </form>
       </div>
 
+      {isAdminUser ? (
       <section className={`taxonomy-report-card${taxonomyOpen ? " taxonomy-open" : " taxonomy-collapsed"}`}>
         <button
           type="button"
@@ -1498,6 +1603,7 @@ function BranchStockPanel({ csrfToken }) {
         </div>
         )}
       </section>
+      ) : null}
 
       {error && <p className="notice error compact">เชื่อมต่อไม่ได้: {error}</p>}
       {loading && <p className="empty-state">กำลังโหลดข้อมูลสต็อกสาขา...</p>}
@@ -1684,7 +1790,7 @@ function BranchStockPanel({ csrfToken }) {
             <div className="dialog-actions">
               <button
                 type="button"
-                className="ghost-button"
+                className="excel-export-button"
                 onClick={() => setExportModalOpen(false)}
                 disabled={exporting}
               >
@@ -3060,6 +3166,13 @@ export default function App() {
     const startIndex = (safeCurrentPage - 1) * pageSize;
     return filteredStock.slice(startIndex, startIndex + pageSize);
   }, [filteredStock, pageSize, safeCurrentPage]);
+  const isAdminUser = session?.user?.role === "admin";
+
+  useEffect(() => {
+    if (!isAdminUser && (view === "category-review" || view === "sync-log")) {
+      setView("receipts");
+    }
+  }, [isAdminUser, view]);
 
   if (loading && !session) {
     return (
@@ -3124,6 +3237,8 @@ export default function App() {
             type="button"
             className={view === "category-review" ? "view-nav-btn active" : "view-nav-btn"}
             onClick={() => setView("category-review")}
+            disabled={!isAdminUser}
+            aria-disabled={!isAdminUser}
           >
             ตรวจหมวดสินค้า
           </button>
@@ -3131,6 +3246,8 @@ export default function App() {
             type="button"
             className={view === "sync-log" ? "view-nav-btn active" : "view-nav-btn"}
             onClick={() => setView("sync-log")}
+            disabled={!isAdminUser}
+            aria-disabled={!isAdminUser}
           >
             ประวัติ Sync
           </button>
@@ -3190,10 +3307,10 @@ export default function App() {
           canViewPrices={session.user.role === "admin"}
         />
       ) : view === "branch-stock" ? (
-        <BranchStockPanel csrfToken={session.csrfToken} />
-      ) : view === "category-review" ? (
+        <BranchStockPanel csrfToken={session.csrfToken} isAdminUser={isAdminUser} />
+      ) : view === "category-review" && isAdminUser ? (
         <ReviewQueuePanel csrfToken={session.csrfToken} />
-      ) : view === "sync-log" ? (
+      ) : view === "sync-log" && isAdminUser ? (
         <SyncLogPanel />
       ) : (
         <>

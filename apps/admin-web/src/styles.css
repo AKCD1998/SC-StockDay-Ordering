@@ -401,6 +401,32 @@ button {
   cursor: wait;
 }
 
+.branch-stock-search-button {
+  border-color: #2c6ee8;
+  background: linear-gradient(180deg, #4d90ff 0%, #2c6ee8 100%);
+  color: #fff;
+}
+
+.branch-stock-search-button:hover:not(:disabled),
+.branch-stock-search-button:focus-visible:not(:disabled) {
+  border-color: #3c7af0;
+  background: linear-gradient(180deg, #62a0ff 0%, #3474ea 100%);
+  color: #fff;
+}
+
+.branch-stock-refresh-button {
+  border-color: rgba(141, 160, 184, 0.36);
+  background: rgba(244, 248, 252, 0.06);
+  color: #8fa3bb;
+}
+
+.branch-stock-refresh-button:hover:not(:disabled),
+.branch-stock-refresh-button:focus-visible:not(:disabled) {
+  border-color: rgba(118, 141, 169, 0.5);
+  background: rgba(32, 48, 70, 0.08);
+  color: #dbe5f3;
+}
+
 .taxonomy-report-card {
   margin-bottom: 20px;
   border: 1px solid #d6deea;
@@ -703,6 +729,16 @@ button {
 .branch-stock-table th:nth-child(2),
 .branch-stock-table td:nth-child(2) {
   min-width: 180px;
+}
+
+.category-group-card {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--category-group-border, rgba(124, 141, 168, 0.2));
+  border-radius: 12px;
+  background: var(--category-group-bg, rgba(124, 141, 168, 0.08));
 }
 
 .category-metrics {
@@ -1044,6 +1080,11 @@ th {
   font-weight: 700;
 }
 
+.category-status-pill {
+  min-width: 150px;
+  text-align: center;
+}
+
 .status.danger {
   background: #f8d8dd;
   color: #842029;
@@ -1233,20 +1274,22 @@ select {
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 0;
+  align-items: stretch;
 }
 
 .view-nav-btn {
   position: relative;
-  border-radius: 999px;
-  padding: 12px 18px;
+  border-radius: 0;
+  margin-left: -1px;
+  padding: 14px 20px;
   border: 1px solid rgba(73, 101, 140, 0.16);
-  background: linear-gradient(180deg, #fbfcff 0%, #f1f5fb 100%);
+  background: linear-gradient(180deg, #fcfdff 0%, #edf2f8 100%);
   color: #4f6276;
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 10px 22px rgba(31, 49, 82, 0.08);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.7);
   transition:
     transform 0.18s ease,
     box-shadow 0.22s ease,
@@ -1259,10 +1302,10 @@ select {
 .view-nav-btn:focus-visible {
   color: #16344d;
   border-color: rgba(61, 101, 255, 0.34);
-  background: linear-gradient(180deg, #ffffff 0%, #eef4ff 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #e9f1ff 100%);
   box-shadow:
-    0 0 0 4px rgba(80, 116, 255, 0.14),
-    0 18px 34px rgba(44, 72, 140, 0.18);
+    inset 0 0 0 1px rgba(80, 116, 255, 0.12),
+    0 0 18px rgba(80, 116, 255, 0.14);
   transform: translateY(-1px);
 }
 
@@ -1272,15 +1315,17 @@ select {
 
 .view-nav-btn.active {
   background:
-    radial-gradient(circle at top, rgba(124, 157, 255, 0.55), transparent 62%),
-    linear-gradient(180deg, #ffffff 0%, #e7efff 100%);
+    radial-gradient(circle at top, rgba(124, 157, 255, 0.62), transparent 66%),
+    linear-gradient(180deg, #ffffff 0%, #dde9ff 100%);
   color: #16344d;
   border-color: rgba(29, 66, 205, 0.4);
   box-shadow:
-    0 0 0 5px rgba(74, 111, 255, 0.18),
-    0 0 28px rgba(74, 111, 255, 0.42),
-    0 22px 40px rgba(46, 74, 156, 0.24);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    0 0 0 3px rgba(74, 111, 255, 0.16),
+    0 0 24px rgba(74, 111, 255, 0.4),
+    0 14px 26px rgba(46, 74, 156, 0.18);
   transform: translateY(-2px);
+  z-index: 1;
 }
 
 .view-nav-btn-disabled {
@@ -1755,6 +1800,46 @@ select {
   background: transparent;
 }
 
+.supplier-brand-polipharm .supplier-brand-mark {
+  width: 188px;
+  height: 62px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.supplier-brand-tman-pharmaceutical .supplier-brand-mark {
+  width: 188px;
+  height: 68px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.supplier-brand-berlin-pharmaceutical .supplier-brand-mark {
+  width: 188px;
+  height: 64px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.supplier-brand-anb-laboratory .supplier-brand-mark {
+  width: 188px;
+  height: 72px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.supplier-brand-pacific-healthcare-thailand .supplier-brand-mark {
+  width: 188px;
+  height: 60px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
 .supplier-brand-dksh .supplier-brand-copy strong {
   color: #c30a35;
   font-size: 1.48rem;
@@ -1943,7 +2028,7 @@ select {
   border-color: rgba(97, 120, 156, 0.28);
   background: linear-gradient(180deg, #182332 0%, #111c2a 100%);
   color: #b5c3d8;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.04);
 }
 
 [data-theme="dark"] .view-nav-btn:hover,
@@ -1952,9 +2037,8 @@ select {
   border-color: rgba(124, 157, 255, 0.44);
   background: linear-gradient(180deg, #1a2940 0%, #132338 100%);
   box-shadow:
-    0 0 0 4px rgba(92, 124, 255, 0.2),
-    0 18px 36px rgba(0, 0, 0, 0.34),
-    0 0 24px rgba(91, 123, 255, 0.16);
+    inset 0 0 0 1px rgba(141, 171, 255, 0.12),
+    0 0 22px rgba(91, 123, 255, 0.2);
 }
 
 [data-theme="dark"] .panel h2,
@@ -1977,12 +2061,13 @@ select {
 [data-theme="dark"] .view-nav-btn.active {
   border-color: rgba(137, 164, 255, 0.52);
   background:
-    radial-gradient(circle at top, rgba(118, 146, 255, 0.46), transparent 58%),
-    linear-gradient(180deg, #1d2b46 0%, #15233a 100%);
+    radial-gradient(circle at top, rgba(118, 146, 255, 0.54), transparent 62%),
+    linear-gradient(180deg, #1f3050 0%, #15243c 100%);
   box-shadow:
-    0 0 0 5px rgba(92, 124, 255, 0.22),
-    0 0 32px rgba(92, 124, 255, 0.42),
-    0 22px 42px rgba(0, 0, 0, 0.36);
+    inset 0 0 0 1px rgba(214, 227, 255, 0.08),
+    0 0 0 3px rgba(92, 124, 255, 0.18),
+    0 0 28px rgba(92, 124, 255, 0.42),
+    0 14px 28px rgba(0, 0, 0, 0.28);
 }
 
 [data-theme="dark"] .receipt-tab {
@@ -2057,6 +2142,32 @@ select {
 [data-theme="dark"] .receipt-refresh-button {
   border-color: transparent;
   background: transparent;
+}
+
+[data-theme="dark"] .branch-stock-search-button {
+  border-color: #4f8dff;
+  background: linear-gradient(180deg, #4f8dff 0%, #2e67d9 100%);
+  color: #f8fbff;
+}
+
+[data-theme="dark"] .branch-stock-search-button:hover:not(:disabled),
+[data-theme="dark"] .branch-stock-search-button:focus-visible:not(:disabled) {
+  border-color: #74a8ff;
+  background: linear-gradient(180deg, #66a0ff 0%, #3972e3 100%);
+  color: #fff;
+}
+
+[data-theme="dark"] .branch-stock-refresh-button {
+  border-color: rgba(86, 106, 132, 0.56);
+  background: rgba(20, 31, 46, 0.82);
+  color: #9fb0c5;
+}
+
+[data-theme="dark"] .branch-stock-refresh-button:hover:not(:disabled),
+[data-theme="dark"] .branch-stock-refresh-button:focus-visible:not(:disabled) {
+  border-color: rgba(111, 135, 165, 0.72);
+  background: rgba(25, 39, 58, 0.96);
+  color: #f4f7fb;
 }
 
 [data-theme="dark"] .supplier-brand-dksh .supplier-brand-mark,
