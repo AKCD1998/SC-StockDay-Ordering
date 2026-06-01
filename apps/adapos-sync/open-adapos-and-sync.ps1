@@ -75,7 +75,31 @@ function Send-PasteText {
     $Shell
   )
 
-  Set-Clipboard -Value $Text
+  $clipboardSet = $false
+  $lastError = $null
+
+  for ($attempt = 1; $attempt -le 10; $attempt++) {
+    try {
+      Add-Type -AssemblyName System.Windows.Forms
+      $thread = [System.Threading.Thread]::new({
+        param($clipboardText)
+        [System.Windows.Forms.Clipboard]::SetText($clipboardText)
+      })
+      $thread.SetApartmentState([System.Threading.ApartmentState]::STA)
+      $thread.Start($Text)
+      $thread.Join()
+      $clipboardSet = $true
+      break
+    } catch {
+      $lastError = $_
+      Start-Sleep -Milliseconds 300
+    }
+  }
+
+  if (-not $clipboardSet) {
+    throw "Could not set clipboard for login paste. $($lastError.Exception.Message)"
+  }
+
   Start-Sleep -Milliseconds 250
   $Shell.SendKeys("^v")
   Start-Sleep -Milliseconds 250
