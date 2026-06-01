@@ -1032,7 +1032,8 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
       }
     }
 
-    function handleScroll() {
+    function handleScroll(event) {
+      if (filterMenuRef.current && filterMenuRef.current.contains(event.target)) return;
       setOpenFilterKey("");
       setFilterMenuAnchor(null);
       setPendingFilterValues([]);
