@@ -3233,24 +3233,24 @@ export default function App() {
           >
             สต็อกสาขา
           </button>
-          <button
-            type="button"
-            className={view === "category-review" ? "view-nav-btn active" : "view-nav-btn"}
-            onClick={() => setView("category-review")}
-            disabled={!isAdminUser}
-            aria-disabled={!isAdminUser}
-          >
-            ตรวจหมวดสินค้า
-          </button>
-          <button
-            type="button"
-            className={view === "sync-log" ? "view-nav-btn active" : "view-nav-btn"}
-            onClick={() => setView("sync-log")}
-            disabled={!isAdminUser}
-            aria-disabled={!isAdminUser}
-          >
-            ประวัติ Sync
-          </button>
+          {isAdminUser ? (
+            <>
+              <button
+                type="button"
+                className={view === "category-review" ? "view-nav-btn active" : "view-nav-btn"}
+                onClick={() => setView("category-review")}
+              >
+                ตรวจหมวดสินค้า
+              </button>
+              <button
+                type="button"
+                className={view === "sync-log" ? "view-nav-btn active" : "view-nav-btn"}
+                onClick={() => setView("sync-log")}
+              >
+                ประวัติ Sync
+              </button>
+            </>
+          ) : null}
         </nav>
 
         <div className="account-actions">
