@@ -1,0 +1,14 @@
+[2026-06-01 12:39:28] Starting sync attempt 1 of 3 for branch 005.
+=== AdaPos Sync Agent ===
+Host:          192.168.0.127
+Instance:      SQLEXPRESS
+Database:      AdaAcc
+User:          readonly_pilot
+Branch filter: 005
+Datasets:      products, sales, branch_stock, transfers, transfer_lines, pending_receipts, approved_receipts
+Dry-run:       false
+Date cutoff:   2026-12-31
+Approved lookback: last 14 days
+
+SQL Server: connected OK
+

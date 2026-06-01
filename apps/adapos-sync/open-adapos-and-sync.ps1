@@ -41,7 +41,9 @@ function Invoke-LoggedProcess {
   )
 
   & $FilePath @ArgumentList 2>&1 | ForEach-Object {
-    $line = if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.ToString() } else { "$_" }
+    $line = if ($_ -is [System.Management.Automation.ErrorRecord]) {
+      if ($null -ne $_.TargetObject) { "$($_.TargetObject)" } else { $_.Exception.Message }
+    } else { "$_" }
     Write-Host $line
     Add-Content -Path $LogPath -Value $line
   }
