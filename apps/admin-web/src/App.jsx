@@ -910,6 +910,7 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
   const [columnFilters, setColumnFilters] = useState({});
   const [openFilterKey, setOpenFilterKey] = useState("");
   const [filterSearchTerm, setFilterSearchTerm] = useState("");
+  const [pendingFilterValues, setPendingFilterValues] = useState([]);
   const [pagination, setPagination] = useState({
     limit: pageFetchLimit,
     offset: 0,
@@ -1024,6 +1025,7 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
     function handlePointerDown(event) {
       if (filterMenuRef.current && !filterMenuRef.current.contains(event.target)) {
         setOpenFilterKey("");
+        setPendingFilterValues([]);
         setFilterSearchTerm("");
       }
     }
@@ -1090,13 +1092,24 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
   }
 
   function openColumnFilter(columnKey) {
-    setOpenFilterKey((current) => (current === columnKey ? "" : columnKey));
+    if (openFilterKey === columnKey) {
+      setOpenFilterKey("");
+      setPendingFilterValues([]);
+      setFilterSearchTerm("");
+      return;
+    }
+
+    const optionValues = columnOptions[columnKey] || [];
+    const currentValues = columnFilters[columnKey] ? [...columnFilters[columnKey]] : [...optionValues];
+    setPendingFilterValues(currentValues);
+    setOpenFilterKey(columnKey);
     setFilterSearchTerm("");
   }
 
   function updateColumnSort(columnKey, direction) {
     setSortConfig({ key: columnKey, direction });
     setOpenFilterKey("");
+    setPendingFilterValues([]);
   }
 
   function clearColumnFilter(columnKey) {
@@ -1105,48 +1118,40 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
       delete next[columnKey];
       return next;
     });
-  }
-
-  function toggleColumnFilterValue(columnKey, optionValue, optionValues) {
-    setColumnFilters((current) => {
-      const activeValues = current[columnKey] ? [...current[columnKey]] : [...optionValues];
-      const nextValues = activeValues.includes(optionValue)
-        ? activeValues.filter((value) => value !== optionValue)
-        : [...activeValues, optionValue];
-
-      if (nextValues.length === optionValues.length) {
-        const next = { ...current };
-        delete next[columnKey];
-        return next;
-      }
-
-      return {
-        ...current,
-        [columnKey]: nextValues,
-      };
-    });
+    setPendingFilterValues([]);
     setOffset(0);
   }
 
-  function deselectAllColumnFilterValues(columnKey) {
-    setColumnFilters((current) => ({
-      ...current,
-      [columnKey]: [],
-    }));
-    setOffset(0);
+  function toggleColumnFilterValue(optionValue) {
+    setPendingFilterValues((current) =>
+      current.includes(optionValue)
+        ? current.filter((value) => value !== optionValue)
+        : [...current, optionValue],
+    );
   }
 
-  function toggleAllColumnFilterValues(columnKey, optionValues) {
+  function deselectAllColumnFilterValues() {
+    setPendingFilterValues([]);
+  }
+
+  function toggleAllColumnFilterValues(optionValues) {
+    setPendingFilterValues((current) =>
+      current.length === optionValues.length ? [] : [...optionValues],
+    );
+  }
+
+  function applyColumnFilter(columnKey, optionValues) {
     setColumnFilters((current) => {
-      const currentValues = current[columnKey] ? [...current[columnKey]] : [...optionValues];
       const next = { ...current };
-      if (currentValues.length === optionValues.length) {
+      if (pendingFilterValues.length === optionValues.length) {
         delete next[columnKey];
       } else {
-        next[columnKey] = [...optionValues];
+        next[columnKey] = [...pendingFilterValues];
       }
       return next;
     });
+    setOpenFilterKey("");
+    setPendingFilterValues([]);
     setOffset(0);
   }
 
@@ -1628,7 +1633,9 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
             <tr>
               {BRANCH_STOCK_COLUMNS.map((column) => {
                 const optionValues = columnOptions[column.key] || [];
-                const activeValues = columnFilters[column.key] ? [...columnFilters[column.key]] : optionValues;
+                const appliedValues = columnFilters[column.key] ? [...columnFilters[column.key]] : optionValues;
+                const activeValues =
+                  openFilterKey === column.key ? pendingFilterValues : appliedValues;
                 const allSelected = activeValues.length === optionValues.length;
                 const hasActiveFilter = Object.prototype.hasOwnProperty.call(columnFilters, column.key);
                 const filteredOptions = optionValues.filter((value) =>
@@ -1681,7 +1688,7 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
                         <button
                           type="button"
                           className="branch-stock-filter-action"
-                          onClick={() => deselectAllColumnFilterValues(column.key)}
+                          onClick={() => deselectAllColumnFilterValues()}
                           disabled={activeValues.length === 0}
                         >
                           Deselect All
@@ -1698,7 +1705,7 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
                             <input
                               type="checkbox"
                               checked={allSelected}
-                              onChange={() => toggleAllColumnFilterValues(column.key, optionValues)}
+                              onChange={() => toggleAllColumnFilterValues(optionValues)}
                             />
                             <span>(Select All)</span>
                           </label>
@@ -1707,12 +1714,19 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
                               <input
                                 type="checkbox"
                                 checked={activeValues.includes(value)}
-                                onChange={() => toggleColumnFilterValue(column.key, value, optionValues)}
+                                onChange={() => toggleColumnFilterValue(value)}
                               />
                               <span>{value || "(Blank)"}</span>
                             </label>
                           ))}
                         </div>
+                        <button
+                          type="button"
+                          className="branch-stock-filter-action"
+                          onClick={() => applyColumnFilter(column.key, optionValues)}
+                        >
+                          OK
+                        </button>
                       </div>
                     ) : null}
                   </th>
