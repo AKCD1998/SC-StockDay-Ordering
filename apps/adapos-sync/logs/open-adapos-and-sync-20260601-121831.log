@@ -1,0 +1,6 @@
+[2026-06-01 12:18:32] Closing existing AdaPOS process PID 23032.
+[2026-06-01 12:18:34] Opening AdaPOS: D:\AdaSoft\AdaPos4.0HpmFhn\AdaPos\AdaPosBack.exe
+[2026-06-01 12:18:35] AdaPOS window detected.
+[2026-06-01 12:18:35] Attempting AdaPOS login as dao1.
+[2026-06-01 12:18:37] Login values pasted from clipboard. This should work regardless of keyboard language.
+[2026-06-01 12:18:37] Waiting 60 seconds before syncing.

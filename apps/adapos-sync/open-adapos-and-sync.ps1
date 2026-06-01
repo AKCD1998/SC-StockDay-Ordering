@@ -104,7 +104,7 @@ function Invoke-LoggedProcess {
   foreach ($path in @($stdoutPath, $stderrPath)) {
     if (Test-Path -LiteralPath $path) {
       Get-Content -LiteralPath $path | ForEach-Object {
-        Write-Output $_
+        Write-Host $_
         Add-Content -Path $LogPath -Value $_
       }
       Remove-Item -LiteralPath $path -Force

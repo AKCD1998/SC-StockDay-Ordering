@@ -1,0 +1,39 @@
+[2026-06-01 12:18:57] Opening AdaPOS: D:\AdaSoft\AdaPos4.0HpmFhn\AdaPos\AdaPosBack.exe
+[2026-06-01 12:18:58] AdaPOS window detected.
+[2026-06-01 12:18:58] Attempting AdaPOS login as dao1.
+[2026-06-01 12:19:00] Login values pasted from clipboard. This should work regardless of keyboard language.
+[2026-06-01 12:19:00] Waiting 60 seconds before syncing.
+[2026-06-01 12:20:00] Starting sync attempt 1 of 3 for branch 005.
+=== AdaPos Sync Agent ===
+Host:          192.168.0.127
+Database:      AdaAcc
+User:          readonly_pilot
+Branch filter: 005
+Datasets:      products, sales, branch_stock, transfers, transfer_lines, pending_receipts, approved_receipts
+Dry-run:       false
+Date cutoff:   2026-12-31
+Approved lookback: last 14 days
+
+
+Sync failed: Failed to connect to 192.168.0.127:49684 - Could not connect (sequence)
+Code: ESOCKET
+Detail: Failed to connect to 192.168.0.127:49684 - Could not connect (sequence)
+[2026-06-01 12:20:03] Sync attempt 1 failed with exit code === AdaPos Sync Agent === Host:          192.168.0.127 Database:      AdaAcc User:          readonly_pilot Branch filter: 005 Datasets:      products, sales, branch_stock, transfers, transfer_lines, pending_receipts, approved_receipts Dry-run:       false Date cutoff:   2026-12-31 Approved lookback: last 14 days   Sync failed: Failed to connect to 192.168.0.127:49684 - Could not connect (sequence) Code: ESOCKET Detail: Failed to connect to 192.168.0.127:49684 - Could not connect (sequence) 1.
+[2026-06-01 12:20:03] Waiting 120 seconds before retry.
+[2026-06-01 12:22:03] Starting sync attempt 2 of 3 for branch 005.
+=== AdaPos Sync Agent ===
+Host:          192.168.0.127
+Database:      AdaAcc
+User:          readonly_pilot
+Branch filter: 005
+Datasets:      products, sales, branch_stock, transfers, transfer_lines, pending_receipts, approved_receipts
+Dry-run:       false
+Date cutoff:   2026-12-31
+Approved lookback: last 14 days
+
+
+Sync failed: Failed to connect to 192.168.0.127:49684 - Could not connect (sequence)
+Code: ESOCKET
+Detail: Failed to connect to 192.168.0.127:49684 - Could not connect (sequence)
+[2026-06-01 12:22:06] Sync attempt 2 failed with exit code === AdaPos Sync Agent === Host:          192.168.0.127 Database:      AdaAcc User:          readonly_pilot Branch filter: 005 Datasets:      products, sales, branch_stock, transfers, transfer_lines, pending_receipts, approved_receipts Dry-run:       false Date cutoff:   2026-12-31 Approved lookback: last 14 days   Sync failed: Failed to connect to 192.168.0.127:49684 - Could not connect (sequence) Code: ESOCKET Detail: Failed to connect to 192.168.0.127:49684 - Could not connect (sequence) 1.
+[2026-06-01 12:22:06] Waiting 120 seconds before retry.
