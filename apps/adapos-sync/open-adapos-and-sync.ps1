@@ -81,10 +81,11 @@ function Send-PasteText {
   for ($attempt = 1; $attempt -le 10; $attempt++) {
     try {
       Add-Type -AssemblyName System.Windows.Forms
-      $thread = [System.Threading.Thread]::new({
+      $staAction = [System.Threading.ParameterizedThreadStart]{
         param($clipboardText)
-        [System.Windows.Forms.Clipboard]::SetText($clipboardText)
-      })
+        [System.Windows.Forms.Clipboard]::SetText([string]$clipboardText)
+      }
+      $thread = New-Object System.Threading.Thread($staAction)
       $thread.SetApartmentState([System.Threading.ApartmentState]::STA)
       $thread.Start($Text)
       $thread.Join()
