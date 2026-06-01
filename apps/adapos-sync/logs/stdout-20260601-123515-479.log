@@ -1,0 +1,28 @@
+=== AdaPos Sync Agent ===
+Host:          192.168.0.127
+Instance:      SQLEXPRESS
+Database:      AdaAcc
+User:          readonly_pilot
+Branch filter: 005
+Datasets:      products, sales, branch_stock, transfers, transfer_lines, pending_receipts, approved_receipts
+Dry-run:       false
+Date cutoff:   2026-12-31
+Approved lookback: last 14 days
+
+SQL Server: connected OK
+
+  approved_receipts date range: last 14 days
+  products: 6483 rows
+  sales: 1363 rows
+  transfers: 161 rows
+  transfer_lines: 1683 rows
+  pending_receipt_headers: 0 rows
+  pending_receipt_lines: 0 rows
+  approved_receipt_headers: 0 rows
+  approved_receipt_lines: 0 rows
+  branch_stock: 6483 rows
+
+Total records read: 16173
+Posting 6483 products...
+  products: 6483 sent
+Posting 1363 sales records...

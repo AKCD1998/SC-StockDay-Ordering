@@ -40,31 +40,13 @@ function Invoke-LoggedProcess {
     [string[]]$ArgumentList
   )
 
-  $stamp = Get-Date -Format "yyyyMMdd-HHmmss-fff"
-  $stdoutPath = Join-Path $LogDir "stdout-$stamp.log"
-  $stderrPath = Join-Path $LogDir "stderr-$stamp.log"
-
-  $process = Start-Process `
-    -FilePath $FilePath `
-    -ArgumentList $ArgumentList `
-    -WorkingDirectory $ScriptDir `
-    -NoNewWindow `
-    -Wait `
-    -PassThru `
-    -RedirectStandardOutput $stdoutPath `
-    -RedirectStandardError $stderrPath
-
-  foreach ($path in @($stdoutPath, $stderrPath)) {
-    if (Test-Path -LiteralPath $path) {
-      Get-Content -LiteralPath $path | ForEach-Object {
-        Write-Host $_
-        Add-Content -Path $LogPath -Value $_
-      }
-      Remove-Item -LiteralPath $path -Force
-    }
+  & $FilePath @ArgumentList 2>&1 | ForEach-Object {
+    $line = if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.ToString() } else { "$_" }
+    Write-Host $line
+    Add-Content -Path $LogPath -Value $line
   }
 
-  return $process.ExitCode
+  return $LASTEXITCODE
 }
 
 if (-not (Test-Path -LiteralPath $NodeExe)) {
