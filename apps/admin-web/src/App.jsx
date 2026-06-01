@@ -1114,7 +1114,7 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
         ? activeValues.filter((value) => value !== optionValue)
         : [...activeValues, optionValue];
 
-      if (nextValues.length === 0 || nextValues.length === optionValues.length) {
+      if (nextValues.length === optionValues.length) {
         const next = { ...current };
         delete next[columnKey];
         return next;
@@ -1125,6 +1125,14 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
         [columnKey]: nextValues,
       };
     });
+    setOffset(0);
+  }
+
+  function deselectAllColumnFilterValues(columnKey) {
+    setColumnFilters((current) => ({
+      ...current,
+      [columnKey]: [],
+    }));
     setOffset(0);
   }
 
@@ -1227,8 +1235,11 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
     const filtered = records.filter((row) => {
       return BRANCH_STOCK_COLUMNS.every((column) => {
         const activeValues = columnFilters[column.key];
-        if (!activeValues || activeValues.length === 0) {
+        if (!activeValues) {
           return true;
+        }
+        if (activeValues.length === 0) {
+          return false;
         }
         const value = normalizeFilterValue(getBranchStockColumnValue(row, column.key));
         return activeValues.includes(value);
@@ -1619,7 +1630,7 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
                 const optionValues = columnOptions[column.key] || [];
                 const activeValues = columnFilters[column.key] ? [...columnFilters[column.key]] : optionValues;
                 const allSelected = activeValues.length === optionValues.length;
-                const hasActiveFilter = Boolean(columnFilters[column.key]?.length);
+                const hasActiveFilter = Object.prototype.hasOwnProperty.call(columnFilters, column.key);
                 const filteredOptions = optionValues.filter((value) =>
                   normalizeFilterValue(value).toLowerCase().includes(filterSearchTerm.trim().toLowerCase()),
                 );
@@ -1666,6 +1677,14 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
                           disabled={!hasActiveFilter}
                         >
                           Clear Filter
+                        </button>
+                        <button
+                          type="button"
+                          className="branch-stock-filter-action"
+                          onClick={() => deselectAllColumnFilterValues(column.key)}
+                          disabled={activeValues.length === 0}
+                        >
+                          Deselect All
                         </button>
                         <input
                           type="search"
