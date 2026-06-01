@@ -1,0 +1,5 @@
+[2026-06-01 12:06:18] Opening AdaPOS: D:\AdaSoft\AdaPos4.0HpmFhn\AdaPos\AdaPosBack.exe
+[2026-06-01 12:06:18] AdaPOS window detected.
+[2026-06-01 12:06:18] Attempting AdaPOS login as dao1.
+[2026-06-01 12:06:19] Login keys sent. If AdaPOS used a different field order, sign in manually and rerun with -SkipLogin.
+[2026-06-01 12:06:19] Waiting 60 seconds before syncing.

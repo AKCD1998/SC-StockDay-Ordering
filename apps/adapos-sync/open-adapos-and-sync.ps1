@@ -35,11 +35,6 @@ function Write-Log([string]$Message) {
   Add-Content -Path $LogPath -Value $line
 }
 
-function Protect-SendKeysText([string]$Text) {
-  # WScript.SendKeys treats these characters as syntax, so wrap them in braces.
-  return ($Text -replace "([+^%~(){}\[\]])", '{$1}')
-}
-
 function Get-EnvValue([string]$Key) {
   $line = Get-Content ".env" -ErrorAction SilentlyContinue |
           Where-Object { $_ -match "^$Key=" } |
@@ -58,6 +53,65 @@ function Wait-ForMainWindow([System.Diagnostics.Process]$Process, [int]$TimeoutS
     Start-Sleep -Milliseconds 500
   }
   return $false
+}
+
+function Close-AdaPosIfRunning([string]$ExecutablePath) {
+  $normalizedTarget = [System.IO.Path]::GetFullPath($ExecutablePath)
+  $candidates = Get-CimInstance Win32_Process -Filter "Name = 'AdaPosBack.exe'" -ErrorAction SilentlyContinue
+
+  foreach ($candidate in ($candidates | Where-Object { $_.ExecutablePath -eq $normalizedTarget })) {
+    Write-Log "Closing existing AdaPOS process PID $($candidate.ProcessId)."
+    & taskkill.exe /PID $candidate.ProcessId /T /F | Out-Null
+  }
+
+  Start-Sleep -Seconds 2
+}
+
+function Send-PasteText {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Text,
+    [Parameter(Mandatory = $true)]
+    $Shell
+  )
+
+  Set-Clipboard -Value $Text
+  Start-Sleep -Milliseconds 250
+  $Shell.SendKeys("^v")
+  Start-Sleep -Milliseconds 250
+}
+
+function Invoke-LoggedProcess {
+  param(
+    [string]$FilePath,
+    [string[]]$ArgumentList
+  )
+
+  $stamp = Get-Date -Format "yyyyMMdd-HHmmss-fff"
+  $stdoutPath = Join-Path $LogDir "stdout-$stamp.log"
+  $stderrPath = Join-Path $LogDir "stderr-$stamp.log"
+
+  $process = Start-Process `
+    -FilePath $FilePath `
+    -ArgumentList $ArgumentList `
+    -WorkingDirectory $ScriptDir `
+    -NoNewWindow `
+    -Wait `
+    -PassThru `
+    -RedirectStandardOutput $stdoutPath `
+    -RedirectStandardError $stderrPath
+
+  foreach ($path in @($stdoutPath, $stderrPath)) {
+    if (Test-Path -LiteralPath $path) {
+      Get-Content -LiteralPath $path | ForEach-Object {
+        Write-Output $_
+        Add-Content -Path $LogPath -Value $_
+      }
+      Remove-Item -LiteralPath $path -Force
+    }
+  }
+
+  return $process.ExitCode
 }
 
 if (-not (Test-Path -LiteralPath $AdaPosExe)) {
@@ -80,6 +134,7 @@ if (-not $Branch) {
   throw "Branch is required. Pass -Branch 005 or set ADAPOS_SYNC_BRANCH_CODE in apps\adapos-sync\.env."
 }
 
+Close-AdaPosIfRunning -ExecutablePath $AdaPosExe
 Write-Log "Opening AdaPOS: $AdaPosExe"
 $adaProcess = Start-Process -FilePath $AdaPosExe -PassThru
 
@@ -104,10 +159,12 @@ if (-not $SkipLogin) {
 
   if ($activated) {
     Start-Sleep -Milliseconds 700
-    $safeUsername = Protect-SendKeysText $AdaUsername
-    $safePassword = Protect-SendKeysText $AdaPassword
-    $shell.SendKeys("$safeUsername{TAB}$safePassword{ENTER}")
-    Write-Log "Login keys sent. If AdaPOS used a different field order, sign in manually and rerun with -SkipLogin."
+    Send-PasteText -Text $AdaUsername -Shell $shell
+    $shell.SendKeys("{TAB}")
+    Start-Sleep -Milliseconds 250
+    Send-PasteText -Text $AdaPassword -Shell $shell
+    $shell.SendKeys("{ENTER}")
+    Write-Log "Login values pasted from clipboard. This should work regardless of keyboard language."
   } else {
     Write-Log "WARNING: Could not focus AdaPOS. Please sign in manually if needed."
   }
@@ -121,7 +178,12 @@ Start-Sleep -Seconds $AfterLoginWaitSeconds
 $success = $false
 for ($attempt = 1; $attempt -le $MaxRetries; $attempt++) {
   Write-Log "Starting sync attempt $attempt of $MaxRetries for branch $Branch."
-  & $NodeExe "src/index.js" "--execute" "--branch=$Branch" 2>&1 | Tee-Object -FilePath $LogPath -Append
+  $exitCode = Invoke-LoggedProcess -FilePath $NodeExe -ArgumentList @(
+    "src/index.js",
+    "--execute",
+    "--branch=$Branch"
+  )
+  $global:LASTEXITCODE = $exitCode
 
   if ($LASTEXITCODE -eq 0) {
     $success = $true
