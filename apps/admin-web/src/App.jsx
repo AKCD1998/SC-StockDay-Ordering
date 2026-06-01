@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dkshLogoUrl from "./assets/dksh.svg";
 import hansaLogoUrl from "./assets/hansa-logo.png";
 import tnpHealthcareLogoUrl from "./assets/tnp-healthcare-logo.svg";
@@ -18,6 +18,11 @@ import boonsongOsotLogoUrl from "./assets/boonsong-osot-logo.svg";
 import macropharlabLogoUrl from "./assets/macropharlab-logo.svg";
 import aceGlobalLogoUrl from "./assets/ace-global-logo.svg";
 import scharoenPharmaLogoUrl from "./assets/scharoen-pharma-logo.svg";
+import polipharmLogoUrl from "./assets/polipharm-logo.svg";
+import tmanLogoUrl from "./assets/tman-logo.svg";
+import berlinpharmLogoUrl from "./assets/berlinpharm-logo.svg";
+import anbLabLogoUrl from "./assets/anb-lab-logo.svg";
+import pacificHealthcareLogoUrl from "./assets/pacific-healthcare-logo.svg";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const adminViewStorageKey = "sc-stockday-admin-view";
@@ -58,6 +63,108 @@ function translateStatus(status) {
   if (status === "running") return "กำลังทำงาน";
   if (status === "submitted") return "ส่งคำขอแล้ว";
   return status || "-";
+}
+
+function translateCategoryReviewStatus(status) {
+  if (status === "confirmed") return "ยืนยันแล้ว";
+  if (status === "imported_exact_match") return "นำเข้าจาก exact code";
+  if (status === "proposed") return "รอตรวจ";
+  if (status === "needs_review") return "ต้องทบทวน";
+  if (status === "reverify") return "ต้องตรวจซ้ำ";
+  return status || "-";
+}
+
+function categoryStatusClass(status) {
+  if (status === "confirmed" || status === "imported_exact_match") return "good";
+  if (status === "proposed") return "warning";
+  if (status === "reverify") return "danger";
+  return "muted";
+}
+
+function getCategoryGroupStyle(category) {
+  const label = String(category || "").trim();
+  if (!label) return undefined;
+
+  let hash = 0;
+  for (let index = 0; index < label.length; index += 1) {
+    hash = ((hash << 5) - hash) + label.charCodeAt(index);
+    hash |= 0;
+  }
+
+  const hue = Math.abs(hash) % 360;
+  return {
+    "--category-group-bg": `hsla(${hue}, 68%, 56%, 0.12)`,
+    "--category-group-border": `hsla(${hue}, 58%, 45%, 0.24)`,
+  };
+}
+
+function compactFileName(value) {
+  if (!value) return "-";
+  const parts = String(value).split(/[\\/]/);
+  return parts[parts.length - 1] || value;
+}
+
+const BRANCH_STOCK_COLUMNS = [
+  { key: "productCode", label: "รหัสสินค้า", type: "text" },
+  { key: "productNameThai", label: "ชื่อสินค้าไทย", type: "text" },
+  { key: "productNameEng", label: "ชื่ออังกฤษ", type: "text" },
+  { key: "barcode", label: "Barcode", type: "text" },
+  { key: "unit", label: "หน่วย", type: "text" },
+  { key: "category", label: "หมวดหมู่", type: "text" },
+  { key: "categoryStatus", label: "สถานะหมวดหมู่", type: "text" },
+  { key: "qtyBranch000", label: "สาขา 000", type: "number" },
+  { key: "qtyBranch001", label: "สาขา 001", type: "number" },
+  { key: "qtyBranch003", label: "สาขา 003", type: "number" },
+  { key: "qtyBranch004", label: "สาขา 004", type: "number" },
+  { key: "qtyBranch005", label: "สาขา 005", type: "number" },
+  { key: "qtyTotalAllBranches", label: "รวมทุกสาขา", type: "number" },
+  { key: "syncedAt", label: "synced_at", type: "date" },
+];
+
+function normalizeFilterValue(value) {
+  return String(value == null ? "" : value).trim();
+}
+
+function normalizeCategorySearchValue(value) {
+  return normalizeFilterValue(value).toLowerCase();
+}
+
+function getBranchStockColumnValue(row, key) {
+  if (key === "categoryStatus") {
+    return translateCategoryReviewStatus(row.categoryStatus || "needs_review");
+  }
+  if (key === "syncedAt") {
+    return row.syncedAt || "";
+  }
+  if (key === "category") {
+    return row.category || "";
+  }
+  return row[key] ?? "";
+}
+
+function compareBranchStockValues(leftValue, rightValue, type, direction) {
+  const order = direction === "desc" ? -1 : 1;
+
+  if (type === "number") {
+    const leftNumber = Number(leftValue || 0);
+    const rightNumber = Number(rightValue || 0);
+    if (leftNumber === rightNumber) return 0;
+    return leftNumber > rightNumber ? order : -order;
+  }
+
+  if (type === "date") {
+    const leftTime = leftValue ? new Date(leftValue).getTime() : 0;
+    const rightTime = rightValue ? new Date(rightValue).getTime() : 0;
+    if (leftTime === rightTime) return 0;
+    return leftTime > rightTime ? order : -order;
+  }
+
+  const leftText = normalizeFilterValue(leftValue);
+  const rightText = normalizeFilterValue(rightValue);
+  if (!leftText && !rightText) return 0;
+  if (!leftText) return 1;
+  if (!rightText) return -1;
+  return leftText.localeCompare(rightText, "th", { numeric: true, sensitivity: "base" }) * order;
 }
 
 // Supplier-to-logo mapping. Add new suppliers here — `patterns` are matched
@@ -196,6 +303,73 @@ const SUPPLIER_BRANDS = [
     tagline: "เทรดดิ้ง",
     logoSrc: scharoenPharmaLogoUrl,
     patterns: ["ส.เจริญเภสัชเทรดดิ้ง", "สเจริญเภสัชเทรดดิ้ง", "S CHAROEN", "SCHAROEN"],
+  },
+  {
+    key: "polipharm",
+    wordmark: "POLIPHARM",
+    tagline: "",
+    logoSrc: polipharmLogoUrl,
+    patterns: [
+      "บริษัท โปลิฟาร์ม จำกัด (สำนักงานใหญ่)",
+      "โปลิฟาร์ม",
+      "POLIPHARM",
+    ],
+  },
+  {
+    key: "tman-pharmaceutical",
+    wordmark: "T.MAN",
+    tagline: "PHARMACEUTICAL",
+    logoSrc: tmanLogoUrl,
+    patterns: [
+      "บริษัท ที. แมน ฟาร์มาซูติคอล จำกัด (มหาชน)",
+      "ที. แมน ฟาร์มาซูติคอล",
+      "ทีแมน ฟาร์มาซูติคอล",
+      "T MAN PHARMACEUTICAL",
+      "TMAN PHARMACEUTICAL",
+      "TMAN",
+    ],
+  },
+  {
+    key: "berlin-pharmaceutical",
+    wordmark: "BERLIN",
+    tagline: "PHARMACEUTICAL",
+    logoSrc: berlinpharmLogoUrl,
+    patterns: [
+      "บริษัท เบอร์ลินฟาร์มาซูติคอลอินดัสตรี้ จำกัด",
+      "เบอร์ลินฟาร์มาซูติคอลอินดัสตรี้",
+      "เบอร์ลินฟาร์มาซูติคอล",
+      "BERLIN PHARMACEUTICAL",
+      "BERLINPHARMACEUTICAL",
+      "BERLIN",
+    ],
+  },
+  {
+    key: "anb-laboratory",
+    wordmark: "A.N.B.",
+    tagline: "LABORATORY",
+    logoSrc: anbLabLogoUrl,
+    patterns: [
+      "บริษัท เอ.เอ็น.บี. ลาบอราตอรี่ (อำนวยเภสัช) จำกัด",
+      "เอ.เอ็น.บี. ลาบอราตอรี่",
+      "เอ็นบี ลาบอราตอรี่",
+      "ANB LABORATORY",
+      "A N B LABORATORY",
+      "ANB LAB",
+    ],
+  },
+  {
+    key: "pacific-healthcare-thailand",
+    wordmark: "PACIFIC",
+    tagline: "HEALTHCARE",
+    logoSrc: pacificHealthcareLogoUrl,
+    patterns: [
+      "บริษัท แปซิฟิค เฮลธ์แคร์ (ไทยแลนด์) จำกัด",
+      "แปซิฟิค เฮลธ์แคร์",
+      "แปซิฟิคเฮลธ์แคร์",
+      "PACIFIC HEALTHCARE",
+      "PACIFIC HEALTH CARE",
+      "PACIFIC HEALTHCARE THAILAND",
+    ],
   },
 ];
 
@@ -716,20 +890,48 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
   );
 }
 
-function BranchStockPanel() {
+function BranchStockPanel({ csrfToken, isAdminUser }) {
   const pageSize = 25;
+  const pageFetchLimit = 10000;
+  const branchExportOptions = [
+    { branchCode: "000", label: "สาขา 000 (HQ)" },
+    { branchCode: "001", label: "สาขา 001" },
+    { branchCode: "003", label: "สาขา 003" },
+    { branchCode: "004", label: "สาขา 004" },
+    { branchCode: "005", label: "สาขา 005" },
+  ];
   const [records, setRecords] = useState([]);
+  const [matchReport, setMatchReport] = useState(null);
+  const [matchPreview, setMatchPreview] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
   const [offset, setOffset] = useState(0);
+  const [sortConfig, setSortConfig] = useState({ key: "productCode", direction: "asc" });
+  const [columnFilters, setColumnFilters] = useState({});
+  const [openFilterKey, setOpenFilterKey] = useState("");
+  const [filterSearchTerm, setFilterSearchTerm] = useState("");
+  const [pendingFilterValues, setPendingFilterValues] = useState([]);
   const [pagination, setPagination] = useState({
-    limit: pageSize,
+    limit: pageFetchLimit,
     offset: 0,
     total: 0,
   });
   const [loading, setLoading] = useState(false);
+  const [loadingReport, setLoadingReport] = useState(false);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [applyingPreview, setApplyingPreview] = useState(false);
   const [error, setError] = useState("");
+  const [reportError, setReportError] = useState("");
+  const [previewError, setPreviewError] = useState("");
+  const [applyMessage, setApplyMessage] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [taxonomyOpen, setTaxonomyOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [selectedExportBranch, setSelectedExportBranch] = useState("001");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
+  const filterMenuRef = useRef(null);
+  const [filterMenuAnchor, setFilterMenuAnchor] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -739,8 +941,8 @@ function BranchStockPanel() {
       setError("");
       try {
         const params = new URLSearchParams({
-          limit: String(pageSize),
-          offset: String(offset),
+          limit: String(pageFetchLimit),
+          offset: "0",
         });
         if (appliedSearchTerm) {
           params.set("search", appliedSearchTerm);
@@ -754,8 +956,8 @@ function BranchStockPanel() {
         setRecords(data.records || []);
         setPagination(
           data.pagination || {
-            limit: pageSize,
-            offset,
+            limit: pageFetchLimit,
+            offset: 0,
             total: data.records?.length || 0,
           },
         );
@@ -773,7 +975,122 @@ function BranchStockPanel() {
     return () => {
       active = false;
     };
-  }, [appliedSearchTerm, offset, refreshKey]);
+  }, [appliedSearchTerm, refreshKey]);
+
+  useEffect(() => {
+    if (!isAdminUser) {
+      setMatchReport(null);
+      setReportError("");
+      setLoadingReport(false);
+      return undefined;
+    }
+
+    let active = true;
+
+    async function loadMatchReport() {
+      setLoadingReport(true);
+      setReportError("");
+      try {
+        const response = await apiFetch("/api/admin/taxonomy-match-report");
+        if (response.status === 404) {
+          if (!active) return;
+          setMatchReport(null);
+          setReportError("ยังไม่มีรายงานเทียบ taxonomy ใน docs/");
+          return;
+        }
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        if (!active) return;
+        setMatchReport(data);
+      } catch (loadError) {
+        if (!active) return;
+        setReportError(loadError.message || "โหลดรายงานเทียบ taxonomy ไม่สำเร็จ");
+      } finally {
+        if (active) {
+          setLoadingReport(false);
+        }
+      }
+    }
+
+    loadMatchReport();
+    return () => {
+      active = false;
+    };
+  }, [isAdminUser, refreshKey]);
+
+  useEffect(() => {
+    if (!openFilterKey) return undefined;
+
+    function handlePointerDown(event) {
+      if (filterMenuRef.current && !filterMenuRef.current.contains(event.target)) {
+        setOpenFilterKey("");
+        setFilterMenuAnchor(null);
+        setPendingFilterValues([]);
+        setFilterSearchTerm("");
+      }
+    }
+
+    function handleScroll() {
+      setOpenFilterKey("");
+      setFilterMenuAnchor(null);
+      setPendingFilterValues([]);
+      setFilterSearchTerm("");
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [openFilterKey]);
+
+  useEffect(() => {
+    if (!isAdminUser) {
+      setMatchPreview(null);
+      setPreviewError("");
+      setApplyMessage("");
+      setLoadingPreview(false);
+      return undefined;
+    }
+
+    let active = true;
+
+    async function loadMatchPreview() {
+      setLoadingPreview(true);
+      setPreviewError("");
+      setApplyMessage("");
+      try {
+        const response = await apiFetch("/api/admin/taxonomy-match-preview?limit=10&offset=0");
+        if (response.status === 404) {
+          if (!active) return;
+          setMatchPreview(null);
+          setPreviewError("ยังไม่มี preview สำหรับ taxonomy report");
+          return;
+        }
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        if (!active) return;
+        setMatchPreview(data);
+      } catch (loadError) {
+        if (!active) return;
+        setPreviewError(loadError.message || "โหลด preview taxonomy ไม่สำเร็จ");
+      } finally {
+        if (active) {
+          setLoadingPreview(false);
+        }
+      }
+    }
+
+    loadMatchPreview();
+    return () => {
+      active = false;
+    };
+  }, [isAdminUser, refreshKey]);
 
   function handleSearchSubmit(event) {
     event.preventDefault();
@@ -785,11 +1102,224 @@ function BranchStockPanel() {
     }
   }
 
-  const total = pagination.total || 0;
-  const currentPage = Math.floor((pagination.offset || 0) / pageSize) + 1;
+  function openColumnFilter(columnKey, event) {
+    if (openFilterKey === columnKey) {
+      setOpenFilterKey("");
+      setFilterMenuAnchor(null);
+      setPendingFilterValues([]);
+      setFilterSearchTerm("");
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    setFilterMenuAnchor({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    const optionValues = columnOptions[columnKey] || [];
+    const currentValues = columnFilters[columnKey] ? [...columnFilters[columnKey]] : [...optionValues];
+    setPendingFilterValues(currentValues);
+    setOpenFilterKey(columnKey);
+    setFilterSearchTerm("");
+  }
+
+  function updateColumnSort(columnKey, direction) {
+    setSortConfig({ key: columnKey, direction });
+    setOpenFilterKey("");
+    setPendingFilterValues([]);
+  }
+
+  function clearColumnFilter(columnKey) {
+    setColumnFilters((current) => {
+      const next = { ...current };
+      delete next[columnKey];
+      return next;
+    });
+    setPendingFilterValues([]);
+    setOffset(0);
+  }
+
+  function toggleColumnFilterValue(optionValue) {
+    setPendingFilterValues((current) =>
+      current.includes(optionValue)
+        ? current.filter((value) => value !== optionValue)
+        : [...current, optionValue],
+    );
+  }
+
+  function deselectAllColumnFilterValues() {
+    setPendingFilterValues([]);
+  }
+
+  function toggleAllColumnFilterValues(optionValues) {
+    setPendingFilterValues((current) =>
+      current.length === optionValues.length ? [] : [...optionValues],
+    );
+  }
+
+  function applyColumnFilter(columnKey, optionValues) {
+    setColumnFilters((current) => {
+      const next = { ...current };
+      if (pendingFilterValues.length === optionValues.length) {
+        delete next[columnKey];
+      } else {
+        next[columnKey] = [...pendingFilterValues];
+      }
+      return next;
+    });
+    setOpenFilterKey("");
+    setPendingFilterValues([]);
+    setOffset(0);
+  }
+
+  async function handleApplySafeMatches() {
+    setApplyingPreview(true);
+    setPreviewError("");
+    setApplyMessage("");
+    try {
+      const response = await apiFetch("/api/admin/taxonomy-match-apply", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken || "",
+        },
+        body: JSON.stringify({}),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || `HTTP ${response.status}`);
+      }
+      setApplyMessage(
+        `apply แล้ว ${formatNumber(data.appliedCount || 0)} รายการ ข้าม ${formatNumber(data.skippedCount || 0)} รายการ`,
+      );
+      setRefreshKey((value) => value + 1);
+    } catch (applyError) {
+      setPreviewError(applyError.message || "apply taxonomy exact matches ไม่สำเร็จ");
+    } finally {
+      setApplyingPreview(false);
+    }
+  }
+
+  async function handleExportExcel() {
+    setExporting(true);
+    setExportError("");
+    try {
+      const params = new URLSearchParams({
+        branchCode: selectedExportBranch,
+      });
+      const exportSearch = searchTerm.trim() || appliedSearchTerm;
+      if (exportSearch) {
+        params.set("search", exportSearch);
+      }
+
+      const response = await apiFetch(`/api/branch-stock/export.xlsx?${params.toString()}`);
+      if (!response.ok) {
+        let message = `HTTP ${response.status}`;
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const payload = await response.json();
+          message = payload.message || payload.error || message;
+        }
+        throw new Error(message);
+      }
+
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const disposition = response.headers.get("content-disposition") || "";
+      const fileNameMatch = disposition.match(/filename=\"?([^"]+)\"?/i);
+      anchor.href = objectUrl;
+      anchor.download = fileNameMatch?.[1] || `branch-stock-${selectedExportBranch}.xlsx`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(objectUrl);
+      setExportModalOpen(false);
+    } catch (downloadError) {
+      setExportError(downloadError.message || "ส่งออก Excel ไม่สำเร็จ");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  const columnOptions = useMemo(() => {
+    return Object.fromEntries(
+      BRANCH_STOCK_COLUMNS.map((column) => {
+        const values = [...new Set(records.map((row) => normalizeFilterValue(getBranchStockColumnValue(row, column.key))))].sort(
+          (left, right) => left.localeCompare(right, "th", { numeric: true, sensitivity: "base" }),
+        );
+        return [column.key, values];
+      }),
+    );
+  }, [records]);
+
+  const visibleRecords = useMemo(() => {
+    const filtered = records.filter((row) => {
+      return BRANCH_STOCK_COLUMNS.every((column) => {
+        const activeValues = columnFilters[column.key];
+        if (!activeValues) {
+          return true;
+        }
+        if (activeValues.length === 0) {
+          return false;
+        }
+        const value = normalizeFilterValue(getBranchStockColumnValue(row, column.key));
+        return activeValues.includes(value);
+      });
+    });
+
+    const sortColumn = BRANCH_STOCK_COLUMNS.find((column) => column.key === sortConfig.key) || BRANCH_STOCK_COLUMNS[0];
+    return [...filtered].sort((left, right) =>
+      compareBranchStockValues(
+        getBranchStockColumnValue(left, sortColumn.key),
+        getBranchStockColumnValue(right, sortColumn.key),
+        sortColumn.type,
+        sortConfig.direction,
+      ),
+    );
+  }, [records, columnFilters, sortConfig]);
+
+  const total = visibleRecords.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const start = total === 0 ? 0 : (pagination.offset || 0) + 1;
-  const end = total === 0 ? 0 : (pagination.offset || 0) + records.length;
+  const safeOffset = Math.min(offset, Math.max(0, (totalPages - 1) * pageSize));
+  const currentPage = Math.floor(safeOffset / pageSize) + 1;
+  const start = total === 0 ? 0 : safeOffset + 1;
+  const pagedRecords = visibleRecords.slice(safeOffset, safeOffset + pageSize);
+  const end = total === 0 ? 0 : safeOffset + pagedRecords.length;
+  const reportSummary = matchReport?.summary || null;
+  const reportStats = matchReport?.stats || null;
+  const previewSummary = matchPreview?.summary || null;
+
+  useEffect(() => {
+    if (safeOffset !== offset) {
+      setOffset(safeOffset);
+    }
+  }, [offset, safeOffset]);
+
+  function renderBranchStockCell(row, column) {
+    if (column.key === "productCode") {
+      return <strong>{row.productCode}</strong>;
+    }
+    if (column.key === "category") {
+      return (
+        <div className="category-group-card" style={getCategoryGroupStyle(row.category)}>
+          <strong>{row.category || "-"}</strong>
+          {isAdminUser && row.categoryRationale ? <div className="meta">{row.categoryRationale}</div> : null}
+        </div>
+      );
+    }
+    if (column.key === "categoryStatus") {
+      return (
+        <span className={`status category-status-pill ${categoryStatusClass(row.categoryStatus)}`}>
+          {translateCategoryReviewStatus(row.categoryStatus || "needs_review")}
+        </span>
+      );
+    }
+    if (column.type === "number") {
+      return formatNumber(row[column.key], 2);
+    }
+    if (column.key === "syncedAt") {
+      return formatDateTime(row.syncedAt);
+    }
+    return row[column.key] || "-";
+  }
 
   return (
     <section className="panel branch-stock-panel">
@@ -806,12 +1336,22 @@ function BranchStockPanel() {
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="ค้นหารหัสสินค้า ชื่อไทย ชื่ออังกฤษ หรือ Barcode"
           />
-          <button type="submit" className="ghost-button">
+          <button
+            type="button"
+            className="excel-export-button"
+            onClick={() => {
+              setExportError("");
+              setExportModalOpen(true);
+            }}
+          >
+            ส่งออก Excel
+          </button>
+          <button type="submit" className="ghost-button branch-stock-search-button">
             ค้นหา
           </button>
           <button
             type="button"
-            className="ghost-button"
+            className="ghost-button branch-stock-refresh-button"
             onClick={() => setRefreshKey((value) => value + 1)}
             disabled={loading}
           >
@@ -819,6 +1359,281 @@ function BranchStockPanel() {
           </button>
         </form>
       </div>
+
+      {isAdminUser ? (
+      <section className={`taxonomy-report-card${taxonomyOpen ? " taxonomy-open" : " taxonomy-collapsed"}`}>
+        <button
+          type="button"
+          className="taxonomy-toggle-bar"
+          onClick={() => setTaxonomyOpen((v) => !v)}
+          aria-expanded={taxonomyOpen}
+        >
+          <span className="taxonomy-toggle-label">
+            <span className="taxonomy-toggle-icon">{taxonomyOpen ? "▾" : "▸"}</span>
+            <span>Taxonomy</span>
+            {!taxonomyOpen && reportSummary && (
+              <span className="taxonomy-toggle-pill">
+                {formatNumber(reportSummary.exactCodeMatches || 0)} matched
+                {(reportSummary.conflictRows || 0) > 0 && (
+                  <span className="taxonomy-toggle-warn"> · {formatNumber(reportSummary.conflictRows)} conflicts</span>
+                )}
+              </span>
+            )}
+          </span>
+          {!taxonomyOpen && (
+            <span className="taxonomy-toggle-hint">คลิกเพื่อดูรายงาน</span>
+          )}
+        </button>
+
+        {taxonomyOpen && (
+        <div className="taxonomy-report-body">
+        <div className="taxonomy-report-header">
+          <div>
+            <h3>รายงานเทียบ taxonomy ล่าสุด</h3>
+            <p>
+              เทียบ workbook กับ live product export ตามกติกา column C only เพื่อดูความพร้อมก่อนใช้จริง
+            </p>
+          </div>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => setRefreshKey((value) => value + 1)}
+            disabled={loadingReport}
+          >
+            {loadingReport ? "กำลังโหลด..." : "รีโหลดรายงาน"}
+          </button>
+        </div>
+
+        {reportError && <p className="notice error compact">รายงาน: {reportError}</p>}
+        {previewError && <p className="notice error compact">Preview: {previewError}</p>}
+        {applyMessage && <p className="notice success compact">{applyMessage}</p>}
+
+        {matchReport ? (
+          <>
+            <div className="taxonomy-report-meta">
+              <span>ไฟล์รายงาน: {matchReport.fileName}</span>
+              <span>สร้างเมื่อ: {formatDateTime(matchReport.generatedAt)}</span>
+              <span>Workbook: {compactFileName(matchReport.args?.workbookFile)}</span>
+              <span>Live source: {compactFileName(matchReport.args?.liveFile)}</span>
+            </div>
+
+            <div className="taxonomy-report-metrics">
+              <article className="taxonomy-report-metric">
+                <span>Live rows</span>
+                <strong>{formatNumber(reportSummary?.totalLiveRowsExamined || 0)}</strong>
+                {reportStats?.liveCodeStats ? (
+                  <small>{formatNumber(reportStats.liveCodeStats.uniqueValues || 0)} unique codes</small>
+                ) : null}
+              </article>
+              <article className="taxonomy-report-metric">
+                <span>Workbook rows</span>
+                <strong>{formatNumber(reportSummary?.totalWorkbookRowsExamined || 0)}</strong>
+                {reportStats?.workbookCodeStats ? (
+                  <small>{formatNumber(reportStats.workbookCodeStats.uniqueValues || 0)} unique C codes</small>
+                ) : null}
+              </article>
+              <article className="taxonomy-report-metric">
+                <span>Exact code</span>
+                <strong>{formatNumber(reportSummary?.exactCodeMatches || 0)}</strong>
+              </article>
+              <article className="taxonomy-report-metric">
+                <span>Barcode</span>
+                <strong>{formatNumber(reportSummary?.barcodeMatches || 0)}</strong>
+              </article>
+              <article className="taxonomy-report-metric">
+                <span>Unmatched live</span>
+                <strong>{formatNumber(reportSummary?.unmatchedLiveRows || 0)}</strong>
+              </article>
+              <article className="taxonomy-report-metric">
+                <span>Conflicts</span>
+                <strong>{formatNumber(reportSummary?.conflictRows || 0)}</strong>
+              </article>
+            </div>
+
+            <div className="taxonomy-report-source-status">
+              <span className={`status ${
+                Number(matchReport.backendEvidence?.productsRows || 0) > 0 &&
+                Number(matchReport.backendEvidence?.branchStockSnapshotRows || 0) > 0
+                  ? "good"
+                  : "warning"
+              }`}>
+                {Number(matchReport.backendEvidence?.productsRows || 0) > 0 &&
+                Number(matchReport.backendEvidence?.branchStockSnapshotRows || 0) > 0
+                  ? "ใช้ backend source"
+                  : "ใช้ file-backed fallback"}
+              </span>
+              <span className="meta-line">
+                products={formatNumber(matchReport.backendEvidence?.productsRows || 0)} ·
+                branch_stock_snapshots={formatNumber(matchReport.backendEvidence?.branchStockSnapshotRows || 0)}
+              </span>
+            </div>
+
+            {matchPreview ? (
+              <>
+                <div className="taxonomy-report-metrics taxonomy-report-preview-metrics">
+                  <article className="taxonomy-report-metric">
+                    <span>Safe to apply</span>
+                    <strong>{formatNumber(previewSummary?.safeToApply || 0)}</strong>
+                  </article>
+                  <article className="taxonomy-report-metric">
+                    <span>Category conflict</span>
+                    <strong>{formatNumber(previewSummary?.category_conflict || 0)}</strong>
+                  </article>
+                  <article className="taxonomy-report-metric">
+                    <span>Already confirmed</span>
+                    <strong>{formatNumber(previewSummary?.already_confirmed || 0)}</strong>
+                  </article>
+                  <article className="taxonomy-report-metric">
+                    <span>Needs review</span>
+                    <strong>{formatNumber(previewSummary?.needs_review || 0)}</strong>
+                  </article>
+                </div>
+
+                <div className="taxonomy-report-header taxonomy-report-preview-header">
+                  <div>
+                    <h3>Preview ก่อน apply</h3>
+                    <p>ใช้ exact code match เพื่อสร้าง category overlay แบบปลอดภัยก่อนแตะ source data จริง</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={handleApplySafeMatches}
+                    disabled={applyingPreview || loadingPreview || !csrfToken}
+                  >
+                    {applyingPreview ? "กำลัง apply..." : "Apply safe exact matches"}
+                  </button>
+                </div>
+
+                <div className="table-wrap taxonomy-mini-table-wrap">
+                  <table className="taxonomy-mini-table">
+                    <thead>
+                      <tr>
+                        <th>Code</th>
+                        <th>Current</th>
+                        <th>Proposed</th>
+                        <th>Safe</th>
+                        <th>Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(matchPreview.records || []).map((row) => (
+                        <tr key={`${row.productCode}-${row.workbookRowNumber}`}>
+                          <td>{row.productCode}</td>
+                          <td>{row.currentCategory || "-"}</td>
+                          <td>{row.proposedCategory || "-"}</td>
+                          <td>{row.safeToApply ? "yes" : "no"}</td>
+                          <td>{row.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : null}
+
+            <div className="taxonomy-report-grid">
+              <details className="taxonomy-report-section" open>
+                <summary>ตัวอย่าง exact code match</summary>
+                <div className="table-wrap taxonomy-mini-table-wrap">
+                  <table className="taxonomy-mini-table">
+                    <thead>
+                      <tr>
+                        <th>Live code</th>
+                        <th>Workbook C</th>
+                        <th>ชื่อสินค้า</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(matchReport.samples?.exactCodeMatches || []).slice(0, 5).map((row) => (
+                        <tr key={`${row.liveProductCode}-${row.workbookRowNumber}`}>
+                          <td>{row.liveProductCode}</td>
+                          <td>{row.workbookProductCode}</td>
+                          <td>{row.liveProductNameThai || row.workbookProductNameThai || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+
+              <details className="taxonomy-report-section">
+                <summary>ตัวอย่าง unmatched live</summary>
+                <div className="table-wrap taxonomy-mini-table-wrap">
+                  <table className="taxonomy-mini-table">
+                    <thead>
+                      <tr>
+                        <th>Live code</th>
+                        <th>Barcode</th>
+                        <th>ชื่อสินค้า</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(matchReport.samples?.unmatchedLiveRows || []).slice(0, 5).map((row) => (
+                        <tr key={`${row.liveProductCode}-${row.liveRowNumber}`}>
+                          <td>{row.liveProductCode}</td>
+                          <td>{row.liveBarcode || "-"}</td>
+                          <td>{row.liveProductNameThai || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+
+              <details className="taxonomy-report-section">
+                <summary>ตัวอย่าง unmatched workbook</summary>
+                <div className="table-wrap taxonomy-mini-table-wrap">
+                  <table className="taxonomy-mini-table">
+                    <thead>
+                      <tr>
+                        <th>Workbook C</th>
+                        <th>Barcode</th>
+                        <th>ชื่อสินค้า</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(matchReport.samples?.unmatchedWorkbookRows || []).slice(0, 5).map((row) => (
+                        <tr key={`${row.workbookProductCode}-${row.workbookRowNumber}`}>
+                          <td>{row.workbookProductCode}</td>
+                          <td>{row.workbookBarcode || "-"}</td>
+                          <td>{row.workbookProductNameThai || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+
+              <details className="taxonomy-report-section">
+                <summary>ตัวอย่าง conflict</summary>
+                <div className="table-wrap taxonomy-mini-table-wrap">
+                  <table className="taxonomy-mini-table">
+                    <thead>
+                      <tr>
+                        <th>Type</th>
+                        <th>Value</th>
+                        <th>Code</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(matchReport.samples?.conflicts || []).slice(0, 5).map((row, index) => (
+                        <tr key={`${row.type}-${row.value}-${row.productCode || index}`}>
+                          <td>{row.type}</td>
+                          <td>{row.value || "-"}</td>
+                          <td>{row.productCode || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </div>
+          </>
+        ) : null}
+        </div>
+        )}
+      </section>
+      ) : null}
 
       {error && <p className="notice error compact">เชื่อมต่อไม่ได้: {error}</p>}
       {loading && <p className="empty-state">กำลังโหลดข้อมูลสต็อกสาขา...</p>}
@@ -830,40 +1645,128 @@ function BranchStockPanel() {
         <table className="branch-stock-table">
           <thead>
             <tr>
-              <th>รหัสสินค้า</th>
-              <th>ชื่อสินค้าไทย</th>
-              <th>ชื่ออังกฤษ</th>
-              <th>Barcode</th>
-              <th>หน่วย</th>
-              <th>สาขา 000</th>
-              <th>สาขา 001</th>
-              <th>สาขา 003</th>
-              <th>สาขา 004</th>
-              <th>สาขา 005</th>
-              <th>รวมทุกสาขา</th>
-              <th>synced_at</th>
+              {BRANCH_STOCK_COLUMNS.map((column) => {
+                const optionValues = columnOptions[column.key] || [];
+                const appliedValues = columnFilters[column.key] ? [...columnFilters[column.key]] : optionValues;
+                const activeValues =
+                  openFilterKey === column.key ? pendingFilterValues : appliedValues;
+                const allSelected = activeValues.length === optionValues.length;
+                const hasActiveFilter = Object.prototype.hasOwnProperty.call(columnFilters, column.key);
+                const filteredOptions = optionValues.filter((value) =>
+                  normalizeFilterValue(value).toLowerCase().includes(filterSearchTerm.trim().toLowerCase()),
+                );
+
+                return (
+                  <th key={column.key}>
+                    <div className="branch-stock-header-cell">
+                      <span>{column.label}</span>
+                      <button
+                        type="button"
+                        className={`branch-stock-filter-button ${openFilterKey === column.key ? "active" : ""} ${
+                          hasActiveFilter ? "filtered" : ""
+                        }`}
+                        onClick={(e) => openColumnFilter(column.key, e)}
+                        aria-label={`Sort and filter ${column.label}`}
+                      >
+                        ▾
+                      </button>
+                    </div>
+
+                    {openFilterKey === column.key ? (
+                      <div
+                        className="branch-stock-filter-menu"
+                        ref={filterMenuRef}
+                        style={filterMenuAnchor ? { top: filterMenuAnchor.top, right: filterMenuAnchor.right } : undefined}
+                      >
+                        <button
+                          type="button"
+                          className="branch-stock-filter-action"
+                          onClick={() => updateColumnSort(column.key, "asc")}
+                        >
+                          Sort A to Z
+                        </button>
+                        <button
+                          type="button"
+                          className="branch-stock-filter-action"
+                          onClick={() => updateColumnSort(column.key, "desc")}
+                        >
+                          Sort Z to A
+                        </button>
+                        <button
+                          type="button"
+                          className="branch-stock-filter-action"
+                          onClick={() => {
+                            clearColumnFilter(column.key);
+                            setOpenFilterKey("");
+                          }}
+                          disabled={!hasActiveFilter}
+                        >
+                          Clear Filter
+                        </button>
+                        <button
+                          type="button"
+                          className="branch-stock-filter-action"
+                          onClick={() => deselectAllColumnFilterValues()}
+                          disabled={activeValues.length === 0}
+                        >
+                          Deselect All
+                        </button>
+                        <input
+                          type="search"
+                          value={filterSearchTerm}
+                          onChange={(event) => setFilterSearchTerm(event.target.value)}
+                          placeholder="Search"
+                          className="branch-stock-filter-search"
+                        />
+                        <div className="branch-stock-filter-options">
+                          <label className="branch-stock-filter-option">
+                            <input
+                              type="checkbox"
+                              checked={allSelected}
+                              onChange={() => toggleAllColumnFilterValues(optionValues)}
+                            />
+                            <span>(Select All)</span>
+                          </label>
+                          {filteredOptions.map((value) => (
+                            <label key={`${column.key}-${value || "blank"}`} className="branch-stock-filter-option">
+                              <input
+                                type="checkbox"
+                                checked={activeValues.includes(value)}
+                                onChange={() => toggleColumnFilterValue(value)}
+                              />
+                              <span>{value || "(Blank)"}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          className="branch-stock-filter-action"
+                          onClick={() => applyColumnFilter(column.key, optionValues)}
+                        >
+                          OK
+                        </button>
+                      </div>
+                    ) : null}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-            {records.map((row) => (
+            {pagedRecords.map((row) => (
               <tr key={row.productCode}>
-                <td><strong>{row.productCode}</strong></td>
-                <td>{row.productNameThai || "-"}</td>
-                <td>{row.productNameEng || "-"}</td>
-                <td>{row.barcode || "-"}</td>
-                <td>{row.unit || "-"}</td>
-                <td>{formatNumber(row.qtyBranch000, 2)}</td>
-                <td>{formatNumber(row.qtyBranch001, 2)}</td>
-                <td>{formatNumber(row.qtyBranch003, 2)}</td>
-                <td>{formatNumber(row.qtyBranch004, 2)}</td>
-                <td>{formatNumber(row.qtyBranch005, 2)}</td>
-                <td>{formatNumber(row.qtyTotalAllBranches, 2)}</td>
-                <td>{formatDateTime(row.syncedAt)}</td>
+                {BRANCH_STOCK_COLUMNS.map((column) => (
+                  <td key={`${row.productCode}-${column.key}`}>{renderBranchStockCell(row, column)}</td>
+                ))}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {!loading && !error && records.length > 0 && pagedRecords.length === 0 && (
+        <p className="empty-state">ไม่พบข้อมูลหลังใช้ตัวกรองที่หัวตาราง</p>
+      )}
 
       <div className="pagination">
         <p className="pagination-info">
@@ -887,11 +1790,884 @@ function BranchStockPanel() {
             type="button"
             className="ghost-button"
             disabled={loading || currentPage >= totalPages}
-            onClick={() => setOffset((current) => current + pageSize)}
+            onClick={() => setOffset((current) => Math.min(Math.max(0, total - 1), current + pageSize))}
           >
             ถัดไป
           </button>
         </div>
+      </div>
+
+      {exportModalOpen && (
+        <div className="dialog-overlay" onClick={() => !exporting && setExportModalOpen(false)}>
+          <div
+            className="dialog-card export-dialog"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="branch-export-title"
+          >
+            <div className="dialog-header">
+              <div>
+                <h3 id="branch-export-title">ส่งออก Excel แยกตามสาขา</h3>
+                <p>เลือกสาขาที่ต้องการดาวน์โหลดเพื่อให้ไฟล์แสดงเฉพาะยอดของสาขานั้น</p>
+              </div>
+              <button
+                type="button"
+                className="ghost-button dialog-close-button"
+                onClick={() => setExportModalOpen(false)}
+                disabled={exporting}
+              >
+                ปิด
+              </button>
+            </div>
+
+            <div className="export-branch-grid">
+              {branchExportOptions.map((option) => (
+                <button
+                  key={option.branchCode}
+                  type="button"
+                  className={`export-branch-option${selectedExportBranch === option.branchCode ? " active" : ""}`}
+                  onClick={() => setSelectedExportBranch(option.branchCode)}
+                  disabled={exporting}
+                >
+                  <strong>{option.label}</strong>
+                  <span>ดึงเฉพาะคอลัมน์จำนวนของ {option.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {exportError && <p className="notice error compact">{exportError}</p>}
+
+            <div className="dialog-actions">
+              <button
+                type="button"
+                className="excel-export-button export-cancel-button"
+                onClick={() => setExportModalOpen(false)}
+                disabled={exporting}
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                className="excel-export-button"
+                onClick={handleExportExcel}
+                disabled={exporting}
+              >
+                {exporting ? "กำลังสร้างไฟล์..." : `ดาวน์โหลด ${selectedExportBranch}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CategoryReviewPanel({ decidedBy }) {
+  const pageSize = 20;
+  const [records, setRecords] = useState([]);
+  const [metrics, setMetrics] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("open");
+  const [pagination, setPagination] = useState({ limit: pageSize, offset: 0, total: 0 });
+  const [loading, setLoading] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState("");
+  const [savingCode, setSavingCode] = useState("");
+  const [drafts, setDrafts] = useState({});
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadReviewQueue() {
+      setLoading(true);
+      setError("");
+      try {
+        const params = new URLSearchParams({
+          limit: String(pageSize),
+          offset: String(pagination.offset || 0),
+          status: statusFilter,
+        });
+        if (appliedSearchTerm) {
+          params.set("search", appliedSearchTerm);
+        }
+
+        const [queueResponse, metricsResponse] = await Promise.all([
+          apiFetch(`/api/admin/category-review?${params.toString()}`),
+          apiFetch("/api/admin/category-metrics"),
+        ]);
+
+        if (!queueResponse.ok) {
+          throw new Error(`HTTP ${queueResponse.status}`);
+        }
+        if (!metricsResponse.ok) {
+          throw new Error(`HTTP ${metricsResponse.status}`);
+        }
+
+        const [queueData, metricsData] = await Promise.all([
+          queueResponse.json(),
+          metricsResponse.json(),
+        ]);
+
+        if (!active) return;
+        setRecords(queueData.records || []);
+        setMetrics(metricsData);
+        setPagination(
+          queueData.pagination || {
+            limit: pageSize,
+            offset: 0,
+            total: queueData.records?.length || 0,
+          },
+        );
+        setDrafts((current) => {
+          const next = { ...current };
+          for (const row of queueData.records || []) {
+            if (!next[row.productCode]) {
+              next[row.productCode] = {
+                cleanCategory: row.cleanCategory || "",
+                shelfNo: row.shelfNo ?? "",
+                isColdChain: Boolean(row.isColdChain),
+              };
+            }
+          }
+          return next;
+        });
+      } catch (loadError) {
+        if (active) {
+          setError(loadError.message || "โหลดคิวหมวดหมู่ไม่สำเร็จ");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadReviewQueue();
+    return () => {
+      active = false;
+    };
+  }, [appliedSearchTerm, pagination.offset, refreshKey, statusFilter]);
+
+  function handleSearchSubmit(event) {
+    event.preventDefault();
+    setAppliedSearchTerm(searchTerm.trim());
+    setPagination((current) => ({ ...current, offset: 0 }));
+  }
+
+  async function handleRunCategorizer() {
+    setRunning(true);
+    setError("");
+    try {
+      const response = await apiFetch("/api/admin/categories/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      setPagination((current) => ({ ...current, offset: 0 }));
+      setRefreshKey((value) => value + 1);
+    } catch (runError) {
+      setError(runError.message || "สั่งประมวลผลหมวดหมู่ไม่สำเร็จ");
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  async function handleConfirm(productCode) {
+    const draft = drafts[productCode] || {};
+    setSavingCode(productCode);
+    setError("");
+    try {
+      const response = await apiFetch(`/api/admin/category-review/${productCode}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cleanCategory: draft.cleanCategory,
+          shelfNo: draft.shelfNo === "" ? null : Number(draft.shelfNo),
+          isColdChain: Boolean(draft.isColdChain),
+          decidedBy,
+        }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.message || `HTTP ${response.status}`);
+      }
+      setRefreshKey((value) => value + 1);
+    } catch (saveError) {
+      setError(saveError.message || "บันทึกการยืนยันหมวดหมู่ไม่สำเร็จ");
+    } finally {
+      setSavingCode("");
+    }
+  }
+
+  const total = pagination.total || 0;
+  const currentPage = Math.floor((pagination.offset || 0) / pageSize) + 1;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const start = total === 0 ? 0 : (pagination.offset || 0) + 1;
+  const end = total === 0 ? 0 : (pagination.offset || 0) + records.length;
+
+  return (
+    <section className="panel category-review-panel">
+      <div className="panel-header stacked">
+        <div>
+          <h2>คิวตรวจหมวดหมู่สินค้า</h2>
+          <p>ตรวจรายการที่ระบบจัดหมวดหมู่ได้ไม่ชัด หรือรายการที่ต้องยืนยันจากเภสัช</p>
+        </div>
+
+        <form className="toolbar branch-stock-toolbar" onSubmit={handleSearchSubmit}>
+          <input
+            type="search"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="ค้นหารหัสสินค้า ชื่อ หรือหมวดหมู่"
+          />
+          <select value={statusFilter} onChange={(event) => {
+            setStatusFilter(event.target.value);
+            setPagination((current) => ({ ...current, offset: 0 }));
+          }}>
+            <option value="open">คิวที่ยังไม่ยืนยัน</option>
+            <option value="needs_review">ต้องทบทวน</option>
+            <option value="reverify">ต้องตรวจซ้ำ</option>
+            <option value="proposed">รอตรวจ</option>
+            <option value="confirmed">ยืนยันแล้ว</option>
+            <option value="all">ทั้งหมด</option>
+          </select>
+          <button type="submit" className="ghost-button">
+            ค้นหา
+          </button>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={handleRunCategorizer}
+            disabled={running}
+          >
+            {running ? "กำลังประมวลผล..." : "ประมวลผลใหม่"}
+          </button>
+        </form>
+      </div>
+
+      {metrics ? (
+        <div className="category-metrics">
+          <article className="category-metric">
+            <span>สินค้าทั้งหมด</span>
+            <strong>{formatNumber(metrics.totalProducts)}</strong>
+          </article>
+          <article className="category-metric">
+            <span>ชื่อไทยพร้อมใช้</span>
+            <strong>{formatNumber((metrics.thaiNameCoverage || 0) * 100, 1)}%</strong>
+          </article>
+          <article className="category-metric">
+            <span>ชื่ออังกฤษพร้อมใช้</span>
+            <strong>{formatNumber((metrics.englishNameCoverage || 0) * 100, 1)}%</strong>
+          </article>
+          <article className="category-metric">
+            <span>Barcode ใช้งานได้</span>
+            <strong>{formatNumber((metrics.barcodeCoverage || 0) * 100, 1)}%</strong>
+          </article>
+          <article className="category-metric">
+            <span>Dummy barcode</span>
+            <strong>{formatNumber((metrics.dummyBarcodeRate || 0) * 100, 1)}%</strong>
+          </article>
+        </div>
+      ) : null}
+
+      {error && <p className="notice error compact">{error}</p>}
+      {loading && <p className="empty-state">กำลังโหลดคิวหมวดหมู่...</p>}
+      {!loading && !records.length ? (
+        <p className="empty-state">ไม่มีรายการในคิวตามตัวกรองปัจจุบัน</p>
+      ) : null}
+
+      <div className="category-review-list">
+        {records.map((row) => {
+          const draft = drafts[row.productCode] || {
+            cleanCategory: row.cleanCategory || "",
+            shelfNo: row.shelfNo ?? "",
+            isColdChain: Boolean(row.isColdChain),
+          };
+          return (
+            <article className="category-review-card" key={row.productCode}>
+              <div className="category-review-main">
+                <div>
+                  <strong>{row.productNameThai || row.productCode}</strong>
+                  <p className="meta-line">{row.productCode} · {row.productNameEng || "-"}</p>
+                  <p className="meta-line">
+                    Barcode: {row.barcode || "-"} · source: {row.source || "-"}
+                  </p>
+                </div>
+                <span className={`status ${categoryStatusClass(row.reviewStatus)}`}>
+                  {translateCategoryReviewStatus(row.reviewStatus)}
+                </span>
+              </div>
+
+              <div className="category-review-grid">
+                <label>
+                  หมวดหมู่
+                  <input
+                    value={draft.cleanCategory}
+                    onChange={(event) => setDrafts((current) => ({
+                      ...current,
+                      [row.productCode]: {
+                        ...draft,
+                        cleanCategory: event.target.value,
+                      },
+                    }))}
+                  />
+                </label>
+                <label>
+                  Shelf
+                  <input
+                    value={draft.shelfNo}
+                    onChange={(event) => setDrafts((current) => ({
+                      ...current,
+                      [row.productCode]: {
+                        ...draft,
+                        shelfNo: event.target.value,
+                      },
+                    }))}
+                  />
+                </label>
+                <label className="checkbox-field">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(draft.isColdChain)}
+                    onChange={(event) => setDrafts((current) => ({
+                      ...current,
+                      [row.productCode]: {
+                        ...draft,
+                        isColdChain: event.target.checked,
+                      },
+                    }))}
+                  />
+                  <span>Cold chain</span>
+                </label>
+              </div>
+
+              <div className="category-review-meta">
+                <span>แสดงผล: <strong>{row.category || "-"}</strong></span>
+                <span>Category conf. {formatNumber((row.categoryConfidence || 0) * 100, 1)}%</span>
+                <span>Placement conf. {formatNumber((row.placementConfidence || 0) * 100, 1)}%</span>
+              </div>
+
+              <p className="meta-line">{row.rationale || "ไม่มีคำอธิบายจากระบบ"}</p>
+              {row.rawLabelSource ? <p className="meta-line">ประวัติอ้างอิง: {row.rawLabelSource}</p> : null}
+
+              <div className="category-review-actions">
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled={savingCode === row.productCode || !draft.cleanCategory.trim()}
+                  onClick={() => handleConfirm(row.productCode)}
+                >
+                  {savingCode === row.productCode ? "กำลังบันทึก..." : "ยืนยันหมวดหมู่"}
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      <div className="pagination">
+        <p className="pagination-info">
+          {total === 0
+            ? "0 รายการ"
+            : `${formatNumber(start)}-${formatNumber(end)} จาก ${formatNumber(total)} รายการ`}
+        </p>
+        <div className="pagination-actions">
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={loading || currentPage <= 1}
+            onClick={() => setPagination((current) => ({
+              ...current,
+              offset: Math.max(0, (current.offset || 0) - pageSize),
+            }))}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="receipt-page-indicator">
+            หน้า {formatNumber(currentPage)} / {formatNumber(totalPages)}
+          </span>
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={loading || currentPage >= totalPages}
+            onClick={() => setPagination((current) => ({
+              ...current,
+              offset: (current.offset || 0) + pageSize,
+            }))}
+          >
+            ถัดไป
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Review Queue — fast keyboard-driven human category verification ───────────
+function ReviewQueuePanel({ csrfToken }) {
+  // phase: idle → reviewing → summary → done
+  const [phase, setPhase]           = useState("idle");
+  const [queue, setQueue]           = useState([]);          // current batch of products
+  const [allCategories, setAllCats] = useState([]);          // every known confirmed category
+  const [totalInQueue, setTotal]    = useState(null);
+  const [loading, setLoading]       = useState(false);
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  // Per-session state
+  const [decisions, setDecisions]   = useState([]);          // [{productCode,productNameThai,categoryName,isNew?,skipped?}]
+  const [currentIdx, setCurrentIdx] = useState(0);           // index into queue[]
+  const [search, setSearch]         = useState("");
+  const [showNewCat, setShowNewCat] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitMsg, setSubmitMsg]   = useState("");
+
+  const searchRef  = useRef(null);
+  const newCatRef  = useRef(null);
+
+  // ── Load queue ──────────────────────────────────────────────────────────────
+  const loadQueue = useCallback(async (filter) => {
+    setLoading(true);
+    try {
+      const f = filter || statusFilter;
+      const response = await apiFetch(`/api/admin/review-queue?limit=80&status=${f}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      setQueue(data.records || []);
+      setAllCats(data.allCategories || []);
+      setTotal(data.total || 0);
+      return (data.records || []).length;
+    } catch (e) {
+      setSubmitMsg("โหลดคิวไม่สำเร็จ: " + e.message);
+      return 0;
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter]);
+
+  // ── Current product ─────────────────────────────────────────────────────────
+  const product = queue[currentIdx] || null;
+
+  // Category options sorted: proposed first (if any), then by similarity
+  const options = useMemo(() => {
+    if (!product) return [];
+    const opts = [...(product.options || [])];
+    if (product.currentCategory && !opts.find(o => o.category_name === product.currentCategory)) {
+      opts.unshift({ category_name: product.currentCategory, similarity: null, isProposed: true });
+    }
+    return opts;
+  }, [product]);
+
+  const searchableCategories = useMemo(() => {
+    const byName = new Map();
+
+    for (const option of options) {
+      const name = normalizeFilterValue(option?.category_name);
+      if (!name) continue;
+      byName.set(name, {
+        category_name: name,
+        similarity: option?.similarity ?? null,
+        isProposed: Boolean(option?.isProposed),
+      });
+    }
+
+    for (const category of allCategories) {
+      const name = normalizeFilterValue(category);
+      if (!name || byName.has(name)) continue;
+      byName.set(name, {
+        category_name: name,
+        similarity: null,
+        isProposed: false,
+      });
+    }
+
+    return [...byName.values()].sort((left, right) => {
+      if (left.isProposed && !right.isProposed) return -1;
+      if (!left.isProposed && right.isProposed) return 1;
+      return left.category_name.localeCompare(right.category_name, "th", {
+        sensitivity: "base",
+        numeric: true,
+      });
+    });
+  }, [options, allCategories]);
+
+  // Filtered options for search
+  const filteredOptions = useMemo(() => {
+    const q = normalizeCategorySearchValue(search);
+    if (!q) return options.slice(0, 9);
+    return searchableCategories
+      .filter((option) => normalizeCategorySearchValue(option.category_name).includes(q))
+      .slice(0, 9);
+  }, [search, options, searchableCategories]);
+
+  // ── Decision helpers ────────────────────────────────────────────────────────
+  const pickCategory = useCallback((categoryName, isNew = false) => {
+    if (!product) return;
+    setDecisions(prev => {
+      const next = prev.filter(d => d.productCode !== product.productCode);
+      next.push({ productCode: product.productCode, productNameThai: product.productNameThai, categoryName, isNew, skipped: false });
+      return next;
+    });
+    setSearch("");
+    setShowNewCat(false);
+    setNewCatName("");
+    if (currentIdx + 1 >= queue.length) {
+      setPhase("summary");
+    } else {
+      setCurrentIdx(i => i + 1);
+    }
+  }, [product, currentIdx, queue.length]);
+
+  const skipProduct = useCallback(() => {
+    if (!product) return;
+    setDecisions(prev => {
+      const next = prev.filter(d => d.productCode !== product.productCode);
+      next.push({ productCode: product.productCode, productNameThai: product.productNameThai, categoryName: null, skipped: true });
+      return next;
+    });
+    setSearch("");
+    if (currentIdx + 1 >= queue.length) {
+      setPhase("summary");
+    } else {
+      setCurrentIdx(i => i + 1);
+    }
+  }, [product, currentIdx, queue.length]);
+
+  const goBack = useCallback(() => {
+    if (currentIdx === 0) return;
+    setDecisions(prev => prev.filter(d => d.productCode !== (queue[currentIdx - 1]?.productCode)));
+    setSearch("");
+    setShowNewCat(false);
+    setCurrentIdx(i => i - 1);
+  }, [currentIdx, queue]);
+
+  const createNewCategory = useCallback(() => {
+    const name = newCatName.trim();
+    if (!name) return;
+    apiFetch("/api/admin/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken || "" },
+      body: JSON.stringify({ name }),
+    }).catch(() => {});
+    setAllCats(prev => [...new Set([...prev, name])].sort());
+    pickCategory(name, true);
+  }, [newCatName, csrfToken, pickCategory]);
+
+  // ── Keyboard handler ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== "reviewing") return;
+    function onKey(e) {
+      const tag = e.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const n = parseInt(e.key, 10);
+      if (n >= 1 && n <= 9 && filteredOptions[n - 1]) {
+        e.preventDefault();
+        pickCategory(filteredOptions[n - 1].category_name);
+      } else if (e.key === "ArrowLeft" || e.key === "Backspace") {
+        e.preventDefault();
+        goBack();
+      } else if ((e.key === "s" || e.key === "S") && !e.ctrlKey) {
+        e.preventDefault();
+        skipProduct();
+      } else if ((e.key === "n" || e.key === "N") && !e.ctrlKey) {
+        e.preventDefault();
+        setShowNewCat(true);
+        setTimeout(() => newCatRef.current?.focus(), 50);
+      } else if (e.key === "/") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase, filteredOptions, pickCategory, goBack, skipProduct]);
+
+  // ── Confirm batch ───────────────────────────────────────────────────────────
+  async function confirmAll() {
+    const toConfirm = decisions.filter(d => !d.skipped && d.categoryName);
+    if (!toConfirm.length) return;
+    setSubmitting(true);
+    setSubmitMsg("");
+    try {
+      const response = await apiFetch("/api/admin/review-queue/confirm-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken || "" },
+        body: JSON.stringify({ decisions: toConfirm.map(d => ({ productCode: d.productCode, categoryName: d.categoryName, isNewCategory: d.isNew || false })) }),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      setSubmitMsg(`ยืนยันสำเร็จ ${toConfirm.length} รายการ`);
+      setPhase("done");
+    } catch (e) {
+      setSubmitMsg("เกิดข้อผิดพลาด: " + e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function startSession() {
+    setDecisions([]);
+    setCurrentIdx(0);
+    setSearch("");
+    setShowNewCat(false);
+    setNewCatName("");
+    setSubmitMsg("");
+    setPhase("reviewing");
+  }
+
+  function resetAll() {
+    setPhase("idle");
+    setQueue([]);
+    setDecisions([]);
+    setCurrentIdx(0);
+    setTotal(null);
+    setSubmitMsg("");
+  }
+
+  const confirmed  = decisions.filter(d => !d.skipped && d.categoryName).length;
+  const skipped    = decisions.filter(d => d.skipped).length;
+  const progress   = queue.length ? Math.round(((confirmed + skipped) / queue.length) * 100) : 0;
+
+  // ── IDLE ────────────────────────────────────────────────────────────────────
+  if (phase === "idle" || phase === "done") {
+    return (
+      <section className="panel rq-panel">
+        <div className="panel-header">
+          <h2>ตรวจหมวดสินค้า</h2>
+          <p>ยืนยันหมวดของสินค้าที่ระบบยังไม่แน่ใจ — แต่ละรายการใช้เวลาไม่กี่วินาที</p>
+        </div>
+
+        {submitMsg && <p className="notice success compact">{submitMsg}</p>}
+
+        <div className="rq-start-grid">
+          {[
+            { key: "all",          label: "ทั้งหมด",                desc: "รอตรวจ + ต้องทบทวน" },
+            { key: "proposed",     label: "รอตรวจ",                  desc: "ระบบเดาไว้ รอ approve" },
+            { key: "needs_review", label: "ต้องทบทวน",               desc: "ระบบไม่รู้ ต้องหาเอง" },
+          ].map(opt => (
+            <button
+              key={opt.key}
+              type="button"
+              className={`rq-start-card${statusFilter === opt.key ? " active" : ""}`}
+              onClick={() => setStatusFilter(opt.key)}
+            >
+              <strong>{opt.label}</strong>
+              <span>{opt.desc}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="rq-start-actions">
+          <button
+            type="button"
+            className="primary-button"
+            onClick={async () => {
+              const loaded = await loadQueue(statusFilter);
+              if (loaded > 0) {
+                startSession();
+              } else {
+                setSubmitMsg("ไม่พบสินค้าในคิวสำหรับตัวกรองนี้");
+              }
+            }}
+            disabled={loading}
+          >
+            {loading ? "กำลังโหลด..." : "เริ่มตรวจ →"}
+          </button>
+          {totalInQueue !== null && (
+            <span className="rq-queue-count">
+              {totalInQueue.toLocaleString()} รายการในคิว
+            </span>
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  // ── SUMMARY ─────────────────────────────────────────────────────────────────
+  if (phase === "summary") {
+    return (
+      <section className="panel rq-panel">
+        <div className="rq-summary-header">
+          <h2>สรุปก่อนยืนยัน</h2>
+          <p>ตรวจสอบรายการด้านล่าง แก้ไขได้ก่อนกด "ยืนยันทั้งหมด"</p>
+        </div>
+
+        {submitMsg && <p className={`notice ${submitMsg.includes("ผิด") ? "error" : "success"} compact`}>{submitMsg}</p>}
+
+        <div className="rq-summary-stats">
+          <span className="rq-stat good">{confirmed} รายการพร้อม</span>
+          {skipped > 0 && <span className="rq-stat muted">{skipped} ข้าม</span>}
+        </div>
+
+        <div className="rq-summary-list">
+          {decisions.filter(d => !d.skipped).map((d, i) => (
+            <div key={d.productCode} className="rq-summary-row">
+              <span className="rq-summary-name">{d.productNameThai}</span>
+              <span className={`rq-summary-cat${d.isNew ? " new" : ""}`}>
+                {d.categoryName}
+                {d.isNew && <span className="rq-new-badge">ใหม่</span>}
+              </span>
+              <button
+                type="button"
+                className="ghost-button rq-edit-btn"
+                onClick={() => {
+                  setCurrentIdx(i);
+                  setDecisions(prev => prev.filter((_, idx) => idx !== i));
+                  setPhase("reviewing");
+                }}
+              >
+                แก้
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="rq-summary-actions">
+          <button type="button" className="ghost-button" onClick={() => setPhase("reviewing")}>
+            ← กลับตรวจต่อ
+          </button>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={confirmAll}
+            disabled={submitting || confirmed === 0}
+          >
+            {submitting ? "กำลังบันทึก..." : `✓ ยืนยัน ${confirmed} รายการ`}
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  // ── REVIEWING ───────────────────────────────────────────────────────────────
+  if (!product) {
+    return (
+      <section className="panel rq-panel">
+        <p className="empty-state">คิวว่าง — ไม่มีสินค้าที่ต้องตรวจ</p>
+        <button type="button" className="ghost-button" onClick={resetAll}>กลับ</button>
+      </section>
+    );
+  }
+
+  return (
+    <section className="panel rq-panel rq-reviewing">
+      {/* ── top bar ── */}
+      <div className="rq-topbar">
+        <button type="button" className="ghost-button rq-back-btn" onClick={goBack} disabled={currentIdx === 0} title="← กลับ (ArrowLeft)">
+          ←
+        </button>
+        <div className="rq-progress-wrap">
+          <div className="rq-progress-bar" style={{ width: `${progress}%` }} />
+        </div>
+        <span className="rq-counter">{currentIdx + 1} / {queue.length}</span>
+        <button type="button" className="ghost-button rq-summary-btn" onClick={() => setPhase("summary")}>
+          สรุป ({confirmed})
+        </button>
+      </div>
+
+      {/* ── product name ── */}
+      <div className="rq-product">
+        <div className="rq-product-name">{product.productNameThai}</div>
+        {product.productNameEng && <div className="rq-product-eng">{product.productNameEng}</div>}
+        <div className="rq-product-meta">
+          {product.productCode}
+          {product.barcode && <> · {product.barcode}</>}
+          {product.reviewStatus === "proposed" && product.currentCategory && (
+            <span className="rq-proposed-badge">ระบบเดา: {product.currentCategory}</span>
+          )}
+        </div>
+      </div>
+
+      {/* ── category buttons ── */}
+      {!showNewCat && (
+        <div className="rq-options">
+          {filteredOptions.map((opt, i) => (
+            <button
+              key={opt.category_name}
+              type="button"
+              className={`rq-option${opt.category_name === product.currentCategory ? " rq-option-proposed" : ""}`}
+              onClick={() => pickCategory(opt.category_name)}
+              title={opt.similarity ? `${Math.round(opt.similarity * 100)}% similarity` : ""}
+            >
+              <span className="rq-option-key">{i + 1}</span>
+              <span className="rq-option-name">{opt.category_name}</span>
+              {opt.similarity != null && (
+                <span className="rq-option-sim">{Math.round(opt.similarity * 100)}%</span>
+              )}
+            </button>
+          ))}
+          {!filteredOptions.length && (
+            <div className="rq-option-empty">
+              ไม่พบหมวดที่ตรงกับคำค้น ลองพิมพ์คำอื่นหรือสร้างหมวดใหม่
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── search ── */}
+      {!showNewCat && (
+        <div className="rq-search-row">
+          <input
+            ref={searchRef}
+            type="text"
+            className="rq-search"
+            placeholder="/ ค้นหาหมวด..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Escape") { setSearch(""); e.target.blur(); }
+              if (e.key === "Enter" && filteredOptions.length === 1) pickCategory(filteredOptions[0].category_name);
+            }}
+          />
+        </div>
+      )}
+
+      {/* ── new category ── */}
+      {showNewCat ? (
+        <div className="rq-newcat-row">
+          <input
+            ref={newCatRef}
+            type="text"
+            className="rq-search"
+            placeholder="ชื่อหมวดใหม่..."
+            value={newCatName}
+            onChange={e => setNewCatName(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter") createNewCategory();
+              if (e.key === "Escape") { setShowNewCat(false); setNewCatName(""); }
+            }}
+            autoFocus
+          />
+          <button type="button" className="primary-button" onClick={createNewCategory} disabled={!newCatName.trim()}>
+            สร้าง + เลือก
+          </button>
+          <button type="button" className="ghost-button" onClick={() => { setShowNewCat(false); setNewCatName(""); }}>
+            ยกเลิก
+          </button>
+        </div>
+      ) : (
+        <div className="rq-footer-actions">
+          <button type="button" className="ghost-button rq-newcat-btn" onClick={() => { setShowNewCat(true); setTimeout(() => newCatRef.current?.focus(), 50); }} title="N">
+            + สร้างหมวดใหม่
+          </button>
+          <button type="button" className="ghost-button rq-skip-btn" onClick={skipProduct} title="S">
+            ข้ามไปก่อน
+          </button>
+        </div>
+      )}
+
+      {/* ── keyboard hint ── */}
+      <div className="rq-hints">
+        <span>1–9 เลือก</span><span>/ ค้นหา</span><span>N หมวดใหม่</span><span>S ข้าม</span><span>← กลับ</span>
       </div>
     </section>
   );
@@ -1196,7 +2972,7 @@ export default function App() {
   const [view, setView] = useState(() => {
     if (typeof window === "undefined") return "dashboard";
     const savedView = window.localStorage.getItem(adminViewStorageKey);
-    return ["dashboard", "receipts", "branch-stock", "sync-log"].includes(savedView)
+    return ["dashboard", "receipts", "branch-stock", "category-review", "sync-log"].includes(savedView)
       ? savedView
       : "dashboard";
   });
@@ -1441,6 +3217,13 @@ export default function App() {
     const startIndex = (safeCurrentPage - 1) * pageSize;
     return filteredStock.slice(startIndex, startIndex + pageSize);
   }, [filteredStock, pageSize, safeCurrentPage]);
+  const isAdminUser = session?.user?.role === "admin";
+
+  useEffect(() => {
+    if (!isAdminUser && (view === "category-review" || view === "sync-log")) {
+      setView("receipts");
+    }
+  }, [isAdminUser, view]);
 
   if (loading && !session) {
     return (
@@ -1501,13 +3284,24 @@ export default function App() {
           >
             สต็อกสาขา
           </button>
-          <button
-            type="button"
-            className={view === "sync-log" ? "view-nav-btn active" : "view-nav-btn"}
-            onClick={() => setView("sync-log")}
-          >
-            ประวัติ Sync
-          </button>
+          {isAdminUser ? (
+            <>
+              <button
+                type="button"
+                className={view === "category-review" ? "view-nav-btn active" : "view-nav-btn"}
+                onClick={() => setView("category-review")}
+              >
+                ตรวจหมวดสินค้า
+              </button>
+              <button
+                type="button"
+                className={view === "sync-log" ? "view-nav-btn active" : "view-nav-btn"}
+                onClick={() => setView("sync-log")}
+              >
+                ประวัติ Sync
+              </button>
+            </>
+          ) : null}
         </nav>
 
         <div className="account-actions">
@@ -1564,8 +3358,10 @@ export default function App() {
           canViewPrices={session.user.role === "admin"}
         />
       ) : view === "branch-stock" ? (
-        <BranchStockPanel />
-      ) : view === "sync-log" ? (
+        <BranchStockPanel csrfToken={session.csrfToken} isAdminUser={isAdminUser} />
+      ) : view === "category-review" && isAdminUser ? (
+        <ReviewQueuePanel csrfToken={session.csrfToken} />
+      ) : view === "sync-log" && isAdminUser ? (
         <SyncLogPanel />
       ) : (
         <>

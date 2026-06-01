@@ -27,6 +27,20 @@ function makeMockRepo(overrides = {}) {
     }),
     getTransfersByBranch: async () => [],
     ingestRunLog: async () => ({ accepted: 1 }),
+    getCategoryReviewQueue: async () => ({ records: [], pagination: { limit: 25, offset: 0, total: 0 } }),
+    getCategoryMetrics: async () => ({
+      totalProducts: 0,
+      thaiNameCoverage: 0,
+      englishNameCoverage: 0,
+      barcodeCoverage: 0,
+      dummyBarcodeRate: 0,
+    }),
+    refreshProductCategories: async () => ({ processed: 0, confirmed: 0, needsReview: 0, reverify: 0 }),
+    confirmProductCategory: async ({ productCode, cleanCategory, shelfNo = null }) => ({
+      ok: true,
+      productCode,
+      category: shelfNo === null ? cleanCategory : `${shelfNo}${cleanCategory}`,
+    }),
     ...overrides,
   };
 }

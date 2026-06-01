@@ -18,6 +18,12 @@ CREATE TABLE IF NOT EXISTS ingest.sync_runs (
   created_at   timestamptz  NOT NULL DEFAULT now()
 );
 
+ALTER TABLE ingest.sync_runs
+  ADD COLUMN IF NOT EXISTS branch_code text;
+
+ALTER TABLE ingest.sync_runs
+  ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_sync_runs_branch_started
   ON ingest.sync_runs (branch_code, started_at DESC);
 
