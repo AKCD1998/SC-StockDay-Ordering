@@ -932,13 +932,6 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
   const filterMenuRef = useRef(null);
 
   useEffect(() => {
-    if (!isAdminUser) {
-      setMatchReport(null);
-      setReportError("");
-      setLoadingReport(false);
-      return undefined;
-    }
-
     let active = true;
 
     async function loadBranchStock() {
@@ -983,6 +976,13 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
   }, [appliedSearchTerm, refreshKey]);
 
   useEffect(() => {
+    if (!isAdminUser) {
+      setMatchReport(null);
+      setReportError("");
+      setLoadingReport(false);
+      return undefined;
+    }
+
     let active = true;
 
     async function loadMatchReport() {
