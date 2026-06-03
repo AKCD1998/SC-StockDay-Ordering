@@ -2,6 +2,12 @@ import { branches, orderRequests, products, staffAccounts, syncErrors, syncRuns 
 import { buildStockDayRow } from "../stockDay.js";
 import { makeId, normalizeQuery } from "../utils.js";
 
+const MOCK_MEMBERS = [
+  { id: "mem_demo_001", memberCode: "M000001", displayName: "สมชาย ใจดี",  phone: "0831234567", email: "somchai@example.com", currentPoints: 0 },
+  { id: "mem_demo_002", memberCode: "M000002", displayName: "สมหญิง รักดี", phone: "0627966956", email: "somying@example.com", currentPoints: 50 },
+  { id: "mem_demo_003", memberCode: "M000003", displayName: "วิทยา มีสุข",  phone: "0899876543", email: null,                  currentPoints: 120 },
+];
+
 export class MockRepository {
   constructor() {
     this.branches = structuredClone(branches);
@@ -10,6 +16,8 @@ export class MockRepository {
     this.staffAccounts = structuredClone(staffAccounts);
     this.syncRuns = structuredClone(syncRuns);
     this.syncErrors = structuredClone(syncErrors);
+    this.members = structuredClone(MOCK_MEMBERS);
+    this.loyaltyClaims = [];
   }
 
   async getBranches() {
@@ -326,6 +334,59 @@ export class MockRepository {
 
   async getNightlySyncLog(_days) {
     return { dates: [], branches: [], rows: {} };
+  }
+
+  // ── Loyalty ───────────────────────────────────────────────────────────────────
+
+  async searchMembers(query) {
+    const q = normalizeQuery(query);
+    if (!q) return [];
+    return this.members
+      .filter((m) =>
+        [m.phone, m.displayName, m.email, m.memberCode].some((f) =>
+          normalizeQuery(f || "").includes(q),
+        ),
+      )
+      .slice(0, 20);
+  }
+
+  async getMemberById(memberId) {
+    return this.members.find((m) => m.id === memberId) || null;
+  }
+
+  async createLoyaltyClaim(payload) {
+    const { receiptNo, branchCode, memberId, items, totalAmount } = payload;
+
+    const dup = this.loyaltyClaims.find(
+      (c) => c.branchCode === branchCode && c.receiptNo === receiptNo,
+    );
+    if (dup) {
+      const err = new Error("Receipt already claimed.");
+      err.statusCode = 409;
+      throw err;
+    }
+
+    const member = this.members.find((m) => m.id === memberId);
+    if (!member) {
+      const err = new Error("Member not found.");
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const awardedPoints = Math.max(0, Math.floor(Number(totalAmount) / 100));
+    member.currentPoints += awardedPoints;
+
+    const claimId = makeId("clm");
+    this.loyaltyClaims.push({ id: claimId, receiptNo, branchCode, memberId, items });
+
+    return {
+      ok: true,
+      claimId,
+      receiptNo,
+      member: { id: memberId, displayName: member.displayName, currentPoints: member.currentPoints },
+      awardedPoints,
+      newPointsBalance: member.currentPoints,
+    };
   }
 
   async close() {}

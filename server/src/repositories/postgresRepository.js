@@ -8,6 +8,17 @@ import {
 import { buildStockDayRow } from "../stockDay.js";
 import { makeId, normalizeQuery } from "../utils.js";
 
+function mapMemberRow(row) {
+  return {
+    id:            row.id,
+    memberCode:    row.member_code,
+    displayName:   row.display_name,
+    phone:         row.phone || null,
+    email:         row.email || null,
+    currentPoints: Number(row.current_points || 0),
+  };
+}
+
 function mapSearchRow(row) {
   return {
     productCode: row.product_code,
@@ -2093,6 +2104,161 @@ export class PostgresRepository {
     }
 
     return { hours: hourKeys, branches, rows: resultRows };
+  }
+
+  // ── Loyalty: member search ────────────────────────────────────────────────────
+
+  async searchMembers(query) {
+    const q = normalizeQuery(query);
+    if (!q) return [];
+
+    const { rows } = await this.pool.query(
+      `
+      SELECT id, member_code, display_name, first_name, last_name, phone, email, current_points
+      FROM members
+      WHERE LOWER(COALESCE(phone, ''))       LIKE $1
+         OR LOWER(display_name)              LIKE $1
+         OR LOWER(COALESCE(first_name, ''))  LIKE $1
+         OR LOWER(COALESCE(last_name, ''))   LIKE $1
+         OR LOWER(COALESCE(email, ''))       LIKE $1
+         OR LOWER(member_code)               LIKE $1
+         OR LOWER(COALESCE(thai_id, ''))     LIKE $1
+      ORDER BY
+        CASE
+          WHEN LOWER(COALESCE(phone, ''))  = $2 THEN 0
+          WHEN LOWER(member_code)          = $2 THEN 1
+          WHEN LOWER(COALESCE(phone, ''))  LIKE $3 THEN 2
+          ELSE 3
+        END,
+        display_name ASC
+      LIMIT 20
+      `,
+      [`%${q}%`, q, `${q}%`],
+    );
+
+    return rows.map(mapMemberRow);
+  }
+
+  async getMemberById(memberId) {
+    const { rows } = await this.pool.query(
+      `SELECT id, member_code, display_name, first_name, last_name, phone, email, current_points
+       FROM members WHERE id = $1`,
+      [memberId],
+    );
+    return rows[0] ? mapMemberRow(rows[0]) : null;
+  }
+
+  // ── Loyalty: claim creation ───────────────────────────────────────────────────
+
+  async createLoyaltyClaim(payload) {
+    const { receiptNo, branchCode, cashierStaffCode, soldAt, totalAmount, previewPoints, memberId, items } = payload;
+    const awardedPoints = Math.max(0, Math.floor(Number(totalAmount) / 100));
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // Duplicate check
+      const dup = await client.query(
+        `SELECT id FROM loyalty_claims WHERE branch_code = $1 AND receipt_no = $2`,
+        [branchCode, receiptNo],
+      );
+      if (dup.rowCount > 0) {
+        const err = new Error("Receipt already claimed.");
+        err.statusCode = 409;
+        throw err;
+      }
+
+      // Member must exist
+      const memberResult = await client.query(
+        `SELECT id, display_name, current_points FROM members WHERE id = $1`,
+        [memberId],
+      );
+      if (!memberResult.rowCount) {
+        const err = new Error("Member not found.");
+        err.statusCode = 404;
+        throw err;
+      }
+      const member = memberResult.rows[0];
+
+      // Insert claim header
+      const claimId = makeId("clm");
+      await client.query(
+        `INSERT INTO loyalty_claims
+           (id, receipt_no, branch_code, cashier_staff_code, sold_at, total_amount, preview_points, awarded_points, member_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          claimId,
+          receiptNo,
+          branchCode,
+          cashierStaffCode || null,
+          soldAt || null,
+          Number(totalAmount),
+          previewPoints != null ? Number(previewPoints) : null,
+          awardedPoints,
+          memberId,
+        ],
+      );
+
+      // Insert line items
+      for (const item of items) {
+        // eslint-disable-next-line no-await-in-loop
+        await client.query(
+          `INSERT INTO loyalty_claim_items (id, claim_id, product_code, product_name, qty, unit_price, line_total)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            makeId("clm_item"),
+            claimId,
+            String(item.productCode || "").trim() || null,
+            String(item.productName || "").trim() || null,
+            Number(item.qty || 0),
+            Number(item.unitPrice || 0),
+            Number(item.lineTotal || 0),
+          ],
+        );
+      }
+
+      // Update member balance
+      const newBalance = Number(member.current_points) + awardedPoints;
+      await client.query(
+        `UPDATE members SET current_points = $1, updated_at = NOW() WHERE id = $2`,
+        [newBalance, memberId],
+      );
+
+      // Ledger entry
+      await client.query(
+        `INSERT INTO loyalty_point_ledger (id, member_id, claim_id, points_delta, balance_after, event_type, note)
+         VALUES ($1, $2, $3, $4, $5, 'earn', $6)`,
+        [
+          makeId("ledger"),
+          memberId,
+          claimId,
+          awardedPoints,
+          newBalance,
+          `Earned from receipt ${receiptNo}`,
+        ],
+      );
+
+      await client.query("COMMIT");
+
+      return {
+        ok: true,
+        claimId,
+        receiptNo,
+        member: {
+          id: memberId,
+          displayName: member.display_name,
+          currentPoints: newBalance,
+        },
+        awardedPoints,
+        newPointsBalance: newBalance,
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async close() {

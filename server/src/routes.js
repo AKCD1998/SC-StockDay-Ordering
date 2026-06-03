@@ -603,6 +603,53 @@ export function createRouter(repository) {
     res.json(result);
   }));
 
+  // ── Loyalty: member search ────────────────────────────────────────────────────
+  // GET /api/members/search?q=<phone|name|email|memberCode>
+  router.get("/api/members/search", asyncHandler(async (req, res) => {
+    const q = String(req.query.q || "").trim();
+    if (!q) return res.json([]);
+    return res.json(await repository.searchMembers(q));
+  }));
+
+  // ── Loyalty: claim a receipt ──────────────────────────────────────────────────
+  // POST /api/loyalty/claims
+  router.post("/api/loyalty/claims", asyncHandler(async (req, res) => {
+    const body = req.body || {};
+
+    const receiptNo        = String(body.receiptNo        || "").trim();
+    const branchCode       = String(body.branchCode       || "").trim();
+    const memberId         = String(body.memberId         || "").trim();
+    const cashierStaffCode = String(body.cashierStaffCode || "").trim() || null;
+    const soldAt           = body.soldAt  || null;
+    const items            = body.items;
+    const totalAmount      = Number(body.totalAmount);
+    const previewPoints    = body.previewPoints != null ? Number(body.previewPoints) : null;
+
+    if (!receiptNo)                                    return res.status(400).json({ message: "receiptNo is required." });
+    if (!branchCode)                                   return res.status(400).json({ message: "branchCode is required." });
+    if (!memberId)                                     return res.status(400).json({ message: "memberId is required." });
+    if (!Array.isArray(items) || items.length === 0)   return res.status(400).json({ message: "Receipt items are required." });
+    if (!Number.isFinite(totalAmount) || totalAmount < 0) return res.status(400).json({ message: "totalAmount must be a non-negative number." });
+
+    try {
+      const result = await repository.createLoyaltyClaim({
+        receiptNo,
+        branchCode,
+        cashierStaffCode,
+        soldAt,
+        totalAmount,
+        previewPoints,
+        memberId,
+        items,
+      });
+      return res.status(201).json(result);
+    } catch (error) {
+      if (error.statusCode === 409) return res.status(409).json({ message: error.message });
+      if (error.statusCode === 404) return res.status(404).json({ message: error.message });
+      throw error;
+    }
+  }));
+
   router.use((error, _req, res, _next) => {
     console.error(error);
     res.status(500).json({ message: error.message || "Internal server error." });
