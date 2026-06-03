@@ -189,10 +189,121 @@ AdaPosFront active on both `POSSRV` and `FRONT2` during the test.
 
 ---
 
-## Open Questions
+## Open Questions (resolved in follow-up below)
 
-1. What is the printed receipt number from the test transaction?
-2. Does `TPSTHoldHD` exist in this DB, and does it have a row from today?
-3. Does `SELECT TOP 1 FDDateIns FROM TPSTSalHD ORDER BY FDDateIns DESC` return `2026-...` or `2569-...`?
-4. Is the watcher querying by `FDDateIns > threshold` or `FDShdDocDate`? If the cashier date is different from insert date, the filter could miss rows.
-5. Was the transaction definitely completed (payment confirmed, receipt printed) or was it possibly left on hold?
+1. What is the printed receipt number from the test transaction? → `S2606005001-0000645`
+2. Does `TPSTHoldHD` exist? → Yes but doc not there
+3. Is FDDateIns 2026 or 2569? → 2026 (Gregorian)
+4. Was the transaction completed? → Yes — receipt printed, PromptPay confirmed
+
+---
+
+## Follow-Up Findings — Same Session
+
+### Receipt Found In Unexpected Tables
+
+`S2606005001-0000645` located in:
+- ✅ `TSHD001` — sale header (complete, `FTShdStaPaid='3'`, `FCShdGrand=2`, `FDDateIns=2026-06-03`)
+- ✅ `TSDT001` — sale detail (product `630020242`, `ปกติ ทัมใจ 1 ซอง`, qty 1, net 2)
+- ✅ `TSRC001` — payment row (`FTRcvCode='013'`, `FTRcvName='พร้อมเพย์'`, `FTSrcRef=0603094445...`, `FCSrcNet=2`)
+- ✅ `TPSTmpFSlipDT` — temp full-slip detail (also present)
+
+NOT in: `TPSTSalHD`, `TPSTSalDT`, `TPSTSalRC`, `TPSTHoldHD`, `TPSTmpFSlipHD`
+
+### Root Cause — Per-Register Physical Tables
+
+**AdaPos uses per-register physical table families, not one shared sale table.**
+
+| POS | Header | Detail | Payment |
+|---|---|---|---|
+| 001 | `TSHD001` | `TSDT001` | `TSRC001` |
+| 002 | `TSHD002` | `TSDT002` | `TSRC002` |
+
+`TPSTSalHD/DT/RC` appears to be a centralized or processed view, not the live local write target for individual POS registers.
+
+**This was NOT discovered in the NB-005-01 expedition because that machine only observed back-office data from POS terminal 002. Terminal 001 (FRONT2) uses TSHD001.**
+
+### Watcher Fix Applied By Codex
+
+`AdaPosWatcher.cs` updated to:
+- Auto-discover live `TSHDxxx / TSDTxxx / TSRCxxx` table sets by POS code
+- Fall back to `TPSTSal*` if per-register tables not found
+- Each detected receipt carries its source table context for downstream fetches
+
+`ReceiptWorkflowStore.cs` — durable queue serializer fixed (`receipt-queue.json` was failing).
+
+Build: Release, 0 errors, 0 warnings.
+
+### Watcher Now Working — But New Blocker
+
+After fix:
+- `runtime.log` shows: `Receipt detected: doc=S2606005001-0000647`, `...0648`
+- `receipt-queue.json` persisting receipts correctly
+- Retries running
+
+**But backend returns: `Sale event not found`** on `/internal/crm/pos/claim-token`
+
+---
+
+## Root Cause Of "Sale event not found"
+
+**This is an architecture gap, not a bug in SCCRMonPOS.**
+
+The CRM backend (`sc-official-website.onrender.com`) validates sale events before issuing claim tokens. It does this by looking up the sale in its own database — which is populated by:
+
+```
+Branch POSSRV\SQLEXPRESS (local TSHD001)
+    ↓ [NOT synced directly]
+    ↓ AdaSky.exe FTP → central WIN-N8RL1PCFEDO\SQLEXPRESS
+    ↓ adapos-sync reads central → SC-StockDay PostgreSQL
+    ↓ CRM backend looks up sale here
+```
+
+The sale `S2606005001-0000645` is:
+- ✅ committed locally on `POSSRV\SQLEXPRESS` in `TSHD001`
+- ❌ NOT yet synced to central (FTP is manual, lag = hours to days)
+- ❌ NOT in the CRM backend DB
+
+**So the backend correctly says "Sale event not found" — it hasn't received the sale yet.**
+
+This gap was known in the expedition: *"Central sync is manual and laggy by design"* and *"Branch-local SQL after commit = seconds; central after FTP sync = hours to days."*
+
+---
+
+## What Must Change
+
+The CRM claim-token flow needs to be decoupled from the central-sync lag.
+
+**Option A (recommended): SCCRMonPOS pushes sale data directly to CRM backend before claiming.**
+
+```
+SCCRMonPOS detects receipt in TSHD001
+    ↓
+POST /internal/crm/pos/sale-event  ← NEW endpoint
+  { docNo, branchCode, posCode, grand, tender, items[], timestamp }
+    ↓
+Backend stores the sale event locally (not waiting for FTP)
+    ↓
+POST /internal/crm/pos/claim-token  ← existing endpoint
+  { docNo, memberCardId }
+    ↓
+Backend finds the sale → issues token → shows popup
+```
+
+**Option B: Remove sale-event validation from claim-token.**
+Backend trusts SCCRMonPOS's assertion. Lower safety but simpler. Suitable if fraud risk is acceptable.
+
+**Option C: Make FTP sync automatic/scheduled.**
+Reduces lag but doesn't solve the real-time problem (minutes vs seconds).
+
+---
+
+## Next Debug Step
+
+Inspect the exact payload SCCRMonPOS sends to `/internal/crm/pos/claim-token`:
+- What fields does it send?
+- What does the backend expect?
+- Is `docNo` in the format `S2606005001-0000645` or stripped/reformatted?
+- Does the backend try to look up by `docNo` alone, or `docNo + branchCode + posCode`?
+
+Check `ApiClient.cs` claim-token method and compare with backend route handler.
