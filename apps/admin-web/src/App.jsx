@@ -23,6 +23,11 @@ import tmanLogoUrl from "./assets/tman-logo.svg";
 import berlinpharmLogoUrl from "./assets/berlinpharm-logo.svg";
 import anbLabLogoUrl from "./assets/anb-lab-logo.svg";
 import pacificHealthcareLogoUrl from "./assets/pacific-healthcare-logo.svg";
+import greaterPharmaLogoUrl from "./assets/greater-pharma-logo.svg";
+import siamPharmaceuticalLogoUrl from "./assets/siam-pharmaceutical-logo.svg";
+import rxchumchonLogoUrl from "./assets/rxchumchon-logo.svg";
+import woothiLogoUrl from "./assets/woothi-logo.svg";
+import orexTradingLogoUrl from "./assets/orex-trading-logo.svg";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const adminViewStorageKey = "sc-stockday-admin-view";
@@ -369,6 +374,57 @@ const SUPPLIER_BRANDS = [
       "PACIFIC HEALTHCARE",
       "PACIFIC HEALTH CARE",
       "PACIFIC HEALTHCARE THAILAND",
+    ],
+  },
+  {
+    key: "greater-pharma",
+    wordmark: "GREATER",
+    tagline: "PHARMA",
+    logoSrc: greaterPharmaLogoUrl,
+    patterns: ["เกร๊ตเตอร์ ฟาร์ม่า", "GREATER PHARMA", "GREATER"],
+  },
+  {
+    key: "siam-pharmaceutical",
+    wordmark: "SIAM",
+    tagline: "PHARMACEUTICAL",
+    logoSrc: siamPharmaceuticalLogoUrl,
+    patterns: ["เภสัช สยาม", "SIAM PHARMACEUTICAL", "SIAM"],
+  },
+  {
+    key: "rxchumchon",
+    wordmark: "RXCHUMCHON",
+    tagline: "",
+    logoSrc: rxchumchonLogoUrl,
+    patterns: [
+      "บริษัท ชุมชนเภสัชกรรม จำกัด (มหาชน)",
+      "ชุมชนเภสัชกรรม",
+      "RXCHUMCHON",
+      "RX CHUMCHON",
+    ],
+  },
+  {
+    key: "woothi-interdrugs",
+    wordmark: "WOOTHI",
+    tagline: "INTERDRUGS 2010",
+    logoSrc: woothiLogoUrl,
+    patterns: [
+      "บริษัท วุฒิ อินเตอร์ดรักส์ 2010 จำกัด",
+      "วุฒิ อินเตอร์ดรักส์ 2010",
+      "วุฒิ อินเตอร์ดรักส์",
+      "WOOTHI INTERDRUGS 2010",
+      "WOOTHI",
+    ],
+  },
+  {
+    key: "orex-trading",
+    wordmark: "OREX",
+    tagline: "TRADING",
+    logoSrc: orexTradingLogoUrl,
+    patterns: [
+      "บริษัท โอเร็กซ์ เทรดดิ้ง จำกัด (สำนักงานใหญ่)",
+      "โอเร็กซ์ เทรดดิ้ง",
+      "OREX TRADING",
+      "OCL",
     ],
   },
 ];
