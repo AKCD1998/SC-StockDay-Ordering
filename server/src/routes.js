@@ -186,6 +186,31 @@ function validateBranchStockSyncToken(req) {
   return null;
 }
 
+function validatePosApiKey(req) {
+  const configuredToken = config.posApiKey;
+  if (!configuredToken) {
+    return "POS_API_KEY is not configured on the server.";
+  }
+
+  const headerToken = String(req.headers["x-pos-api-key"] || "").trim();
+  if (!headerToken || headerToken !== configuredToken) {
+    return "Unauthorized POS API key.";
+  }
+
+  return null;
+}
+
+function normalizeMemberUpdatePayload(body) {
+  return {
+    displayName: String(body?.name || "").trim(),
+    phone: String(body?.phone || "").trim() || null,
+    email: String(body?.email || "").trim() || null,
+    sex: String(body?.sex || "").trim().toLowerCase() || null,
+    dob: String(body?.dob || "").trim() || null,
+    remark: String(body?.remark || "").trim(),
+  };
+}
+
 function validateAndNormalizeBranchStockRecords(body) {
   if (!body || !Array.isArray(body.records)) {
     return { error: "Payload must include a records array.", records: [] };
@@ -609,6 +634,45 @@ export function createRouter(repository) {
     const q = String(req.query.q || "").trim();
     if (!q) return res.json([]);
     return res.json(await repository.searchMembers(q));
+  }));
+
+  // GET /api/members/:id
+  router.get("/api/members/:id", asyncHandler(async (req, res) => {
+    const authError = validatePosApiKey(req);
+    if (authError) return res.status(401).json({ message: authError });
+
+    const memberId = String(req.params.id || "").trim();
+    if (!memberId) return res.status(400).json({ message: "Member id is required." });
+
+    const member = await repository.getMemberById(memberId);
+    if (!member) return res.status(404).json({ message: "Member not found." });
+
+    return res.json(member);
+  }));
+
+  // PUT /api/members/:id
+  router.put("/api/members/:id", asyncHandler(async (req, res) => {
+    const authError = validatePosApiKey(req);
+    if (authError) return res.status(401).json({ message: authError });
+
+    const memberId = String(req.params.id || "").trim();
+    if (!memberId) return res.status(400).json({ message: "Member id is required." });
+
+    const payload = normalizeMemberUpdatePayload(req.body || {});
+    if (!payload.displayName) {
+      return res.status(400).json({ message: "name is required." });
+    }
+    if (payload.sex && !["male", "female", "other"].includes(payload.sex)) {
+      return res.status(400).json({ message: "sex must be one of: male, female, other." });
+    }
+    if (payload.dob && !/^\d{4}-\d{2}-\d{2}$/.test(payload.dob)) {
+      return res.status(400).json({ message: "dob must be in YYYY-MM-DD format." });
+    }
+
+    const member = await repository.updateMemberById(memberId, payload);
+    if (!member) return res.status(404).json({ message: "Member not found." });
+
+    return res.json(member);
   }));
 
   // ── Loyalty: claim a receipt ──────────────────────────────────────────────────

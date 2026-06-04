@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
 import { createServer } from "node:http";
+import { config } from "../config.js";
 import { createRouter } from "../routes.js";
 import { MockRepository } from "../repositories/mockRepository.js";
 
@@ -35,6 +36,17 @@ async function request(url, { method = "GET", body } = {}) {
   return { status: res.status, body: json };
 }
 
+async function requestWithHeaders(url, { method = "GET", body, headers = {} } = {}) {
+  const opts = {
+    method,
+    headers: { "Content-Type": "application/json", ...headers },
+  };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  const json = await res.json().catch(() => null);
+  return { status: res.status, body: json };
+}
+
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
 const VALID_CLAIM = {
@@ -50,6 +62,12 @@ const VALID_CLAIM = {
     { productCode: "P002", productName: "Product B", qty: 1, unitPrice: 110, lineTotal: 110 },
   ],
 };
+
+const POS_API_KEY = "test-pos-key";
+
+test.beforeEach(() => {
+  config.posApiKey = POS_API_KEY;
+});
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -103,6 +121,87 @@ test("GET /api/members/search — partial name match returns array", async () =>
     assert.equal(status, 200);
     assert.ok(Array.isArray(body));
     assert.ok(body.length >= 1);
+  } finally {
+    await stopServer(server);
+  }
+});
+
+test("GET /api/members/:id — requires x-pos-api-key", async () => {
+  const repo = new MockRepository();
+  const { server, url } = await startServer(repo);
+  try {
+    const { status, body } = await request(`${url}/api/members/mem_demo_001`);
+    assert.equal(status, 401);
+    assert.equal(body.message, "Unauthorized POS API key.");
+  } finally {
+    await stopServer(server);
+  }
+});
+
+test("GET /api/members/:id — returns member by id when x-pos-api-key is valid", async () => {
+  const repo = new MockRepository();
+  const { server, url } = await startServer(repo);
+  try {
+    const { status, body } = await requestWithHeaders(`${url}/api/members/mem_demo_002`, {
+      headers: { "x-pos-api-key": POS_API_KEY },
+    });
+    assert.equal(status, 200);
+    assert.equal(body.id, "mem_demo_002");
+    assert.equal(body.memberCode, "M000002");
+    assert.equal(body.phone, "0627966956");
+  } finally {
+    await stopServer(server);
+  }
+});
+
+test("PUT /api/members/:id — updates editable fields by id with x-pos-api-key", async () => {
+  const repo = new MockRepository();
+  const { server, url } = await startServer(repo);
+  try {
+    const payload = {
+      name: "Chavit Ditsataporn",
+      phone: "0627966956",
+      email: "auukunn.bkk@gmail.com",
+      sex: "male",
+      dob: "1998-05-05",
+      remark: "",
+    };
+    const { status, body } = await requestWithHeaders(`${url}/api/members/mem_demo_002`, {
+      method: "PUT",
+      headers: { "x-pos-api-key": POS_API_KEY },
+      body: payload,
+    });
+    assert.equal(status, 200);
+    assert.equal(body.id, "mem_demo_002");
+    assert.equal(body.displayName, payload.name);
+    assert.equal(body.phone, payload.phone);
+    assert.equal(body.email, payload.email);
+    assert.equal(body.sex, payload.sex);
+    assert.equal(body.dob, payload.dob);
+    assert.equal(body.remark, payload.remark);
+  } finally {
+    await stopServer(server);
+  }
+});
+
+test("PUT /api/members/:id — returns 404 for unknown id instead of matching memberCode or other fields", async () => {
+  const repo = new MockRepository();
+  const { server, url } = await startServer(repo);
+  try {
+    const { status, body } = await requestWithHeaders(`${url}/api/members/M000002`, {
+      method: "PUT",
+      headers: { "x-pos-api-key": POS_API_KEY },
+      body: {
+        name: "Wrong Lookup",
+        phone: "000",
+        email: "wrong@example.com",
+        sex: "male",
+        dob: "1998-05-05",
+        remark: "",
+      },
+    });
+    assert.equal(status, 404);
+    assert.equal(body.message, "Member not found.");
   } finally {
     await stopServer(server);
   }

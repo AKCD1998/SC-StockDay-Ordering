@@ -36,5 +36,6 @@ export const config = {
     /render\.com/i.test(env.DATABASE_URL || ""),
   defaultPeriodDays: Number(env.DEFAULT_PERIOD_DAYS || 30),
   branchStockSyncToken: env.BRANCH_STOCK_SYNC_TOKEN || "",
+  posApiKey: env.POS_API_KEY || env.BRANCH_STOCK_SYNC_TOKEN || "",
   isMockMode: dataMode === "mock",
 };

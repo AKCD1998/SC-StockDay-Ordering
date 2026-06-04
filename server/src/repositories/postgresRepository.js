@@ -15,6 +15,9 @@ function mapMemberRow(row) {
     displayName:   row.display_name,
     phone:         row.phone || null,
     email:         row.email || null,
+    sex:           row.sex || null,
+    dob:           row.dob || null,
+    remark:        row.remark || "",
     currentPoints: Number(row.current_points || 0),
   };
 }
@@ -2141,9 +2144,37 @@ export class PostgresRepository {
 
   async getMemberById(memberId) {
     const { rows } = await this.pool.query(
-      `SELECT id, member_code, display_name, first_name, last_name, phone, email, current_points
+      `SELECT id, member_code, display_name, first_name, last_name, phone, email, sex, dob, remark, current_points
        FROM members WHERE id = $1`,
       [memberId],
+    );
+    return rows[0] ? mapMemberRow(rows[0]) : null;
+  }
+
+  async updateMemberById(memberId, payload) {
+    const { rows } = await this.pool.query(
+      `
+      UPDATE members
+      SET
+        display_name = $2,
+        phone = $3,
+        email = $4,
+        sex = $5,
+        dob = $6,
+        remark = $7,
+        updated_at = NOW()
+      WHERE id = $1
+      RETURNING id, member_code, display_name, first_name, last_name, phone, email, sex, dob, remark, current_points
+      `,
+      [
+        memberId,
+        payload.displayName,
+        payload.phone,
+        payload.email,
+        payload.sex,
+        payload.dob,
+        payload.remark,
+      ],
     );
     return rows[0] ? mapMemberRow(rows[0]) : null;
   }

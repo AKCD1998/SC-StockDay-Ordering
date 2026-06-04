@@ -9,11 +9,18 @@ CREATE TABLE IF NOT EXISTS members (
   last_name       TEXT,
   phone           TEXT,
   email           TEXT,
+  sex             TEXT,
+  dob             DATE,
+  remark          TEXT NOT NULL DEFAULT '',
   thai_id         TEXT,
   current_points  INTEGER NOT NULL DEFAULT 0,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE members ADD COLUMN IF NOT EXISTS sex TEXT;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS dob DATE;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS remark TEXT NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS idx_members_phone       ON members (phone);
 CREATE INDEX IF NOT EXISTS idx_members_email       ON members (LOWER(email));

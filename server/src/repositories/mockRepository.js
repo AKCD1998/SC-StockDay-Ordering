@@ -3,9 +3,9 @@ import { buildStockDayRow } from "../stockDay.js";
 import { makeId, normalizeQuery } from "../utils.js";
 
 const MOCK_MEMBERS = [
-  { id: "mem_demo_001", memberCode: "M000001", displayName: "สมชาย ใจดี",  phone: "0831234567", email: "somchai@example.com", currentPoints: 0 },
-  { id: "mem_demo_002", memberCode: "M000002", displayName: "สมหญิง รักดี", phone: "0627966956", email: "somying@example.com", currentPoints: 50 },
-  { id: "mem_demo_003", memberCode: "M000003", displayName: "วิทยา มีสุข",  phone: "0899876543", email: null,                  currentPoints: 120 },
+  { id: "mem_demo_001", memberCode: "M000001", displayName: "สมชาย ใจดี",  phone: "0831234567", email: "somchai@example.com", sex: null, dob: null, remark: "", currentPoints: 0 },
+  { id: "mem_demo_002", memberCode: "M000002", displayName: "สมหญิง รักดี", phone: "0627966956", email: "somying@example.com", sex: null, dob: null, remark: "", currentPoints: 50 },
+  { id: "mem_demo_003", memberCode: "M000003", displayName: "วิทยา มีสุข",  phone: "0899876543", email: null,                  sex: null, dob: null, remark: "", currentPoints: 120 },
 ];
 
 export class MockRepository {
@@ -352,6 +352,20 @@ export class MockRepository {
 
   async getMemberById(memberId) {
     return this.members.find((m) => m.id === memberId) || null;
+  }
+
+  async updateMemberById(memberId, payload) {
+    const member = this.members.find((m) => m.id === memberId);
+    if (!member) return null;
+
+    member.displayName = payload.displayName;
+    member.phone = payload.phone;
+    member.email = payload.email;
+    member.sex = payload.sex;
+    member.dob = payload.dob;
+    member.remark = payload.remark;
+
+    return structuredClone(member);
   }
 
   async createLoyaltyClaim(payload) {
