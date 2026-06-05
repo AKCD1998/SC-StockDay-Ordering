@@ -9,3 +9,4 @@ npm-debug.log*
 output/
 SESSION_SUMMARY_*.md
 .claude/
+apps/adapos-sync/logs/
