@@ -250,22 +250,28 @@ button {
 .movement-checkbox {
   display: inline-flex;
   flex-direction: row;
-  gap: 8px;
+  gap: 7px;
   align-items: center;
   justify-content: center;
   width: fit-content;
-  min-height: 36px;
-  padding: 7px 10px;
+  min-height: 34px;
+  padding: 7px 11px;
   border: 1px solid #d7dfeb;
   border-radius: 999px;
   background: #fff;
-  line-height: 1.2;
+  font-family: Inter, "Segoe UI", "Noto Sans Thai", Arial, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1;
   white-space: nowrap;
 }
 
 .movement-checkbox input {
   flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
   margin: 0;
+  accent-color: #8b5cf6;
 }
 
 .movement-kpis {
