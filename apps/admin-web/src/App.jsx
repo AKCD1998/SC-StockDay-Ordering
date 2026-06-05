@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dkshLogoUrl from "./assets/dksh.svg";
 import hansaLogoUrl from "./assets/hansa-logo.png";
 import tnpHealthcareLogoUrl from "./assets/tnp-healthcare-logo.svg";
@@ -467,6 +467,579 @@ async function apiFetch(path, options = {}) {
       ...(options.headers || {}),
     },
   });
+}
+
+function parsePastedProductCodes(value) {
+  const seen = new Set();
+  const duplicates = [];
+  const skipped = [];
+  const productCodes = [];
+
+  String(value || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .forEach((code) => {
+      if (!code || code.toUpperCase() === "#N/A") {
+        if (code) skipped.push(code);
+        return;
+      }
+      if (seen.has(code)) {
+        duplicates.push(code);
+        return;
+      }
+      seen.add(code);
+      productCodes.push(code);
+    });
+
+  return { productCodes, duplicates, skipped };
+}
+
+function movementTypeLabel(type) {
+  if (type === "transfer_in") return "รับโอนเข้า";
+  if (type === "transfer_out") return "โอนออก";
+  if (type === "supplier_receipt") return "ซื้อ Supplier";
+  if (type === "sales_summary") return "ยอดขายรวม";
+  return type || "-";
+}
+
+function movementTypeClass(type) {
+  if (type === "transfer_in") return "good";
+  if (type === "transfer_out") return "warning";
+  if (type === "supplier_receipt") return "muted";
+  if (type === "sales_summary") return "danger";
+  return "muted";
+}
+
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function daysAgoIsoDate(days) {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
+function ProductMovementTracePanel({ branchCode, csrfToken }) {
+  const [pasteText, setPasteText] = useState("");
+  const [selectedCodes, setSelectedCodes] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [options, setOptions] = useState({ categories: [], brands: [], branches: [] });
+  const [groups, setGroups] = useState([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState([]);
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedBrands, setSelectedBrands] = useState([]);
+  const [selectedBranch, setSelectedBranch] = useState(branchCode || "005");
+  const [dateFrom, setDateFrom] = useState(daysAgoIsoDate(30));
+  const [dateTo, setDateTo] = useState(todayIsoDate());
+  const [movementTypes, setMovementTypes] = useState(["transfer_in", "transfer_out", "supplier_receipt", "sales_summary"]);
+  const [result, setResult] = useState(null);
+  const [loadingTrace, setLoadingTrace] = useState(false);
+  const [error, setError] = useState("");
+  const [expanded, setExpanded] = useState({});
+  const [groupName, setGroupName] = useState("");
+  const [groupDescription, setGroupDescription] = useState("");
+  const [editingGroupId, setEditingGroupId] = useState("");
+  const [savingGroup, setSavingGroup] = useState(false);
+  const pasteStats = useMemo(() => parsePastedProductCodes(pasteText), [pasteText]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadOptions() {
+      try {
+        const [optionsResponse, groupsResponse] = await Promise.all([
+          apiFetch("/api/admin/product-movement-options"),
+          apiFetch("/api/admin/product-movement-groups"),
+        ]);
+        if (!optionsResponse.ok || !groupsResponse.ok) throw new Error("โหลดตัวเลือกการสืบค้นไม่สำเร็จ");
+        const [optionsData, groupsData] = await Promise.all([optionsResponse.json(), groupsResponse.json()]);
+        if (!active) return;
+        setOptions(optionsData);
+        setGroups(groupsData.groups || []);
+      } catch (loadError) {
+        if (active) setError(loadError.message || "โหลดตัวเลือกการสืบค้นไม่สำเร็จ");
+      }
+    }
+    loadOptions();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return undefined;
+    }
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      setSearching(true);
+      try {
+        const response = await apiFetch(`/api/products/search?q=${encodeURIComponent(searchQuery.trim())}`);
+        if (!response.ok) throw new Error("ค้นหาสินค้าไม่สำเร็จ");
+        const data = await response.json();
+        if (active) setSearchResults(Array.isArray(data) ? data.slice(0, 8) : []);
+      } catch (_error) {
+        if (active) setSearchResults([]);
+      } finally {
+        if (active) setSearching(false);
+      }
+    }, 260);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [searchQuery]);
+
+  function mergeCodes(codes) {
+    setSelectedCodes((current) => {
+      const seen = new Set(current);
+      const next = [...current];
+      codes.forEach((code) => {
+        if (!seen.has(code)) {
+          seen.add(code);
+          next.push(code);
+        }
+      });
+      return next;
+    });
+  }
+
+  function applyPasteList() {
+    mergeCodes(pasteStats.productCodes);
+  }
+
+  function removeCode(code) {
+    setSelectedCodes((current) => current.filter((item) => item !== code));
+  }
+
+  function toggleArrayValue(setter, value) {
+    setter((current) => (
+      current.includes(value)
+        ? current.filter((item) => item !== value)
+        : [...current, value]
+    ));
+  }
+
+  async function runTrace() {
+    setLoadingTrace(true);
+    setError("");
+    try {
+      const response = await apiFetch("/api/admin/product-movement-trace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_codes: selectedCodes,
+          saved_group_ids: selectedGroupIds,
+          category_names: selectedCategories,
+          brand_names: selectedBrands,
+          branch_code: selectedBranch,
+          date_from: dateFrom,
+          date_to: dateTo,
+          movement_types: movementTypes,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || data.message || "สืบค้นการเคลื่อนไหวไม่สำเร็จ");
+      setResult(data);
+      setExpanded({});
+    } catch (traceError) {
+      setError(traceError.message || "สืบค้นการเคลื่อนไหวไม่สำเร็จ");
+    } finally {
+      setLoadingTrace(false);
+    }
+  }
+
+  async function saveCurrentGroup() {
+    setSavingGroup(true);
+    setError("");
+    try {
+      const path = editingGroupId
+        ? `/api/admin/product-movement-groups/${editingGroupId}`
+        : "/api/admin/product-movement-groups";
+      const response = await apiFetch(path, {
+        method: editingGroupId ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken || "",
+        },
+        body: JSON.stringify({
+          name: groupName,
+          description: groupDescription,
+          product_codes: selectedCodes,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || data.message || "บันทึกกลุ่มไม่สำเร็จ");
+      const groupsResponse = await apiFetch("/api/admin/product-movement-groups");
+      const groupsData = await groupsResponse.json();
+      setGroups(groupsData.groups || []);
+      setGroupName("");
+      setGroupDescription("");
+      setEditingGroupId("");
+    } catch (saveError) {
+      setError(saveError.message || "บันทึกกลุ่มไม่สำเร็จ");
+    } finally {
+      setSavingGroup(false);
+    }
+  }
+
+  async function deleteEditingGroup() {
+    if (!editingGroupId) return;
+    setSavingGroup(true);
+    setError("");
+    try {
+      const response = await apiFetch(`/api/admin/product-movement-groups/${editingGroupId}`, {
+        method: "DELETE",
+        headers: {
+          "X-CSRF-Token": csrfToken || "",
+        },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || data.message || "ลบกลุ่มไม่สำเร็จ");
+      const groupsResponse = await apiFetch("/api/admin/product-movement-groups");
+      const groupsData = await groupsResponse.json();
+      setGroups(groupsData.groups || []);
+      setSelectedGroupIds((current) => current.filter((id) => String(id) !== String(editingGroupId)));
+      setEditingGroupId("");
+      setGroupName("");
+      setGroupDescription("");
+    } catch (deleteError) {
+      setError(deleteError.message || "ลบกลุ่มไม่สำเร็จ");
+    } finally {
+      setSavingGroup(false);
+    }
+  }
+
+  const products = result?.products || [];
+  const totalSummary = products.reduce((summary, product) => {
+    summary.transferIn += Number(product.summary?.transfer_in_qty || 0);
+    summary.transferOut += Number(product.summary?.transfer_out_qty || 0);
+    summary.supplierReceipt += Number(product.summary?.supplier_receipt_qty || 0);
+    summary.sold += Number(product.summary?.sold_qty_base || 0);
+    summary.net += Number(product.summary?.net_movement_qty || 0);
+    return summary;
+  }, { transferIn: 0, transferOut: 0, supplierReceipt: 0, sold: 0, net: 0 });
+
+  return (
+    <section className="panel movement-panel">
+      <div className="panel-header stacked">
+        <div>
+          <p className="eyebrow">Product Movement Trace</p>
+          <h2>สืบค้นการเคลื่อนไหวสินค้า</h2>
+          <p>ดูรับเข้า โอนออก ซื้อ Supplier และยอดขายรวมตามช่วงเวลาในหน้าเดียว</p>
+        </div>
+      </div>
+
+      <div className="notice movement-warning">
+        ยอดขายเป็นข้อมูลสรุปรวมตามช่วง ไม่ใช่รายบิล จึงไม่สามารถบอกวันที่ขายจริงต่อ transaction ได้ในหน้านี้
+      </div>
+
+      <div className="movement-layout">
+        <section className="movement-controls">
+          <div className="movement-control-block">
+            <label>
+              Paste รหัสสินค้า จาก Excel คอลัมน์เดียว
+              <textarea
+                value={pasteText}
+                onChange={(event) => setPasteText(event.target.value)}
+                rows={7}
+                placeholder={"IC-002833\nIC-000193\n#N/A\nIC-003501"}
+              />
+            </label>
+            <div className="movement-inline-actions">
+              <button type="button" className="primary-button" onClick={applyPasteList}>
+                เพิ่มจาก Paste
+              </button>
+              <span className="meta-line">
+                {pasteStats.productCodes.length} รายการ
+                {pasteStats.duplicates.length ? ` · ซ้ำ ${pasteStats.duplicates.length}` : ""}
+              </span>
+            </div>
+          </div>
+
+          <div className="movement-control-block">
+            <label>
+              Search-add สินค้า
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="ค้นรหัสสินค้า ชื่อสินค้า หรือ barcode"
+              />
+            </label>
+            <div className="movement-search-results">
+              {searching ? <p className="meta-line">กำลังค้นหา...</p> : null}
+              {searchResults.map((item) => (
+                <button
+                  key={item.productCode}
+                  type="button"
+                  className="movement-search-item"
+                  onClick={() => mergeCodes([item.productCode])}
+                >
+                  <strong>{item.productCode}</strong>
+                  <span>{item.productName}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="movement-control-block">
+            <label>
+              Saved Groups
+              <select
+                value=""
+                onChange={(event) => {
+                  const id = Number(event.target.value);
+                  if (id) toggleArrayValue(setSelectedGroupIds, id);
+                }}
+              >
+                <option value="">เลือกกลุ่มสินค้า</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name} ({group.productCodes.length})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="movement-chip-list">
+              {selectedGroupIds.map((id) => {
+                const group = groups.find((item) => item.id === id);
+                return (
+                  <button key={id} type="button" className="movement-chip" onClick={() => toggleArrayValue(setSelectedGroupIds, id)}>
+                    {group?.name || id} ×
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="movement-control-block">
+            <label>
+              แก้ไขกลุ่มเดิม หรือสร้างกลุ่มใหม่
+              <select
+                value={editingGroupId}
+                onChange={(event) => {
+                  const nextId = event.target.value;
+                  setEditingGroupId(nextId);
+                  const group = groups.find((item) => String(item.id) === String(nextId));
+                  if (group) {
+                    setGroupName(group.name);
+                    setGroupDescription(group.description || "");
+                    setSelectedCodes(group.productCodes || []);
+                  } else {
+                    setGroupName("");
+                    setGroupDescription("");
+                  }
+                }}
+              >
+                <option value="">สร้างกลุ่มใหม่</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <input value={groupName} onChange={(event) => setGroupName(event.target.value)} placeholder="ชื่อกลุ่ม เช่น ยาความดัน" />
+            <input value={groupDescription} onChange={(event) => setGroupDescription(event.target.value)} placeholder="คำอธิบาย optional" />
+            <div className="movement-inline-actions">
+              <button type="button" className="ghost-button" disabled={savingGroup || !groupName.trim() || selectedCodes.length === 0} onClick={saveCurrentGroup}>
+                {savingGroup ? "กำลังบันทึก..." : editingGroupId ? "Update Group" : "Save Group"}
+              </button>
+              {editingGroupId ? (
+                <button type="button" className="ghost-button" disabled={savingGroup} onClick={deleteEditingGroup}>
+                  Delete
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </section>
+
+        <section className="movement-main">
+          <div className="movement-filter-grid">
+            <label>
+              สาขา
+              <select value={selectedBranch} onChange={(event) => setSelectedBranch(event.target.value)}>
+                <option value="">ทุกสาขา</option>
+                {(options.branches || []).map((branch) => (
+                  <option key={branch.branchCode} value={branch.branchCode}>
+                    {branch.branchCode} {branch.branchName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              จากวันที่
+              <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+            </label>
+            <label>
+              ถึงวันที่
+              <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+            </label>
+          </div>
+
+          <div className="movement-filter-grid">
+            <label>
+              Category
+              <select value="" onChange={(event) => event.target.value && toggleArrayValue(setSelectedCategories, event.target.value)}>
+                <option value="">เลือกหมวดสินค้า</option>
+                {(options.categories || []).map((category) => (
+                  <option key={category.name} value={category.name}>
+                    {category.name} ({category.productCount})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Brand / Supplier Code
+              <select value="" onChange={(event) => event.target.value && toggleArrayValue(setSelectedBrands, event.target.value)}>
+                <option value="">เลือก brand/supplier</option>
+                {(options.brands || []).map((brand) => (
+                  <option key={brand.name} value={brand.name}>
+                    {brand.name} ({brand.productCount})
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="movement-chip-list">
+            {selectedCodes.map((code) => (
+              <button key={code} type="button" className="movement-chip" onClick={() => removeCode(code)}>
+                {code} ×
+              </button>
+            ))}
+            {selectedCategories.map((name) => (
+              <button key={name} type="button" className="movement-chip movement-chip-category" onClick={() => toggleArrayValue(setSelectedCategories, name)}>
+                {name} ×
+              </button>
+            ))}
+            {selectedBrands.map((name) => (
+              <button key={name} type="button" className="movement-chip movement-chip-brand" onClick={() => toggleArrayValue(setSelectedBrands, name)}>
+                {name} ×
+              </button>
+            ))}
+          </div>
+
+          <div className="movement-type-row">
+            {["transfer_in", "transfer_out", "supplier_receipt", "sales_summary"].map((type) => (
+              <label key={type} className="movement-checkbox">
+                <input
+                  type="checkbox"
+                  checked={movementTypes.includes(type)}
+                  onChange={() => toggleArrayValue(setMovementTypes, type)}
+                />
+                {movementTypeLabel(type)}
+              </label>
+            ))}
+          </div>
+
+          <div className="movement-actions">
+            <button type="button" className="primary-button" onClick={runTrace} disabled={loadingTrace || movementTypes.length === 0}>
+              {loadingTrace ? "กำลังสืบค้น..." : "สืบค้นข้อมูล"}
+            </button>
+            <span className="meta-line">เลือกสินค้า {selectedCodes.length} รายการ · groups {selectedGroupIds.length}</span>
+          </div>
+
+          {error ? <div className="notice error compact">{error}</div> : null}
+
+          {result ? (
+            <>
+              <section className="kpis movement-kpis">
+                <article className="kpi"><span>รับโอนเข้า</span><strong>{formatNumber(totalSummary.transferIn)}</strong></article>
+                <article className="kpi"><span>โอนออก</span><strong>{formatNumber(totalSummary.transferOut)}</strong></article>
+                <article className="kpi"><span>ซื้อ Supplier</span><strong>{formatNumber(totalSummary.supplierReceipt)}</strong></article>
+                <article className="kpi"><span>ขายรวม</span><strong>{formatNumber(totalSummary.sold)}</strong></article>
+                <article className="kpi"><span>Net movement</span><strong>{formatNumber(totalSummary.net)}</strong></article>
+              </section>
+
+              {(result.warnings || []).map((warning) => (
+                <div key={warning} className="notice movement-warning">{warning}</div>
+              ))}
+
+              <div className="table-wrap movement-table-wrap">
+                <table className="movement-table">
+                  <thead>
+                    <tr>
+                      <th>สินค้า</th>
+                      <th>รับโอนเข้า</th>
+                      <th>โอนออก</th>
+                      <th>ซื้อ Supplier</th>
+                      <th>ขายรวม</th>
+                      <th>Net</th>
+                      <th>ล่าสุด</th>
+                      <th>รายละเอียด</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map((product) => (
+                      <Fragment key={product.product_code}>
+                        <tr>
+                          <td>
+                            <strong>{product.product_name}</strong>
+                            <div className="meta">{product.product_code} · {product.barcode || "ไม่มี barcode"}</div>
+                          </td>
+                          <td>{formatNumber(product.summary.transfer_in_qty)}</td>
+                          <td>{formatNumber(product.summary.transfer_out_qty)}</td>
+                          <td>{formatNumber(product.summary.supplier_receipt_qty)}</td>
+                          <td>{formatNumber(product.summary.sold_qty_base)}</td>
+                          <td>{formatNumber(product.summary.net_movement_qty)}</td>
+                          <td>{product.last_movement_date || "-"}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="ghost-button movement-expand-button"
+                              onClick={() => setExpanded((current) => ({ ...current, [product.product_code]: !current[product.product_code] }))}
+                            >
+                              {expanded[product.product_code] ? "ซ่อน" : "ดู timeline"}
+                            </button>
+                          </td>
+                        </tr>
+                        {expanded[product.product_code] ? (
+                          <tr key={`${product.product_code}-detail`} className="movement-detail-row">
+                            <td colSpan={8}>
+                              <div className="movement-detail-grid">
+                                {[...(product.movements || []), ...(product.sales_summary || []).map((item) => ({
+                                  date: `${item.date_from} ถึง ${item.date_to}`,
+                                  type: "sales_summary",
+                                  from_branch: item.branch_code,
+                                  to_branch: "Customer",
+                                  document_no: "summary",
+                                  qty: item.sold_qty_base,
+                                  unit_cost: null,
+                                }))].map((movement, index) => (
+                                  <div className="movement-event" key={`${movement.type}-${movement.document_no}-${index}`}>
+                                    <span className={`status ${movementTypeClass(movement.type)}`}>{movementTypeLabel(movement.type)}</span>
+                                    <strong>{movement.date}</strong>
+                                    <span>{movement.from_branch || "-"} → {movement.to_branch || "-"}</span>
+                                    <span>{movement.document_no || "-"}</span>
+                                    <span>{formatNumber(movement.qty)} ชิ้น</span>
+                                    <span>ทุน {movement.unit_cost == null ? "-" : formatNumber(movement.unit_cost, 2)}</span>
+                                  </div>
+                                ))}
+                                {!(product.movements || []).length && !(product.sales_summary || []).length ? (
+                                  <p className="empty-state">ไม่พบ movement ในช่วงนี้</p>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {!products.length ? <p className="empty-state">ยังไม่มีผลลัพธ์ตามเงื่อนไขที่เลือก</p> : null}
+            </>
+          ) : (
+            <p className="empty-state">เลือกสินค้า กลุ่ม หรือหมวด แล้วกดสืบค้นข้อมูล</p>
+          )}
+        </section>
+      </div>
+    </section>
+  );
 }
 
 function LoginScreen({ authError, busy, username, password, onUsernameChange, onPasswordChange, onSubmit }) {
@@ -3029,7 +3602,7 @@ export default function App() {
   const [view, setView] = useState(() => {
     if (typeof window === "undefined") return "dashboard";
     const savedView = window.localStorage.getItem(adminViewStorageKey);
-    return ["dashboard", "receipts", "branch-stock", "category-review", "sync-log"].includes(savedView)
+    return ["dashboard", "receipts", "branch-stock", "movement-trace", "category-review", "sync-log"].includes(savedView)
       ? savedView
       : "dashboard";
   });
@@ -3341,6 +3914,13 @@ export default function App() {
           >
             สต็อกสาขา
           </button>
+          <button
+            type="button"
+            className={view === "movement-trace" ? "view-nav-btn active" : "view-nav-btn"}
+            onClick={() => setView("movement-trace")}
+          >
+            สืบค้น Movement
+          </button>
           {isAdminUser ? (
             <>
               <button
@@ -3416,6 +3996,8 @@ export default function App() {
         />
       ) : view === "branch-stock" ? (
         <BranchStockPanel csrfToken={session.csrfToken} isAdminUser={isAdminUser} />
+      ) : view === "movement-trace" ? (
+        <ProductMovementTracePanel branchCode={branchCode} csrfToken={session.csrfToken} />
       ) : view === "category-review" && isAdminUser ? (
         <ReviewQueuePanel csrfToken={session.csrfToken} />
       ) : view === "sync-log" && isAdminUser ? (
