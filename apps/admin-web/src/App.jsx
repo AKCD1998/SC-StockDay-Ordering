@@ -3919,7 +3919,7 @@ export default function App() {
             className={view === "movement-trace" ? "view-nav-btn active" : "view-nav-btn"}
             onClick={() => setView("movement-trace")}
           >
-            สืบค้น Movement
+            Movement
           </button>
           {isAdminUser ? (
             <>
