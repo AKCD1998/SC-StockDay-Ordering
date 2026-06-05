@@ -1,14 +1,12 @@
 # open-adapos-and-sync.ps1
-# Runs the branch sync. AdaPOS Back Office must already be open and logged in.
+# Runs the branch sync directly against the local SQL Server.
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\open-adapos-and-sync.ps1 -Branch 005
 
 param(
   [string]$Branch = "",
-  [string]$NodeExe = "C:\Program Files\nodejs\node.exe",
-  [int]$MaxRetries = 3,
-  [int]$RetryWaitSeconds = 120
+  [string]$NodeExe = "C:\Program Files\nodejs\node.exe"
 )
 
 $ErrorActionPreference = "Stop"
@@ -67,31 +65,18 @@ if (-not $Branch) {
   throw "Branch is required. Pass -Branch 005 or set ADAPOS_SYNC_BRANCH_CODE in apps\adapos-sync\.env."
 }
 
-$success = $false
-for ($attempt = 1; $attempt -le $MaxRetries; $attempt++) {
-  Write-Log "Starting sync attempt $attempt of $MaxRetries for branch $Branch."
-  $exitCode = Invoke-LoggedProcess -FilePath $NodeExe -ArgumentList @(
-    "src/index.js",
-    "--execute",
-    "--branch=$Branch"
-  )
-  $global:LASTEXITCODE = $exitCode
+Write-Log "Starting sync for branch $Branch."
+$exitCode = Invoke-LoggedProcess -FilePath $NodeExe -ArgumentList @(
+  "src/index.js",
+  "--execute",
+  "--branch=$Branch"
+)
+$global:LASTEXITCODE = $exitCode
 
-  if ($LASTEXITCODE -eq 0) {
-    $success = $true
-    Write-Log "Sync succeeded."
-    break
-  }
-
-  Write-Log "Sync attempt $attempt failed with exit code $LASTEXITCODE."
-  if ($attempt -lt $MaxRetries) {
-    Write-Log "Waiting $RetryWaitSeconds seconds before retry."
-    Start-Sleep -Seconds $RetryWaitSeconds
-  }
+if ($LASTEXITCODE -ne 0) {
+  throw "Sync failed with exit code $LASTEXITCODE. See log: $LogPath"
 }
 
-if (-not $success) {
-  throw "Sync failed after $MaxRetries attempts. See log: $LogPath"
-}
+Write-Log "Sync succeeded."
 
 Write-Log "Done. Log saved to $LogPath"
