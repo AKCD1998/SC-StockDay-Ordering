@@ -235,10 +235,13 @@ button {
   gap: 8px;
   align-items: center;
   justify-content: center;
-  padding: 8px 12px;
+  width: fit-content;
+  min-height: 36px;
+  padding: 7px 10px;
   border: 1px solid #d7dfeb;
   border-radius: 999px;
   background: #fff;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
