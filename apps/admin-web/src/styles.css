@@ -231,12 +231,20 @@ button {
 
 .movement-checkbox {
   display: inline-flex;
+  flex-direction: row;
   gap: 8px;
   align-items: center;
+  justify-content: center;
   padding: 8px 12px;
   border: 1px solid #d7dfeb;
   border-radius: 999px;
   background: #fff;
+  white-space: nowrap;
+}
+
+.movement-checkbox input {
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 .movement-kpis {
