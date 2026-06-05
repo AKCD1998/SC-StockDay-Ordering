@@ -163,10 +163,28 @@ button {
 .movement-filter-grid select {
   width: 100%;
   border: 1px solid #c8d3e2;
-  border-radius: 14px;
-  padding: 10px 12px;
+  border-radius: 10px;
+  padding: 9px 11px;
   color: #1f2933;
   background: #fff;
+  font-family: Inter, "Segoe UI", "Noto Sans Thai", Arial, sans-serif;
+  font-size: 0.92rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.movement-control-block select,
+.movement-filter-grid select {
+  min-height: 40px;
+}
+
+.movement-control-block option,
+.movement-filter-grid option {
+  color: #1f2933;
+  background-color: #fff;
+  font-family: "Segoe UI", "Noto Sans Thai", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .movement-control-block textarea {
@@ -2517,6 +2535,12 @@ select {
   border-color: #314255;
   background: #0d1724;
   color: #edf3ff;
+}
+
+[data-theme="dark"] .movement-control-block option,
+[data-theme="dark"] .movement-filter-grid option {
+  color: #d8e4f3;
+  background-color: #101a28;
 }
 
 [data-theme="dark"] input::placeholder {

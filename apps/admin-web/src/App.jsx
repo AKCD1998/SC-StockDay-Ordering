@@ -510,6 +510,14 @@ function movementTypeClass(type) {
   return "muted";
 }
 
+function formatBranchOptionLabel(branch) {
+  const code = String(branch?.branchCode || "").trim();
+  const name = String(branch?.branchName || "").trim();
+  if (!code) return name || "-";
+  if (!name || name === code) return `สาขา ${code}`;
+  return `${code} - ${name}`;
+}
+
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -865,7 +873,7 @@ function ProductMovementTracePanel({ branchCode, csrfToken }) {
                 <option value="">ทุกสาขา</option>
                 {(options.branches || []).map((branch) => (
                   <option key={branch.branchCode} value={branch.branchCode}>
-                    {branch.branchCode} {branch.branchName}
+                    {formatBranchOptionLabel(branch)}
                   </option>
                 ))}
               </select>
