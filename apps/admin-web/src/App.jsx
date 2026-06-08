@@ -64,29 +64,9 @@ function getNavigationGroups(isAdminUser) {
       items: [
         { label: "ตรวจหมวดสินค้า", view: "category-review", description: "review queue สำหรับยืนยันหมวดสินค้า" },
         { label: "พจนานุกรมสารสำคัญ", view: "ingredient-dictionary", description: "ดูแลฐานความรู้สารสำคัญ" },
+        { label: "ประวัติ Sync", view: "sync-log", description: "สถานะและประวัติการ sync ข้อมูล" },
         { label: "Ingredient Mapping", description: "supervision workflow ระยะถัดไป", disabled: true },
         { label: "Product Master", description: "ทะเบียนสินค้ากลาง", disabled: true },
-      ],
-    },
-    {
-      id: "reports",
-      label: "รายงาน",
-      shortLabel: "RP",
-      items: [
-        { label: "KPI", description: "รายงานตัวชี้วัดสำหรับผู้บริหาร", disabled: true },
-        { label: "Export", description: "ศูนย์รวมไฟล์ส่งออก", disabled: true },
-      ],
-    },
-    {
-      id: "system",
-      label: "ระบบ",
-      shortLabel: "SY",
-      adminOnly: true,
-      items: [
-        { label: "ประวัติ Sync", view: "sync-log", description: "สถานะและประวัติการ sync ข้อมูล" },
-        { label: "ผู้ใช้งาน", description: "จัดการบัญชีผู้ใช้", disabled: true },
-        { label: "สิทธิ์การใช้งาน", description: "กำหนดสิทธิ์ตามบทบาท", disabled: true },
-        { label: "ตั้งค่าระบบ", description: "ค่ากลางของระบบ", disabled: true },
       ],
     },
   ].filter((group) => !group.adminOnly || isAdminUser);
