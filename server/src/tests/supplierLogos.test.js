@@ -68,6 +68,30 @@ test("PUT /api/admin/supplier-logos stores SVG data URLs", async () => {
   }
 });
 
+test("PUT /supplier-logos aliases the admin supplier logo endpoint", async () => {
+  const { server, url } = await startServer(makeRepo());
+  try {
+    const logoDataUrl = svgDataUrl('<svg xmlns="http://www.w3.org/2000/svg"><circle r="1"/></svg>');
+    const saveResponse = await fetch(`${url}/supplier-logos`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        supplierKey: "pks",
+        supplierName: "PKS Medical Center",
+        logoDataUrl,
+      }),
+    });
+    assert.equal(saveResponse.status, 200);
+
+    const listResponse = await fetch(`${url}/supplier-logos`);
+    assert.equal(listResponse.status, 200);
+    const listBody = await listResponse.json();
+    assert.equal(listBody.logos[0].logoDataUrl, logoDataUrl);
+  } finally {
+    await stopServer(server);
+  }
+});
+
 test("PUT /api/admin/supplier-logos rejects unsafe SVG markup", async () => {
   const { server, url } = await startServer(makeRepo());
   try {

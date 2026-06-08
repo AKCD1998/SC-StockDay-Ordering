@@ -302,6 +302,20 @@ function validateAndNormalizeBranchStockRecords(body) {
 export function createRouter(repository) {
   const router = express.Router();
 
+  async function sendSupplierLogos(_req, res) {
+    res.json({ ok: true, logos: await repository.getSupplierLogos() });
+  }
+
+  async function saveSupplierLogo(req, res) {
+    const validation = validateSupplierLogoPayload(req.body || {});
+    if (validation.error) {
+      return res.status(400).json({ error: validation.error });
+    }
+
+    const logo = await repository.upsertSupplierLogo(validation.value);
+    return res.json({ ok: true, logo });
+  }
+
   router.get("/api/branches", asyncHandler(async (_req, res) => {
     res.json(await repository.getBranches());
   }));
@@ -467,19 +481,10 @@ export function createRouter(repository) {
     res.json({ ok: true, ...result });
   }));
 
-  router.get("/api/admin/supplier-logos", asyncHandler(async (_req, res) => {
-    res.json({ ok: true, logos: await repository.getSupplierLogos() });
-  }));
-
-  router.put("/api/admin/supplier-logos", asyncHandler(async (req, res) => {
-    const validation = validateSupplierLogoPayload(req.body || {});
-    if (validation.error) {
-      return res.status(400).json({ error: validation.error });
-    }
-
-    const logo = await repository.upsertSupplierLogo(validation.value);
-    return res.json({ ok: true, logo });
-  }));
+  router.get("/api/admin/supplier-logos", asyncHandler(sendSupplierLogos));
+  router.put("/api/admin/supplier-logos", asyncHandler(saveSupplierLogo));
+  router.get("/supplier-logos", asyncHandler(sendSupplierLogos));
+  router.put("/supplier-logos", asyncHandler(saveSupplierLogo));
 
   router.get("/api/admin/transfers", asyncHandler(async (req, res) => {
     const { branchCode } = req.query;
