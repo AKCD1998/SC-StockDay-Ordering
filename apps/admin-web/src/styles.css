@@ -1227,6 +1227,28 @@ button {
 .id-strength { color: #3a6cd4; font-weight: 500; }
 .id-pager { display: flex; align-items: center; gap: 14px; justify-content: center; margin-top: 12px; font-size: 0.8rem; color: #6a7a90; }
 
+/* confirm / reject controls */
+.id-matched-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.id-bulk-bar { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #2a5cb4; }
+.id-confirm-cell { white-space: nowrap; }
+.id-confirm-btn {
+  width: 26px; height: 26px; border-radius: 7px; border: 1.5px solid #d6deea;
+  background: none; cursor: pointer; font-size: 0.85rem; line-height: 1; margin-right: 4px;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+.id-confirm-btn.ok { color: #1a8a50; }
+.id-confirm-btn.ok:hover, .id-confirm-btn.ok.on { border-color: #34bc61; background: rgba(47,177,90,0.14); }
+.id-confirm-btn.no { color: #c0392b; }
+.id-confirm-btn.no:hover, .id-confirm-btn.no.on { border-color: #e06; background: rgba(220,60,60,0.12); }
+.id-confirm-btn:disabled { opacity: 0.5; cursor: default; }
+.id-row-rejected { opacity: 0.55; }
+.rq-ing-actions { display: inline-flex; gap: 4px; margin-left: auto; }
+.rq-ing-item-rejected { opacity: 0.55; }
+.rq-ing-status-rejected { background: rgba(220,60,60,0.12); color: #c0392b; }
+
+[data-theme="dark"] .id-confirm-btn { border-color: #263547; }
+[data-theme="dark"] .id-bulk-bar { color: #9fc0ec; }
+
 [data-theme="dark"] .id-subtab { border-color: #263547; color: #7090aa; }
 [data-theme="dark"] .id-subtab.active { border-color: #4a7ce4; background: rgba(74,124,228,0.12); color: #9fc0ec; }
 [data-theme="dark"] .id-select { border-color: #263547; }

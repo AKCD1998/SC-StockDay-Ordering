@@ -3079,8 +3079,17 @@ function formatIngredientStrength(ingredient) {
   return `${value}${unit || ""}`;
 }
 
-function IngredientSuggestions({ productCode, onUseCategory }) {
+function IngredientSuggestions({ productCode, onUseCategory, csrfToken }) {
   const [state, setState] = useState({ status: "loading", data: null });
+  const [busyId, setBusyId] = useState(null);
+
+  const fetchSupervision = useCallback(async (force) => {
+    const res = await apiFetch(`/api/admin/products/${encodeURIComponent(productCode)}/ingredient-supervision`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    ingredientSupervisionCache.set(productCode, json);
+    return json;
+  }, [productCode]);
 
   useEffect(() => {
     if (!productCode) return undefined;
@@ -3093,18 +3102,34 @@ function IngredientSuggestions({ productCode, onUseCategory }) {
     }
 
     setState({ status: "loading", data: null });
-    apiFetch(`/api/admin/products/${encodeURIComponent(productCode)}/ingredient-supervision`)
-      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
-      .then((json) => {
-        ingredientSupervisionCache.set(productCode, json);
-        if (active) setState({ status: "ready", data: json });
-      })
+    fetchSupervision()
+      .then((json) => { if (active) setState({ status: "ready", data: json }); })
       .catch(() => { if (active) setState({ status: "error", data: null }); });
 
     return () => { active = false; };
-  }, [productCode]);
+  }, [productCode, fetchSupervision]);
 
-  const title = <div className="rq-ing-title">สารสำคัญ (อ่านอย่างเดียว)</div>;
+  async function setIngredientStatus(ing, status) {
+    setBusyId(ing.ingredientId);
+    try {
+      const res = await apiFetch(`/api/admin/ingredient-dictionary/product-ingredients/${encodeURIComponent(productCode)}/${ing.ingredientId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken || "" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      ingredientSupervisionCache.delete(productCode);
+      const json = await fetchSupervision(true);
+      setState({ status: "ready", data: json });
+    } catch (e) {
+      // surface minimally; keep panel usable
+      setState((prev) => ({ ...prev }));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const title = <div className="rq-ing-title">สารสำคัญ</div>;
 
   if (state.status === "loading") {
     return <div className="rq-ing"><div className="rq-ing-card">{title}<p className="rq-ing-muted">⏳ กำลังโหลด...</p></div></div>;
@@ -3132,7 +3157,7 @@ function IngredientSuggestions({ productCode, onUseCategory }) {
               const drugClasses = (ing.drugClasses || []).map((dc) => dc.name).filter(Boolean);
               const indications = (ing.indications || []).map((ind) => ind.name).filter(Boolean);
               return (
-                <li key={ing.ingredientId} className="rq-ing-item">
+                <li key={ing.ingredientId} className={`rq-ing-item${ing.status === "rejected" ? " rq-ing-item-rejected" : ""}`}>
                   <div className="rq-ing-head">
                     <span className="rq-ing-name">
                       {ing.displayName || ing.canonicalName}
@@ -3143,6 +3168,22 @@ function IngredientSuggestions({ productCode, onUseCategory }) {
                         {INGREDIENT_STATUS_LABELS[ing.status] || ing.status}
                       </span>
                     )}
+                    <span className="rq-ing-actions">
+                      <button
+                        type="button"
+                        className={`id-confirm-btn ok${ing.status === "confirmed" ? " on" : ""}`}
+                        title="ยืนยันสารนี้"
+                        disabled={busyId === ing.ingredientId}
+                        onClick={() => setIngredientStatus(ing, "confirmed")}
+                      >✓</button>
+                      <button
+                        type="button"
+                        className={`id-confirm-btn no${ing.status === "rejected" ? " on" : ""}`}
+                        title="ปฏิเสธสารนี้"
+                        disabled={busyId === ing.ingredientId}
+                        onClick={() => setIngredientStatus(ing, "rejected")}
+                      >✗</button>
+                    </span>
                   </div>
                   {drugClasses.length > 0 && (
                     <div className="rq-ing-line rq-ing-class">{drugClasses.join(" · ")}</div>
@@ -3227,6 +3268,7 @@ function IngredientDictionaryPanel({ csrfToken }) {
   const [matchedOffset, setMatchedOffset] = useState(0);
   const [matchedSearch, setMatchedSearch] = useState("");
   const [loadingMatched, setLoadingMatched] = useState(false);
+  const [matchedSelected, setMatchedSelected] = useState(() => new Set());
 
   // discoveries
   const [discoveries, setDiscoveries] = useState([]);
@@ -3282,6 +3324,7 @@ function IngredientDictionaryPanel({ csrfToken }) {
       setMatched(data.records || []);
       setMatchedTotal(data.total || 0);
       setMatchedOffset(offset);
+      setMatchedSelected(new Set());
     } catch (e) {
       setError("โหลดสินค้าที่จับคู่ไม่สำเร็จ: " + e.message);
     } finally {
@@ -3334,6 +3377,38 @@ function IngredientDictionaryPanel({ csrfToken }) {
       await fn();
       if (successMsg) setNotice(successMsg);
       loadList();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  // matched-products confirm/reject
+  const toggleMatchedSelect = (key) => setMatchedSelected((prev) => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+
+  async function confirmMatched(rec, status) {
+    try {
+      await mutate(`/product-ingredients/${encodeURIComponent(rec.productCode)}/${rec.ingredientId}`, "PATCH", { status });
+      setMatched((prev) => prev.map((m) => (m.productCode === rec.productCode && m.ingredientId === rec.ingredientId ? { ...m, ingredientStatus: status } : m)));
+      setNotice(status === "confirmed" ? "ยืนยันแล้ว" : "ปฏิเสธแล้ว");
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function bulkMatched(status) {
+    const decisions = matched
+      .filter((m) => matchedSelected.has(`${m.productCode}|${m.ingredientId}`))
+      .map((m) => ({ productCode: m.productCode, ingredientId: m.ingredientId, status }));
+    if (!decisions.length) return;
+    try {
+      const data = await mutate(`/product-ingredients/confirm-batch`, "POST", { decisions });
+      setMatched((prev) => prev.map((m) => (matchedSelected.has(`${m.productCode}|${m.ingredientId}`) ? { ...m, ingredientStatus: status } : m)));
+      setMatchedSelected(new Set());
+      setNotice(`อัปเดต ${data.updated ?? decisions.length} รายการ`);
     } catch (e) {
       setError(e.message);
     }
@@ -3621,27 +3696,45 @@ function IngredientDictionaryPanel({ csrfToken }) {
               onChange={(e) => setMatchedSearch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") loadMatched(0); }} />
             <button type="button" className="ghost-button" onClick={() => loadMatched(0)}>ค้นหา</button>
           </div>
-          <div className="id-list-meta">{matchedTotal.toLocaleString()} รายการ (เพื่อการกำกับดูแล)</div>
+          <div className="id-matched-toolbar">
+            <span className="id-list-meta">{matchedTotal.toLocaleString()} รายการ — กดยืนยัน/ปฏิเสธสารที่ระบบเดาไว้</span>
+            {matchedSelected.size > 0 && (
+              <span className="id-bulk-bar">
+                เลือก {matchedSelected.size} รายการ:
+                <button type="button" className="primary-button id-mini" onClick={() => bulkMatched("confirmed")}>✓ ยืนยันที่เลือก</button>
+                <button type="button" className="ghost-button id-mini" onClick={() => bulkMatched("rejected")}>✗ ปฏิเสธที่เลือก</button>
+                <button type="button" className="ghost-button id-mini" onClick={() => setMatchedSelected(new Set())}>ล้าง</button>
+              </span>
+            )}
+          </div>
           <div className="table-wrap">
             <table className="id-table">
               <thead>
-                <tr><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>สารที่จับคู่</th><th>ที่มา</th><th>สถานะ</th></tr>
+                <tr><th></th><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>สารที่จับคู่</th><th>ที่มา</th><th>สถานะ</th><th>ยืนยัน</th></tr>
               </thead>
               <tbody>
                 {loadingMatched ? (
-                  <tr><td colSpan={5} className="empty-state">กำลังโหลด...</td></tr>
+                  <tr><td colSpan={7} className="empty-state">กำลังโหลด...</td></tr>
                 ) : matched.length === 0 ? (
-                  <tr><td colSpan={5} className="empty-state">ยังไม่มีสินค้าที่จับคู่ใน product_ingredients</td></tr>
+                  <tr><td colSpan={7} className="empty-state">ยังไม่มีสินค้าที่จับคู่ใน product_ingredients</td></tr>
                 ) : (
-                  matched.map((m, idx) => (
-                    <tr key={`${m.productCode}-${idx}`}>
-                      <td><code>{m.productCode}</code></td>
-                      <td>{m.productName}</td>
-                      <td>{m.matchedIngredient}{m.strengthValue != null && <span className="id-strength"> {m.strengthValue}{m.strengthUnit || ""}</span>}</td>
-                      <td>{m.matchSource}</td>
-                      <td><span className={`id-badge ${m.ingredientStatus === "confirmed" ? "good" : "muted"}`}>{ingStatusLabel(m.ingredientStatus)}</span></td>
-                    </tr>
-                  ))
+                  matched.map((m, idx) => {
+                    const key = `${m.productCode}|${m.ingredientId}`;
+                    return (
+                      <tr key={`${m.productCode}-${idx}`} className={m.ingredientStatus === "rejected" ? "id-row-rejected" : ""}>
+                        <td><input type="checkbox" checked={matchedSelected.has(key)} onChange={() => toggleMatchedSelect(key)} /></td>
+                        <td><code>{m.productCode}</code></td>
+                        <td>{m.productName}</td>
+                        <td>{m.matchedIngredient}{m.strengthValue != null && <span className="id-strength"> {m.strengthValue}{m.strengthUnit || ""}</span>}</td>
+                        <td>{m.matchSource}</td>
+                        <td><span className={`id-badge ${m.ingredientStatus === "confirmed" ? "good" : m.ingredientStatus === "rejected" ? "muted" : ""}`}>{ingStatusLabel(m.ingredientStatus)}</span></td>
+                        <td className="id-confirm-cell">
+                          <button type="button" className={`id-confirm-btn ok${m.ingredientStatus === "confirmed" ? " on" : ""}`} title="ยืนยัน" onClick={() => confirmMatched(m, "confirmed")}>✓</button>
+                          <button type="button" className={`id-confirm-btn no${m.ingredientStatus === "rejected" ? " on" : ""}`} title="ปฏิเสธ" onClick={() => confirmMatched(m, "rejected")}>✗</button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -4069,7 +4162,7 @@ function ReviewQueuePanel({ csrfToken }) {
       </div>
 
       {/* ── ingredient knowledge layer (read-only) ── */}
-      <IngredientSuggestions productCode={product.productCode} onUseCategory={pickCategory} />
+      <IngredientSuggestions productCode={product.productCode} onUseCategory={pickCategory} csrfToken={csrfToken} />
 
       {/* ── category buttons ── */}
       {!showNewCat && (
