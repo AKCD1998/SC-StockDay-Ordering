@@ -1734,7 +1734,7 @@ select {
 /* ── Hero navigation ───────────────────────── */
 .view-nav {
   display: flex;
-  justify-content: center;
+  justify-content: stretch;
   flex-wrap: nowrap;
   gap: 0;
   align-items: stretch;
@@ -1755,6 +1755,8 @@ select {
   position: relative;
   display: flex;
   align-self: stretch;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .view-nav-btn,
@@ -1765,7 +1767,9 @@ select {
   justify-content: center;
   gap: 8px;
   align-self: stretch;
-  flex: 0 0 auto;
+  flex: 1 1 0;
+  width: 100%;
+  min-width: 0;
   border-radius: 0;
   margin-left: -1px;
   padding: 12px 14px;
@@ -1804,6 +1808,8 @@ select {
 
 .hero-nav-label {
   line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hero-nav-chevron {
