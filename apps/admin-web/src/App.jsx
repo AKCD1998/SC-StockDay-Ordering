@@ -3059,6 +3059,638 @@ function CategoryReviewPanel({ decidedBy }) {
 }
 
 // ── Review Queue — fast keyboard-driven human category verification ───────────
+// ── Ingredient Knowledge Layer (read-only display) ───────────────────────────
+// Cache supervision payloads per product code so navigating back/forth in the
+// queue does not re-hit the backend.
+const ingredientSupervisionCache = new Map();
+
+const INGREDIENT_STATUS_LABELS = {
+  proposed:     "รอตรวจ",
+  confirmed:    "ยืนยันแล้ว",
+  needs_review: "ต้องทบทวน",
+  rejected:     "ปฏิเสธ",
+};
+
+function formatIngredientStrength(ingredient) {
+  const value = ingredient?.strengthValue;
+  const unit  = ingredient?.strengthUnit;
+  if (value == null && !unit) return "";
+  if (value == null) return unit || "";
+  return `${value}${unit || ""}`;
+}
+
+function IngredientSuggestions({ productCode, onUseCategory }) {
+  const [state, setState] = useState({ status: "loading", data: null });
+
+  useEffect(() => {
+    if (!productCode) return undefined;
+    let active = true;
+
+    const cached = ingredientSupervisionCache.get(productCode);
+    if (cached) {
+      setState({ status: "ready", data: cached });
+      return undefined;
+    }
+
+    setState({ status: "loading", data: null });
+    apiFetch(`/api/admin/products/${encodeURIComponent(productCode)}/ingredient-supervision`)
+      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .then((json) => {
+        ingredientSupervisionCache.set(productCode, json);
+        if (active) setState({ status: "ready", data: json });
+      })
+      .catch(() => { if (active) setState({ status: "error", data: null }); });
+
+    return () => { active = false; };
+  }, [productCode]);
+
+  const title = <div className="rq-ing-title">สารสำคัญ (อ่านอย่างเดียว)</div>;
+
+  if (state.status === "loading") {
+    return <div className="rq-ing"><div className="rq-ing-card">{title}<p className="rq-ing-muted">⏳ กำลังโหลด...</p></div></div>;
+  }
+  if (state.status === "error") {
+    return <div className="rq-ing"><div className="rq-ing-card">{title}<p className="rq-ing-muted">โหลดข้อมูลสารสำคัญไม่สำเร็จ</p></div></div>;
+  }
+
+  const ingredients = state.data?.ingredients || [];
+  const categorySuggestions = state.data?.categorySuggestions || [];
+
+  if (!ingredients.length && !categorySuggestions.length) {
+    return <div className="rq-ing"><div className="rq-ing-card">{title}<p className="rq-ing-muted">ยังไม่มีข้อมูลสารสำคัญ</p></div></div>;
+  }
+
+  return (
+    <div className="rq-ing">
+      <div className="rq-ing-card">
+        {title}
+
+        {ingredients.length > 0 && (
+          <ul className="rq-ing-list">
+            {ingredients.map((ing) => {
+              const strength = formatIngredientStrength(ing);
+              const drugClasses = (ing.drugClasses || []).map((dc) => dc.name).filter(Boolean);
+              const indications = (ing.indications || []).map((ind) => ind.name).filter(Boolean);
+              return (
+                <li key={ing.ingredientId} className="rq-ing-item">
+                  <div className="rq-ing-head">
+                    <span className="rq-ing-name">
+                      {ing.displayName || ing.canonicalName}
+                      {strength && <span className="rq-ing-strength"> {strength}</span>}
+                    </span>
+                    {ing.status && (
+                      <span className={`rq-ing-status rq-ing-status-${ing.status}`}>
+                        {INGREDIENT_STATUS_LABELS[ing.status] || ing.status}
+                      </span>
+                    )}
+                  </div>
+                  {drugClasses.length > 0 && (
+                    <div className="rq-ing-line rq-ing-class">{drugClasses.join(" · ")}</div>
+                  )}
+                  {indications.length > 0 && (
+                    <div className="rq-ing-line rq-ing-indication">{indications.join(" / ")}</div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {categorySuggestions.length > 0 && (
+          <div className="rq-ing-suggest">
+            <div className="rq-ing-suggest-title">หมวดที่แนะนำจากสารสำคัญ</div>
+            {categorySuggestions.map((sug, i) => (
+              <button
+                key={`${sug.categoryName}-${i}`}
+                type="button"
+                className="rq-ing-suggest-btn"
+                onClick={() => onUseCategory && onUseCategory(sug.categoryName)}
+                title={sug.reason || sug.categoryName}
+              >
+                <span className="rq-ing-suggest-cat">{sug.categoryName}</span>
+                {sug.reason && <span className="rq-ing-suggest-reason">{sug.reason}</span>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Ingredient Dictionary Admin (Phase 5A) ───────────────────────────────────
+const ING_API = "/api/admin/ingredient-dictionary";
+
+const ING_STATUS_LABELS = {
+  active: "ใช้งาน",
+  confirmed: "ยืนยันแล้ว",
+  proposed: "รอตรวจ",
+  needs_review: "ต้องทบทวน",
+  deprecated: "ปิดใช้",
+  inactive: "ปิดใช้",
+  rejected: "ปฏิเสธ",
+};
+
+function ingStatusLabel(status) {
+  return ING_STATUS_LABELS[status] || status || "-";
+}
+
+function IngredientDictionaryPanel({ csrfToken }) {
+  const [subTab, setSubTab] = useState("dictionary"); // dictionary | matched | discoveries
+
+  // dictionary list
+  const [search, setSearch]       = useState("");
+  const [statusFilter, setStatus] = useState("");
+  const [list, setList]           = useState([]);
+  const [total, setTotal]         = useState(0);
+  const [loadingList, setLoadingList] = useState(false);
+
+  // selected ingredient detail
+  const [selectedId, setSelectedId] = useState(null);
+  const [detail, setDetail]         = useState(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  const [notice, setNotice] = useState("");
+  const [error, setError]   = useState("");
+
+  // form inputs
+  const [newSynonym, setNewSynonym]   = useState("");
+  const [newDrugClass, setNewDrugClass] = useState("");
+  const [newIndication, setNewIndication] = useState("");
+  const [ruleCategory, setRuleCategory] = useState("");
+  const [rulePriority, setRulePriority] = useState("100");
+  const [categoryOptions, setCategoryOptions] = useState([]);
+
+  // matched products
+  const [matched, setMatched]           = useState([]);
+  const [matchedTotal, setMatchedTotal] = useState(0);
+  const [matchedOffset, setMatchedOffset] = useState(0);
+  const [matchedSearch, setMatchedSearch] = useState("");
+  const [loadingMatched, setLoadingMatched] = useState(false);
+
+  // discoveries
+  const [discoveries, setDiscoveries] = useState([]);
+  const [discoveryTotal, setDiscoveryTotal] = useState(0);
+  const [loadingDiscoveries, setLoadingDiscoveries] = useState(false);
+
+  const MATCHED_PAGE = 50;
+
+  // ── loaders ───────────────────────────────────────────────────────────────
+  const loadList = useCallback(async () => {
+    setLoadingList(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({ limit: "100" });
+      if (search.trim()) params.set("search", search.trim());
+      if (statusFilter) params.set("status", statusFilter);
+      const res = await apiFetch(`${ING_API}/ingredients?${params.toString()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setList(data.records || []);
+      setTotal(data.total || 0);
+    } catch (e) {
+      setError("โหลดรายการสารสำคัญไม่สำเร็จ: " + e.message);
+    } finally {
+      setLoadingList(false);
+    }
+  }, [search, statusFilter]);
+
+  const loadDetail = useCallback(async (id) => {
+    setLoadingDetail(true);
+    setError("");
+    try {
+      const res = await apiFetch(`${ING_API}/ingredients/${id}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setDetail(data.ingredient);
+    } catch (e) {
+      setError("โหลดรายละเอียดไม่สำเร็จ: " + e.message);
+    } finally {
+      setLoadingDetail(false);
+    }
+  }, []);
+
+  const loadMatched = useCallback(async (offset = 0) => {
+    setLoadingMatched(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({ limit: String(MATCHED_PAGE), offset: String(offset) });
+      if (matchedSearch.trim()) params.set("search", matchedSearch.trim());
+      const res = await apiFetch(`${ING_API}/matched-products?${params.toString()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setMatched(data.records || []);
+      setMatchedTotal(data.total || 0);
+      setMatchedOffset(offset);
+    } catch (e) {
+      setError("โหลดสินค้าที่จับคู่ไม่สำเร็จ: " + e.message);
+    } finally {
+      setLoadingMatched(false);
+    }
+  }, [matchedSearch]);
+
+  const loadDiscoveries = useCallback(async () => {
+    setLoadingDiscoveries(true);
+    setError("");
+    try {
+      const res = await apiFetch(`${ING_API}/potential-discoveries?limit=100&minCount=5`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setDiscoveries(data.records || []);
+      setDiscoveryTotal(data.totalProducts || 0);
+    } catch (e) {
+      setError("โหลดคำที่ยังไม่รู้จักไม่สำเร็จ: " + e.message);
+    } finally {
+      setLoadingDiscoveries(false);
+    }
+  }, []);
+
+  useEffect(() => { if (subTab === "dictionary") loadList(); }, [subTab, loadList]);
+  useEffect(() => { if (subTab === "matched") loadMatched(0); }, [subTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (subTab === "discoveries") loadDiscoveries(); }, [subTab, loadDiscoveries]);
+
+  useEffect(() => {
+    if (selectedId) loadDetail(selectedId);
+    else setDetail(null);
+  }, [selectedId, loadDetail]);
+
+  // ── mutation helper ──────────────────────────────────────────────────────────
+  const mutate = useCallback(async (path, method, body) => {
+    setError("");
+    setNotice("");
+    const res = await apiFetch(`${ING_API}${path}`, {
+      method,
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken || "" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    if (data.ingredient) setDetail(data.ingredient);
+    return data;
+  }, [csrfToken]);
+
+  async function runMutation(fn, successMsg) {
+    try {
+      await fn();
+      if (successMsg) setNotice(successMsg);
+      loadList();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  // category options for rule picker
+  useEffect(() => {
+    if (subTab !== "dictionary" || !detail) return;
+    let active = true;
+    apiFetch(`${ING_API}/categories?search=${encodeURIComponent(ruleCategory.trim())}`)
+      .then((r) => (r.ok ? r.json() : { records: [] }))
+      .then((d) => { if (active) setCategoryOptions(d.records || []); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [ruleCategory, subTab, detail]);
+
+  // ── action handlers ───────────────────────────────────────────────────────────
+  const addSynonym = () => runMutation(async () => {
+    const t = newSynonym.trim();
+    if (!t) return;
+    await mutate(`/ingredients/${detail.ingredientId}/synonyms`, "POST", { synonymText: t, language: "en" });
+    setNewSynonym("");
+  }, "เพิ่มคำพ้องแล้ว");
+
+  const toggleSynonym = (s) => runMutation(async () => {
+    const next = s.status === "deprecated" ? "active" : "deprecated";
+    await mutate(`/synonyms/${s.synonymId}`, "PATCH", { status: next });
+  });
+
+  const addDrugClass = () => runMutation(async () => {
+    const name = newDrugClass.trim();
+    if (!name) return;
+    await mutate(`/ingredients/${detail.ingredientId}/drug-classes`, "POST", { name });
+    setNewDrugClass("");
+  }, "เชื่อมกลุ่มยาแล้ว");
+
+  const toggleDrugClass = (d) => runMutation(async () => {
+    const next = d.status === "rejected" ? "confirmed" : "rejected";
+    await mutate(`/ingredients/${detail.ingredientId}/drug-classes/${d.drugClassId}`, "PATCH", { status: next });
+  });
+
+  const addIndication = () => runMutation(async () => {
+    const name = newIndication.trim();
+    if (!name) return;
+    await mutate(`/ingredients/${detail.ingredientId}/indications`, "POST", { name });
+    setNewIndication("");
+  }, "เชื่อมข้อบ่งใช้แล้ว");
+
+  const toggleIndication = (i) => runMutation(async () => {
+    const next = i.status === "rejected" ? "confirmed" : "rejected";
+    await mutate(`/ingredients/${detail.ingredientId}/indications/${i.indicationId}`, "PATCH", { status: next });
+  });
+
+  const addCategoryRule = () => runMutation(async () => {
+    const categoryName = ruleCategory.trim();
+    if (!categoryName) return;
+    await mutate(`/ingredients/${detail.ingredientId}/category-rules`, "POST", {
+      categoryName,
+      priority: parseInt(rulePriority, 10) || 100,
+    });
+    setRuleCategory("");
+  }, "เพิ่มกฎหมวดแล้ว");
+
+  const toggleRule = (r) => runMutation(async () => {
+    const next = r.ruleStatus === "active" ? "inactive" : "active";
+    await mutate(`/category-rules/${r.ruleId}`, "PATCH", { ruleStatus: next });
+  });
+
+  const changeRulePriority = (r, delta) => runMutation(async () => {
+    await mutate(`/category-rules/${r.ruleId}`, "PATCH", { priority: Math.max(0, r.priority + delta) });
+  });
+
+  // ── render ──────────────────────────────────────────────────────────────────
+  return (
+    <section className="panel id-panel">
+      <div className="panel-header">
+        <h2>พจนานุกรมสารสำคัญ</h2>
+        <p>จัดการความรู้สารสำคัญ — คำพ้อง กลุ่มยา ข้อบ่งใช้ และกฎหมวด (อ่าน/แก้ไขโดยเภสัชกร)</p>
+      </div>
+
+      <div className="id-subtabs">
+        {[
+          { key: "dictionary", label: "พจนานุกรม" },
+          { key: "matched", label: "สินค้าที่จับคู่แล้ว" },
+          { key: "discoveries", label: "คำที่ยังไม่รู้จัก" },
+        ].map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            className={subTab === t.key ? "id-subtab active" : "id-subtab"}
+            onClick={() => setSubTab(t.key)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {error && <p className="notice error compact">{error}</p>}
+      {notice && <p className="notice success compact">{notice}</p>}
+
+      {/* ── DICTIONARY ── */}
+      {subTab === "dictionary" && (
+        <div className="id-dictionary">
+          <div className="id-list-col">
+            <div className="id-search-row">
+              <input
+                type="text"
+                className="rq-search"
+                placeholder="ค้นหา: ชื่อสาร / คำพ้อง / กลุ่มยา / ข้อบ่งใช้"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") loadList(); }}
+              />
+              <select className="id-select" value={statusFilter} onChange={(e) => setStatus(e.target.value)}>
+                <option value="">ทุกสถานะ</option>
+                <option value="active">ใช้งาน</option>
+                <option value="needs_review">ต้องทบทวน</option>
+                <option value="deprecated">ปิดใช้</option>
+              </select>
+              <button type="button" className="ghost-button" onClick={loadList}>ค้นหา</button>
+            </div>
+            <div className="id-list-meta">{total.toLocaleString()} สาร</div>
+            <div className="id-list">
+              {loadingList ? (
+                <p className="empty-state">กำลังโหลด...</p>
+              ) : list.length === 0 ? (
+                <p className="empty-state">ไม่พบสารสำคัญ</p>
+              ) : (
+                list.map((row) => (
+                  <button
+                    key={row.ingredientId}
+                    type="button"
+                    className={`id-list-item${selectedId === row.ingredientId ? " active" : ""}`}
+                    onClick={() => setSelectedId(row.ingredientId)}
+                  >
+                    <div className="id-list-name">
+                      {row.displayName}
+                      {row.status !== "active" && <span className="id-badge muted">{ingStatusLabel(row.status)}</span>}
+                    </div>
+                    <div className="id-list-sub">
+                      {row.drugClassNames || "ไม่มีกลุ่มยา"}
+                    </div>
+                    <div className="id-list-counts">
+                      <span title="คำพ้อง">🔤 {row.synonymCount}</span>
+                      <span title="กลุ่มยา">💊 {row.drugClassCount}</span>
+                      <span title="ข้อบ่งใช้">🩺 {row.indicationCount}</span>
+                      <span title="กฎหมวด">📂 {row.categoryRuleCount}</span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="id-detail-col">
+            {!detail ? (
+              <p className="empty-state">เลือกสารสำคัญทางซ้ายเพื่อดูรายละเอียด</p>
+            ) : loadingDetail ? (
+              <p className="empty-state">กำลังโหลด...</p>
+            ) : (
+              <>
+                <div className="id-detail-head">
+                  <h3>{detail.displayName}</h3>
+                  <code>{detail.canonicalName}</code>
+                  <span className={`id-badge ${detail.status === "active" ? "good" : "muted"}`}>{ingStatusLabel(detail.status)}</span>
+                </div>
+                <div className="id-detail-dates">
+                  สร้าง: {new Date(detail.createdAt).toLocaleString("th-TH")} · แก้ไขล่าสุด: {new Date(detail.updatedAt).toLocaleString("th-TH")}
+                </div>
+
+                {/* Synonyms */}
+                <div className="id-section">
+                  <div className="id-section-title">คำพ้อง (Synonyms)</div>
+                  <ul className="id-rows">
+                    {detail.synonyms.map((s) => (
+                      <li key={s.synonymId} className={s.status === "deprecated" ? "id-row off" : "id-row"}>
+                        <span className="id-row-main">{s.synonymText}</span>
+                        <span className="id-row-meta">{s.language || "-"} · {s.source || "-"} · {ingStatusLabel(s.status)}</span>
+                        <button type="button" className="ghost-button id-mini" onClick={() => toggleSynonym(s)}>
+                          {s.status === "deprecated" ? "เปิดใช้" : "ปิดใช้"}
+                        </button>
+                      </li>
+                    ))}
+                    {detail.synonyms.length === 0 && <li className="id-row empty">ยังไม่มีคำพ้อง</li>}
+                  </ul>
+                  <div className="id-add-row">
+                    <input type="text" className="rq-search" placeholder="เพิ่มคำพ้องใหม่..." value={newSynonym}
+                      onChange={(e) => setNewSynonym(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addSynonym(); }} />
+                    <button type="button" className="primary-button id-mini" onClick={addSynonym} disabled={!newSynonym.trim()}>เพิ่ม</button>
+                  </div>
+                </div>
+
+                {/* Drug classes */}
+                <div className="id-section">
+                  <div className="id-section-title">กลุ่มยา (Drug Classes)</div>
+                  <ul className="id-rows">
+                    {detail.drugClasses.map((d) => (
+                      <li key={d.drugClassId} className={d.status === "rejected" ? "id-row off" : "id-row"}>
+                        <span className="id-row-main">{d.name}</span>
+                        <span className="id-row-meta">
+                          {d.confidence != null ? `conf ${d.confidence}` : "conf -"} · {d.source || "-"} · {ingStatusLabel(d.status)}
+                        </span>
+                        <button type="button" className="ghost-button id-mini" onClick={() => toggleDrugClass(d)}>
+                          {d.status === "rejected" ? "เปิดใช้" : "ปิดใช้"}
+                        </button>
+                      </li>
+                    ))}
+                    {detail.drugClasses.length === 0 && <li className="id-row empty">ยังไม่มีกลุ่มยา</li>}
+                  </ul>
+                  <div className="id-add-row">
+                    <input type="text" className="rq-search" placeholder="เพิ่ม/เชื่อมกลุ่มยา..." value={newDrugClass}
+                      onChange={(e) => setNewDrugClass(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addDrugClass(); }} />
+                    <button type="button" className="primary-button id-mini" onClick={addDrugClass} disabled={!newDrugClass.trim()}>เชื่อม</button>
+                  </div>
+                </div>
+
+                {/* Indications */}
+                <div className="id-section">
+                  <div className="id-section-title">ข้อบ่งใช้ (Indications)</div>
+                  <ul className="id-rows">
+                    {detail.indications.map((i) => (
+                      <li key={i.indicationId} className={i.status === "rejected" ? "id-row off" : "id-row"}>
+                        <span className="id-row-main">{i.name}</span>
+                        <span className="id-row-meta">{i.source || "-"} · {ingStatusLabel(i.status)}</span>
+                        <button type="button" className="ghost-button id-mini" onClick={() => toggleIndication(i)}>
+                          {i.status === "rejected" ? "เปิดใช้" : "ปิดใช้"}
+                        </button>
+                      </li>
+                    ))}
+                    {detail.indications.length === 0 && <li className="id-row empty">ยังไม่มีข้อบ่งใช้</li>}
+                  </ul>
+                  <div className="id-add-row">
+                    <input type="text" className="rq-search" placeholder="เพิ่ม/เชื่อมข้อบ่งใช้..." value={newIndication}
+                      onChange={(e) => setNewIndication(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addIndication(); }} />
+                    <button type="button" className="primary-button id-mini" onClick={addIndication} disabled={!newIndication.trim()}>เชื่อม</button>
+                  </div>
+                </div>
+
+                {/* Category rules */}
+                <div className="id-section">
+                  <div className="id-section-title">กฎหมวด (Category Rules)</div>
+                  <ul className="id-rows">
+                    {detail.categoryRules.map((r) => (
+                      <li key={r.ruleId} className={r.ruleStatus !== "active" ? "id-row off" : "id-row"}>
+                        <span className="id-row-main">
+                          {detail.displayName}
+                          {r.drugClassName && <> → {r.drugClassName}</>}
+                          {r.indicationName && <> → {r.indicationName}</>}
+                          {" → "}<strong>{r.categoryName}</strong>
+                        </span>
+                        <span className="id-row-meta">priority {r.priority} · {ingStatusLabel(r.ruleStatus)}</span>
+                        <span className="id-row-actions">
+                          <button type="button" className="ghost-button id-mini" onClick={() => changeRulePriority(r, -10)} title="ลำดับสำคัญขึ้น">▲</button>
+                          <button type="button" className="ghost-button id-mini" onClick={() => changeRulePriority(r, 10)} title="ลำดับสำคัญลง">▼</button>
+                          <button type="button" className="ghost-button id-mini" onClick={() => toggleRule(r)}>
+                            {r.ruleStatus === "active" ? "ปิดใช้" : "เปิดใช้"}
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                    {detail.categoryRules.length === 0 && <li className="id-row empty">ยังไม่มีกฎหมวด</li>}
+                  </ul>
+                  <div className="id-add-row">
+                    <input type="text" className="rq-search" list="id-category-options" placeholder="เลือกหมวดที่มีอยู่แล้ว..." value={ruleCategory}
+                      onChange={(e) => setRuleCategory(e.target.value)} />
+                    <datalist id="id-category-options">
+                      {categoryOptions.map((c) => <option key={c.categoryName} value={c.categoryName}>{`${c.categoryName} (${c.productCount})`}</option>)}
+                    </datalist>
+                    <input type="number" className="id-priority-input" value={rulePriority} onChange={(e) => setRulePriority(e.target.value)} title="priority" />
+                    <button type="button" className="primary-button id-mini" onClick={addCategoryRule} disabled={!ruleCategory.trim()}>เพิ่มกฎ</button>
+                  </div>
+                  <p className="id-hint">* เลือกได้เฉพาะหมวดที่ยืนยันแล้วในระบบ — ไม่สร้างหมวดใหม่ และไม่กระทบการยืนยันหมวดสินค้า</p>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── MATCHED PRODUCTS ── */}
+      {subTab === "matched" && (
+        <div className="id-matched">
+          <div className="id-search-row">
+            <input type="text" className="rq-search" placeholder="ค้นหา: รหัส / ชื่อสินค้า / สาร" value={matchedSearch}
+              onChange={(e) => setMatchedSearch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") loadMatched(0); }} />
+            <button type="button" className="ghost-button" onClick={() => loadMatched(0)}>ค้นหา</button>
+          </div>
+          <div className="id-list-meta">{matchedTotal.toLocaleString()} รายการ (เพื่อการกำกับดูแล)</div>
+          <div className="table-wrap">
+            <table className="id-table">
+              <thead>
+                <tr><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>สารที่จับคู่</th><th>ที่มา</th><th>สถานะ</th></tr>
+              </thead>
+              <tbody>
+                {loadingMatched ? (
+                  <tr><td colSpan={5} className="empty-state">กำลังโหลด...</td></tr>
+                ) : matched.length === 0 ? (
+                  <tr><td colSpan={5} className="empty-state">ยังไม่มีสินค้าที่จับคู่ใน product_ingredients</td></tr>
+                ) : (
+                  matched.map((m, idx) => (
+                    <tr key={`${m.productCode}-${idx}`}>
+                      <td><code>{m.productCode}</code></td>
+                      <td>{m.productName}</td>
+                      <td>{m.matchedIngredient}{m.strengthValue != null && <span className="id-strength"> {m.strengthValue}{m.strengthUnit || ""}</span>}</td>
+                      <td>{m.matchSource}</td>
+                      <td><span className={`id-badge ${m.ingredientStatus === "confirmed" ? "good" : "muted"}`}>{ingStatusLabel(m.ingredientStatus)}</span></td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="id-pager">
+            <button type="button" className="ghost-button" disabled={matchedOffset === 0 || loadingMatched} onClick={() => loadMatched(Math.max(0, matchedOffset - MATCHED_PAGE))}>← ก่อนหน้า</button>
+            <span>{matchedTotal === 0 ? 0 : matchedOffset + 1}–{Math.min(matchedOffset + MATCHED_PAGE, matchedTotal)} / {matchedTotal}</span>
+            <button type="button" className="ghost-button" disabled={matchedOffset + MATCHED_PAGE >= matchedTotal || loadingMatched} onClick={() => loadMatched(matchedOffset + MATCHED_PAGE)}>ถัดไป →</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── POTENTIAL DISCOVERIES ── */}
+      {subTab === "discoveries" && (
+        <div className="id-discoveries">
+          <div className="id-list-meta">
+            คำที่พบบ่อยในชื่อสินค้าที่ยังจับคู่ไม่ได้ — ใช้เป็นตัวช่วยขยายพจนานุกรม
+            {discoveryTotal > 0 && <> (จากทั้งหมด {discoveryTotal.toLocaleString()} สินค้า)</>}
+          </div>
+          <div className="table-wrap">
+            <table className="id-table">
+              <thead>
+                <tr><th>#</th><th>คำ</th><th>จำนวนสินค้า</th><th>% ของแคตตาล็อก</th></tr>
+              </thead>
+              <tbody>
+                {loadingDiscoveries ? (
+                  <tr><td colSpan={4} className="empty-state">กำลังสแกนชื่อสินค้า...</td></tr>
+                ) : discoveries.length === 0 ? (
+                  <tr><td colSpan={4} className="empty-state">ไม่มีข้อมูล</td></tr>
+                ) : (
+                  discoveries.map((d, idx) => (
+                    <tr key={d.token}>
+                      <td>{idx + 1}</td>
+                      <td><strong>{d.token}</strong></td>
+                      <td>{d.productCount.toLocaleString()}</td>
+                      <td>{d.coveragePct.toFixed(2)}%</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <p className="id-hint">* คำเหล่านี้รวมชื่อยี่ห้อ/บรรจุภัณฑ์ด้วย — เภสัชกรควรเลือกเฉพาะที่เป็นสารสำคัญจริงก่อนเพิ่มเข้าพจนานุกรม</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function ReviewQueuePanel({ csrfToken }) {
   // phase: idle → reviewing → summary → done
   const [phase, setPhase]           = useState("idle");
@@ -3435,6 +4067,9 @@ function ReviewQueuePanel({ csrfToken }) {
           )}
         </div>
       </div>
+
+      {/* ── ingredient knowledge layer (read-only) ── */}
+      <IngredientSuggestions productCode={product.productCode} onUseCategory={pickCategory} />
 
       {/* ── category buttons ── */}
       {!showNewCat && (
@@ -4151,6 +4786,13 @@ export default function App() {
               </button>
               <button
                 type="button"
+                className={view === "ingredient-dictionary" ? "view-nav-btn active" : "view-nav-btn"}
+                onClick={() => setView("ingredient-dictionary")}
+              >
+                พจนานุกรมสารสำคัญ
+              </button>
+              <button
+                type="button"
                 className={view === "sync-log" ? "view-nav-btn active" : "view-nav-btn"}
                 onClick={() => setView("sync-log")}
               >
@@ -4221,6 +4863,8 @@ export default function App() {
         <ProductMovementTracePanel branchCode={branchCode} csrfToken={session.csrfToken} />
       ) : view === "category-review" && isAdminUser ? (
         <ReviewQueuePanel csrfToken={session.csrfToken} />
+      ) : view === "ingredient-dictionary" && isAdminUser ? (
+        <IngredientDictionaryPanel csrfToken={session.csrfToken} />
       ) : view === "sync-log" && isAdminUser ? (
         <SyncLogPanel />
       ) : (

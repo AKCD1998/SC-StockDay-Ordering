@@ -1085,6 +1085,163 @@ button {
   font-size: 0.72rem;
 }
 
+/* ingredient knowledge layer (read-only) */
+.rq-ing { margin-bottom: 18px; }
+.rq-ing-card {
+  border: 1px solid #e1e8f2;
+  border-radius: 12px;
+  background: #f7fafd;
+  padding: 12px 14px;
+}
+.rq-ing-title {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #6a7a90;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.rq-ing-muted { font-size: 0.82rem; color: #8090a8; margin: 0; }
+.rq-ing-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rq-ing-item {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #e8eef6;
+}
+.rq-ing-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rq-ing-name { font-size: 0.9rem; font-weight: 600; color: #1a2840; }
+.rq-ing-strength { font-weight: 500; color: #3a6cd4; }
+.rq-ing-status {
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  background: #eef2f8;
+  color: #6a7a90;
+}
+.rq-ing-status-proposed     { background: rgba(58,108,212,0.1);  color: #2a5cb4; }
+.rq-ing-status-confirmed    { background: rgba(30,160,90,0.1);   color: #1a8a50; }
+.rq-ing-status-needs_review { background: rgba(212,140,40,0.12); color: #a96a14; }
+.rq-ing-line { font-size: 0.78rem; margin-top: 3px; }
+.rq-ing-class { color: #5a6a85; }
+.rq-ing-indication { color: #8090a8; }
+.rq-ing-suggest { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #d6deea; display: flex; flex-direction: column; gap: 6px; }
+.rq-ing-suggest-title { font-size: 0.74rem; font-weight: 600; color: #6a7a90; }
+.rq-ing-suggest-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 7px 10px;
+  border: 1.5px solid #cfe0c9;
+  border-radius: 8px;
+  background: rgba(47,177,90,0.06);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.12s, background 0.12s;
+}
+.rq-ing-suggest-btn:hover, .rq-ing-suggest-btn:focus {
+  border-color: #34bc61;
+  background: rgba(47,177,90,0.12);
+  outline: none;
+}
+.rq-ing-suggest-cat { font-size: 0.85rem; font-weight: 600; color: #1a8a50; }
+.rq-ing-suggest-reason { font-size: 0.72rem; color: #6a7a90; }
+
+[data-theme="dark"] .rq-ing-card { border-color: #263547; background: #111e2d; }
+[data-theme="dark"] .rq-ing-item { border-color: #1e2e42; background: #0f1824; }
+[data-theme="dark"] .rq-ing-name { color: #d8e4f2; }
+[data-theme="dark"] .rq-ing-status { background: #1e2e42; color: #7090aa; }
+[data-theme="dark"] .rq-ing-suggest-btn { border-color: #2a4a36; background: rgba(47,177,90,0.1); }
+[data-theme="dark"] .rq-ing-suggest-btn:hover,
+[data-theme="dark"] .rq-ing-suggest-btn:focus { border-color: #34bc61; background: rgba(47,177,90,0.16); }
+[data-theme="dark"] .rq-ing-suggest-cat { color: #4fd587; }
+
+/* ── Ingredient Dictionary Admin (Phase 5A) ── */
+.id-panel .panel-header { margin-bottom: 14px; }
+.id-subtabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.id-subtab {
+  padding: 8px 16px;
+  border: 1.5px solid #d6deea;
+  border-radius: 10px;
+  background: none;
+  color: #5a6a85;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+.id-subtab:hover { border-color: #3a6cd4; }
+.id-subtab.active { border-color: #3a6cd4; background: rgba(58,108,212,0.08); color: #2a5cb4; }
+
+.id-search-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; flex-wrap: wrap; }
+.id-search-row .rq-search { flex: 1; min-width: 200px; }
+.id-select {
+  padding: 9px 12px; border: 1.5px solid #d6deea; border-radius: 10px;
+  background: none; color: inherit; font-size: 0.85rem;
+}
+.id-list-meta { font-size: 0.76rem; color: #8090a8; margin-bottom: 8px; }
+
+.id-dictionary { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; gap: 18px; align-items: start; }
+.id-list { display: flex; flex-direction: column; gap: 6px; max-height: 70vh; overflow-y: auto; }
+.id-list-item {
+  text-align: left; border: 1.5px solid #e1e8f2; border-radius: 10px; background: #fff;
+  padding: 10px 12px; cursor: pointer; transition: border-color 0.12s, background 0.12s;
+}
+.id-list-item:hover { border-color: #3a6cd4; }
+.id-list-item.active { border-color: #3a6cd4; background: rgba(58,108,212,0.06); }
+.id-list-name { font-size: 0.9rem; font-weight: 600; color: #1a2840; display: flex; align-items: center; gap: 6px; }
+.id-list-sub { font-size: 0.74rem; color: #6a7a90; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.id-list-counts { display: flex; gap: 12px; font-size: 0.72rem; color: #8090a8; margin-top: 5px; }
+
+.id-detail-col { border: 1px solid #e1e8f2; border-radius: 12px; padding: 16px 18px; background: #f7fafd; min-height: 200px; }
+.id-detail-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.id-detail-head h3 { margin: 0; font-size: 1.2rem; color: #0f1824; }
+.id-detail-head code { font-size: 0.8rem; color: #6a7a90; background: #eef2f8; padding: 2px 8px; border-radius: 6px; }
+.id-detail-dates { font-size: 0.72rem; color: #8090a8; margin: 6px 0 14px; }
+
+.id-badge { padding: 1px 8px; border-radius: 10px; font-size: 0.68rem; font-weight: 600; background: #eef2f8; color: #6a7a90; }
+.id-badge.good { background: rgba(30,160,90,0.1); color: #1a8a50; }
+.id-badge.muted { background: #f0f3f8; color: #8090a8; }
+
+.id-section { border-top: 1px solid #e4eaf2; padding-top: 12px; margin-top: 14px; }
+.id-section-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: #6a7a90; margin-bottom: 8px; }
+.id-rows { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.id-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; background: #fff; border: 1px solid #e8eef6; flex-wrap: wrap; }
+.id-row.off { opacity: 0.55; }
+.id-row.empty { color: #8090a8; font-size: 0.8rem; background: none; border: 1px dashed #d6deea; }
+.id-row-main { flex: 1; font-size: 0.85rem; color: #1a2840; min-width: 140px; }
+.id-row-meta { font-size: 0.72rem; color: #8090a8; }
+.id-row-actions { display: flex; gap: 4px; }
+.id-mini { font-size: 0.75rem !important; padding: 4px 10px !important; }
+.id-add-row { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+.id-add-row .rq-search { flex: 1; }
+.id-priority-input { width: 70px; padding: 9px 8px; border: 1.5px solid #d6deea; border-radius: 10px; background: none; color: inherit; font-size: 0.82rem; }
+.id-hint { font-size: 0.72rem; color: #8090a8; margin: 6px 0 0; }
+
+.id-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+.id-table th, .id-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eef2f8; }
+.id-table th { font-size: 0.74rem; color: #6a7a90; text-transform: uppercase; letter-spacing: 0.02em; }
+.id-table code { font-size: 0.8rem; color: #2a5cb4; }
+.id-strength { color: #3a6cd4; font-weight: 500; }
+.id-pager { display: flex; align-items: center; gap: 14px; justify-content: center; margin-top: 12px; font-size: 0.8rem; color: #6a7a90; }
+
+[data-theme="dark"] .id-subtab { border-color: #263547; color: #7090aa; }
+[data-theme="dark"] .id-subtab.active { border-color: #4a7ce4; background: rgba(74,124,228,0.12); color: #9fc0ec; }
+[data-theme="dark"] .id-select { border-color: #263547; }
+[data-theme="dark"] .id-list-item { border-color: #1e2e42; background: #0f1824; }
+[data-theme="dark"] .id-list-item:hover, [data-theme="dark"] .id-list-item.active { border-color: #4a7ce4; background: rgba(74,124,228,0.1); }
+[data-theme="dark"] .id-list-name { color: #d8e4f2; }
+[data-theme="dark"] .id-detail-col { border-color: #263547; background: #111e2d; }
+[data-theme="dark"] .id-detail-head h3 { color: #e0eaf8; }
+[data-theme="dark"] .id-detail-head code { background: #1e2e42; color: #9fb4cc; }
+[data-theme="dark"] .id-row { border-color: #1e2e42; background: #0f1824; }
+[data-theme="dark"] .id-row-main { color: #c8d8ec; }
+[data-theme="dark"] .id-section, [data-theme="dark"] .id-table th, [data-theme="dark"] .id-table td { border-color: #1e2e42; }
+[data-theme="dark"] .id-badge { background: #1e2e42; color: #7090aa; }
+[data-theme="dark"] .id-priority-input { border-color: #263547; }
+
 /* option buttons */
 .rq-options {
   display: grid;
