@@ -3307,6 +3307,7 @@ function IngredientDictionaryPanel({ csrfToken }) {
   const [matchedTotal, setMatchedTotal] = useState(0);
   const [matchedOffset, setMatchedOffset] = useState(0);
   const [matchedSearch, setMatchedSearch] = useState("");
+  const [matchedStatusFilter, setMatchedStatusFilter] = useState("");
   const [loadingMatched, setLoadingMatched] = useState(false);
   const [matchedSelected, setMatchedSelected] = useState(() => new Set());
 
@@ -3358,6 +3359,7 @@ function IngredientDictionaryPanel({ csrfToken }) {
     try {
       const params = new URLSearchParams({ limit: String(MATCHED_PAGE), offset: String(offset) });
       if (matchedSearch.trim()) params.set("search", matchedSearch.trim());
+      if (matchedStatusFilter) params.set("status", matchedStatusFilter);
       const res = await apiFetch(`${ING_API}/matched-products?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -3370,7 +3372,7 @@ function IngredientDictionaryPanel({ csrfToken }) {
     } finally {
       setLoadingMatched(false);
     }
-  }, [matchedSearch]);
+  }, [matchedSearch, matchedStatusFilter]);
 
   const loadDiscoveries = useCallback(async () => {
     setLoadingDiscoveries(true);
@@ -3389,7 +3391,7 @@ function IngredientDictionaryPanel({ csrfToken }) {
   }, []);
 
   useEffect(() => { if (subTab === "dictionary") loadList(); }, [subTab, loadList]);
-  useEffect(() => { if (subTab === "matched") loadMatched(0); }, [subTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (subTab === "matched") loadMatched(0); }, [subTab, matchedStatusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (subTab === "discoveries") loadDiscoveries(); }, [subTab, loadDiscoveries]);
 
   useEffect(() => {
@@ -3734,6 +3736,24 @@ function IngredientDictionaryPanel({ csrfToken }) {
           <div className="id-search-row">
             <input type="text" className="rq-search" placeholder="ค้นหา: รหัส / ชื่อสินค้า / สาร" value={matchedSearch}
               onChange={(e) => setMatchedSearch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") loadMatched(0); }} />
+            <label className="id-filter-label">
+              <span>ยืนยัน</span>
+              <select
+                className="id-select"
+                value={matchedStatusFilter}
+                onChange={(e) => {
+                  setMatchedStatusFilter(e.target.value);
+                  setMatchedOffset(0);
+                }}
+                title="กรองสถานะการยืนยัน"
+              >
+                <option value="">ทั้งหมดที่ยังไม่ถูกปฏิเสธ</option>
+                <option value="proposed">รอยืนยัน</option>
+                <option value="confirmed">ยืนยันแล้ว</option>
+                <option value="needs_review">ต้องทบทวน</option>
+                <option value="rejected">ปฏิเสธแล้ว</option>
+              </select>
+            </label>
             <button type="button" className="ghost-button" onClick={() => loadMatched(0)}>ค้นหา</button>
           </div>
           <div className="id-matched-toolbar">
@@ -3750,7 +3770,33 @@ function IngredientDictionaryPanel({ csrfToken }) {
           <div className="table-wrap">
             <table className="id-table">
               <thead>
-                <tr><th></th><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>สารที่จับคู่</th><th>ที่มา</th><th>สถานะ</th><th>ยืนยัน</th></tr>
+                <tr>
+                  <th></th>
+                  <th>รหัสสินค้า</th>
+                  <th>ชื่อสินค้า</th>
+                  <th>สารที่จับคู่</th>
+                  <th>ที่มา</th>
+                  <th>สถานะ</th>
+                  <th>
+                    <label className="id-th-filter">
+                      <span>ยืนยัน</span>
+                      <select
+                        value={matchedStatusFilter}
+                        onChange={(e) => {
+                          setMatchedStatusFilter(e.target.value);
+                          setMatchedOffset(0);
+                        }}
+                        aria-label="กรองสถานะยืนยัน"
+                      >
+                        <option value="">ทั้งหมด</option>
+                        <option value="proposed">รอยืนยัน</option>
+                        <option value="confirmed">ยืนยันแล้ว</option>
+                        <option value="needs_review">ต้องทบทวน</option>
+                        <option value="rejected">ปฏิเสธแล้ว</option>
+                      </select>
+                    </label>
+                  </th>
+                </tr>
               </thead>
               <tbody>
                 {loadingMatched ? (
