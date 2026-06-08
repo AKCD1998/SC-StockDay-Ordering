@@ -438,9 +438,32 @@ function normalizeSupplierText(value) {
     .replace(/[\s.-]+/g, "");
 }
 
-function getSupplierBrand(supplierName) {
+function getSupplierBrand(supplierName, supplierLogoMap = {}) {
   const normalized = normalizeSupplierText(supplierName);
   if (!normalized) return null;
+
+  const customLogo = supplierLogoMap[normalized];
+  if (customLogo?.logoDataUrl) {
+    return {
+      key: "custom",
+      wordmark: customLogo.supplierName || supplierName,
+      tagline: "",
+      logoSrc: customLogo.logoDataUrl,
+      isCustom: true,
+    };
+  }
+
+  for (const [key, logo] of Object.entries(supplierLogoMap)) {
+    if (key && logo?.logoDataUrl && (normalized.includes(key) || key.includes(normalized))) {
+      return {
+        key: "custom",
+        wordmark: logo.supplierName || supplierName,
+        tagline: "",
+        logoSrc: logo.logoDataUrl,
+        isCustom: true,
+      };
+    }
+  }
 
   for (const brand of SUPPLIER_BRANDS) {
     const matched = brand.patterns.some((pattern) =>
@@ -457,6 +480,26 @@ function getSupplierBrand(supplierName) {
   }
 
   return null;
+}
+
+function svgTextToDataUrl(svgText) {
+  const bytes = new TextEncoder().encode(svgText);
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return `data:image/svg+xml;base64,${window.btoa(binary)}`;
+}
+
+function validateSvgText(svgText) {
+  const lowerSvg = String(svgText || "").toLowerCase();
+  if (!lowerSvg.includes("<svg") || !lowerSvg.includes("</svg")) {
+    return "ไฟล์นี้ไม่ใช่ SVG ที่ถูกต้อง";
+  }
+  if (/<script[\s>]/i.test(svgText) || /<foreignobject[\s>]/i.test(svgText) || /\son[a-z]+\s*=/i.test(svgText)) {
+    return "SVG นี้มี markup ที่ไม่ปลอดภัย";
+  }
+  return "";
 }
 
 async function apiFetch(path, options = {}) {
@@ -1095,11 +1138,16 @@ function LoginScreen({ authError, busy, username, password, onUsernameChange, on
   );
 }
 
-function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
+function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfToken }) {
   const receiptPageSize = 10;
   const [activeTab, setActiveTab] = useState("pending");
   const [pendingRecords, setPendingRecords] = useState([]);
   const [approvedRecords, setApprovedRecords] = useState([]);
+  const [supplierLogoMap, setSupplierLogoMap] = useState({});
+  const [logoEditorRecord, setLogoEditorRecord] = useState(null);
+  const [logoPreviewSrc, setLogoPreviewSrc] = useState("");
+  const [logoEditorMessage, setLogoEditorMessage] = useState("");
+  const [savingLogo, setSavingLogo] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
   const [approvedSortOrder, setApprovedSortOrder] = useState("desc");
   const [pendingDateFilter, setPendingDateFilter] = useState("");
@@ -1126,6 +1174,27 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
   });
   const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
   const [approvedRefreshKey, setApprovedRefreshKey] = useState(0);
+
+  function indexSupplierLogos(logos) {
+    const nextMap = {};
+    for (const logo of logos || []) {
+      const keys = [
+        normalizeSupplierText(logo.supplierKey),
+        normalizeSupplierText(logo.supplierName),
+      ].filter(Boolean);
+      for (const key of keys) {
+        nextMap[key] = logo;
+      }
+    }
+    return nextMap;
+  }
+
+  async function fetchSupplierLogos() {
+    const res = await apiFetch("/api/admin/supplier-logos");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    setSupplierLogoMap(indexSupplierLogos(data.logos || []));
+  }
 
   function toggleDoc(docNo) {
     setExpandedDocs((prev) => ({ ...prev, [docNo]: !prev[docNo] }));
@@ -1205,6 +1274,12 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
     fetchApproved();
   }, [approvedPage, approvedRefreshKey, appliedSearchTerm, branchCode, selectedDate, approvedSortOrder]);
 
+  useEffect(() => {
+    fetchSupplierLogos().catch(() => {
+      setSupplierLogoMap({});
+    });
+  }, []);
+
   function formatDocDate(value) {
     if (!value) return "-";
     const d = new Date(value);
@@ -1244,6 +1319,82 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
       return;
     }
     setApprovedRefreshKey((value) => value + 1);
+  }
+
+  function openLogoEditor(record) {
+    const supplierName = record.supplierName || record.supplierCode || "";
+    const supplierBrand = getSupplierBrand(supplierName, supplierLogoMap);
+    setLogoEditorRecord(record);
+    setLogoPreviewSrc(supplierBrand?.logoSrc || "");
+    setLogoEditorMessage("");
+  }
+
+  function closeLogoEditor() {
+    if (savingLogo) return;
+    setLogoEditorRecord(null);
+    setLogoPreviewSrc("");
+    setLogoEditorMessage("");
+  }
+
+  async function handleLogoFileChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".svg")) {
+      setLogoEditorMessage("กรุณาเลือกไฟล์ .svg เท่านั้น");
+      return;
+    }
+    if (file.size > 300_000) {
+      setLogoEditorMessage("ไฟล์ SVG ต้องไม่เกิน 300KB");
+      return;
+    }
+
+    const svgText = await file.text();
+    const validationMessage = validateSvgText(svgText);
+    if (validationMessage) {
+      setLogoEditorMessage(validationMessage);
+      return;
+    }
+
+    setLogoPreviewSrc(svgTextToDataUrl(svgText));
+    setLogoEditorMessage("");
+  }
+
+  async function saveSupplierLogo() {
+    const supplierName = logoEditorRecord?.supplierName || logoEditorRecord?.supplierCode || "";
+    if (!supplierName || !logoPreviewSrc) {
+      setLogoEditorMessage("กรุณาเลือก SVG ก่อนบันทึก");
+      return;
+    }
+
+    setSavingLogo(true);
+    setLogoEditorMessage("");
+    try {
+      const res = await apiFetch("/api/admin/supplier-logos", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken || "",
+        },
+        body: JSON.stringify({
+          supplierKey: normalizeSupplierText(supplierName),
+          supplierName,
+          logoDataUrl: logoPreviewSrc,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setSupplierLogoMap((current) => ({
+        ...current,
+        [normalizeSupplierText(data.logo.supplierKey)]: data.logo,
+        [normalizeSupplierText(data.logo.supplierName)]: data.logo,
+      }));
+      setLogoEditorRecord(null);
+      setLogoPreviewSrc("");
+    } catch (err) {
+      setLogoEditorMessage(err.message || "บันทึกโลโก้ไม่สำเร็จ");
+    } finally {
+      setSavingLogo(false);
+    }
   }
 
   function renderPagination(pagination, setPage, loading, records) {
@@ -1287,7 +1438,8 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
   function ReceiptCard({ record }) {
     const docNo = record.docNo;
     const isOpen = !!expandedDocs[docNo];
-    const supplierBrand = getSupplierBrand(record.supplierName || record.supplierCode);
+    const supplierName = record.supplierName || record.supplierCode || "";
+    const supplierBrand = getSupplierBrand(supplierName, supplierLogoMap);
     return (
       <article className="receipt-card">
         <div className="receipt-card-header">
@@ -1302,31 +1454,42 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
             </span>
           </div>
           <div className="receipt-card-brand-slot">
-            {supplierBrand ? (
-              <div className={`supplier-brand supplier-brand-${supplierBrand.key}`}>
-                <div className="supplier-brand-mark" aria-hidden="true">
-                  {supplierBrand.logoSrc ? (
-                    <img
-                      className="supplier-brand-image"
-                      src={supplierBrand.logoSrc}
-                      alt=""
-                    />
-                  ) : supplierBrand.key === "dksh" ? (
-                    <>
-                      <span className="supplier-brand-dksh-half" />
-                      <span className="supplier-brand-dksh-leaf supplier-brand-dksh-leaf-1" />
-                      <span className="supplier-brand-dksh-leaf supplier-brand-dksh-leaf-2" />
-                      <span className="supplier-brand-dksh-leaf supplier-brand-dksh-leaf-3" />
-                    </>
-                  ) : (
-                    <>
-                      <span className="supplier-brand-globe" />
-                      <span className="supplier-brand-slash" />
-                    </>
-                  )}
+            <div className="receipt-card-brand-stack">
+              {supplierBrand ? (
+                <div className={`supplier-brand supplier-brand-${supplierBrand.key}`}>
+                  <div className="supplier-brand-mark" aria-hidden="true">
+                    {supplierBrand.logoSrc ? (
+                      <img
+                        className="supplier-brand-image"
+                        src={supplierBrand.logoSrc}
+                        alt=""
+                      />
+                    ) : supplierBrand.key === "dksh" ? (
+                      <>
+                        <span className="supplier-brand-dksh-half" />
+                        <span className="supplier-brand-dksh-leaf supplier-brand-dksh-leaf-1" />
+                        <span className="supplier-brand-dksh-leaf supplier-brand-dksh-leaf-2" />
+                        <span className="supplier-brand-dksh-leaf supplier-brand-dksh-leaf-3" />
+                      </>
+                    ) : (
+                      <>
+                        <span className="supplier-brand-globe" />
+                        <span className="supplier-brand-slash" />
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ) : null}
+              ) : null}
+              {canEditLogos ? (
+                <button
+                  type="button"
+                  className="ghost-button supplier-logo-edit-button"
+                  onClick={() => openLogoEditor(record)}
+                >
+                  แก้โลโก้
+                </button>
+              ) : null}
+            </div>
           </div>
           <div className="receipt-card-side">
             {canViewPrices && (
@@ -1523,6 +1686,54 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices }) {
             renderPagination(approvedPagination, setApprovedPage, loadingApproved, approvedRecords)}
         </div>
       )}
+      {logoEditorRecord ? (
+        <div className="logo-editor-backdrop" role="presentation" onClick={closeLogoEditor}>
+          <div
+            className="logo-editor-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="แก้โลโก้ผู้จำหน่าย"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="logo-editor-header">
+              <div>
+                <h3>แก้โลโก้ผู้จำหน่าย</h3>
+                <p>{logoEditorRecord.supplierName || logoEditorRecord.supplierCode || "-"}</p>
+              </div>
+              <button type="button" className="ghost-button" onClick={closeLogoEditor} disabled={savingLogo}>
+                ปิด
+              </button>
+            </div>
+            <div className="logo-editor-body">
+              <div className="logo-editor-preview">
+                {logoPreviewSrc ? (
+                  <img className="supplier-brand-image" src={logoPreviewSrc} alt="" />
+                ) : (
+                  <span>ยังไม่มีโลโก้</span>
+                )}
+              </div>
+              <label className="logo-file-picker">
+                <span>อัปโหลด SVG</span>
+                <input type="file" accept=".svg,image/svg+xml" onChange={handleLogoFileChange} />
+              </label>
+              {logoEditorMessage ? <p className="notice error compact">{logoEditorMessage}</p> : null}
+            </div>
+            <div className="logo-editor-actions">
+              <button type="button" className="ghost-button" onClick={closeLogoEditor} disabled={savingLogo}>
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={saveSupplierLogo}
+                disabled={savingLogo || !logoPreviewSrc}
+              >
+                {savingLogo ? "กำลังบันทึก..." : "บันทึกโลโก้"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -4001,6 +4212,8 @@ export default function App() {
         <PurchaseReceiptsPanel
           branchCode={branchCode}
           canViewPrices={session.user.role === "admin"}
+          canEditLogos={isAdminUser}
+          csrfToken={session.csrfToken}
         />
       ) : view === "branch-stock" ? (
         <BranchStockPanel csrfToken={session.csrfToken} isAdminUser={isAdminUser} />

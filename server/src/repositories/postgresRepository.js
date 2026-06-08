@@ -81,6 +81,16 @@ function mapBranchStockSnapshotRow(row) {
   };
 }
 
+function mapSupplierLogoRow(row) {
+  return {
+    supplierKey: row.supplier_key,
+    supplierName: row.supplier_name,
+    logoDataUrl: row.logo_data_url,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export class PostgresRepository {
   constructor() {
     // pool may be overridden after construction (e.g. in tests with a mock pool)
@@ -1679,6 +1689,34 @@ export class PostgresRepository {
       lineTable: "ada_approved_receipt_lines",
       ...options,
     });
+  }
+
+  async getSupplierLogos() {
+    const { rows } = await this.pool.query(
+      `
+      SELECT supplier_key, supplier_name, logo_data_url, created_at, updated_at
+      FROM supplier_logos
+      ORDER BY supplier_name ASC
+      `,
+    );
+    return rows.map(mapSupplierLogoRow);
+  }
+
+  async upsertSupplierLogo({ supplierKey, supplierName, logoDataUrl }) {
+    const { rows } = await this.pool.query(
+      `
+      INSERT INTO supplier_logos (supplier_key, supplier_name, logo_data_url)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (supplier_key)
+      DO UPDATE SET
+        supplier_name = EXCLUDED.supplier_name,
+        logo_data_url = EXCLUDED.logo_data_url,
+        updated_at = NOW()
+      RETURNING supplier_key, supplier_name, logo_data_url, created_at, updated_at
+      `,
+      [supplierKey, supplierName, logoDataUrl],
+    );
+    return mapSupplierLogoRow(rows[0]);
   }
 
   async ingestBranchStockSnapshots(records) {

@@ -69,6 +69,55 @@ function normalizeOptionalText(value, maxLength = 255) {
   return String(value).trim().replace(/\s+/g, " ").slice(0, maxLength);
 }
 
+function normalizeSupplierLogoKey(value) {
+  return normalizeOptionalText(value, 255)
+    .toLowerCase()
+    .replace(/[\s.-]+/g, "");
+}
+
+function validateSupplierLogoPayload(body) {
+  const supplierName = normalizeOptionalText(body?.supplierName, 255);
+  const supplierKey = normalizeSupplierLogoKey(body?.supplierKey || supplierName);
+  const logoDataUrl = String(body?.logoDataUrl || "").trim();
+
+  if (!supplierName) {
+    return { error: "supplierName is required." };
+  }
+  if (!supplierKey) {
+    return { error: "supplierKey is required." };
+  }
+  if (!logoDataUrl.startsWith("data:image/svg+xml;base64,")) {
+    return { error: "logoDataUrl must be a base64 SVG data URL." };
+  }
+  if (logoDataUrl.length > 450_000) {
+    return { error: "SVG logo is too large." };
+  }
+
+  let svgText = "";
+  try {
+    svgText = Buffer.from(logoDataUrl.slice("data:image/svg+xml;base64,".length), "base64").toString("utf8");
+  } catch {
+    return { error: "SVG logo is not valid base64." };
+  }
+
+  const lowerSvg = svgText.toLowerCase();
+  if (!lowerSvg.includes("<svg") || !lowerSvg.includes("</svg")) {
+    return { error: "SVG logo must contain an <svg> element." };
+  }
+  if (/<script[\s>]/i.test(svgText) || /<foreignobject[\s>]/i.test(svgText) || /\son[a-z]+\s*=/i.test(svgText)) {
+    return { error: "SVG logo contains unsafe markup." };
+  }
+
+  return {
+    error: null,
+    value: {
+      supplierKey,
+      supplierName,
+      logoDataUrl,
+    },
+  };
+}
+
 function normalizeBranchStockNumber(value) {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -416,6 +465,20 @@ export function createRouter(repository) {
       pageSize,
     });
     res.json({ ok: true, ...result });
+  }));
+
+  router.get("/api/admin/supplier-logos", asyncHandler(async (_req, res) => {
+    res.json({ ok: true, logos: await repository.getSupplierLogos() });
+  }));
+
+  router.put("/api/admin/supplier-logos", asyncHandler(async (req, res) => {
+    const validation = validateSupplierLogoPayload(req.body || {});
+    if (validation.error) {
+      return res.status(400).json({ error: validation.error });
+    }
+
+    const logo = await repository.upsertSupplierLogo(validation.value);
+    return res.json({ ok: true, logo });
   }));
 
   router.get("/api/admin/transfers", asyncHandler(async (req, res) => {

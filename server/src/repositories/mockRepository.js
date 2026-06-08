@@ -18,6 +18,7 @@ export class MockRepository {
     this.syncErrors = structuredClone(syncErrors);
     this.members = structuredClone(MOCK_MEMBERS);
     this.loyaltyClaims = [];
+    this.supplierLogos = [];
   }
 
   async getBranches() {
@@ -250,6 +251,31 @@ export class MockRepository {
         totalPages: 1,
       },
     };
+  }
+
+  async getSupplierLogos() {
+    return this.supplierLogos;
+  }
+
+  async upsertSupplierLogo({ supplierKey, supplierName, logoDataUrl }) {
+    const now = new Date().toISOString();
+    const existing = this.supplierLogos.find((item) => item.supplierKey === supplierKey);
+    if (existing) {
+      existing.supplierName = supplierName;
+      existing.logoDataUrl = logoDataUrl;
+      existing.updatedAt = now;
+      return existing;
+    }
+
+    const next = {
+      supplierKey,
+      supplierName,
+      logoDataUrl,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.supplierLogos.push(next);
+    return next;
   }
 
   async ingestBranchStock(payload) {

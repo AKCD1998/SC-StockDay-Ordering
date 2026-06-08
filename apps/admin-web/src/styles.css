@@ -1855,6 +1855,12 @@ select {
   min-height: 92px;
 }
 
+.receipt-card-brand-stack {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
 .supplier-brand {
   display: flex;
   align-items: center;
@@ -1878,6 +1884,95 @@ select {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.supplier-logo-edit-button {
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.logo-editor-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(11, 22, 36, 0.54);
+}
+
+.logo-editor-dialog {
+  width: min(480px, 100%);
+  border: 1px solid #d5deea;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(18, 32, 52, 0.28);
+}
+
+.logo-editor-header,
+.logo-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+}
+
+.logo-editor-header {
+  border-bottom: 1px solid #e4eaf2;
+}
+
+.logo-editor-header h3 {
+  margin: 0;
+  color: #17334d;
+  font-size: 1.14rem;
+}
+
+.logo-editor-header p {
+  margin: 4px 0 0;
+  color: #63758a;
+  font-size: 0.92rem;
+}
+
+.logo-editor-body {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.logo-editor-preview {
+  display: grid;
+  place-items: center;
+  width: 128px;
+  height: 128px;
+  border: 1px solid #d3dce9;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #6d7f92;
+  overflow: hidden;
+}
+
+.logo-file-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px dashed #aebbd0;
+  border-radius: 8px;
+  color: #364e68;
+}
+
+.logo-file-picker input {
+  max-width: 230px;
+}
+
+.logo-editor-actions {
+  border-top: 1px solid #e4eaf2;
 }
 
 .supplier-brand-globe {
