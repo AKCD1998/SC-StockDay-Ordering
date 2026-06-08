@@ -32,6 +32,65 @@ import orexTradingLogoUrl from "./assets/orex-trading-logo.svg";
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const adminViewStorageKey = "sc-stockday-admin-view";
 const adminThemeStorageKey = "sc-stockday-admin-theme";
+const adminOnlyViews = ["category-review", "ingredient-dictionary", "sync-log"];
+const adminViewKeys = ["dashboard", "receipts", "branch-stock", "movement-trace", ...adminOnlyViews];
+
+function getNavigationGroups(isAdminUser) {
+  return [
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      shortLabel: "DB",
+      items: [
+        { label: "Dashboard", view: "dashboard", description: "ภาพรวม Stock Day และคำขอจากสาขา" },
+      ],
+    },
+    {
+      id: "product-data",
+      label: "ข้อมูลสินค้า",
+      shortLabel: "PR",
+      items: [
+        { label: "ใบรับสินค้า", view: "receipts", description: "ตรวจใบรับสินค้าและโลโก้ Supplier" },
+        { label: "สต็อกสาขา", view: "branch-stock", description: "สถานะสต็อกแยกตามสาขา" },
+        { label: "Movement", view: "movement-trace", description: "ติดตาม movement รายสินค้า" },
+        { label: "ตรวจสอบสต็อก", description: "โมดูลต่อยอดสำหรับ audit สต็อก", disabled: true },
+      ],
+    },
+    {
+      id: "data-quality",
+      label: "ตรวจสอบฐานข้อมูล",
+      shortLabel: "DQ",
+      adminOnly: true,
+      items: [
+        { label: "ตรวจหมวดสินค้า", view: "category-review", description: "review queue สำหรับยืนยันหมวดสินค้า" },
+        { label: "พจนานุกรมสารสำคัญ", view: "ingredient-dictionary", description: "ดูแลฐานความรู้สารสำคัญ" },
+        { label: "Ingredient Mapping", description: "supervision workflow ระยะถัดไป", disabled: true },
+        { label: "Product Master", description: "ทะเบียนสินค้ากลาง", disabled: true },
+      ],
+    },
+    {
+      id: "reports",
+      label: "รายงาน",
+      shortLabel: "RP",
+      items: [
+        { label: "KPI", description: "รายงานตัวชี้วัดสำหรับผู้บริหาร", disabled: true },
+        { label: "Export", description: "ศูนย์รวมไฟล์ส่งออก", disabled: true },
+      ],
+    },
+    {
+      id: "system",
+      label: "ระบบ",
+      shortLabel: "SY",
+      adminOnly: true,
+      items: [
+        { label: "ประวัติ Sync", view: "sync-log", description: "สถานะและประวัติการ sync ข้อมูล" },
+        { label: "ผู้ใช้งาน", description: "จัดการบัญชีผู้ใช้", disabled: true },
+        { label: "สิทธิ์การใช้งาน", description: "กำหนดสิทธิ์ตามบทบาท", disabled: true },
+        { label: "ตั้งค่าระบบ", description: "ค่ากลางของระบบ", disabled: true },
+      ],
+    },
+  ].filter((group) => !group.adminOnly || isAdminUser);
+}
 
 function statusClass(status) {
   if (status === "Reorder soon") return "danger";
@@ -4549,17 +4608,19 @@ export default function App() {
   const [view, setView] = useState(() => {
     if (typeof window === "undefined") return "dashboard";
     const savedView = window.localStorage.getItem(adminViewStorageKey);
-    return ["dashboard", "receipts", "branch-stock", "movement-trace", "category-review", "sync-log"].includes(savedView)
+    return adminViewKeys.includes(savedView)
       ? savedView
       : "dashboard";
   });
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [openNavGroup, setOpenNavGroup] = useState(null);
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "dark";
     const savedTheme = window.localStorage.getItem(adminThemeStorageKey);
     return savedTheme === "light" ? "light" : "dark";
   });
   const accountMenuRef = useRef(null);
+  const navigationMenuRef = useRef(null);
   const branchCode = import.meta.env.VITE_BRANCH_CODE || "005";
 
   useEffect(() => {
@@ -4766,6 +4827,30 @@ export default function App() {
     };
   }, [accountMenuOpen]);
 
+  useEffect(() => {
+    if (!openNavGroup || typeof window === "undefined") return undefined;
+
+    function handlePointerDown(event) {
+      if (!navigationMenuRef.current?.contains(event.target)) {
+        setOpenNavGroup(null);
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setOpenNavGroup(null);
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openNavGroup]);
+
   const riskItems = useMemo(() => {
     return [...stockDay]
       .filter((item) => item.status !== "Normal")
@@ -4795,9 +4880,64 @@ export default function App() {
     return filteredStock.slice(startIndex, startIndex + pageSize);
   }, [filteredStock, pageSize, safeCurrentPage]);
   const isAdminUser = session?.user?.role === "admin";
+  const navigationGroups = useMemo(() => getNavigationGroups(isAdminUser), [isAdminUser]);
+
+  const focusNavItem = useCallback((groupId, direction) => {
+    if (typeof window === "undefined") return;
+    window.requestAnimationFrame(() => {
+      const items = Array.from(
+        navigationMenuRef.current?.querySelectorAll(`[data-nav-group="${groupId}"] [data-nav-item]:not(:disabled)`) || [],
+      );
+      if (items.length === 0) return;
+      const activeIndex = items.findIndex((item) => item === document.activeElement);
+      let nextIndex = 0;
+      if (direction === "last") {
+        nextIndex = items.length - 1;
+      } else if (direction === "next") {
+        nextIndex = activeIndex >= 0 ? (activeIndex + 1) % items.length : 0;
+      } else if (direction === "previous") {
+        nextIndex = activeIndex >= 0 ? (activeIndex - 1 + items.length) % items.length : items.length - 1;
+      }
+      items[nextIndex]?.focus();
+    });
+  }, []);
+
+  const handleNavigate = useCallback((item) => {
+    if (!item?.view || item.disabled) return;
+    setView(item.view);
+    setOpenNavGroup(null);
+  }, []);
+
+  const handleNavTriggerKeyDown = useCallback((event, group) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setOpenNavGroup(group.id);
+      focusNavItem(group.id, "first");
+    }
+  }, [focusNavItem]);
+
+  const handleNavItemKeyDown = useCallback((event, groupId) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setOpenNavGroup(null);
+      navigationMenuRef.current?.querySelector(`[data-nav-trigger="${groupId}"]`)?.focus();
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusNavItem(groupId, "next");
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusNavItem(groupId, "previous");
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      focusNavItem(groupId, "first");
+    } else if (event.key === "End") {
+      event.preventDefault();
+      focusNavItem(groupId, "last");
+    }
+  }, [focusNavItem]);
 
   useEffect(() => {
-    if (!isAdminUser && (view === "category-review" || view === "sync-log")) {
+    if (!isAdminUser && adminOnlyViews.includes(view)) {
       setView("receipts");
     }
   }, [isAdminUser, view]);
@@ -4837,62 +4977,83 @@ export default function App() {
           </div>
         </div>
 
-        <nav className="view-nav" aria-label="เมนูหลัก">
-          <button
-            type="button"
-            className="view-nav-btn view-nav-btn-disabled"
-            disabled
-            aria-disabled="true"
-          >
-            หน้าหลักแดชบอร์ด
-            <span className="view-nav-badge">เร็วๆนี้</span>
-          </button>
-          <button
-            type="button"
-            className={view === "receipts" ? "view-nav-btn active" : "view-nav-btn"}
-            onClick={() => setView("receipts")}
-          >
-            ใบรับสินค้า
-          </button>
-          <button
-            type="button"
-            className={view === "branch-stock" ? "view-nav-btn active" : "view-nav-btn"}
-            onClick={() => setView("branch-stock")}
-          >
-            สต็อกสาขา
-          </button>
-          <button
-            type="button"
-            className={view === "movement-trace" ? "view-nav-btn active" : "view-nav-btn"}
-            onClick={() => setView("movement-trace")}
-          >
-            Movement
-          </button>
-          {isAdminUser ? (
-            <>
-              <button
-                type="button"
-                className={view === "category-review" ? "view-nav-btn active" : "view-nav-btn"}
-                onClick={() => setView("category-review")}
+        <nav className="view-nav hero-nav" aria-label="เมนูหลัก" ref={navigationMenuRef}>
+          {navigationGroups.map((group) => {
+            const activeItem = group.items.find((item) => item.view === view);
+            const isOpen = openNavGroup === group.id;
+            const hasDropdown = group.items.length > 1 || group.items.some((item) => item.disabled);
+            const triggerClassName = [
+              "view-nav-btn",
+              "hero-nav-trigger",
+              activeItem ? "active" : "",
+              isOpen ? "open" : "",
+            ].filter(Boolean).join(" ");
+
+            if (!hasDropdown) {
+              return (
+                <button
+                  key={group.id}
+                  type="button"
+                  className={triggerClassName}
+                  onClick={() => handleNavigate(group.items[0])}
+                >
+                  <span className="hero-nav-mark" aria-hidden="true">{group.shortLabel}</span>
+                  <span className="hero-nav-label">{group.label}</span>
+                </button>
+              );
+            }
+
+            return (
+              <div
+                key={group.id}
+                className={isOpen ? "hero-nav-group open" : "hero-nav-group"}
+                data-nav-group={group.id}
+                onMouseEnter={() => setOpenNavGroup(group.id)}
+                onMouseLeave={() => setOpenNavGroup((current) => (current === group.id ? null : current))}
               >
-                ตรวจหมวดสินค้า
-              </button>
-              <button
-                type="button"
-                className={view === "ingredient-dictionary" ? "view-nav-btn active" : "view-nav-btn"}
-                onClick={() => setView("ingredient-dictionary")}
-              >
-                พจนานุกรมสารสำคัญ
-              </button>
-              <button
-                type="button"
-                className={view === "sync-log" ? "view-nav-btn active" : "view-nav-btn"}
-                onClick={() => setView("sync-log")}
-              >
-                ประวัติ Sync
-              </button>
-            </>
-          ) : null}
+                <button
+                  type="button"
+                  className={triggerClassName}
+                  aria-haspopup="menu"
+                  aria-expanded={isOpen}
+                  data-nav-trigger={group.id}
+                  onClick={() => setOpenNavGroup((current) => (current === group.id ? null : group.id))}
+                  onKeyDown={(event) => handleNavTriggerKeyDown(event, group)}
+                >
+                  <span className="hero-nav-mark" aria-hidden="true">{group.shortLabel}</span>
+                  <span className="hero-nav-label">{group.label}</span>
+                  <span className="hero-nav-chevron" aria-hidden="true">▾</span>
+                </button>
+                <div className="hero-nav-menu" role="menu" aria-label={group.label} aria-hidden={!isOpen}>
+                  {group.items.map((item) => {
+                    const isActive = item.view === view;
+                    return (
+                      <button
+                        key={item.view || item.label}
+                        type="button"
+                        className={[
+                          "hero-nav-item",
+                          isActive ? "active" : "",
+                          item.disabled ? "disabled" : "",
+                        ].filter(Boolean).join(" ")}
+                        role="menuitem"
+                        disabled={item.disabled}
+                        data-nav-item
+                        onClick={() => handleNavigate(item)}
+                        onKeyDown={(event) => handleNavItemKeyDown(event, group.id)}
+                      >
+                        <span className="hero-nav-item-main">
+                          <span>{item.label}</span>
+                          {item.disabled ? <span className="view-nav-badge">เร็วๆนี้</span> : null}
+                        </span>
+                        <span className="hero-nav-item-desc">{item.description}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </nav>
 
         <div className="account-actions">
