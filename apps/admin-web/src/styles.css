@@ -1735,7 +1735,7 @@ select {
 .view-nav {
   display: flex;
   justify-content: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0;
   align-items: stretch;
   align-self: stretch;
@@ -1763,12 +1763,12 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
+  gap: 8px;
   align-self: stretch;
   flex: 0 0 auto;
   border-radius: 0;
   margin-left: -1px;
-  padding: 12px 18px;
+  padding: 12px 14px;
   border-left: 1px solid rgba(73, 101, 140, 0.16);
   border-right: 1px solid rgba(73, 101, 140, 0.16);
   border-top: 0;
@@ -1789,8 +1789,8 @@ select {
 }
 
 .hero-nav-mark {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 8px;
   display: inline-grid;
   place-items: center;
@@ -1961,6 +1961,7 @@ select {
     display: grid;
     grid-template-columns: 1fr;
     width: 100%;
+    flex-wrap: nowrap;
     border-top: 1px solid rgba(73, 101, 140, 0.16);
     border-bottom: 1px solid rgba(73, 101, 140, 0.16);
   }
