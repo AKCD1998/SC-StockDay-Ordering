@@ -32,8 +32,9 @@ import orexTradingLogoUrl from "./assets/orex-trading-logo.svg";
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const adminViewStorageKey = "sc-stockday-admin-view";
 const adminThemeStorageKey = "sc-stockday-admin-theme";
+const defaultAdminView = "receipts";
 const adminOnlyViews = ["category-review", "ingredient-dictionary", "sync-log"];
-const adminViewKeys = ["dashboard", "receipts", "branch-stock", "movement-trace", ...adminOnlyViews];
+const adminViewKeys = [defaultAdminView, "branch-stock", "movement-trace", ...adminOnlyViews];
 
 function getNavigationGroups(isAdminUser) {
   return [
@@ -42,7 +43,7 @@ function getNavigationGroups(isAdminUser) {
       label: "Dashboard",
       shortLabel: "DB",
       items: [
-        { label: "Dashboard", view: "dashboard", description: "ภาพรวม Stock Day และคำขอจากสาขา" },
+        { label: "Dashboard", description: "ภาพรวม Stock Day และคำขอจากสาขา", disabled: true },
       ],
     },
     {
@@ -4586,11 +4587,11 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [view, setView] = useState(() => {
-    if (typeof window === "undefined") return "dashboard";
+    if (typeof window === "undefined") return defaultAdminView;
     const savedView = window.localStorage.getItem(adminViewStorageKey);
     return adminViewKeys.includes(savedView)
       ? savedView
-      : "dashboard";
+      : defaultAdminView;
   });
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [openNavGroup, setOpenNavGroup] = useState(null);
@@ -4970,15 +4971,22 @@ export default function App() {
             ].filter(Boolean).join(" ");
 
             if (!hasDropdown) {
+              const item = group.items[0];
               return (
                 <button
                   key={group.id}
                   type="button"
-                  className={triggerClassName}
-                  onClick={() => handleNavigate(group.items[0])}
+                  className={[
+                    triggerClassName,
+                    item.disabled ? "view-nav-btn-disabled" : "",
+                  ].filter(Boolean).join(" ")}
+                  disabled={item.disabled}
+                  aria-disabled={item.disabled}
+                  onClick={() => handleNavigate(item)}
                 >
                   <span className="hero-nav-mark" aria-hidden="true">{group.shortLabel}</span>
                   <span className="hero-nav-label">{group.label}</span>
+                  {item.disabled ? <span className="view-nav-badge">เร็วๆนี้</span> : null}
                 </button>
               );
             }
