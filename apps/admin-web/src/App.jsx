@@ -3556,21 +3556,33 @@ function IngredientDictionaryPanel({ csrfToken }) {
         <div className="id-dictionary">
           <div className="id-list-col">
             <div className="id-search-row">
-              <input
-                type="text"
-                className="rq-search"
-                placeholder="ค้นหา: ชื่อสาร / คำพ้อง / กลุ่มยา / ข้อบ่งใช้"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") loadList(); }}
-              />
-              <select className="id-select" value={statusFilter} onChange={(e) => setStatus(e.target.value)}>
-                <option value="">ทุกสถานะ</option>
-                <option value="active">ใช้งาน</option>
-                <option value="needs_review">ต้องทบทวน</option>
-                <option value="deprecated">ปิดใช้</option>
-              </select>
-              <button type="button" className="ghost-button" onClick={loadList}>ค้นหา</button>
+              <div className="id-search-stack">
+                <label className="id-search-box">
+                  <span className="id-search-icon" aria-hidden="true">⌕</span>
+                  <input
+                    type="text"
+                    className="rq-search"
+                    placeholder="ค้นหา: ชื่อสาร / คำพ้อง / กลุ่มยา / ข้อบ่งใช้"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") loadList(); }}
+                  />
+                </label>
+                <label className="id-status-box">
+                  <span className="id-status-dot" aria-hidden="true" />
+                  <select className="id-select" value={statusFilter} onChange={(e) => setStatus(e.target.value)}>
+                    <option value="">ทุกสถานะ</option>
+                    <option value="active">ใช้งาน</option>
+                    <option value="needs_review">ต้องทบทวน</option>
+                    <option value="deprecated">ปิดใช้</option>
+                  </select>
+                  <span className="id-status-chevron" aria-hidden="true">⌄</span>
+                </label>
+              </div>
+              <button type="button" className="id-search-button" onClick={loadList}>
+                <span className="id-search-button-icon" aria-hidden="true">⌕</span>
+                <span>ค้นหา</span>
+              </button>
             </div>
             <div className="id-list-meta">{total.toLocaleString()} สาร</div>
             <div className="id-list">
