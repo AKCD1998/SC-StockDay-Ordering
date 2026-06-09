@@ -191,17 +191,24 @@ export function toBranchStockRecords(rows) {
       qty_branch_004: 0,
       qty_branch_005: 0,
       qty_total_all_branches: 0,
+      cost_avg_branch_000: null,
+      cost_avg_branch_001: null,
+      cost_avg_branch_002: null,
+      cost_avg_branch_003: null,
+      cost_avg_branch_004: null,
+      cost_avg_branch_005: null,
       synced_at: new Date().toISOString(),
     };
 
     snapshot.branch_code = branchCode;
 
-    if (branchCode === "000") snapshot.qty_branch_000 = qty;
-    if (branchCode === "001") snapshot.qty_branch_001 = qty;
-    if (branchCode === "002") snapshot.qty_branch_002 = qty;
-    if (branchCode === "003") snapshot.qty_branch_003 = qty;
-    if (branchCode === "004") snapshot.qty_branch_004 = qty;
-    if (branchCode === "005") snapshot.qty_branch_005 = qty;
+    const costAvg = Number(row.cost_avg ?? 0);
+    if (branchCode === "000") { snapshot.qty_branch_000 = qty; snapshot.cost_avg_branch_000 = costAvg; }
+    if (branchCode === "001") { snapshot.qty_branch_001 = qty; snapshot.cost_avg_branch_001 = costAvg; }
+    if (branchCode === "002") { snapshot.qty_branch_002 = qty; snapshot.cost_avg_branch_002 = costAvg; }
+    if (branchCode === "003") { snapshot.qty_branch_003 = qty; snapshot.cost_avg_branch_003 = costAvg; }
+    if (branchCode === "004") { snapshot.qty_branch_004 = qty; snapshot.cost_avg_branch_004 = costAvg; }
+    if (branchCode === "005") { snapshot.qty_branch_005 = qty; snapshot.cost_avg_branch_005 = costAvg; }
 
     snapshots.set(productCode, snapshot);
   }

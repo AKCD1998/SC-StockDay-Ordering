@@ -1734,6 +1734,12 @@ export class PostgresRepository {
     const qtyBranch004 = [];
     const qtyBranch005 = [];
     const qtyTotals = [];
+    const costAvgBranch000 = [];
+    const costAvgBranch001 = [];
+    const costAvgBranch002 = [];
+    const costAvgBranch003 = [];
+    const costAvgBranch004 = [];
+    const costAvgBranch005 = [];
     const syncedAts = [];
 
     for (const record of records) {
@@ -1749,6 +1755,12 @@ export class PostgresRepository {
       qtyBranch004.push(toBranchStockNumber(record.qtyBranch004));
       qtyBranch005.push(toBranchStockNumber(record.qtyBranch005));
       qtyTotals.push(toBranchStockNumber(record.qtyTotalAllBranches));
+      costAvgBranch000.push(record.costAvgBranch000 ?? null);
+      costAvgBranch001.push(record.costAvgBranch001 ?? null);
+      costAvgBranch002.push(record.costAvgBranch002 ?? null);
+      costAvgBranch003.push(record.costAvgBranch003 ?? null);
+      costAvgBranch004.push(record.costAvgBranch004 ?? null);
+      costAvgBranch005.push(record.costAvgBranch005 ?? null);
       syncedAts.push(record.syncedAt);
     }
 
@@ -1767,6 +1779,12 @@ export class PostgresRepository {
         qty_branch_004,
         qty_branch_005,
         qty_total_all_branches,
+        cost_avg_branch_000,
+        cost_avg_branch_001,
+        cost_avg_branch_002,
+        cost_avg_branch_003,
+        cost_avg_branch_004,
+        cost_avg_branch_005,
         synced_at
       )
       SELECT
@@ -1782,7 +1800,13 @@ export class PostgresRepository {
         unnest($10::numeric[]),
         unnest($11::numeric[]),
         unnest($12::numeric[]),
-        unnest($13::timestamptz[])
+        unnest($13::numeric[]),
+        unnest($14::numeric[]),
+        unnest($15::numeric[]),
+        unnest($16::numeric[]),
+        unnest($17::numeric[]),
+        unnest($18::numeric[]),
+        unnest($19::timestamptz[])
       ON CONFLICT (product_code) DO UPDATE SET
         product_name_thai = EXCLUDED.product_name_thai,
         product_name_eng = EXCLUDED.product_name_eng,
@@ -1795,6 +1819,12 @@ export class PostgresRepository {
         qty_branch_004 = EXCLUDED.qty_branch_004,
         qty_branch_005 = EXCLUDED.qty_branch_005,
         qty_total_all_branches = EXCLUDED.qty_total_all_branches,
+        cost_avg_branch_000 = COALESCE(EXCLUDED.cost_avg_branch_000, branch_stock_snapshots.cost_avg_branch_000),
+        cost_avg_branch_001 = COALESCE(EXCLUDED.cost_avg_branch_001, branch_stock_snapshots.cost_avg_branch_001),
+        cost_avg_branch_002 = COALESCE(EXCLUDED.cost_avg_branch_002, branch_stock_snapshots.cost_avg_branch_002),
+        cost_avg_branch_003 = COALESCE(EXCLUDED.cost_avg_branch_003, branch_stock_snapshots.cost_avg_branch_003),
+        cost_avg_branch_004 = COALESCE(EXCLUDED.cost_avg_branch_004, branch_stock_snapshots.cost_avg_branch_004),
+        cost_avg_branch_005 = COALESCE(EXCLUDED.cost_avg_branch_005, branch_stock_snapshots.cost_avg_branch_005),
         synced_at = EXCLUDED.synced_at,
         updated_at = NOW()
       `,
@@ -1811,6 +1841,12 @@ export class PostgresRepository {
         qtyBranch004,
         qtyBranch005,
         qtyTotals,
+        costAvgBranch000,
+        costAvgBranch001,
+        costAvgBranch002,
+        costAvgBranch003,
+        costAvgBranch004,
+        costAvgBranch005,
         syncedAts,
       ],
     );
@@ -1818,6 +1854,51 @@ export class PostgresRepository {
     return {
       accepted: records.length,
       insertedOrUpdated: records.length,
+    };
+  }
+
+  async getBranchStockInventoryValue(branchCode, detail = false) {
+    const col = `qty_branch_${branchCode}`;
+    const costCol = `cost_avg_branch_${branchCode}`;
+    const validBranches = ["000", "001", "002", "003", "004", "005"];
+    if (!validBranches.includes(branchCode)) {
+      throw new Error(`Invalid branchCode: ${branchCode}`);
+    }
+
+    const summaryResult = await this.pool.query(`
+      SELECT
+        COUNT(*)::int                                           AS product_count,
+        COUNT(*) FILTER (WHERE ${col} > 0)::int                AS products_with_stock,
+        COUNT(*) FILTER (WHERE ${costCol} IS NOT NULL)::int    AS products_with_cost,
+        ROUND(SUM(${col} * COALESCE(${costCol}, 0))::numeric, 2) AS total_inventory_value
+      FROM branch_stock_snapshots
+    `);
+
+    const summary = {
+      branchCode,
+      ...summaryResult.rows[0],
+    };
+
+    if (!detail) return summary;
+
+    const detailResult = await this.pool.query(`
+      SELECT
+        product_code,
+        product_name_thai,
+        product_name_eng,
+        barcode,
+        unit,
+        ${col}           AS qty,
+        ${costCol}       AS unit_cost_avg,
+        ROUND((${col} * COALESCE(${costCol}, 0))::numeric, 2) AS inventory_value
+      FROM branch_stock_snapshots
+      WHERE ${col} > 0
+      ORDER BY inventory_value DESC
+    `);
+
+    return {
+      ...summary,
+      products: detailResult.rows,
     };
   }
 

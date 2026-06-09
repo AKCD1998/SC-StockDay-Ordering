@@ -6,6 +6,7 @@ import {
   getPurchaseSummaryRows,
   discoverTransferSchema,
   discoverPurchaseSchema,
+  discoverProductMasterSchema,
   getTransferHeaderRows,
   getTransferLineRows,
   getPendingReceiptHeaderRows,
@@ -50,6 +51,9 @@ async function fetchDatasets(pool) {
   }
   if (datasets.includes("purchase_schema")) {
     data.purchase_schema = await discoverPurchaseSchema(pool);
+  }
+  if (datasets.includes("product_master_schema")) {
+    data.product_master_schema = await discoverProductMasterSchema(pool);
   }
   if (datasets.includes("products")) {
     data.products = await getProductMasterRows(pool);
@@ -130,8 +134,8 @@ async function runOnce() {
     const data = await fetchDatasets(pool);
 
     // schema_discovery / purchase_schema print columns + sample, then exit
-    if (data.schema_discovery || data.purchase_schema) {
-      const discoveryKeys = ["schema_discovery", "purchase_schema"];
+    if (data.schema_discovery || data.purchase_schema || data.product_master_schema) {
+      const discoveryKeys = ["schema_discovery", "purchase_schema", "product_master_schema"];
       for (const key of discoveryKeys) {
         if (!data[key]) continue;
         console.log(`\n=== ${key} ===`);

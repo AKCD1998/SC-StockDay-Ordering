@@ -76,6 +76,19 @@ export async function getPurchaseSummaryRows(pool, branchCode, periodDays) {
   return result.recordset;
 }
 
+// ── Product master schema discovery ───────────────────────────────────────────
+// Run with --datasets=product_master_schema to inspect TCNMPdt columns.
+// Use this to find cost columns (e.g. FCPdtCostIn, FCPdtLastCost) before adding them to getProductMasterRows.
+export async function discoverProductMasterSchema(pool) {
+  const result = await pool.request().query("SELECT TOP 1 * FROM TCNMPdt");
+  return {
+    TCNMPdt: {
+      columns: Object.keys(result.recordset?.[0] ?? {}),
+      sample:  result.recordset?.[0] ?? null,
+    },
+  };
+}
+
 // ── Purchase schema discovery ──────────────────────────────────────────────────
 // Run with --datasets=purchase_schema to inspect TACTPiHD and TACTPiDT columns.
 export async function discoverPurchaseSchema(pool) {
@@ -309,7 +322,8 @@ export async function getBranchStockRows(pool, branchCode) {
       COALESCE(p.FTPdtBarCode1, p.FTPdtBarCode2, p.FTPdtBarCode3) AS barcode,
       COALESCE(u.FTPunName, p.FTPdtSUnit, p.FTPdtMUnit, p.FTPdtLUnit) AS unit,
       @branchCode AS branch_code,
-      COALESCE(p.FCPdtQtyNow, 0) AS qty
+      COALESCE(p.FCPdtQtyNow, 0) AS qty,
+      COALESCE(p.FCPdtCostAvg, 0) AS cost_avg
     FROM TCNMPdt p
     LEFT JOIN TCNMPdtUnit u ON u.FTPunCode = COALESCE(p.FTPdtSUnit, p.FTPdtMUnit, p.FTPdtLUnit)
     WHERE p.FTPdtStaActive = 1

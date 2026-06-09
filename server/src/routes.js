@@ -123,6 +123,12 @@ function normalizeBranchStockNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function normalizeOptionalNumber(value) {
+  if (value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function normalizeSyncedAt(value) {
   const candidate = value ? new Date(value) : new Date();
   if (Number.isNaN(candidate.getTime())) {
@@ -292,6 +298,12 @@ function validateAndNormalizeBranchStockRecords(body) {
       qtyTotalAllBranches: normalizeBranchStockNumber(
         record?.qty_total_all_branches ?? record?.qtyTotalAllBranches,
       ),
+      costAvgBranch000: normalizeOptionalNumber(record?.cost_avg_branch_000 ?? record?.costAvgBranch000),
+      costAvgBranch001: normalizeOptionalNumber(record?.cost_avg_branch_001 ?? record?.costAvgBranch001),
+      costAvgBranch002: normalizeOptionalNumber(record?.cost_avg_branch_002 ?? record?.costAvgBranch002),
+      costAvgBranch003: normalizeOptionalNumber(record?.cost_avg_branch_003 ?? record?.costAvgBranch003),
+      costAvgBranch004: normalizeOptionalNumber(record?.cost_avg_branch_004 ?? record?.costAvgBranch004),
+      costAvgBranch005: normalizeOptionalNumber(record?.cost_avg_branch_005 ?? record?.costAvgBranch005),
       syncedAt,
     });
   }
@@ -553,6 +565,15 @@ export function createRouter(repository) {
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
     res.send(buffer);
+  }));
+
+  router.get("/api/branch-stock/inventory-value", asyncHandler(async (req, res) => {
+    const branchCode = String(req.query.branchCode || "").trim();
+    const detail = req.query.detail === "true";
+    if (!branchCode) {
+      return res.status(400).json({ message: "branchCode query param is required." });
+    }
+    res.json(await repository.getBranchStockInventoryValue(branchCode, detail));
   }));
 
   router.get("/api/admin/taxonomy-match-report", asyncHandler(async (_req, res) => {
