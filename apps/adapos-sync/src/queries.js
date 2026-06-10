@@ -308,7 +308,7 @@ export async function getApprovedReceiptHeaderRows(
 // ── Branch-level stock from local branch product master ───────────────────────
 // On branch laptops, TCNTPdtInWha warehouse mappings are not reliable for
 // inferring "which branch owns this qty". The local branch's actual on-hand
-// stock is reflected in TCNMPdt.FCPdtQtyNow on that machine, so emit one row
+// stock is reflected in TCNMPdt.FCPdtQtyRet on that machine, so emit one row
 // per active product and tag it with the syncing branch code directly.
 export async function getBranchStockRows(pool, branchCode) {
   const req = pool.request();
@@ -322,7 +322,7 @@ export async function getBranchStockRows(pool, branchCode) {
       COALESCE(p.FTPdtBarCode1, p.FTPdtBarCode2, p.FTPdtBarCode3) AS barcode,
       COALESCE(u.FTPunName, p.FTPdtSUnit, p.FTPdtMUnit, p.FTPdtLUnit) AS unit,
       @branchCode AS branch_code,
-      COALESCE(p.FCPdtQtyNow, 0) AS qty,
+      COALESCE(p.FCPdtQtyRet, 0) AS qty,
       COALESCE(p.FCPdtCostAvg, 0) AS cost_avg
     FROM TCNMPdt p
     LEFT JOIN TCNMPdtUnit u ON u.FTPunCode = COALESCE(p.FTPdtSUnit, p.FTPdtMUnit, p.FTPdtLUnit)
