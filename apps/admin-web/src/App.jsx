@@ -1188,9 +1188,11 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
   const [logoPreviewSrc, setLogoPreviewSrc] = useState("");
   const [logoEditorMessage, setLogoEditorMessage] = useState("");
   const [savingLogo, setSavingLogo] = useState(false);
-  const [selectedDate, setSelectedDate] = useState("");
+  const [approvedDateFrom, setApprovedDateFrom] = useState("");
+  const [approvedDateTo, setApprovedDateTo] = useState("");
   const [approvedSortOrder, setApprovedSortOrder] = useState("desc");
-  const [pendingDateFilter, setPendingDateFilter] = useState("");
+  const [pendingDateFrom, setPendingDateFrom] = useState("");
+  const [pendingDateTo, setPendingDateTo] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
   const [loadingPending, setLoadingPending] = useState(false);
@@ -1240,7 +1242,12 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
     setExpandedDocs((prev) => ({ ...prev, [docNo]: !prev[docNo] }));
   }
 
-  async function fetchPending({ page = pendingPage, search = appliedSearchTerm, date = pendingDateFilter } = {}) {
+  async function fetchPending({
+    page = pendingPage,
+    search = appliedSearchTerm,
+    dateFrom = pendingDateFrom,
+    dateTo = pendingDateTo,
+  } = {}) {
     setLoadingPending(true);
     setPendingError("");
     try {
@@ -1250,7 +1257,8 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
         pageSize: String(receiptPageSize),
       });
       if (search) params.set("search", search);
-      if (date) params.set("date", date);
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
       const res = await apiFetch(`/api/admin/pending-receipts?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -1271,7 +1279,8 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
   }
 
   async function fetchApproved({
-    date = selectedDate,
+    dateFrom = approvedDateFrom,
+    dateTo = approvedDateTo,
     page = approvedPage,
     search = appliedSearchTerm,
     sort = approvedSortOrder,
@@ -1285,7 +1294,8 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
         pageSize: String(receiptPageSize),
         sort,
       });
-      if (date) params.set("date", date);
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
       if (search) params.set("search", search);
       const res = await apiFetch(`/api/admin/approved-receipts?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1308,11 +1318,11 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
 
   useEffect(() => {
     fetchPending();
-  }, [appliedSearchTerm, branchCode, pendingDateFilter, pendingPage, pendingRefreshKey]);
+  }, [appliedSearchTerm, branchCode, pendingDateFrom, pendingDateTo, pendingPage, pendingRefreshKey]);
 
   useEffect(() => {
     fetchApproved();
-  }, [approvedPage, approvedRefreshKey, appliedSearchTerm, branchCode, selectedDate, approvedSortOrder]);
+  }, [approvedPage, approvedRefreshKey, appliedSearchTerm, branchCode, approvedDateFrom, approvedDateTo, approvedSortOrder]);
 
   useEffect(() => {
     fetchSupplierLogos().catch(() => {
@@ -1646,17 +1656,34 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
             placeholder="ค้นหา SKU, ชื่อสินค้า, ผู้จำหน่าย, เลขที่เอกสาร"
           />
           <label className="date-label receipt-date-label">
-            วันที่
+            จากวันที่
             <input
               type="date"
-              value={activeTab === "pending" ? pendingDateFilter : selectedDate}
+              value={activeTab === "pending" ? pendingDateFrom : approvedDateFrom}
               onChange={(event) => {
                 if (activeTab === "pending") {
-                  setPendingDateFilter(event.target.value);
+                  setPendingDateFrom(event.target.value);
                   setPendingPage(1);
                   return;
                 }
-                setSelectedDate(event.target.value);
+                setApprovedDateFrom(event.target.value);
+                setApprovedPage(1);
+              }}
+              className="date-input-inline"
+            />
+          </label>
+          <label className="date-label receipt-date-label">
+            ถึงวันที่
+            <input
+              type="date"
+              value={activeTab === "pending" ? pendingDateTo : approvedDateTo}
+              onChange={(event) => {
+                if (activeTab === "pending") {
+                  setPendingDateTo(event.target.value);
+                  setPendingPage(1);
+                  return;
+                }
+                setApprovedDateTo(event.target.value);
                 setApprovedPage(1);
               }}
               className="date-input-inline"
@@ -1714,7 +1741,9 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
           )}
           {!loadingApproved && !approvedError && approvedRecords.length === 0 && (
             <p className="empty-state">
-              {selectedDate ? "ยังไม่มีเอกสารรับของสำหรับวันที่เลือก" : "ยังไม่มีเอกสารรับของ"}
+              {approvedDateFrom || approvedDateTo
+                ? "ยังไม่มีเอกสารรับของในช่วงวันที่เลือก"
+                : "ยังไม่มีเอกสารรับของ"}
             </p>
           )}
           <div className="receipt-list">

@@ -1508,6 +1508,8 @@ export class PostgresRepository {
     lineTable,
     branchCode = null,
     date = null,
+    dateFrom = null,
+    dateTo = null,
     search = "",
     sort = "desc",
     page = 1,
@@ -1518,27 +1520,37 @@ export class PostgresRepository {
     const safePage = Math.max(1, Number(page) || 1);
     const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 10));
     const offset = (safePage - 1) * safePageSize;
-    const params = [branchCode, date, normalizedSearch || null, safePageSize, offset];
+    const normalizedDateFrom = dateFrom ?? date ?? null;
+    const normalizedDateTo = dateTo ?? date ?? null;
+    const params = [
+      branchCode,
+      normalizedDateFrom,
+      normalizedDateTo,
+      normalizedSearch || null,
+      safePageSize,
+      offset,
+    ];
     const whereClause = `
       WHERE ($1::text IS NULL OR h.branch_code = $1)
-        AND ($2::text IS NULL OR CAST(h.doc_date AS DATE) = $2::date)
+        AND ($2::text IS NULL OR CAST(h.doc_date AS DATE) >= $2::date)
+        AND ($3::text IS NULL OR CAST(h.doc_date AS DATE) <= $3::date)
         AND (
-          $3::text IS NULL
-          OR LOWER(COALESCE(h.doc_no, '')) LIKE '%' || $3 || '%'
-          OR LOWER(COALESCE(h.supplier_name, '')) LIKE '%' || $3 || '%'
-          OR LOWER(COALESCE(h.supplier_code, '')) LIKE '%' || $3 || '%'
-          OR LOWER(COALESCE(h.ref_ext, '')) LIKE '%' || $3 || '%'
-          OR LOWER(COALESCE(h.created_by, '')) LIKE '%' || $3 || '%'
+          $4::text IS NULL
+          OR LOWER(COALESCE(h.doc_no, '')) LIKE '%' || $4 || '%'
+          OR LOWER(COALESCE(h.supplier_name, '')) LIKE '%' || $4 || '%'
+          OR LOWER(COALESCE(h.supplier_code, '')) LIKE '%' || $4 || '%'
+          OR LOWER(COALESCE(h.ref_ext, '')) LIKE '%' || $4 || '%'
+          OR LOWER(COALESCE(h.created_by, '')) LIKE '%' || $4 || '%'
           OR EXISTS (
             SELECT 1
             FROM ${lineTable} lx
             WHERE lx.doc_no = h.doc_no
               AND (
-                LOWER(COALESCE(lx.product_code, '')) LIKE '%' || $3 || '%'
-                OR LOWER(COALESCE(lx.product_name, '')) LIKE '%' || $3 || '%'
-                OR LOWER(COALESCE(lx.barcode, '')) LIKE '%' || $3 || '%'
-                OR LOWER(COALESCE(lx.lot_no, '')) LIKE '%' || $3 || '%'
-                OR LOWER(COALESCE(lx.unit_name, '')) LIKE '%' || $3 || '%'
+                LOWER(COALESCE(lx.product_code, '')) LIKE '%' || $4 || '%'
+                OR LOWER(COALESCE(lx.product_name, '')) LIKE '%' || $4 || '%'
+                OR LOWER(COALESCE(lx.barcode, '')) LIKE '%' || $4 || '%'
+                OR LOWER(COALESCE(lx.lot_no, '')) LIKE '%' || $4 || '%'
+                OR LOWER(COALESCE(lx.unit_name, '')) LIKE '%' || $4 || '%'
               )
           )
         )
@@ -1550,7 +1562,7 @@ export class PostgresRepository {
       FROM ${headerTable} h
       ${whereClause}
       `,
-      params.slice(0, 3),
+      params.slice(0, 4),
     );
     const total = Number(countResult.rows[0]?.total || 0);
 
@@ -1561,7 +1573,7 @@ export class PostgresRepository {
         FROM ${headerTable} h
         ${whereClause}
         ORDER BY h.doc_date ${normalizedSort}, h.doc_time ${normalizedSort}, h.doc_no ${normalizedSort}
-        LIMIT $4 OFFSET $5
+        LIMIT $5 OFFSET $6
       )
       SELECT
         h.doc_no, h.branch_code, h.doc_type, h.doc_date, h.doc_time,

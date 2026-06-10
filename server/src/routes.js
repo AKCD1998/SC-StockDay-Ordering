@@ -454,12 +454,13 @@ export function createRouter(repository) {
 
   // Admin view: pending purchase receipts grouped by document
   router.get("/api/admin/pending-receipts", asyncHandler(async (req, res) => {
-    const { branchCode, date, search } = req.query;
+    const { branchCode, date, dateFrom, dateTo, search } = req.query;
     const page = parsePageParam(req.query.page, 1);
     const pageSize = parsePageParam(req.query.pageSize, 10);
     res.json(await repository.getPendingReceipts({
       branchCode: branchCode || null,
-      date: date || null,
+      dateFrom: dateFrom || date || null,
+      dateTo: dateTo || date || null,
       search: search || "",
       page,
       pageSize,
@@ -478,13 +479,14 @@ export function createRouter(repository) {
 
   // Admin view: approved purchase receipts for today (or a specific date)
   router.get("/api/admin/approved-receipts", asyncHandler(async (req, res) => {
-    const { branchCode, date, search, sort } = req.query;
+    const { branchCode, date, dateFrom, dateTo, search, sort } = req.query;
     if (!branchCode) return res.status(400).json({ error: "branchCode required" });
     const page = parsePageParam(req.query.page, 1);
     const pageSize = parsePageParam(req.query.pageSize, 10);
     const result = await repository.getApprovedReceipts({
       branchCode,
-      date: date ?? null,
+      dateFrom: dateFrom || date || null,
+      dateTo: dateTo || date || null,
       search: search || "",
       sort: sort || "desc",
       page,
