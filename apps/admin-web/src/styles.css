@@ -2260,7 +2260,10 @@ select {
 
 .receipt-filter-bar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content max-content max-content;
+  grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
+  grid-template-areas:
+    "search search search submit"
+    "date-from date-to spacer refresh";
   align-items: end;
   justify-content: stretch;
   column-gap: 8px;
@@ -2358,13 +2361,13 @@ select {
 }
 
 .receipt-search-input {
-  grid-column: 1 / span 4;
-  grid-row: 1;
+  grid-area: search;
   width: 100%;
   min-width: 0;
 }
 
 .receipt-refresh-button {
+  grid-area: refresh;
   white-space: nowrap;
   margin-bottom: 2px;
   border-color: transparent;
@@ -2375,7 +2378,7 @@ select {
 }
 
 .receipt-search-button {
-  grid-row: 2;
+  grid-area: submit;
   white-space: nowrap;
   border-color: #2c6ee8;
   background: linear-gradient(180deg, #4d90ff 0%, #2c6ee8 100%);
@@ -2391,26 +2394,16 @@ select {
 }
 
 .receipt-date-label {
-  grid-row: 2;
   min-width: 0;
   white-space: nowrap;
 }
 
 .receipt-date-label:nth-of-type(1) {
-  grid-column: 1;
+  grid-area: date-from;
 }
 
 .receipt-date-label:nth-of-type(2) {
-  grid-column: 2;
-}
-
-.receipt-search-button {
-  grid-column: 3;
-}
-
-.receipt-refresh-button {
-  grid-column: 4;
-  grid-row: 2;
+  grid-area: date-to;
 }
 
 .date-label {
