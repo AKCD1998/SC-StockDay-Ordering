@@ -2260,10 +2260,11 @@ select {
 
 .receipt-filter-bar {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) max-content auto auto;
+  grid-template-columns: minmax(0, 1fr) max-content max-content max-content;
   align-items: end;
   justify-content: stretch;
-  gap: 8px;
+  column-gap: 8px;
+  row-gap: 10px;
   min-width: 0;
   margin-right: 0;
   padding-right: 0;
@@ -2369,7 +2370,7 @@ select {
   border-color: transparent;
   background: transparent;
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 10px 10px;
   justify-self: start;
 }
 
@@ -2380,7 +2381,7 @@ select {
   background: linear-gradient(180deg, #4d90ff 0%, #2c6ee8 100%);
   color: #fff;
   border-radius: 12px;
-  padding: 10px 16px;
+  padding: 10px 14px;
   justify-self: start;
 }
 
@@ -2391,7 +2392,8 @@ select {
 
 .receipt-date-label {
   grid-row: 2;
-  min-width: 180px;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .receipt-date-label:nth-of-type(1) {
