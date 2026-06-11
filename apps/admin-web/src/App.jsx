@@ -5087,8 +5087,6 @@ export default function App() {
                 key={group.id}
                 className={isOpen ? "hero-nav-group open" : "hero-nav-group"}
                 data-nav-group={group.id}
-                onMouseEnter={() => setOpenNavGroup(group.id)}
-                onMouseLeave={() => setOpenNavGroup((current) => (current === group.id ? null : current))}
               >
                 <button
                   type="button"

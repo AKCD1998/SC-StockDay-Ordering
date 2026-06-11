@@ -2297,10 +2297,10 @@ select {
 
 .receipt-date-row {
   display: grid;
-  grid-template-columns: max-content max-content minmax(0, 1fr) 84px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 84px;
   align-items: end;
   gap: 8px;
-  justify-content: end;
+  justify-content: stretch;
 }
 
 .receipt-pagination {
@@ -2396,7 +2396,7 @@ select {
 }
 
 .receipt-refresh-button {
-  grid-column: 4;
+  grid-column: 3;
   white-space: nowrap;
   margin-bottom: 2px;
   border-color: transparent;
@@ -2409,12 +2409,17 @@ select {
 }
 
 .receipt-search-button {
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   white-space: nowrap;
   border-color: #2c6ee8;
   background: linear-gradient(180deg, #4d90ff 0%, #2c6ee8 100%);
   color: #fff;
   border-radius: 12px;
-  padding: 10px 14px;
+  min-height: 100%;
+  padding: 12px 14px;
   width: 100%;
   justify-self: stretch;
   text-align: center;
@@ -2428,8 +2433,10 @@ select {
 }
 
 .receipt-date-label {
+  width: 100%;
   min-width: 0;
   white-space: nowrap;
+  justify-content: space-between;
 }
 
 .date-label {
@@ -2441,8 +2448,8 @@ select {
 }
 
 .date-input-inline {
-  width: auto;
-  min-width: 150px;
+  width: 100%;
+  min-width: 0;
   border: 1px solid #c8d3e2;
   border-radius: 14px;
   padding: 8px 12px;
