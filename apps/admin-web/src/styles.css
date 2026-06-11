@@ -2245,7 +2245,7 @@ select {
   display: flex;
   justify-content: space-between;
   align-items: end;
-  gap: 14px;
+  gap: 8px;
   margin-bottom: 20px;
 }
 
@@ -2258,13 +2258,13 @@ select {
 }
 
 .receipt-filter-bar {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, max-content);
   align-items: end;
   justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-right: 18px;
-  padding-right: 6px;
+  gap: 8px;
+  margin-right: 0;
+  padding-right: 0;
 }
 
 .receipt-pagination {
@@ -2355,7 +2355,9 @@ select {
 }
 
 .receipt-search-input {
-  width: 40%;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  width: 100%;
   min-width: 360px;
 }
 
@@ -2367,6 +2369,7 @@ select {
 }
 
 .receipt-search-button {
+  grid-row: 2;
   white-space: nowrap;
   border-color: #2c6ee8;
   background: linear-gradient(180deg, #4d90ff 0%, #2c6ee8 100%);
@@ -2379,7 +2382,25 @@ select {
 }
 
 .receipt-date-label {
+  grid-row: 2;
   min-width: 180px;
+}
+
+.receipt-date-label:nth-of-type(1) {
+  grid-column: 1;
+}
+
+.receipt-date-label:nth-of-type(2) {
+  grid-column: 2;
+}
+
+.receipt-search-button {
+  grid-column: 3;
+}
+
+.receipt-refresh-button {
+  grid-column: 4;
+  grid-row: 2;
 }
 
 .date-label {
