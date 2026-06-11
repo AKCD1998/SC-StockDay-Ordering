@@ -2260,7 +2260,7 @@ select {
 
 .receipt-filter-bar {
   display: grid;
-  grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
+  grid-template-columns: max-content max-content minmax(0, 1fr) minmax(78px, max-content);
   grid-template-areas:
     "search search search submit"
     "date-from date-to spacer refresh";
@@ -2363,7 +2363,9 @@ select {
 .receipt-search-input {
   grid-area: search;
   width: 100%;
+  max-width: min(100%, 560px);
   min-width: 0;
+  justify-self: start;
 }
 
 .receipt-refresh-button {
@@ -2374,7 +2376,9 @@ select {
   background: transparent;
   border-radius: 12px;
   padding: 10px 10px;
-  justify-self: start;
+  width: 100%;
+  justify-self: stretch;
+  text-align: center;
 }
 
 .receipt-search-button {
@@ -2385,7 +2389,9 @@ select {
   color: #fff;
   border-radius: 12px;
   padding: 10px 14px;
-  justify-self: start;
+  width: 100%;
+  justify-self: stretch;
+  text-align: center;
 }
 
 .receipt-sort-button {
