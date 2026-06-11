@@ -1648,70 +1648,74 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
           </button>
         </div>
         <form className="receipt-filter-bar" onSubmit={handleSearchSubmit}>
-          <input
-            type="search"
-            className="receipt-search-input"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="ค้นหา SKU, ชื่อสินค้า, ผู้จำหน่าย, เลขที่เอกสาร"
-          />
-          <label className="date-label receipt-date-label">
-            จากวันที่
+          <div className="receipt-search-row">
             <input
-              type="date"
-              value={activeTab === "pending" ? pendingDateFrom : approvedDateFrom}
-              onChange={(event) => {
-                if (activeTab === "pending") {
-                  setPendingDateFrom(event.target.value);
-                  setPendingPage(1);
-                  return;
-                }
-                setApprovedDateFrom(event.target.value);
-                setApprovedPage(1);
-              }}
-              className="date-input-inline"
+              type="search"
+              className="receipt-search-input"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="ค้นหา SKU, ชื่อสินค้า, ผู้จำหน่าย, เลขที่เอกสาร"
             />
-          </label>
-          <label className="date-label receipt-date-label">
-            ถึงวันที่
-            <input
-              type="date"
-              value={activeTab === "pending" ? pendingDateTo : approvedDateTo}
-              onChange={(event) => {
-                if (activeTab === "pending") {
-                  setPendingDateTo(event.target.value);
-                  setPendingPage(1);
-                  return;
-                }
-                setApprovedDateTo(event.target.value);
-                setApprovedPage(1);
-              }}
-              className="date-input-inline"
-            />
-          </label>
-          {activeTab === "approved" && (
+            <button type="submit" className="ghost-button receipt-search-button">
+              ค้นหา
+            </button>
+          </div>
+          <div className="receipt-date-row">
+            <label className="date-label receipt-date-label">
+              จากวันที่
+              <input
+                type="date"
+                value={activeTab === "pending" ? pendingDateFrom : approvedDateFrom}
+                onChange={(event) => {
+                  if (activeTab === "pending") {
+                    setPendingDateFrom(event.target.value);
+                    setPendingPage(1);
+                    return;
+                  }
+                  setApprovedDateFrom(event.target.value);
+                  setApprovedPage(1);
+                }}
+                className="date-input-inline"
+              />
+            </label>
+            <label className="date-label receipt-date-label">
+              ถึงวันที่
+              <input
+                type="date"
+                value={activeTab === "pending" ? pendingDateTo : approvedDateTo}
+                onChange={(event) => {
+                  if (activeTab === "pending") {
+                    setPendingDateTo(event.target.value);
+                    setPendingPage(1);
+                    return;
+                  }
+                  setApprovedDateTo(event.target.value);
+                  setApprovedPage(1);
+                }}
+                className="date-input-inline"
+              />
+            </label>
+            {activeTab === "approved" && (
+              <button
+                type="button"
+                className="ghost-button receipt-sort-button"
+                onClick={() => {
+                  setApprovedSortOrder((current) => (current === "desc" ? "asc" : "desc"));
+                  setApprovedPage(1);
+                }}
+              >
+                {approvedSortOrder === "desc" ? "ใหม่ -> เก่า" : "เก่า -> ใหม่"}
+              </button>
+            )}
             <button
               type="button"
-              className="ghost-button receipt-sort-button"
-              onClick={() => {
-                setApprovedSortOrder((current) => (current === "desc" ? "asc" : "desc"));
-                setApprovedPage(1);
-              }}
+              className="ghost-button receipt-refresh-button"
+              onClick={handleRefresh}
+              disabled={activeTab === "pending" ? loadingPending : loadingApproved}
             >
-              {approvedSortOrder === "desc" ? "ใหม่ -> เก่า" : "เก่า -> ใหม่"}
+              🔄 รีเฟรช
             </button>
-          )}
-          <button type="submit" className="ghost-button receipt-search-button">
-            ค้นหา
-          </button>
-          <button
-            type="button"
-            className="ghost-button receipt-refresh-button"
-            onClick={handleRefresh}
-            disabled={activeTab === "pending" ? loadingPending : loadingApproved}
-          >
-            🔄 รีเฟรช
-          </button>
+          </div>
         </form>
       </div>
 

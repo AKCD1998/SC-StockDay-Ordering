@@ -1179,7 +1179,7 @@ button {
 .id-search-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 86px;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 10px;
   padding: 12px;
   border-radius: 18px;
@@ -1236,8 +1236,8 @@ button {
   border: 0;
   background: transparent;
   color: #e8f0ff;
-  font-size: 0.82rem;
-  line-height: 1.35;
+  font-size: 0.95rem;
+  line-height: 1.4;
   box-shadow: none;
 }
 .id-panel .rq-search::placeholder {
@@ -1265,9 +1265,9 @@ button {
   border: 0;
   background: transparent;
   color: #f0f5ff;
-  font-size: 0.82rem;
+  font-size: 0.95rem;
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.4;
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
@@ -1291,11 +1291,12 @@ button {
 }
 .id-search-button {
   display: inline-flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 114px;
+  align-self: start;
+  gap: 5px;
+  min-height: 52px;
   width: 100%;
   border: 0;
   border-radius: 14px;
@@ -1319,7 +1320,7 @@ button {
   transform: translateY(0);
 }
 .id-search-button-icon {
-  font-size: 1.45rem;
+  font-size: 1rem;
 }
 .id-filter-label {
   display: inline-flex;
@@ -1332,7 +1333,13 @@ button {
 }
 .id-list-meta { font-size: 0.92rem; color: #8090a8; margin-bottom: 10px; }
 
-.id-dictionary { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; gap: 18px; align-items: start; }
+.id-dictionary {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 920px);
+  justify-content: start;
+  gap: 18px;
+  align-items: start;
+}
 .id-list { display: flex; flex-direction: column; gap: 6px; max-height: 70vh; overflow-y: auto; }
 .id-list-item {
   text-align: left; border: 1.5px solid #e1e8f2; border-radius: 10px; background: #fff;
@@ -1344,7 +1351,7 @@ button {
 .id-list-sub { font-size: 0.9rem; color: #6a7a90; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.35; }
 .id-list-counts { display: flex; gap: 14px; font-size: 0.88rem; color: #8090a8; margin-top: 8px; flex-wrap: wrap; }
 
-.id-detail-col { border: 1px solid #e1e8f2; border-radius: 12px; padding: 20px 22px; background: #f7fafd; min-height: 200px; }
+.id-detail-col { border: 1px solid #e1e8f2; border-radius: 12px; padding: 20px 22px; background: #f7fafd; min-height: 200px; min-width: 0; }
 .id-detail-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .id-detail-head h3 { margin: 0; font-size: 1.42rem; color: #0f1824; line-height: 1.2; }
 .id-detail-head code { font-size: 0.94rem; color: #6a7a90; background: #eef2f8; padding: 4px 10px; border-radius: 6px; }
@@ -1419,14 +1426,14 @@ button {
   }
 
   .id-search-button {
-    min-height: 120px;
+    min-height: 52px;
     flex-direction: row;
-    gap: 14px;
-    font-size: 1.6rem;
+    gap: 8px;
+    font-size: 1rem;
   }
 
   .id-search-button-icon {
-    font-size: 2.6rem;
+    font-size: 1.25rem;
   }
 
   .id-dictionary {
@@ -1946,8 +1953,20 @@ select {
     display: grid;
     grid-template-columns: 1fr;
     justify-content: stretch;
+    justify-self: stretch;
+    width: 100%;
     margin-right: 0;
     padding-right: 0;
+  }
+
+  .receipt-search-row,
+  .receipt-date-row {
+    grid-template-columns: 1fr;
+  }
+
+  .receipt-refresh-button,
+  .receipt-sort-button {
+    grid-column: auto;
   }
 
   .brand-lockup,
@@ -2260,17 +2279,26 @@ select {
 
 .receipt-filter-bar {
   display: grid;
-  grid-template-columns: max-content max-content minmax(0, 1fr) minmax(78px, max-content);
-  grid-template-areas:
-    "search search search submit"
-    "date-from date-to spacer refresh";
-  align-items: end;
-  justify-content: stretch;
-  column-gap: 8px;
-  row-gap: 10px;
+  gap: 10px;
+  justify-self: start;
+  width: min(100%, 600px);
   min-width: 0;
   margin-right: 0;
   padding-right: 0;
+}
+
+.receipt-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.receipt-date-row {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr) 84px;
+  align-items: end;
+  gap: 8px;
 }
 
 .receipt-pagination {
@@ -2361,15 +2389,12 @@ select {
 }
 
 .receipt-search-input {
-  grid-area: search;
   width: 100%;
-  max-width: min(100%, 560px);
   min-width: 0;
-  justify-self: start;
 }
 
 .receipt-refresh-button {
-  grid-area: refresh;
+  grid-column: 4;
   white-space: nowrap;
   margin-bottom: 2px;
   border-color: transparent;
@@ -2382,7 +2407,6 @@ select {
 }
 
 .receipt-search-button {
-  grid-area: submit;
   white-space: nowrap;
   border-color: #2c6ee8;
   background: linear-gradient(180deg, #4d90ff 0%, #2c6ee8 100%);
@@ -2395,6 +2419,8 @@ select {
 }
 
 .receipt-sort-button {
+  grid-column: 3;
+  justify-self: start;
   min-width: 112px;
   white-space: nowrap;
 }
@@ -2402,14 +2428,6 @@ select {
 .receipt-date-label {
   min-width: 0;
   white-space: nowrap;
-}
-
-.receipt-date-label:nth-of-type(1) {
-  grid-area: date-from;
-}
-
-.receipt-date-label:nth-of-type(2) {
-  grid-area: date-to;
 }
 
 .date-label {
