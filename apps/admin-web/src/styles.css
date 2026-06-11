@@ -2263,8 +2263,8 @@ select {
 .receipt-tabs-row {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
-  align-items: end;
-  gap: 16px;
+  align-items: center;
+  gap: 20px;
   margin-bottom: 20px;
 }
 
@@ -2280,8 +2280,9 @@ select {
 .receipt-filter-bar {
   display: grid;
   gap: 10px;
-  justify-self: start;
-  width: min(100%, 600px);
+  justify-self: end;
+  justify-items: stretch;
+  width: min(100%, 680px);
   min-width: 0;
   margin-right: 0;
   padding-right: 0;
@@ -2299,6 +2300,7 @@ select {
   grid-template-columns: max-content max-content minmax(0, 1fr) 84px;
   align-items: end;
   gap: 8px;
+  justify-content: end;
 }
 
 .receipt-pagination {
