@@ -2103,17 +2103,39 @@ export class PostgresRepository {
             WHEN bool_or(status = 'success') THEN 'success'
             WHEN bool_or(status = 'running') THEN 'running'
             ELSE 'failed'
-          END AS run_status
+          END AS run_status,
+          COUNT(*)::integer AS total_runs,
+          COALESCE(SUM(records_sent), 0)::integer AS total_sent,
+          MAX(started_at) AS latest_started_at,
+          MAX(finished_at) AS latest_finished_at
         FROM ingest.sync_runs
         WHERE started_at >= CURRENT_DATE - $1 * INTERVAL '1 day'
           AND branch_code IS NOT NULL
         GROUP BY branch_code, started_at::date
       ),
+      latest_run AS (
+        SELECT DISTINCT ON (branch_code, started_at::date)
+          branch_code,
+          started_at::date AS sync_date,
+          sync_type,
+          status AS latest_run_status,
+          started_at,
+          finished_at,
+          records_read,
+          records_sent,
+          message
+        FROM ingest.sync_runs
+        WHERE started_at >= CURRENT_DATE - $1 * INTERVAL '1 day'
+          AND branch_code IS NOT NULL
+        ORDER BY branch_code, started_at::date, started_at DESC, sync_run_id DESC
+      ),
       heartbeats_agg AS (
         SELECT
           branch_code,
           created_at::date AS sync_date,
-          true AS had_heartbeat
+          true AS had_heartbeat,
+          COUNT(*)::integer AS heartbeat_count,
+          MAX(created_at) AS latest_heartbeat_at
         FROM ingest.laptop_heartbeats
         WHERE created_at >= CURRENT_DATE - $1 * INTERVAL '1 day'
         GROUP BY branch_code, created_at::date
@@ -2126,10 +2148,22 @@ export class PostgresRepository {
           WHEN r.run_status IS NOT NULL    THEN r.run_status
           WHEN h.had_heartbeat             THEN 'failed'
           ELSE                                  'offline'
-        END AS status
+        END AS status,
+        r.total_runs,
+        r.total_sent,
+        r.latest_started_at,
+        r.latest_finished_at,
+        lr.sync_type,
+        lr.latest_run_status,
+        lr.records_read,
+        lr.records_sent,
+        lr.message,
+        h.heartbeat_count,
+        h.latest_heartbeat_at
       FROM known_branches b
       CROSS JOIN date_series d
       LEFT JOIN runs_agg       r ON r.branch_code = b.branch_code AND r.sync_date = d.sync_date
+      LEFT JOIN latest_run    lr ON lr.branch_code = b.branch_code AND lr.sync_date = d.sync_date
       LEFT JOIN heartbeats_agg h ON h.branch_code = b.branch_code AND h.sync_date = d.sync_date
       ORDER BY b.branch_code, d.sync_date
       `,
@@ -2155,7 +2189,20 @@ export class PostgresRepository {
         ? row.sync_date.toISOString().slice(0, 10)
         : String(row.sync_date).slice(0, 10);
       if (!resultRows[row.branch_code]) resultRows[row.branch_code] = {};
-      resultRows[row.branch_code][dateKey] = row.status;
+      resultRows[row.branch_code][dateKey] = {
+        status: row.status,
+        totalRuns: Number(row.total_runs ?? 0),
+        totalSent: Number(row.total_sent ?? 0),
+        latestStartedAt: row.latest_started_at,
+        latestFinishedAt: row.latest_finished_at,
+        syncType: row.sync_type || null,
+        latestRunStatus: row.latest_run_status || null,
+        recordsRead: Number(row.records_read ?? 0),
+        recordsSent: Number(row.records_sent ?? 0),
+        message: row.message || "",
+        heartbeatCount: Number(row.heartbeat_count ?? 0),
+        latestHeartbeatAt: row.latest_heartbeat_at,
+      };
     }
 
     return { dates, branches, rows: resultRows };
@@ -2192,11 +2239,30 @@ export class PostgresRepository {
             WHEN bool_or(status = 'running') THEN 'running'
             ELSE 'failed'
           END AS run_status,
-          SUM(records_sent)::integer AS total_sent
+          COUNT(*)::integer AS total_runs,
+          COALESCE(SUM(records_sent), 0)::integer AS total_sent,
+          MAX(started_at) AS latest_started_at,
+          MAX(finished_at) AS latest_finished_at
         FROM ingest.sync_runs
         WHERE started_at >= NOW() - $1 * INTERVAL '1 hour'
           AND branch_code IS NOT NULL
         GROUP BY branch_code, date_trunc('hour', started_at AT TIME ZONE 'Asia/Bangkok')
+      ),
+      latest_run AS (
+        SELECT DISTINCT ON (branch_code, date_trunc('hour', started_at AT TIME ZONE 'Asia/Bangkok'))
+          branch_code,
+          date_trunc('hour', started_at AT TIME ZONE 'Asia/Bangkok') AS hour_slot,
+          sync_type,
+          status AS latest_run_status,
+          started_at,
+          finished_at,
+          records_read,
+          records_sent,
+          message
+        FROM ingest.sync_runs
+        WHERE started_at >= NOW() - $1 * INTERVAL '1 hour'
+          AND branch_code IS NOT NULL
+        ORDER BY branch_code, date_trunc('hour', started_at AT TIME ZONE 'Asia/Bangkok'), started_at DESC, sync_run_id DESC
       )
       SELECT
         b.branch_code,
@@ -2207,11 +2273,21 @@ export class PostgresRepository {
           WHEN r.run_status IS NOT NULL  THEN r.run_status
           ELSE 'offline'
         END AS status,
-        COALESCE(r.total_sent, 0) AS total_sent
+        COALESCE(r.total_sent, 0) AS total_sent,
+        COALESCE(r.total_runs, 0) AS total_runs,
+        r.latest_started_at,
+        r.latest_finished_at,
+        lr.sync_type,
+        lr.latest_run_status,
+        lr.records_read,
+        lr.records_sent,
+        lr.message
       FROM known_branches b
       CROSS JOIN hour_series h
       LEFT JOIN runs_agg r
         ON r.branch_code = b.branch_code AND r.hour_slot = h.hour_slot
+      LEFT JOIN latest_run lr
+        ON lr.branch_code = b.branch_code AND lr.hour_slot = h.hour_slot
       ORDER BY b.branch_code, h.hour_slot ASC
       `,
       [safeHours],
@@ -2232,8 +2308,16 @@ export class PostgresRepository {
     for (const row of rows) {
       if (!resultRows[row.branch_code]) resultRows[row.branch_code] = {};
       resultRows[row.branch_code][row.hour_key] = {
-        status:    row.status,
+        status: row.status,
         totalSent: Number(row.total_sent ?? 0),
+        totalRuns: Number(row.total_runs ?? 0),
+        latestStartedAt: row.latest_started_at,
+        latestFinishedAt: row.latest_finished_at,
+        syncType: row.sync_type || null,
+        latestRunStatus: row.latest_run_status || null,
+        recordsRead: Number(row.records_read ?? 0),
+        recordsSent: Number(row.records_sent ?? 0),
+        message: row.message || "",
       };
     }
 

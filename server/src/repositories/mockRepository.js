@@ -362,6 +362,10 @@ export class MockRepository {
     return { dates: [], branches: [], rows: {} };
   }
 
+  async getHourlySyncLog(_hours) {
+    return { hours: [], branches: [], rows: {} };
+  }
+
   // ── Loyalty ───────────────────────────────────────────────────────────────────
 
   async searchMembers(query) {

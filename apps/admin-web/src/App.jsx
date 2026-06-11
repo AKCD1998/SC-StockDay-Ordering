@@ -4405,11 +4405,77 @@ function formatShortDate(isoDate) {
   return `${d.getDate()}/${d.getMonth() + 1}`;
 }
 
+function formatSyncMetaValue(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("th-TH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function SyncLogMetaCard({ selection, mode }) {
+  if (!selection) {
+    return (
+      <div className="sync-log-meta-card">
+        <div className="sync-log-meta-empty">กดที่ช่องในตารางเพื่อดู metadata ของการ sync ล่าสุด</div>
+      </div>
+    );
+  }
+
+  const { branch, slotLabel, slotValue, cell } = selection;
+  const status = cell?.status ?? "offline";
+  const { icon, label } = syncLogStatusIcon(status);
+  const items = [
+    { label: mode === "nightly" ? "วันที่" : "ช่วงเวลา", value: slotLabel },
+    { label: "สาขา", value: BRANCH_LABELS[branch] ?? `สาขา ${branch}` },
+    { label: "สถานะช่อง", value: `${icon} ${label}` },
+    { label: "sync ล่าสุดเริ่ม", value: formatSyncMetaValue(cell?.latestStartedAt) },
+    { label: "sync ล่าสุดเสร็จ", value: formatSyncMetaValue(cell?.latestFinishedAt) },
+    { label: "sync type", value: cell?.syncType || "-" },
+    { label: "run status ล่าสุด", value: cell?.latestRunStatus || "-" },
+    { label: "จำนวนครั้งที่รัน", value: formatNumber(cell?.totalRuns ?? 0) },
+    { label: "ส่งรวมในช่องนี้", value: formatNumber(cell?.totalSent ?? 0) },
+    { label: "records read ล่าสุด", value: formatNumber(cell?.recordsRead ?? 0) },
+    { label: "records sent ล่าสุด", value: formatNumber(cell?.recordsSent ?? 0) },
+  ];
+
+  if (mode === "nightly") {
+    items.push(
+      { label: "heartbeat ล่าสุด", value: formatSyncMetaValue(cell?.latestHeartbeatAt) },
+      { label: "จำนวน heartbeat", value: formatNumber(cell?.heartbeatCount ?? 0) },
+    );
+  }
+
+  return (
+    <div className="sync-log-meta-card">
+      <div className="sync-log-meta-header">
+        <strong>{BRANCH_LABELS[branch] ?? `สาขา ${branch}`}</strong>
+        <span>{slotValue}</span>
+      </div>
+      <div className="sync-log-meta-grid">
+        {items.map((item) => (
+          <div key={item.label} className="sync-log-meta-item">
+            <span className="sync-log-meta-label">{item.label}</span>
+            <strong className="sync-log-meta-value">{item.value}</strong>
+          </div>
+        ))}
+      </div>
+      <div className="sync-log-meta-message">
+        <span className="sync-log-meta-label">message ล่าสุด</span>
+        <div className="sync-log-meta-message-body">{cell?.message?.trim() || "-"}</div>
+      </div>
+    </div>
+  );
+}
+
 // ── Nightly sub-tab ───────────────────────────────────────────────────────
 function NightlySyncGrid({ days, refreshKey }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
+  const [selection, setSelection] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -4421,6 +4487,10 @@ function NightlySyncGrid({ days, refreshKey }) {
       .catch((err) => { if (active) setError(err.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
+  }, [days, refreshKey]);
+
+  useEffect(() => {
+    setSelection(null);
   }, [days, refreshKey]);
 
   const dates    = data?.dates    ?? [];
@@ -4451,11 +4521,22 @@ function NightlySyncGrid({ days, refreshKey }) {
               <tr key={branch}>
                 <td className="sync-log-branch-label">{BRANCH_LABELS[branch] ?? `สาขา ${branch}`}</td>
                 {dates.map((d) => {
-                  const status = rows[branch]?.[d] ?? "offline";
+                  const cell = rows[branch]?.[d] ?? { status: "offline" };
+                  const status = typeof cell === "string" ? cell : cell.status;
                   const { icon, label, cls } = syncLogStatusIcon(status);
+                  const isActive = selection?.branch === branch && selection?.slotValue === d;
                   return (
-                    <td key={d} className={`sync-log-cell ${cls}`}
-                        title={`${BRANCH_LABELS[branch] ?? branch} · ${d} · ${label}`}>
+                    <td
+                      key={d}
+                      className={`sync-log-cell ${cls}${isActive ? " active" : ""}`}
+                      title={`${BRANCH_LABELS[branch] ?? branch} · ${d} · ${label}`}
+                      onClick={() => setSelection({
+                        branch,
+                        slotLabel: formatShortDate(d),
+                        slotValue: d,
+                        cell: typeof cell === "string" ? { status: cell } : cell,
+                      })}
+                    >
                       <span aria-label={label}>{icon}</span>
                     </td>
                   );
@@ -4475,6 +4556,7 @@ function NightlySyncGrid({ days, refreshKey }) {
           <span key={label} className="sync-log-legend-item">{icon} {label}</span>
         ))}
       </div>
+      <SyncLogMetaCard selection={selection} mode="nightly" />
     </>
   );
 }
@@ -4493,6 +4575,7 @@ function HourlySyncGrid({ hours, refreshKey }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
+  const [selection, setSelection] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -4504,6 +4587,10 @@ function HourlySyncGrid({ hours, refreshKey }) {
       .catch((err) => { if (active) setError(err.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
+  }, [hours, refreshKey]);
+
+  useEffect(() => {
+    setSelection(null);
   }, [hours, refreshKey]);
 
   const hourKeys = data?.hours    ?? [];
@@ -4549,10 +4636,19 @@ function HourlySyncGrid({ hours, refreshKey }) {
                                : rawStatus;
                   const sent   = cell?.totalSent ?? 0;
                   const { icon, label, cls } = syncLogStatusIcon(status);
+                  const isActive = selection?.branch === branch && selection?.slotValue === h;
                   return (
-                    <td key={h}
-                        className={`sync-log-cell-hour ${cls}`}
-                        title={`${BRANCH_LABELS[branch] ?? branch} · ${h} · ${label}${sent > 0 ? ` · ${sent} รายการ` : ""}`}>
+                    <td
+                      key={h}
+                      className={`sync-log-cell-hour ${cls}${isActive ? " active" : ""}`}
+                      title={`${BRANCH_LABELS[branch] ?? branch} · ${h} · ${label}${sent > 0 ? ` · ${sent} รายการ` : ""}`}
+                      onClick={() => setSelection({
+                        branch,
+                        slotLabel: h,
+                        slotValue: h,
+                        cell,
+                      })}
+                    >
                       <span aria-label={label}>{icon}</span>
                       {status === "success" && sent > 0 && (
                         <span className="sync-log-total-sent">{sent}</span>
@@ -4575,6 +4671,7 @@ function HourlySyncGrid({ hours, refreshKey }) {
           <span key={label} className="sync-log-legend-item">{icon} {label}</span>
         ))}
       </div>
+      <SyncLogMetaCard selection={selection} mode="hourly" />
     </>
   );
 }
