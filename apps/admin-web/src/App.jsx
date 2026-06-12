@@ -5105,54 +5105,6 @@ export default function App() {
     document.body.dataset.theme = theme;
   }, [theme]);
 
-  useEffect(() => {
-    if (!accountMenuOpen || typeof window === "undefined") return undefined;
-
-    function handlePointerDown(event) {
-      if (!accountMenuRef.current?.contains(event.target)) {
-        setAccountMenuOpen(false);
-      }
-    }
-
-    function handleKeyDown(event) {
-      if (event.key === "Escape") {
-        setAccountMenuOpen(false);
-      }
-    }
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [accountMenuOpen]);
-
-  useEffect(() => {
-    if (!openNavGroup || typeof window === "undefined") return undefined;
-
-    function handlePointerDown(event) {
-      if (!navigationMenuRef.current?.contains(event.target)) {
-        closeNavGroup();
-      }
-    }
-
-    function handleKeyDown(event) {
-      if (event.key === "Escape") {
-        closeNavGroup(openNavGroup, { restoreFocus: true });
-      }
-    }
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [closeNavGroup, openNavGroup]);
-
   const riskItems = useMemo(() => {
     return [...stockDay]
       .filter((item) => item.status !== "Normal")
@@ -5258,6 +5210,54 @@ export default function App() {
     setOpenNavGroup(null);
     setAccountMenuOpen(false);
   }, []);
+
+  useEffect(() => {
+    if (!accountMenuOpen || typeof window === "undefined") return undefined;
+
+    function handlePointerDown(event) {
+      if (!accountMenuRef.current?.contains(event.target)) {
+        setAccountMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setAccountMenuOpen(false);
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [accountMenuOpen]);
+
+  useEffect(() => {
+    if (!openNavGroup || typeof window === "undefined") return undefined;
+
+    function handlePointerDown(event) {
+      if (!navigationMenuRef.current?.contains(event.target)) {
+        closeNavGroup();
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        closeNavGroup(openNavGroup, { restoreFocus: true });
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeNavGroup, openNavGroup]);
 
   useEffect(() => {
     if (!isAdminUser && adminOnlyViews.includes(view)) {
