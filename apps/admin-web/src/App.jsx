@@ -30,6 +30,7 @@ import woothiLogoUrl from "./assets/woothi-logo.svg";
 import orexTradingLogoUrl from "./assets/orex-trading-logo.svg";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
+const syncEventLogEnabled = String(import.meta.env.VITE_ENABLE_SYNC_EVENT_LOG || "").toLowerCase() === "true";
 const adminViewStorageKey = "sc-stockday-admin-view";
 const adminThemeStorageKey = "sc-stockday-admin-theme";
 const defaultAdminView = "receipts";
@@ -4435,6 +4436,14 @@ function SyncEventLog({ mode, days, hours, refreshKey }) {
   const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
+    if (!syncEventLogEnabled) {
+      setEvents([]);
+      setLoading(false);
+      setError("");
+      setUnavailable(false);
+      return undefined;
+    }
+
     let active = true;
     const params = new URLSearchParams({ limit: "60" });
     if (mode === "nightly") {
@@ -4468,6 +4477,10 @@ function SyncEventLog({ mode, days, hours, refreshKey }) {
 
     return () => { active = false; };
   }, [mode, days, hours, refreshKey]);
+
+  if (!syncEventLogEnabled) {
+    return null;
+  }
 
   return (
     <section className="sync-event-log">
