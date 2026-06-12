@@ -4428,7 +4428,7 @@ function formatSyncLogStamp(value) {
   });
 }
 
-function SyncEventLog({ mode, days, hours, refreshKey }) {
+function SyncEventLog({ mode, days, hours, refreshKey, onUnauthorized }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -4445,9 +4445,23 @@ function SyncEventLog({ mode, days, hours, refreshKey }) {
     setLoading(true);
     setError("");
     apiFetch(`/api/sync/recent-events?${params.toString()}`)
-      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .then((res) => {
+        if (res.status === 401) {
+          onUnauthorized?.();
+          throw new Error("SESSION_EXPIRED");
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((json) => { if (active) setEvents(Array.isArray(json) ? json : []); })
-      .catch((err) => { if (active) setError(err.message); })
+      .catch((err) => {
+        if (!active) return;
+        if (err.message === "SESSION_EXPIRED") {
+          setError("เซสชันหมดอายุแล้ว กรุณาเข้าสู่ระบบใหม่");
+          return;
+        }
+        setError(err.message);
+      })
       .finally(() => { if (active) setLoading(false); });
 
     return () => { active = false; };
@@ -4554,7 +4568,7 @@ function SyncLogMetaCard({ selection, mode }) {
 }
 
 // ── Nightly sub-tab ───────────────────────────────────────────────────────
-function NightlySyncGrid({ days, refreshKey }) {
+function NightlySyncGrid({ days, refreshKey, onUnauthorized }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
@@ -4565,9 +4579,23 @@ function NightlySyncGrid({ days, refreshKey }) {
     setLoading(true);
     setError("");
     apiFetch(`/api/sync/nightly-log?days=${days}`)
-      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .then((res) => {
+        if (res.status === 401) {
+          onUnauthorized?.();
+          throw new Error("SESSION_EXPIRED");
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((json) => { if (active) setData(json); })
-      .catch((err) => { if (active) setError(err.message); })
+      .catch((err) => {
+        if (!active) return;
+        if (err.message === "SESSION_EXPIRED") {
+          setError("เซสชันหมดอายุแล้ว กรุณาเข้าสู่ระบบใหม่");
+          return;
+        }
+        setError(err.message);
+      })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [days, refreshKey]);
@@ -4654,7 +4682,7 @@ function formatHourLabel(hourKey) {
   return `${timePart}\n${Number(dd)}/${Number(mm)}`;
 }
 
-function HourlySyncGrid({ hours, refreshKey }) {
+function HourlySyncGrid({ hours, refreshKey, onUnauthorized }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
@@ -4665,9 +4693,23 @@ function HourlySyncGrid({ hours, refreshKey }) {
     setLoading(true);
     setError("");
     apiFetch(`/api/sync/hourly-log?hours=${hours}`)
-      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .then((res) => {
+        if (res.status === 401) {
+          onUnauthorized?.();
+          throw new Error("SESSION_EXPIRED");
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((json) => { if (active) setData(json); })
-      .catch((err) => { if (active) setError(err.message); })
+      .catch((err) => {
+        if (!active) return;
+        if (err.message === "SESSION_EXPIRED") {
+          setError("เซสชันหมดอายุแล้ว กรุณาเข้าสู่ระบบใหม่");
+          return;
+        }
+        setError(err.message);
+      })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [hours, refreshKey]);
@@ -4760,7 +4802,7 @@ function HourlySyncGrid({ hours, refreshKey }) {
 }
 
 // ── SyncLogPanel — outer shell with sub-tabs ───────────────────────────────
-function SyncLogPanel() {
+function SyncLogPanel({ onUnauthorized }) {
   const [subTab, setSubTab]       = useState("nightly");
   const [nightlyDays, setNightlyDays] = useState(14);
   const [hourlyHours, setHourlyHours] = useState(24);
@@ -4836,14 +4878,15 @@ function SyncLogPanel() {
       </div>
 
       {isNightly
-        ? <NightlySyncGrid days={nightlyDays} refreshKey={refreshKey} />
-        : <HourlySyncGrid  hours={hourlyHours} refreshKey={refreshKey} />}
+        ? <NightlySyncGrid days={nightlyDays} refreshKey={refreshKey} onUnauthorized={onUnauthorized} />
+        : <HourlySyncGrid  hours={hourlyHours} refreshKey={refreshKey} onUnauthorized={onUnauthorized} />}
 
       <SyncEventLog
         mode={subTab}
         days={nightlyDays}
         hours={hourlyHours}
         refreshKey={refreshKey}
+        onUnauthorized={onUnauthorized}
       />
     </section>
   );
@@ -5091,13 +5134,13 @@ export default function App() {
 
     function handlePointerDown(event) {
       if (!navigationMenuRef.current?.contains(event.target)) {
-        setOpenNavGroup(null);
+        closeNavGroup();
       }
     }
 
     function handleKeyDown(event) {
       if (event.key === "Escape") {
-        setOpenNavGroup(null);
+        closeNavGroup(openNavGroup, { restoreFocus: true });
       }
     }
 
@@ -5108,7 +5151,7 @@ export default function App() {
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [openNavGroup]);
+  }, [closeNavGroup, openNavGroup]);
 
   const riskItems = useMemo(() => {
     return [...stockDay]
@@ -5161,11 +5204,26 @@ export default function App() {
     });
   }, []);
 
+  const closeNavGroup = useCallback((groupId = openNavGroup, { restoreFocus = false } = {}) => {
+    if (!groupId) {
+      setOpenNavGroup(null);
+      return;
+    }
+
+    const activeElement = typeof document !== "undefined" ? document.activeElement : null;
+    const groupElement = navigationMenuRef.current?.querySelector(`[data-nav-group="${groupId}"]`);
+    const triggerElement = navigationMenuRef.current?.querySelector(`[data-nav-trigger="${groupId}"]`);
+    if (restoreFocus || (groupElement && activeElement instanceof HTMLElement && groupElement.contains(activeElement))) {
+      triggerElement?.focus();
+    }
+    setOpenNavGroup(null);
+  }, [openNavGroup]);
+
   const handleNavigate = useCallback((item) => {
     if (!item?.view || item.disabled) return;
     setView(item.view);
-    setOpenNavGroup(null);
-  }, []);
+    closeNavGroup();
+  }, [closeNavGroup]);
 
   const handleNavTriggerKeyDown = useCallback((event, group) => {
     if (event.key === "ArrowDown") {
@@ -5178,8 +5236,7 @@ export default function App() {
   const handleNavItemKeyDown = useCallback((event, groupId) => {
     if (event.key === "Escape") {
       event.preventDefault();
-      setOpenNavGroup(null);
-      navigationMenuRef.current?.querySelector(`[data-nav-trigger="${groupId}"]`)?.focus();
+      closeNavGroup(groupId, { restoreFocus: true });
     } else if (event.key === "ArrowDown") {
       event.preventDefault();
       focusNavItem(groupId, "next");
@@ -5193,7 +5250,14 @@ export default function App() {
       event.preventDefault();
       focusNavItem(groupId, "last");
     }
-  }, [focusNavItem]);
+  }, [closeNavGroup, focusNavItem]);
+
+  const handleSyncUnauthorized = useCallback(() => {
+    setSession(null);
+    setAuthError("เซสชันหมดอายุแล้ว กรุณาเข้าสู่ระบบใหม่");
+    setOpenNavGroup(null);
+    setAccountMenuOpen(false);
+  }, []);
 
   useEffect(() => {
     if (!isAdminUser && adminOnlyViews.includes(view)) {
@@ -5281,14 +5345,26 @@ export default function App() {
                   aria-haspopup="menu"
                   aria-expanded={isOpen}
                   data-nav-trigger={group.id}
-                  onClick={() => setOpenNavGroup((current) => (current === group.id ? null : group.id))}
+                  onClick={() => {
+                    if (isOpen) {
+                      closeNavGroup(group.id, { restoreFocus: true });
+                    } else {
+                      setOpenNavGroup(group.id);
+                    }
+                  }}
                   onKeyDown={(event) => handleNavTriggerKeyDown(event, group)}
                 >
                   <span className="hero-nav-mark" aria-hidden="true">{group.shortLabel}</span>
                   <span className="hero-nav-label">{group.label}</span>
                   <span className="hero-nav-chevron" aria-hidden="true">▾</span>
                 </button>
-                <div className="hero-nav-menu" role="menu" aria-label={group.label} aria-hidden={!isOpen}>
+                <div
+                  className="hero-nav-menu"
+                  role="menu"
+                  aria-label={group.label}
+                  aria-hidden={!isOpen}
+                  hidden={!isOpen}
+                >
                   {group.items.map((item) => {
                     const isActive = item.view === view;
                     return (
@@ -5384,7 +5460,7 @@ export default function App() {
       ) : view === "ingredient-dictionary" && isAdminUser ? (
         <IngredientDictionaryPanel csrfToken={session.csrfToken} />
       ) : view === "sync-log" && isAdminUser ? (
-        <SyncLogPanel />
+        <SyncLogPanel onUnauthorized={handleSyncUnauthorized} />
       ) : (
         <>
           <section className="kpis">
