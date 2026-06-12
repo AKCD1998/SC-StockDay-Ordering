@@ -2324,6 +2324,57 @@ export class PostgresRepository {
     return { hours: hourKeys, branches, rows: resultRows };
   }
 
+  async getRecentSyncEvents({ hours = null, days = null, limit = 50 } = {}) {
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 200));
+    const safeHours = hours == null ? null : Math.max(1, Math.min(Number(hours) || 24, 168));
+    const safeDays = days == null ? null : Math.max(1, Math.min(Number(days) || 14, 90));
+
+    const filters = ["branch_code IS NOT NULL"];
+    const params = [];
+
+    if (safeHours != null) {
+      params.push(safeHours);
+      filters.push(`started_at >= NOW() - $${params.length} * INTERVAL '1 hour'`);
+    } else if (safeDays != null) {
+      params.push(safeDays);
+      filters.push(`started_at >= CURRENT_DATE - $${params.length} * INTERVAL '1 day'`);
+    }
+
+    params.push(safeLimit);
+
+    const { rows } = await this.pool.query(
+      `
+      SELECT
+        sync_run_id,
+        branch_code,
+        sync_type,
+        status,
+        started_at,
+        finished_at,
+        records_read,
+        records_sent,
+        message
+      FROM ingest.sync_runs
+      WHERE ${filters.join(" AND ")}
+      ORDER BY started_at DESC, sync_run_id DESC
+      LIMIT $${params.length}
+      `,
+      params,
+    );
+
+    return rows.map((row) => ({
+      syncRunId: row.sync_run_id,
+      branchCode: row.branch_code,
+      syncType: row.sync_type,
+      status: row.status,
+      startedAt: row.started_at,
+      finishedAt: row.finished_at,
+      recordsRead: Number(row.records_read ?? 0),
+      recordsSent: Number(row.records_sent ?? 0),
+      message: row.message || "",
+    }));
+  }
+
   // ── Loyalty: member search ────────────────────────────────────────────────────
 
   async searchMembers(query) {

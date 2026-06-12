@@ -4415,6 +4415,89 @@ function formatSyncMetaValue(value) {
   });
 }
 
+function formatSyncLogStamp(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("th-TH", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function SyncEventLog({ mode, days, hours, refreshKey }) {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    const params = new URLSearchParams({ limit: "60" });
+    if (mode === "nightly") {
+      params.set("days", String(days));
+    } else {
+      params.set("hours", String(hours));
+    }
+
+    setLoading(true);
+    setError("");
+    apiFetch(`/api/sync/recent-events?${params.toString()}`)
+      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .then((json) => { if (active) setEvents(Array.isArray(json) ? json : []); })
+      .catch((err) => { if (active) setError(err.message); })
+      .finally(() => { if (active) setLoading(false); });
+
+    return () => { active = false; };
+  }, [mode, days, hours, refreshKey]);
+
+  return (
+    <section className="sync-event-log">
+      <div className="sync-event-log-header">
+        <h3>Log เวลาที่ส่งเข้า</h3>
+        <span>
+          {mode === "nightly"
+            ? `แสดงรายการย้อนหลัง ${days} วัน`
+            : `แสดงรายการย้อนหลัง ${hours} ชั่วโมง`}
+        </span>
+      </div>
+
+      {error ? <p className="notice error compact">❌ โหลด log ไม่ได้: {error}</p> : null}
+      {loading ? <p className="empty-state">⏳ กำลังโหลด log...</p> : null}
+      {!loading && !error && events.length === 0 ? (
+        <p className="empty-state">ยังไม่มี log การส่งในช่วงเวลานี้</p>
+      ) : null}
+
+      {!loading && !error && events.length > 0 ? (
+        <div className="sync-event-log-list">
+          {events.map((event) => {
+            const status = event.status ?? "offline";
+            const { icon, label, cls } = syncLogStatusIcon(status);
+            return (
+              <article key={event.syncRunId} className={`sync-event-log-item ${cls}`}>
+                <div className="sync-event-log-main">
+                  <strong>{BRANCH_LABELS[event.branchCode] ?? `สาขา ${event.branchCode}`}</strong>
+                  <span>{icon} {label}</span>
+                  <span>เริ่มส่ง {formatSyncLogStamp(event.startedAt)}</span>
+                  <span>เสร็จ {formatSyncLogStamp(event.finishedAt)}</span>
+                </div>
+                <div className="sync-event-log-sub">
+                  <span>ประเภท {event.syncType || "-"}</span>
+                  <span>อ่าน {formatNumber(event.recordsRead ?? 0)} รายการ</span>
+                  <span>ส่ง {formatNumber(event.recordsSent ?? 0)} รายการ</span>
+                </div>
+                <div className="sync-event-log-message">{event.message?.trim() || "-"}</div>
+              </article>
+            );
+          })}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function SyncLogMetaCard({ selection, mode }) {
   if (!selection) {
     return (
@@ -4755,6 +4838,13 @@ function SyncLogPanel() {
       {isNightly
         ? <NightlySyncGrid days={nightlyDays} refreshKey={refreshKey} />
         : <HourlySyncGrid  hours={hourlyHours} refreshKey={refreshKey} />}
+
+      <SyncEventLog
+        mode={subTab}
+        days={nightlyDays}
+        hours={hourlyHours}
+        refreshKey={refreshKey}
+      />
     </section>
   );
 }

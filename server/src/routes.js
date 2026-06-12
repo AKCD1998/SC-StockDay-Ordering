@@ -719,6 +719,14 @@ export function createRouter(repository) {
     res.json(result);
   }));
 
+  router.get("/api/sync/recent-events", asyncHandler(async (req, res) => {
+    const limit = parsePageParam(req.query.limit, 50);
+    const hours = req.query.hours == null ? null : parsePageParam(req.query.hours, 24);
+    const days = req.query.days == null ? null : parsePageParam(req.query.days, 14);
+    const result = await repository.getRecentSyncEvents({ hours, days, limit });
+    res.json(result);
+  }));
+
   // ── Loyalty: member search ────────────────────────────────────────────────────
   // GET /api/members/search?q=<phone|name|email|memberCode>
   router.get("/api/members/search", asyncHandler(async (req, res) => {

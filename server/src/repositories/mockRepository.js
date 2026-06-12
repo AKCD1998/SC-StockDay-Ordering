@@ -366,6 +366,10 @@ export class MockRepository {
     return { hours: [], branches: [], rows: {} };
   }
 
+  async getRecentSyncEvents(_options = {}) {
+    return [];
+  }
+
   // ── Loyalty ───────────────────────────────────────────────────────────────────
 
   async searchMembers(query) {
