@@ -4428,10 +4428,11 @@ function formatSyncLogStamp(value) {
   });
 }
 
-function SyncEventLog({ mode, days, hours, refreshKey, onUnauthorized }) {
+function SyncEventLog({ mode, days, hours, refreshKey }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -4444,11 +4445,11 @@ function SyncEventLog({ mode, days, hours, refreshKey, onUnauthorized }) {
 
     setLoading(true);
     setError("");
+    setUnavailable(false);
     apiFetch(`/api/sync/recent-events?${params.toString()}`)
       .then((res) => {
-        if (res.status === 401) {
-          onUnauthorized?.();
-          throw new Error("SESSION_EXPIRED");
+        if ([401, 403, 404, 405, 501].includes(res.status)) {
+          throw new Error("SYNC_EVENT_LOG_UNAVAILABLE");
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -4456,8 +4457,9 @@ function SyncEventLog({ mode, days, hours, refreshKey, onUnauthorized }) {
       .then((json) => { if (active) setEvents(Array.isArray(json) ? json : []); })
       .catch((err) => {
         if (!active) return;
-        if (err.message === "SESSION_EXPIRED") {
-          setError("เซสชันหมดอายุแล้ว กรุณาเข้าสู่ระบบใหม่");
+        if (err.message === "SYNC_EVENT_LOG_UNAVAILABLE") {
+          setUnavailable(true);
+          setEvents([]);
           return;
         }
         setError(err.message);
@@ -4478,13 +4480,16 @@ function SyncEventLog({ mode, days, hours, refreshKey, onUnauthorized }) {
         </span>
       </div>
 
+      {unavailable ? (
+        <p className="empty-state">backend ปัจจุบันยังไม่เปิด recent event log ส่วนนี้</p>
+      ) : null}
       {error ? <p className="notice error compact">❌ โหลด log ไม่ได้: {error}</p> : null}
       {loading ? <p className="empty-state">⏳ กำลังโหลด log...</p> : null}
-      {!loading && !error && events.length === 0 ? (
+      {!loading && !error && !unavailable && events.length === 0 ? (
         <p className="empty-state">ยังไม่มี log การส่งในช่วงเวลานี้</p>
       ) : null}
 
-      {!loading && !error && events.length > 0 ? (
+      {!loading && !error && !unavailable && events.length > 0 ? (
         <div className="sync-event-log-list">
           {events.map((event) => {
             const status = event.status ?? "offline";
