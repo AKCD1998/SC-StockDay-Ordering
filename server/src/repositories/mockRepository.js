@@ -49,7 +49,7 @@ export class MockRepository {
         productName: product.productName,
         barcode: product.barcode,
         unit: product.unit,
-        currentStock: product.stockCurrent,
+        currentStock: product.stockRetail,
         soldQtyPeriod: product.soldQtyPeriod,
         purchasedQtyPeriod: product.purchasedQtyPeriod,
         minStock: product.minStock,

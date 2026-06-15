@@ -180,7 +180,10 @@ export class PostgresRepository {
         p.product_name_eng,
         COALESCE(p.barcode_1, p.barcode_2, p.barcode_3, '') AS barcode,
         COALESCE(p.unit_small, p.unit_medium, p.unit_large, '') AS unit,
-        p.stock_current,
+        -- Use retail on-hand (FCPdtQtyRet) as the counted stock value to match
+        -- what the other branches use; aliased to stock_current so downstream
+        -- mapping/currentStock stays unchanged.
+        p.stock_retail AS stock_current,
         COALESCE(s.sold_qty_period, 0) AS sold_qty_period,
         COALESCE(pr.purchased_qty_period, 0) AS purchased_qty_period,
         p.min_stock,
