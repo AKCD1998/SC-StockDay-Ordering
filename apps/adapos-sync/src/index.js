@@ -95,10 +95,10 @@ async function fetchDatasets(pool) {
 }
 
 // ── Batch poster ──────────────────────────────────────────────────────────────
-async function postBatches(url, records, batchSize = 500) {
+async function postBatches(url, records, batchSize = 500, extraBody = {}) {
   let sent = 0;
   for (let i = 0; i < records.length; i += batchSize) {
-    await postJson(url, { records: records.slice(i, i + batchSize) });
+    await postJson(url, { ...extraBody, records: records.slice(i, i + batchSize) });
     sent += Math.min(batchSize, records.length - i);
   }
   return sent;
@@ -236,10 +236,14 @@ async function runOnce() {
 
       if (data.branch_stock?.length) {
         console.log(`Posting ${data.branch_stock.length} branch-stock rows...`);
-        const branchStockRecords = toBranchStockRecords(data.branch_stock);
+        // Single-branch sync: each batch states its branchCode explicitly so the
+        // server updates only this branch's column and never the others.
+        const branchStockRecords = toBranchStockRecords(data.branch_stock, syncConfig.branchCode);
         const sent = await postBatches(
           `${syncConfig.apiBaseUrl}/api/branch-stock/sync`,
           branchStockRecords,
+          500,
+          { branchCode: syncConfig.branchCode },
         );
         console.log(`  branch_stock: ${sent} snapshots sent`);
         totalSent += sent;

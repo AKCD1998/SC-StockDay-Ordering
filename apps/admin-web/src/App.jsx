@@ -5318,6 +5318,9 @@ export default function App() {
                           <strong>{row.productName}</strong>
                           <div className="meta">{row.productCode}</div>
                         </td>
+                        {/* LEGACY/APPROXIMATE: global product-master stock for the
+                            all-products overview, not branch-level. Real per-branch
+                            stock is on the "สต็อกสาขา" page (/api/branch-stock). */}
                         <td>{formatNumber(row.currentStock)}</td>
                         <td>{formatNumber(row.soldQtyPeriod)}</td>
                         <td>{formatNumber(row.averageDailyUsage, 2)}</td>

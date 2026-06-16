@@ -266,22 +266,62 @@ function normalizeMemberUpdatePayload(body) {
   };
 }
 
-function validateAndNormalizeBranchStockRecords(body) {
+// Fixed whitelist of branch codes that may sync per-branch stock. Mirrors the
+// columns in branch_stock_snapshots / BRANCH_STOCK_COLUMNS in the repository.
+const BRANCH_STOCK_SYNC_BRANCHES = ["000", "001", "002", "003", "004", "005"];
+
+// A branch-stock sync request describes exactly ONE branch's stock. The branch
+// must be stated explicitly at the top level so the server knows which single
+// column to update — we never infer it from per-record zeroes (which is what
+// allowed one branch's sync to wipe another). Each record carries a single qty
+// (and optional costAvg) for that branch only.
+export function validateAndNormalizeBranchStockRecords(body) {
   if (!body || !Array.isArray(body.records)) {
-    return { error: "Payload must include a records array.", records: [] };
+    return { error: "Payload must include a records array." };
+  }
+
+  const branchCode = normalizeOptionalText(body.branchCode ?? body.branch_code, 3);
+  if (!branchCode) {
+    return { error: "Payload must include a top-level branchCode." };
+  }
+  if (!BRANCH_STOCK_SYNC_BRANCHES.includes(branchCode)) {
+    return { error: `Unknown branchCode: ${branchCode}.` };
   }
 
   const records = [];
   for (const [index, record] of body.records.entries()) {
     const productCode = normalizeOptionalText(record?.product_code ?? record?.productCode, 120);
     if (!productCode) {
-      return { error: `records[${index}].product_code is required.`, records: [] };
+      return { error: `records[${index}].product_code is required.` };
+    }
+
+    // Reject payloads that mix branch identities: a per-record branch code, if
+    // present, must agree with the top-level branchCode.
+    const recordBranch = normalizeOptionalText(record?.branchCode ?? record?.branch_code, 3);
+    if (recordBranch && recordBranch !== branchCode) {
+      return {
+        error: `records[${index}].branchCode (${recordBranch}) does not match payload branchCode (${branchCode}).`,
+      };
     }
 
     const syncedAt = normalizeSyncedAt(record?.synced_at ?? record?.syncedAt);
     if (!syncedAt) {
-      return { error: `records[${index}].synced_at is invalid.`, records: [] };
+      return { error: `records[${index}].synced_at is invalid.` };
     }
+
+    // Prefer the explicit single-branch `qty`; fall back to this branch's legacy
+    // per-branch column if an older agent still sends the wide record shape.
+    const qty = normalizeBranchStockNumber(
+      record?.qty
+        ?? record?.[`qty_branch_${branchCode}`]
+        ?? record?.[`qtyBranch${branchCode}`],
+    );
+    const costAvg = normalizeOptionalNumber(
+      record?.costAvg
+        ?? record?.cost_avg
+        ?? record?.[`cost_avg_branch_${branchCode}`]
+        ?? record?.[`costAvgBranch${branchCode}`],
+    );
 
     records.push({
       productCode,
@@ -289,26 +329,13 @@ function validateAndNormalizeBranchStockRecords(body) {
       productNameEng: normalizeOptionalText(record?.product_name_eng ?? record?.productNameEng),
       barcode: normalizeOptionalText(record?.barcode, 120),
       unit: normalizeOptionalText(record?.unit, 80),
-      qtyBranch000: normalizeBranchStockNumber(record?.qty_branch_000 ?? record?.qtyBranch000),
-      qtyBranch001: normalizeBranchStockNumber(record?.qty_branch_001 ?? record?.qtyBranch001),
-      qtyBranch002: normalizeBranchStockNumber(record?.qty_branch_002 ?? record?.qtyBranch002),
-      qtyBranch003: normalizeBranchStockNumber(record?.qty_branch_003 ?? record?.qtyBranch003),
-      qtyBranch004: normalizeBranchStockNumber(record?.qty_branch_004 ?? record?.qtyBranch004),
-      qtyBranch005: normalizeBranchStockNumber(record?.qty_branch_005 ?? record?.qtyBranch005),
-      qtyTotalAllBranches: normalizeBranchStockNumber(
-        record?.qty_total_all_branches ?? record?.qtyTotalAllBranches,
-      ),
-      costAvgBranch000: normalizeOptionalNumber(record?.cost_avg_branch_000 ?? record?.costAvgBranch000),
-      costAvgBranch001: normalizeOptionalNumber(record?.cost_avg_branch_001 ?? record?.costAvgBranch001),
-      costAvgBranch002: normalizeOptionalNumber(record?.cost_avg_branch_002 ?? record?.costAvgBranch002),
-      costAvgBranch003: normalizeOptionalNumber(record?.cost_avg_branch_003 ?? record?.costAvgBranch003),
-      costAvgBranch004: normalizeOptionalNumber(record?.cost_avg_branch_004 ?? record?.costAvgBranch004),
-      costAvgBranch005: normalizeOptionalNumber(record?.cost_avg_branch_005 ?? record?.costAvgBranch005),
+      qty,
+      costAvg,
       syncedAt,
     });
   }
 
-  return { error: null, records };
+  return { error: null, branchCode, records };
 }
 
 export function createRouter(repository) {
@@ -534,7 +561,7 @@ export function createRouter(repository) {
       return res.status(400).json({ message: validation.error });
     }
 
-    const result = await repository.ingestBranchStockSnapshots(validation.records);
+    const result = await repository.ingestBranchStockSnapshots(validation.branchCode, validation.records);
     res.json(result);
   }));
 

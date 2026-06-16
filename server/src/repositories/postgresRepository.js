@@ -8,6 +8,21 @@ import {
 import { buildStockDayRow } from "../stockDay.js";
 import { makeId, normalizeQuery } from "../utils.js";
 
+// Fixed whitelist mapping a branch code → its physical snapshot columns.
+// Branch-stock SQL column names are ONLY ever taken from this map, never from
+// an arbitrary/dynamic branch code, so a misrouted sync can never write to a
+// column we did not intend. Keep in sync with the branches table and with the
+// adapos-sync transform whitelist.
+export const BRANCH_STOCK_COLUMNS = {
+  "000": { qty: "qty_branch_000", cost: "cost_avg_branch_000" },
+  "001": { qty: "qty_branch_001", cost: "cost_avg_branch_001" },
+  "002": { qty: "qty_branch_002", cost: "cost_avg_branch_002" },
+  "003": { qty: "qty_branch_003", cost: "cost_avg_branch_003" },
+  "004": { qty: "qty_branch_004", cost: "cost_avg_branch_004" },
+  "005": { qty: "qty_branch_005", cost: "cost_avg_branch_005" },
+};
+const ALL_BRANCH_CODES = Object.keys(BRANCH_STOCK_COLUMNS);
+
 function mapMemberRow(row) {
   return {
     id:            row.id,
@@ -30,6 +45,10 @@ function mapSearchRow(row) {
     barcode: row.barcode_1 || row.barcode_2 || row.barcode_3 || "",
     supplier: row.supplier_name || row.supplier_code || "",
     unit: row.unit_small || row.unit_medium || row.unit_large || "",
+    // LEGACY / APPROXIMATE: product-master stock kept for the generic product
+    // search API. NOT branch-level truth — branch stock lives in
+    // branch_stock_snapshots (/api/branch-stock). Do not surface these on a page
+    // that implies real per-branch stock.
     stockCurrent: Number(row.stock_current || 0),
     stockRetail: Number(row.stock_retail || 0),
     stockWarehouse: Number(row.stock_warehouse || 0),
@@ -206,6 +225,9 @@ export class PostgresRepository {
       productNameEng: row.product_name_eng || null,
       barcode: row.barcode,
       unit: row.unit,
+      // LEGACY / APPROXIMATE: global product-master stock (products.stock_current),
+      // not branch-level truth. Only used by the all-products Stock Day overview.
+      // For real per-branch stock use branch_stock_snapshots (/api/branch-stock).
       currentStock: Number(row.stock_current || 0),
       soldQtyPeriod: Number(row.sold_qty_period || 0),
       purchasedQtyPeriod: Number(row.purchased_qty_period || 0),
@@ -1719,27 +1741,25 @@ export class PostgresRepository {
     return mapSupplierLogoRow(rows[0]);
   }
 
-  async ingestBranchStockSnapshots(records) {
-    if (!records.length) return { accepted: 0, insertedOrUpdated: 0 };
+  // A branch-stock sync is ALWAYS scoped to one branch. This upsert therefore
+  // touches only that branch's qty/cost column and leaves every other branch's
+  // stored value untouched. The previous implementation overwrote every
+  // qty_branch_* column from EXCLUDED, so a sync from branch 001 (which sends 0
+  // for branches it doesn't own) wiped branches 003/004/005 to zero.
+  async ingestBranchStockSnapshots(branchCode, records) {
+    const columns = BRANCH_STOCK_COLUMNS[branchCode];
+    if (!columns) {
+      throw new Error(`Unknown branchCode for branch stock sync: ${branchCode}`);
+    }
+    if (!records.length) return { accepted: 0, insertedOrUpdated: 0, branchCode };
 
     const productCodes = [];
     const productNamesThai = [];
     const productNamesEng = [];
     const barcodes = [];
     const units = [];
-    const qtyBranch000 = [];
-    const qtyBranch001 = [];
-    const qtyBranch002 = [];
-    const qtyBranch003 = [];
-    const qtyBranch004 = [];
-    const qtyBranch005 = [];
-    const qtyTotals = [];
-    const costAvgBranch000 = [];
-    const costAvgBranch001 = [];
-    const costAvgBranch002 = [];
-    const costAvgBranch003 = [];
-    const costAvgBranch004 = [];
-    const costAvgBranch005 = [];
+    const qtys = [];
+    const costAvgs = [];
     const syncedAts = [];
 
     for (const record of records) {
@@ -1748,22 +1768,25 @@ export class PostgresRepository {
       productNamesEng.push(record.productNameEng || null);
       barcodes.push(record.barcode || null);
       units.push(record.unit || null);
-      qtyBranch000.push(toBranchStockNumber(record.qtyBranch000));
-      qtyBranch001.push(toBranchStockNumber(record.qtyBranch001));
-      qtyBranch002.push(toBranchStockNumber(record.qtyBranch002));
-      qtyBranch003.push(toBranchStockNumber(record.qtyBranch003));
-      qtyBranch004.push(toBranchStockNumber(record.qtyBranch004));
-      qtyBranch005.push(toBranchStockNumber(record.qtyBranch005));
-      qtyTotals.push(toBranchStockNumber(record.qtyTotalAllBranches));
-      costAvgBranch000.push(record.costAvgBranch000 ?? null);
-      costAvgBranch001.push(record.costAvgBranch001 ?? null);
-      costAvgBranch002.push(record.costAvgBranch002 ?? null);
-      costAvgBranch003.push(record.costAvgBranch003 ?? null);
-      costAvgBranch004.push(record.costAvgBranch004 ?? null);
-      costAvgBranch005.push(record.costAvgBranch005 ?? null);
+      qtys.push(toBranchStockNumber(record.qty));
+      costAvgs.push(record.costAvg ?? null);
       syncedAts.push(record.syncedAt);
     }
 
+    // Recompute the cached total: use the freshly synced qty for THIS branch and
+    // the already-stored value for every other branch. All column names come
+    // from the fixed BRANCH_STOCK_COLUMNS whitelist, never from user input.
+    const totalExpr = ALL_BRANCH_CODES
+      .map((code) =>
+        code === branchCode
+          ? `EXCLUDED.${columns.qty}`
+          : `COALESCE(branch_stock_snapshots.${BRANCH_STOCK_COLUMNS[code].qty}, 0)`,
+      )
+      .join(" + ");
+
+    // INSERT writes only this branch's qty/cost column; on a brand-new product
+    // row the other branch columns fall back to their table defaults (0 / NULL).
+    // ON CONFLICT updates ONLY this branch's qty + cost column.
     await this.pool.query(
       `
       INSERT INTO branch_stock_snapshots (
@@ -1772,19 +1795,9 @@ export class PostgresRepository {
         product_name_eng,
         barcode,
         unit,
-        qty_branch_000,
-        qty_branch_001,
-        qty_branch_002,
-        qty_branch_003,
-        qty_branch_004,
-        qty_branch_005,
+        ${columns.qty},
+        ${columns.cost},
         qty_total_all_branches,
-        cost_avg_branch_000,
-        cost_avg_branch_001,
-        cost_avg_branch_002,
-        cost_avg_branch_003,
-        cost_avg_branch_004,
-        cost_avg_branch_005,
         synced_at
       )
       SELECT
@@ -1795,36 +1808,16 @@ export class PostgresRepository {
         unnest($5::text[]),
         unnest($6::numeric[]),
         unnest($7::numeric[]),
-        unnest($8::numeric[]),
-        unnest($9::numeric[]),
-        unnest($10::numeric[]),
-        unnest($11::numeric[]),
-        unnest($12::numeric[]),
-        unnest($13::numeric[]),
-        unnest($14::numeric[]),
-        unnest($15::numeric[]),
-        unnest($16::numeric[]),
-        unnest($17::numeric[]),
-        unnest($18::numeric[]),
-        unnest($19::timestamptz[])
+        unnest($6::numeric[]),
+        unnest($8::timestamptz[])
       ON CONFLICT (product_code) DO UPDATE SET
         product_name_thai = EXCLUDED.product_name_thai,
         product_name_eng = EXCLUDED.product_name_eng,
         barcode = EXCLUDED.barcode,
         unit = EXCLUDED.unit,
-        qty_branch_000 = EXCLUDED.qty_branch_000,
-        qty_branch_001 = EXCLUDED.qty_branch_001,
-        qty_branch_002 = EXCLUDED.qty_branch_002,
-        qty_branch_003 = EXCLUDED.qty_branch_003,
-        qty_branch_004 = EXCLUDED.qty_branch_004,
-        qty_branch_005 = EXCLUDED.qty_branch_005,
-        qty_total_all_branches = EXCLUDED.qty_total_all_branches,
-        cost_avg_branch_000 = COALESCE(EXCLUDED.cost_avg_branch_000, branch_stock_snapshots.cost_avg_branch_000),
-        cost_avg_branch_001 = COALESCE(EXCLUDED.cost_avg_branch_001, branch_stock_snapshots.cost_avg_branch_001),
-        cost_avg_branch_002 = COALESCE(EXCLUDED.cost_avg_branch_002, branch_stock_snapshots.cost_avg_branch_002),
-        cost_avg_branch_003 = COALESCE(EXCLUDED.cost_avg_branch_003, branch_stock_snapshots.cost_avg_branch_003),
-        cost_avg_branch_004 = COALESCE(EXCLUDED.cost_avg_branch_004, branch_stock_snapshots.cost_avg_branch_004),
-        cost_avg_branch_005 = COALESCE(EXCLUDED.cost_avg_branch_005, branch_stock_snapshots.cost_avg_branch_005),
+        ${columns.qty} = EXCLUDED.${columns.qty},
+        ${columns.cost} = COALESCE(EXCLUDED.${columns.cost}, branch_stock_snapshots.${columns.cost}),
+        qty_total_all_branches = ${totalExpr},
         synced_at = EXCLUDED.synced_at,
         updated_at = NOW()
       `,
@@ -1834,19 +1827,8 @@ export class PostgresRepository {
         productNamesEng,
         barcodes,
         units,
-        qtyBranch000,
-        qtyBranch001,
-        qtyBranch002,
-        qtyBranch003,
-        qtyBranch004,
-        qtyBranch005,
-        qtyTotals,
-        costAvgBranch000,
-        costAvgBranch001,
-        costAvgBranch002,
-        costAvgBranch003,
-        costAvgBranch004,
-        costAvgBranch005,
+        qtys,
+        costAvgs,
         syncedAts,
       ],
     );
@@ -1854,6 +1836,7 @@ export class PostgresRepository {
     return {
       accepted: records.length,
       insertedOrUpdated: records.length,
+      branchCode,
     };
   }
 

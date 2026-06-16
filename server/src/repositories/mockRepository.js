@@ -286,10 +286,11 @@ export class MockRepository {
     return [];
   }
 
-  async ingestBranchStockSnapshots(records) {
+  async ingestBranchStockSnapshots(branchCode, records) {
     return {
       accepted: records.length,
       insertedOrUpdated: records.length,
+      branchCode,
     };
   }
 

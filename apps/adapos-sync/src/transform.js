@@ -26,6 +26,9 @@ export function toProductRecords(rows) {
     factorMedium:   r.FCPdtMFactor   ?? null,
     unitLarge:      r.FTPdtLUnit     || null,
     factorLarge:    r.FCPdtLFactor   ?? null,
+    // LEGACY / APPROXIMATE: these come from the global product master (TCNMPdt)
+    // on whichever machine ran the sync. They are NOT valid as branch-level
+    // stock truth — use branch_stock_snapshots (/api/branch-stock) for that.
     stockCurrent:   r.FCPdtQtyNow    ?? 0,
     stockRetail:    r.FCPdtQtyRet    ?? 0,
     stockWarehouse: r.FCPdtQtyWhs    ?? 0,
@@ -168,61 +171,45 @@ export function toApprovedReceiptPayload(hdRows, dtRows) {
   });
 }
 
-export function toBranchStockRecords(rows) {
+// Fixed whitelist of branch codes allowed to sync per-branch stock. Mirrors the
+// server's BRANCH_STOCK_COLUMNS whitelist. Unknown codes are rejected so a
+// misconfigured agent can never be routed to an arbitrary branch's column.
+export const BRANCH_STOCK_SYNC_BRANCHES = new Set(["000", "001", "002", "003", "004", "005"]);
+
+// Build branch-stock sync records for a SINGLE branch. Each record carries only
+// that branch's qty/cost — never fake zeroes for the other branches — so the
+// server can update just this branch's column and a sync from one branch can
+// never overwrite another branch's stored quantity. The owning branch is sent
+// explicitly at the top level of the request (see index.js), not embedded as a
+// wide per-branch row.
+export function toBranchStockRecords(rows, branchCode) {
+  const normalizedBranch = String(branchCode || "").padStart(3, "0");
+  if (!BRANCH_STOCK_SYNC_BRANCHES.has(normalizedBranch)) {
+    throw new Error(`Refusing to build branch-stock records for unknown branch code: ${branchCode}`);
+  }
+
+  const syncedAt = new Date().toISOString();
   const snapshots = new Map();
 
   for (const row of rows) {
     const productCode = row.product_code;
     if (!productCode) continue;
 
-    const branchCode = String(row.branch_code || "").padStart(3, "0");
-    const qty = Number(row.qty ?? 0);
-    const snapshot = snapshots.get(productCode) || {
-      product_code: productCode,
-      branch_code: branchCode,
-      product_name_thai: row.product_name_thai || "",
-      product_name_eng: row.product_name_eng || "",
+    // getBranchStockRows returns one row per active product; last write wins.
+    snapshots.set(productCode, {
+      productCode,
+      branchCode: normalizedBranch,
+      productNameThai: row.product_name_thai || "",
+      productNameEng: row.product_name_eng || "",
       barcode: row.barcode || "",
       unit: row.unit || "",
-      qty_branch_000: 0,
-      qty_branch_001: 0,
-      qty_branch_002: 0,
-      qty_branch_003: 0,
-      qty_branch_004: 0,
-      qty_branch_005: 0,
-      qty_total_all_branches: 0,
-      cost_avg_branch_000: null,
-      cost_avg_branch_001: null,
-      cost_avg_branch_002: null,
-      cost_avg_branch_003: null,
-      cost_avg_branch_004: null,
-      cost_avg_branch_005: null,
-      synced_at: new Date().toISOString(),
-    };
-
-    snapshot.branch_code = branchCode;
-
-    const costAvg = Number(row.cost_avg ?? 0);
-    if (branchCode === "000") { snapshot.qty_branch_000 = qty; snapshot.cost_avg_branch_000 = costAvg; }
-    if (branchCode === "001") { snapshot.qty_branch_001 = qty; snapshot.cost_avg_branch_001 = costAvg; }
-    if (branchCode === "002") { snapshot.qty_branch_002 = qty; snapshot.cost_avg_branch_002 = costAvg; }
-    if (branchCode === "003") { snapshot.qty_branch_003 = qty; snapshot.cost_avg_branch_003 = costAvg; }
-    if (branchCode === "004") { snapshot.qty_branch_004 = qty; snapshot.cost_avg_branch_004 = costAvg; }
-    if (branchCode === "005") { snapshot.qty_branch_005 = qty; snapshot.cost_avg_branch_005 = costAvg; }
-
-    snapshots.set(productCode, snapshot);
+      qty: Number(row.qty ?? 0),
+      costAvg: Number(row.cost_avg ?? 0),
+      syncedAt,
+    });
   }
 
-  return [...snapshots.values()].map((snapshot) => ({
-    ...snapshot,
-    qty_total_all_branches:
-      Number(snapshot.qty_branch_000 || 0) +
-      Number(snapshot.qty_branch_001 || 0) +
-      Number(snapshot.qty_branch_002 || 0) +
-      Number(snapshot.qty_branch_003 || 0) +
-      Number(snapshot.qty_branch_004 || 0) +
-      Number(snapshot.qty_branch_005 || 0),
-  }));
+  return [...snapshots.values()];
 }
 
 export function toSalesRecords(rows, branchCode, periodDays) {
