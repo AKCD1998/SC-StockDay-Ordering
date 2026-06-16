@@ -49,7 +49,7 @@ export class MockRepository {
         productName: product.productName,
         barcode: product.barcode,
         unit: product.unit,
-        currentStock: product.stockCurrent,
+        currentStock: product.stockRetail,
         soldQtyPeriod: product.soldQtyPeriod,
         purchasedQtyPeriod: product.purchasedQtyPeriod,
         minStock: product.minStock,
@@ -361,6 +361,14 @@ export class MockRepository {
 
   async getNightlySyncLog(_days) {
     return { dates: [], branches: [], rows: {} };
+  }
+
+  async getHourlySyncLog(_hours) {
+    return { hours: [], branches: [], rows: {} };
+  }
+
+  async getRecentSyncEvents(_options = {}) {
+    return [];
   }
 
   // ── Loyalty ───────────────────────────────────────────────────────────────────

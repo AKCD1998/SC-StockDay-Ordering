@@ -30,6 +30,7 @@ import woothiLogoUrl from "./assets/woothi-logo.svg";
 import orexTradingLogoUrl from "./assets/orex-trading-logo.svg";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
+const syncEventLogEnabled = String(import.meta.env.VITE_ENABLE_SYNC_EVENT_LOG || "").toLowerCase() === "true";
 const adminViewStorageKey = "sc-stockday-admin-view";
 const adminThemeStorageKey = "sc-stockday-admin-theme";
 const defaultAdminView = "receipts";
@@ -1188,9 +1189,11 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
   const [logoPreviewSrc, setLogoPreviewSrc] = useState("");
   const [logoEditorMessage, setLogoEditorMessage] = useState("");
   const [savingLogo, setSavingLogo] = useState(false);
-  const [selectedDate, setSelectedDate] = useState("");
+  const [approvedDateFrom, setApprovedDateFrom] = useState("");
+  const [approvedDateTo, setApprovedDateTo] = useState("");
   const [approvedSortOrder, setApprovedSortOrder] = useState("desc");
-  const [pendingDateFilter, setPendingDateFilter] = useState("");
+  const [pendingDateFrom, setPendingDateFrom] = useState("");
+  const [pendingDateTo, setPendingDateTo] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
   const [loadingPending, setLoadingPending] = useState(false);
@@ -1240,7 +1243,12 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
     setExpandedDocs((prev) => ({ ...prev, [docNo]: !prev[docNo] }));
   }
 
-  async function fetchPending({ page = pendingPage, search = appliedSearchTerm, date = pendingDateFilter } = {}) {
+  async function fetchPending({
+    page = pendingPage,
+    search = appliedSearchTerm,
+    dateFrom = pendingDateFrom,
+    dateTo = pendingDateTo,
+  } = {}) {
     setLoadingPending(true);
     setPendingError("");
     try {
@@ -1250,7 +1258,8 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
         pageSize: String(receiptPageSize),
       });
       if (search) params.set("search", search);
-      if (date) params.set("date", date);
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
       const res = await apiFetch(`/api/admin/pending-receipts?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -1271,7 +1280,8 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
   }
 
   async function fetchApproved({
-    date = selectedDate,
+    dateFrom = approvedDateFrom,
+    dateTo = approvedDateTo,
     page = approvedPage,
     search = appliedSearchTerm,
     sort = approvedSortOrder,
@@ -1285,7 +1295,8 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
         pageSize: String(receiptPageSize),
         sort,
       });
-      if (date) params.set("date", date);
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
       if (search) params.set("search", search);
       const res = await apiFetch(`/api/admin/approved-receipts?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1308,11 +1319,11 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
 
   useEffect(() => {
     fetchPending();
-  }, [appliedSearchTerm, branchCode, pendingDateFilter, pendingPage, pendingRefreshKey]);
+  }, [appliedSearchTerm, branchCode, pendingDateFrom, pendingDateTo, pendingPage, pendingRefreshKey]);
 
   useEffect(() => {
     fetchApproved();
-  }, [approvedPage, approvedRefreshKey, appliedSearchTerm, branchCode, selectedDate, approvedSortOrder]);
+  }, [approvedPage, approvedRefreshKey, appliedSearchTerm, branchCode, approvedDateFrom, approvedDateTo, approvedSortOrder]);
 
   useEffect(() => {
     fetchSupplierLogos().catch(() => {
@@ -1638,53 +1649,74 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
           </button>
         </div>
         <form className="receipt-filter-bar" onSubmit={handleSearchSubmit}>
-          <input
-            type="search"
-            className="receipt-search-input"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="ค้นหา SKU, ชื่อสินค้า, ผู้จำหน่าย, เลขที่เอกสาร"
-          />
-          <label className="date-label receipt-date-label">
-            วันที่
+          <div className="receipt-search-row">
             <input
-              type="date"
-              value={activeTab === "pending" ? pendingDateFilter : selectedDate}
-              onChange={(event) => {
-                if (activeTab === "pending") {
-                  setPendingDateFilter(event.target.value);
-                  setPendingPage(1);
-                  return;
-                }
-                setSelectedDate(event.target.value);
-                setApprovedPage(1);
-              }}
-              className="date-input-inline"
+              type="search"
+              className="receipt-search-input"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="ค้นหา SKU, ชื่อสินค้า, ผู้จำหน่าย, เลขที่เอกสาร"
             />
-          </label>
-          {activeTab === "approved" && (
+            <button type="submit" className="ghost-button receipt-search-button">
+              ค้นหา
+            </button>
+          </div>
+          <div className="receipt-date-row">
+            <label className="date-label receipt-date-label">
+              จากวันที่
+              <input
+                type="date"
+                value={activeTab === "pending" ? pendingDateFrom : approvedDateFrom}
+                onChange={(event) => {
+                  if (activeTab === "pending") {
+                    setPendingDateFrom(event.target.value);
+                    setPendingPage(1);
+                    return;
+                  }
+                  setApprovedDateFrom(event.target.value);
+                  setApprovedPage(1);
+                }}
+                className="date-input-inline"
+              />
+            </label>
+            <label className="date-label receipt-date-label">
+              ถึงวันที่
+              <input
+                type="date"
+                value={activeTab === "pending" ? pendingDateTo : approvedDateTo}
+                onChange={(event) => {
+                  if (activeTab === "pending") {
+                    setPendingDateTo(event.target.value);
+                    setPendingPage(1);
+                    return;
+                  }
+                  setApprovedDateTo(event.target.value);
+                  setApprovedPage(1);
+                }}
+                className="date-input-inline"
+              />
+            </label>
+            {activeTab === "approved" && (
+              <button
+                type="button"
+                className="ghost-button receipt-sort-button"
+                onClick={() => {
+                  setApprovedSortOrder((current) => (current === "desc" ? "asc" : "desc"));
+                  setApprovedPage(1);
+                }}
+              >
+                {approvedSortOrder === "desc" ? "ใหม่ -> เก่า" : "เก่า -> ใหม่"}
+              </button>
+            )}
             <button
               type="button"
-              className="ghost-button receipt-sort-button"
-              onClick={() => {
-                setApprovedSortOrder((current) => (current === "desc" ? "asc" : "desc"));
-                setApprovedPage(1);
-              }}
+              className="ghost-button receipt-refresh-button"
+              onClick={handleRefresh}
+              disabled={activeTab === "pending" ? loadingPending : loadingApproved}
             >
-              {approvedSortOrder === "desc" ? "ใหม่ -> เก่า" : "เก่า -> ใหม่"}
+              🔄 รีเฟรช
             </button>
-          )}
-          <button type="submit" className="ghost-button receipt-search-button">
-            ค้นหา
-          </button>
-          <button
-            type="button"
-            className="ghost-button receipt-refresh-button"
-            onClick={handleRefresh}
-            disabled={activeTab === "pending" ? loadingPending : loadingApproved}
-          >
-            🔄 รีเฟรช
-          </button>
+          </div>
         </form>
       </div>
 
@@ -1714,7 +1746,9 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
           )}
           {!loadingApproved && !approvedError && approvedRecords.length === 0 && (
             <p className="empty-state">
-              {selectedDate ? "ยังไม่มีเอกสารรับของสำหรับวันที่เลือก" : "ยังไม่มีเอกสารรับของ"}
+              {approvedDateFrom || approvedDateTo
+                ? "ยังไม่มีเอกสารรับของในช่วงวันที่เลือก"
+                : "ยังไม่มีเอกสารรับของ"}
             </p>
           )}
           <div className="receipt-list">
@@ -4372,22 +4406,220 @@ function formatShortDate(isoDate) {
   return `${d.getDate()}/${d.getMonth() + 1}`;
 }
 
+function formatSyncMetaValue(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("th-TH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function formatSyncLogStamp(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("th-TH", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function SyncEventLog({ mode, days, hours, refreshKey }) {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [unavailable, setUnavailable] = useState(false);
+
+  useEffect(() => {
+    if (!syncEventLogEnabled) {
+      setEvents([]);
+      setLoading(false);
+      setError("");
+      setUnavailable(false);
+      return undefined;
+    }
+
+    let active = true;
+    const params = new URLSearchParams({ limit: "60" });
+    if (mode === "nightly") {
+      params.set("days", String(days));
+    } else {
+      params.set("hours", String(hours));
+    }
+
+    setLoading(true);
+    setError("");
+    setUnavailable(false);
+    apiFetch(`/api/sync/recent-events?${params.toString()}`)
+      .then((res) => {
+        if ([401, 403, 404, 405, 501].includes(res.status)) {
+          throw new Error("SYNC_EVENT_LOG_UNAVAILABLE");
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((json) => { if (active) setEvents(Array.isArray(json) ? json : []); })
+      .catch((err) => {
+        if (!active) return;
+        if (err.message === "SYNC_EVENT_LOG_UNAVAILABLE") {
+          setUnavailable(true);
+          setEvents([]);
+          return;
+        }
+        setError(err.message);
+      })
+      .finally(() => { if (active) setLoading(false); });
+
+    return () => { active = false; };
+  }, [mode, days, hours, refreshKey]);
+
+  if (!syncEventLogEnabled) {
+    return null;
+  }
+
+  return (
+    <section className="sync-event-log">
+      <div className="sync-event-log-header">
+        <h3>Log เวลาที่ส่งเข้า</h3>
+        <span>
+          {mode === "nightly"
+            ? `แสดงรายการย้อนหลัง ${days} วัน`
+            : `แสดงรายการย้อนหลัง ${hours} ชั่วโมง`}
+        </span>
+      </div>
+
+      {unavailable ? (
+        <p className="empty-state">backend ปัจจุบันยังไม่เปิด recent event log ส่วนนี้</p>
+      ) : null}
+      {error ? <p className="notice error compact">❌ โหลด log ไม่ได้: {error}</p> : null}
+      {loading ? <p className="empty-state">⏳ กำลังโหลด log...</p> : null}
+      {!loading && !error && !unavailable && events.length === 0 ? (
+        <p className="empty-state">ยังไม่มี log การส่งในช่วงเวลานี้</p>
+      ) : null}
+
+      {!loading && !error && !unavailable && events.length > 0 ? (
+        <div className="sync-event-log-list">
+          {events.map((event) => {
+            const status = event.status ?? "offline";
+            const { icon, label, cls } = syncLogStatusIcon(status);
+            return (
+              <article key={event.syncRunId} className={`sync-event-log-item ${cls}`}>
+                <div className="sync-event-log-main">
+                  <strong>{BRANCH_LABELS[event.branchCode] ?? `สาขา ${event.branchCode}`}</strong>
+                  <span>{icon} {label}</span>
+                  <span>เริ่มส่ง {formatSyncLogStamp(event.startedAt)}</span>
+                  <span>เสร็จ {formatSyncLogStamp(event.finishedAt)}</span>
+                </div>
+                <div className="sync-event-log-sub">
+                  <span>ประเภท {event.syncType || "-"}</span>
+                  <span>อ่าน {formatNumber(event.recordsRead ?? 0)} รายการ</span>
+                  <span>ส่ง {formatNumber(event.recordsSent ?? 0)} รายการ</span>
+                </div>
+                <div className="sync-event-log-message">{event.message?.trim() || "-"}</div>
+              </article>
+            );
+          })}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function SyncLogMetaCard({ selection, mode }) {
+  if (!selection) {
+    return (
+      <div className="sync-log-meta-card">
+        <div className="sync-log-meta-empty">กดที่ช่องในตารางเพื่อดู metadata ของการ sync ล่าสุด</div>
+      </div>
+    );
+  }
+
+  const { branch, slotLabel, slotValue, cell } = selection;
+  const status = cell?.status ?? "offline";
+  const { icon, label } = syncLogStatusIcon(status);
+  const items = [
+    { label: mode === "nightly" ? "วันที่" : "ช่วงเวลา", value: slotLabel },
+    { label: "สาขา", value: BRANCH_LABELS[branch] ?? `สาขา ${branch}` },
+    { label: "สถานะช่อง", value: `${icon} ${label}` },
+    { label: "sync ล่าสุดเริ่ม", value: formatSyncMetaValue(cell?.latestStartedAt) },
+    { label: "sync ล่าสุดเสร็จ", value: formatSyncMetaValue(cell?.latestFinishedAt) },
+    { label: "sync type", value: cell?.syncType || "-" },
+    { label: "run status ล่าสุด", value: cell?.latestRunStatus || "-" },
+    { label: "จำนวนครั้งที่รัน", value: formatNumber(cell?.totalRuns ?? 0) },
+    { label: "ส่งรวมในช่องนี้", value: formatNumber(cell?.totalSent ?? 0) },
+    { label: "records read ล่าสุด", value: formatNumber(cell?.recordsRead ?? 0) },
+    { label: "records sent ล่าสุด", value: formatNumber(cell?.recordsSent ?? 0) },
+  ];
+
+  if (mode === "nightly") {
+    items.push(
+      { label: "heartbeat ล่าสุด", value: formatSyncMetaValue(cell?.latestHeartbeatAt) },
+      { label: "จำนวน heartbeat", value: formatNumber(cell?.heartbeatCount ?? 0) },
+    );
+  }
+
+  return (
+    <div className="sync-log-meta-card">
+      <div className="sync-log-meta-header">
+        <strong>{BRANCH_LABELS[branch] ?? `สาขา ${branch}`}</strong>
+        <span>{slotValue}</span>
+      </div>
+      <div className="sync-log-meta-grid">
+        {items.map((item) => (
+          <div key={item.label} className="sync-log-meta-item">
+            <span className="sync-log-meta-label">{item.label}</span>
+            <strong className="sync-log-meta-value">{item.value}</strong>
+          </div>
+        ))}
+      </div>
+      <div className="sync-log-meta-message">
+        <span className="sync-log-meta-label">message ล่าสุด</span>
+        <div className="sync-log-meta-message-body">{cell?.message?.trim() || "-"}</div>
+      </div>
+    </div>
+  );
+}
+
 // ── Nightly sub-tab ───────────────────────────────────────────────────────
-function NightlySyncGrid({ days, refreshKey }) {
+function NightlySyncGrid({ days, refreshKey, onUnauthorized }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
+  const [selection, setSelection] = useState(null);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError("");
     apiFetch(`/api/sync/nightly-log?days=${days}`)
-      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .then((res) => {
+        if (res.status === 401) {
+          onUnauthorized?.();
+          throw new Error("SESSION_EXPIRED");
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((json) => { if (active) setData(json); })
-      .catch((err) => { if (active) setError(err.message); })
+      .catch((err) => {
+        if (!active) return;
+        if (err.message === "SESSION_EXPIRED") {
+          setError("เซสชันหมดอายุแล้ว กรุณาเข้าสู่ระบบใหม่");
+          return;
+        }
+        setError(err.message);
+      })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
+  }, [days, refreshKey]);
+
+  useEffect(() => {
+    setSelection(null);
   }, [days, refreshKey]);
 
   const dates    = data?.dates    ?? [];
@@ -4418,11 +4650,22 @@ function NightlySyncGrid({ days, refreshKey }) {
               <tr key={branch}>
                 <td className="sync-log-branch-label">{BRANCH_LABELS[branch] ?? `สาขา ${branch}`}</td>
                 {dates.map((d) => {
-                  const status = rows[branch]?.[d] ?? "offline";
+                  const cell = rows[branch]?.[d] ?? { status: "offline" };
+                  const status = typeof cell === "string" ? cell : cell.status;
                   const { icon, label, cls } = syncLogStatusIcon(status);
+                  const isActive = selection?.branch === branch && selection?.slotValue === d;
                   return (
-                    <td key={d} className={`sync-log-cell ${cls}`}
-                        title={`${BRANCH_LABELS[branch] ?? branch} · ${d} · ${label}`}>
+                    <td
+                      key={d}
+                      className={`sync-log-cell ${cls}${isActive ? " active" : ""}`}
+                      title={`${BRANCH_LABELS[branch] ?? branch} · ${d} · ${label}`}
+                      onClick={() => setSelection({
+                        branch,
+                        slotLabel: formatShortDate(d),
+                        slotValue: d,
+                        cell: typeof cell === "string" ? { status: cell } : cell,
+                      })}
+                    >
                       <span aria-label={label}>{icon}</span>
                     </td>
                   );
@@ -4442,6 +4685,7 @@ function NightlySyncGrid({ days, refreshKey }) {
           <span key={label} className="sync-log-legend-item">{icon} {label}</span>
         ))}
       </div>
+      <SyncLogMetaCard selection={selection} mode="nightly" />
     </>
   );
 }
@@ -4456,21 +4700,40 @@ function formatHourLabel(hourKey) {
   return `${timePart}\n${Number(dd)}/${Number(mm)}`;
 }
 
-function HourlySyncGrid({ hours, refreshKey }) {
+function HourlySyncGrid({ hours, refreshKey, onUnauthorized }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
+  const [selection, setSelection] = useState(null);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError("");
     apiFetch(`/api/sync/hourly-log?hours=${hours}`)
-      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .then((res) => {
+        if (res.status === 401) {
+          onUnauthorized?.();
+          throw new Error("SESSION_EXPIRED");
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((json) => { if (active) setData(json); })
-      .catch((err) => { if (active) setError(err.message); })
+      .catch((err) => {
+        if (!active) return;
+        if (err.message === "SESSION_EXPIRED") {
+          setError("เซสชันหมดอายุแล้ว กรุณาเข้าสู่ระบบใหม่");
+          return;
+        }
+        setError(err.message);
+      })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
+  }, [hours, refreshKey]);
+
+  useEffect(() => {
+    setSelection(null);
   }, [hours, refreshKey]);
 
   const hourKeys = data?.hours    ?? [];
@@ -4516,10 +4779,19 @@ function HourlySyncGrid({ hours, refreshKey }) {
                                : rawStatus;
                   const sent   = cell?.totalSent ?? 0;
                   const { icon, label, cls } = syncLogStatusIcon(status);
+                  const isActive = selection?.branch === branch && selection?.slotValue === h;
                   return (
-                    <td key={h}
-                        className={`sync-log-cell-hour ${cls}`}
-                        title={`${BRANCH_LABELS[branch] ?? branch} · ${h} · ${label}${sent > 0 ? ` · ${sent} รายการ` : ""}`}>
+                    <td
+                      key={h}
+                      className={`sync-log-cell-hour ${cls}${isActive ? " active" : ""}`}
+                      title={`${BRANCH_LABELS[branch] ?? branch} · ${h} · ${label}${sent > 0 ? ` · ${sent} รายการ` : ""}`}
+                      onClick={() => setSelection({
+                        branch,
+                        slotLabel: h,
+                        slotValue: h,
+                        cell,
+                      })}
+                    >
                       <span aria-label={label}>{icon}</span>
                       {status === "success" && sent > 0 && (
                         <span className="sync-log-total-sent">{sent}</span>
@@ -4542,12 +4814,13 @@ function HourlySyncGrid({ hours, refreshKey }) {
           <span key={label} className="sync-log-legend-item">{icon} {label}</span>
         ))}
       </div>
+      <SyncLogMetaCard selection={selection} mode="hourly" />
     </>
   );
 }
 
 // ── SyncLogPanel — outer shell with sub-tabs ───────────────────────────────
-function SyncLogPanel() {
+function SyncLogPanel({ onUnauthorized }) {
   const [subTab, setSubTab]       = useState("nightly");
   const [nightlyDays, setNightlyDays] = useState(14);
   const [hourlyHours, setHourlyHours] = useState(24);
@@ -4623,8 +4896,16 @@ function SyncLogPanel() {
       </div>
 
       {isNightly
-        ? <NightlySyncGrid days={nightlyDays} refreshKey={refreshKey} />
-        : <HourlySyncGrid  hours={hourlyHours} refreshKey={refreshKey} />}
+        ? <NightlySyncGrid days={nightlyDays} refreshKey={refreshKey} onUnauthorized={onUnauthorized} />
+        : <HourlySyncGrid  hours={hourlyHours} refreshKey={refreshKey} onUnauthorized={onUnauthorized} />}
+
+      <SyncEventLog
+        mode={subTab}
+        days={nightlyDays}
+        hours={hourlyHours}
+        refreshKey={refreshKey}
+        onUnauthorized={onUnauthorized}
+      />
     </section>
   );
 }
@@ -4842,54 +5123,6 @@ export default function App() {
     document.body.dataset.theme = theme;
   }, [theme]);
 
-  useEffect(() => {
-    if (!accountMenuOpen || typeof window === "undefined") return undefined;
-
-    function handlePointerDown(event) {
-      if (!accountMenuRef.current?.contains(event.target)) {
-        setAccountMenuOpen(false);
-      }
-    }
-
-    function handleKeyDown(event) {
-      if (event.key === "Escape") {
-        setAccountMenuOpen(false);
-      }
-    }
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [accountMenuOpen]);
-
-  useEffect(() => {
-    if (!openNavGroup || typeof window === "undefined") return undefined;
-
-    function handlePointerDown(event) {
-      if (!navigationMenuRef.current?.contains(event.target)) {
-        setOpenNavGroup(null);
-      }
-    }
-
-    function handleKeyDown(event) {
-      if (event.key === "Escape") {
-        setOpenNavGroup(null);
-      }
-    }
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [openNavGroup]);
-
   const riskItems = useMemo(() => {
     return [...stockDay]
       .filter((item) => item.status !== "Normal")
@@ -4941,11 +5174,26 @@ export default function App() {
     });
   }, []);
 
+  const closeNavGroup = useCallback((groupId = openNavGroup, { restoreFocus = false } = {}) => {
+    if (!groupId) {
+      setOpenNavGroup(null);
+      return;
+    }
+
+    const activeElement = typeof document !== "undefined" ? document.activeElement : null;
+    const groupElement = navigationMenuRef.current?.querySelector(`[data-nav-group="${groupId}"]`);
+    const triggerElement = navigationMenuRef.current?.querySelector(`[data-nav-trigger="${groupId}"]`);
+    if (restoreFocus || (groupElement && activeElement instanceof HTMLElement && groupElement.contains(activeElement))) {
+      triggerElement?.focus();
+    }
+    setOpenNavGroup(null);
+  }, [openNavGroup]);
+
   const handleNavigate = useCallback((item) => {
     if (!item?.view || item.disabled) return;
     setView(item.view);
-    setOpenNavGroup(null);
-  }, []);
+    closeNavGroup();
+  }, [closeNavGroup]);
 
   const handleNavTriggerKeyDown = useCallback((event, group) => {
     if (event.key === "ArrowDown") {
@@ -4958,8 +5206,7 @@ export default function App() {
   const handleNavItemKeyDown = useCallback((event, groupId) => {
     if (event.key === "Escape") {
       event.preventDefault();
-      setOpenNavGroup(null);
-      navigationMenuRef.current?.querySelector(`[data-nav-trigger="${groupId}"]`)?.focus();
+      closeNavGroup(groupId, { restoreFocus: true });
     } else if (event.key === "ArrowDown") {
       event.preventDefault();
       focusNavItem(groupId, "next");
@@ -4973,7 +5220,62 @@ export default function App() {
       event.preventDefault();
       focusNavItem(groupId, "last");
     }
-  }, [focusNavItem]);
+  }, [closeNavGroup, focusNavItem]);
+
+  const handleSyncUnauthorized = useCallback(() => {
+    setSession(null);
+    setAuthError("เซสชันหมดอายุแล้ว กรุณาเข้าสู่ระบบใหม่");
+    setOpenNavGroup(null);
+    setAccountMenuOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!accountMenuOpen || typeof window === "undefined") return undefined;
+
+    function handlePointerDown(event) {
+      if (!accountMenuRef.current?.contains(event.target)) {
+        setAccountMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setAccountMenuOpen(false);
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [accountMenuOpen]);
+
+  useEffect(() => {
+    if (!openNavGroup || typeof window === "undefined") return undefined;
+
+    function handlePointerDown(event) {
+      if (!navigationMenuRef.current?.contains(event.target)) {
+        closeNavGroup();
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        closeNavGroup(openNavGroup, { restoreFocus: true });
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeNavGroup, openNavGroup]);
 
   useEffect(() => {
     if (!isAdminUser && adminOnlyViews.includes(view)) {
@@ -5054,8 +5356,6 @@ export default function App() {
                 key={group.id}
                 className={isOpen ? "hero-nav-group open" : "hero-nav-group"}
                 data-nav-group={group.id}
-                onMouseEnter={() => setOpenNavGroup(group.id)}
-                onMouseLeave={() => setOpenNavGroup((current) => (current === group.id ? null : current))}
               >
                 <button
                   type="button"
@@ -5063,14 +5363,26 @@ export default function App() {
                   aria-haspopup="menu"
                   aria-expanded={isOpen}
                   data-nav-trigger={group.id}
-                  onClick={() => setOpenNavGroup((current) => (current === group.id ? null : group.id))}
+                  onClick={() => {
+                    if (isOpen) {
+                      closeNavGroup(group.id, { restoreFocus: true });
+                    } else {
+                      setOpenNavGroup(group.id);
+                    }
+                  }}
                   onKeyDown={(event) => handleNavTriggerKeyDown(event, group)}
                 >
                   <span className="hero-nav-mark" aria-hidden="true">{group.shortLabel}</span>
                   <span className="hero-nav-label">{group.label}</span>
                   <span className="hero-nav-chevron" aria-hidden="true">▾</span>
                 </button>
-                <div className="hero-nav-menu" role="menu" aria-label={group.label} aria-hidden={!isOpen}>
+                <div
+                  className="hero-nav-menu"
+                  role="menu"
+                  aria-label={group.label}
+                  aria-hidden={!isOpen}
+                  hidden={!isOpen}
+                >
                   {group.items.map((item) => {
                     const isActive = item.view === view;
                     return (
@@ -5166,7 +5478,7 @@ export default function App() {
       ) : view === "ingredient-dictionary" && isAdminUser ? (
         <IngredientDictionaryPanel csrfToken={session.csrfToken} />
       ) : view === "sync-log" && isAdminUser ? (
-        <SyncLogPanel />
+        <SyncLogPanel onUnauthorized={handleSyncUnauthorized} />
       ) : (
         <>
           <section className="kpis">

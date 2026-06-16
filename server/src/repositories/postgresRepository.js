@@ -199,7 +199,10 @@ export class PostgresRepository {
         p.product_name_eng,
         COALESCE(p.barcode_1, p.barcode_2, p.barcode_3, '') AS barcode,
         COALESCE(p.unit_small, p.unit_medium, p.unit_large, '') AS unit,
-        p.stock_current,
+        -- Use retail on-hand (FCPdtQtyRet) as the counted stock value to match
+        -- what the other branches use; aliased to stock_current so downstream
+        -- mapping/currentStock stays unchanged.
+        p.stock_retail AS stock_current,
         COALESCE(s.sold_qty_period, 0) AS sold_qty_period,
         COALESCE(pr.purchased_qty_period, 0) AS purchased_qty_period,
         p.min_stock,
@@ -1530,6 +1533,8 @@ export class PostgresRepository {
     lineTable,
     branchCode = null,
     date = null,
+    dateFrom = null,
+    dateTo = null,
     search = "",
     sort = "desc",
     page = 1,
@@ -1540,27 +1545,37 @@ export class PostgresRepository {
     const safePage = Math.max(1, Number(page) || 1);
     const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 10));
     const offset = (safePage - 1) * safePageSize;
-    const params = [branchCode, date, normalizedSearch || null, safePageSize, offset];
+    const normalizedDateFrom = dateFrom ?? date ?? null;
+    const normalizedDateTo = dateTo ?? date ?? null;
+    const params = [
+      branchCode,
+      normalizedDateFrom,
+      normalizedDateTo,
+      normalizedSearch || null,
+      safePageSize,
+      offset,
+    ];
     const whereClause = `
       WHERE ($1::text IS NULL OR h.branch_code = $1)
-        AND ($2::text IS NULL OR CAST(h.doc_date AS DATE) = $2::date)
+        AND ($2::text IS NULL OR CAST(h.doc_date AS DATE) >= $2::date)
+        AND ($3::text IS NULL OR CAST(h.doc_date AS DATE) <= $3::date)
         AND (
-          $3::text IS NULL
-          OR LOWER(COALESCE(h.doc_no, '')) LIKE '%' || $3 || '%'
-          OR LOWER(COALESCE(h.supplier_name, '')) LIKE '%' || $3 || '%'
-          OR LOWER(COALESCE(h.supplier_code, '')) LIKE '%' || $3 || '%'
-          OR LOWER(COALESCE(h.ref_ext, '')) LIKE '%' || $3 || '%'
-          OR LOWER(COALESCE(h.created_by, '')) LIKE '%' || $3 || '%'
+          $4::text IS NULL
+          OR LOWER(COALESCE(h.doc_no, '')) LIKE '%' || $4 || '%'
+          OR LOWER(COALESCE(h.supplier_name, '')) LIKE '%' || $4 || '%'
+          OR LOWER(COALESCE(h.supplier_code, '')) LIKE '%' || $4 || '%'
+          OR LOWER(COALESCE(h.ref_ext, '')) LIKE '%' || $4 || '%'
+          OR LOWER(COALESCE(h.created_by, '')) LIKE '%' || $4 || '%'
           OR EXISTS (
             SELECT 1
             FROM ${lineTable} lx
             WHERE lx.doc_no = h.doc_no
               AND (
-                LOWER(COALESCE(lx.product_code, '')) LIKE '%' || $3 || '%'
-                OR LOWER(COALESCE(lx.product_name, '')) LIKE '%' || $3 || '%'
-                OR LOWER(COALESCE(lx.barcode, '')) LIKE '%' || $3 || '%'
-                OR LOWER(COALESCE(lx.lot_no, '')) LIKE '%' || $3 || '%'
-                OR LOWER(COALESCE(lx.unit_name, '')) LIKE '%' || $3 || '%'
+                LOWER(COALESCE(lx.product_code, '')) LIKE '%' || $4 || '%'
+                OR LOWER(COALESCE(lx.product_name, '')) LIKE '%' || $4 || '%'
+                OR LOWER(COALESCE(lx.barcode, '')) LIKE '%' || $4 || '%'
+                OR LOWER(COALESCE(lx.lot_no, '')) LIKE '%' || $4 || '%'
+                OR LOWER(COALESCE(lx.unit_name, '')) LIKE '%' || $4 || '%'
               )
           )
         )
@@ -1572,7 +1587,7 @@ export class PostgresRepository {
       FROM ${headerTable} h
       ${whereClause}
       `,
-      params.slice(0, 3),
+      params.slice(0, 4),
     );
     const total = Number(countResult.rows[0]?.total || 0);
 
@@ -1583,7 +1598,7 @@ export class PostgresRepository {
         FROM ${headerTable} h
         ${whereClause}
         ORDER BY h.doc_date ${normalizedSort}, h.doc_time ${normalizedSort}, h.doc_no ${normalizedSort}
-        LIMIT $4 OFFSET $5
+        LIMIT $5 OFFSET $6
       )
       SELECT
         h.doc_no, h.branch_code, h.doc_type, h.doc_date, h.doc_time,
@@ -2074,17 +2089,39 @@ export class PostgresRepository {
             WHEN bool_or(status = 'success') THEN 'success'
             WHEN bool_or(status = 'running') THEN 'running'
             ELSE 'failed'
-          END AS run_status
+          END AS run_status,
+          COUNT(*)::integer AS total_runs,
+          COALESCE(SUM(records_sent), 0)::integer AS total_sent,
+          MAX(started_at) AS latest_started_at,
+          MAX(finished_at) AS latest_finished_at
         FROM ingest.sync_runs
         WHERE started_at >= CURRENT_DATE - $1 * INTERVAL '1 day'
           AND branch_code IS NOT NULL
         GROUP BY branch_code, started_at::date
       ),
+      latest_run AS (
+        SELECT DISTINCT ON (branch_code, started_at::date)
+          branch_code,
+          started_at::date AS sync_date,
+          sync_type,
+          status AS latest_run_status,
+          started_at,
+          finished_at,
+          records_read,
+          records_sent,
+          message
+        FROM ingest.sync_runs
+        WHERE started_at >= CURRENT_DATE - $1 * INTERVAL '1 day'
+          AND branch_code IS NOT NULL
+        ORDER BY branch_code, started_at::date, started_at DESC, sync_run_id DESC
+      ),
       heartbeats_agg AS (
         SELECT
           branch_code,
           created_at::date AS sync_date,
-          true AS had_heartbeat
+          true AS had_heartbeat,
+          COUNT(*)::integer AS heartbeat_count,
+          MAX(created_at) AS latest_heartbeat_at
         FROM ingest.laptop_heartbeats
         WHERE created_at >= CURRENT_DATE - $1 * INTERVAL '1 day'
         GROUP BY branch_code, created_at::date
@@ -2097,10 +2134,22 @@ export class PostgresRepository {
           WHEN r.run_status IS NOT NULL    THEN r.run_status
           WHEN h.had_heartbeat             THEN 'failed'
           ELSE                                  'offline'
-        END AS status
+        END AS status,
+        r.total_runs,
+        r.total_sent,
+        r.latest_started_at,
+        r.latest_finished_at,
+        lr.sync_type,
+        lr.latest_run_status,
+        lr.records_read,
+        lr.records_sent,
+        lr.message,
+        h.heartbeat_count,
+        h.latest_heartbeat_at
       FROM known_branches b
       CROSS JOIN date_series d
       LEFT JOIN runs_agg       r ON r.branch_code = b.branch_code AND r.sync_date = d.sync_date
+      LEFT JOIN latest_run    lr ON lr.branch_code = b.branch_code AND lr.sync_date = d.sync_date
       LEFT JOIN heartbeats_agg h ON h.branch_code = b.branch_code AND h.sync_date = d.sync_date
       ORDER BY b.branch_code, d.sync_date
       `,
@@ -2126,7 +2175,20 @@ export class PostgresRepository {
         ? row.sync_date.toISOString().slice(0, 10)
         : String(row.sync_date).slice(0, 10);
       if (!resultRows[row.branch_code]) resultRows[row.branch_code] = {};
-      resultRows[row.branch_code][dateKey] = row.status;
+      resultRows[row.branch_code][dateKey] = {
+        status: row.status,
+        totalRuns: Number(row.total_runs ?? 0),
+        totalSent: Number(row.total_sent ?? 0),
+        latestStartedAt: row.latest_started_at,
+        latestFinishedAt: row.latest_finished_at,
+        syncType: row.sync_type || null,
+        latestRunStatus: row.latest_run_status || null,
+        recordsRead: Number(row.records_read ?? 0),
+        recordsSent: Number(row.records_sent ?? 0),
+        message: row.message || "",
+        heartbeatCount: Number(row.heartbeat_count ?? 0),
+        latestHeartbeatAt: row.latest_heartbeat_at,
+      };
     }
 
     return { dates, branches, rows: resultRows };
@@ -2163,11 +2225,30 @@ export class PostgresRepository {
             WHEN bool_or(status = 'running') THEN 'running'
             ELSE 'failed'
           END AS run_status,
-          SUM(records_sent)::integer AS total_sent
+          COUNT(*)::integer AS total_runs,
+          COALESCE(SUM(records_sent), 0)::integer AS total_sent,
+          MAX(started_at) AS latest_started_at,
+          MAX(finished_at) AS latest_finished_at
         FROM ingest.sync_runs
         WHERE started_at >= NOW() - $1 * INTERVAL '1 hour'
           AND branch_code IS NOT NULL
         GROUP BY branch_code, date_trunc('hour', started_at AT TIME ZONE 'Asia/Bangkok')
+      ),
+      latest_run AS (
+        SELECT DISTINCT ON (branch_code, date_trunc('hour', started_at AT TIME ZONE 'Asia/Bangkok'))
+          branch_code,
+          date_trunc('hour', started_at AT TIME ZONE 'Asia/Bangkok') AS hour_slot,
+          sync_type,
+          status AS latest_run_status,
+          started_at,
+          finished_at,
+          records_read,
+          records_sent,
+          message
+        FROM ingest.sync_runs
+        WHERE started_at >= NOW() - $1 * INTERVAL '1 hour'
+          AND branch_code IS NOT NULL
+        ORDER BY branch_code, date_trunc('hour', started_at AT TIME ZONE 'Asia/Bangkok'), started_at DESC, sync_run_id DESC
       )
       SELECT
         b.branch_code,
@@ -2178,11 +2259,21 @@ export class PostgresRepository {
           WHEN r.run_status IS NOT NULL  THEN r.run_status
           ELSE 'offline'
         END AS status,
-        COALESCE(r.total_sent, 0) AS total_sent
+        COALESCE(r.total_sent, 0) AS total_sent,
+        COALESCE(r.total_runs, 0) AS total_runs,
+        r.latest_started_at,
+        r.latest_finished_at,
+        lr.sync_type,
+        lr.latest_run_status,
+        lr.records_read,
+        lr.records_sent,
+        lr.message
       FROM known_branches b
       CROSS JOIN hour_series h
       LEFT JOIN runs_agg r
         ON r.branch_code = b.branch_code AND r.hour_slot = h.hour_slot
+      LEFT JOIN latest_run lr
+        ON lr.branch_code = b.branch_code AND lr.hour_slot = h.hour_slot
       ORDER BY b.branch_code, h.hour_slot ASC
       `,
       [safeHours],
@@ -2203,12 +2294,71 @@ export class PostgresRepository {
     for (const row of rows) {
       if (!resultRows[row.branch_code]) resultRows[row.branch_code] = {};
       resultRows[row.branch_code][row.hour_key] = {
-        status:    row.status,
+        status: row.status,
         totalSent: Number(row.total_sent ?? 0),
+        totalRuns: Number(row.total_runs ?? 0),
+        latestStartedAt: row.latest_started_at,
+        latestFinishedAt: row.latest_finished_at,
+        syncType: row.sync_type || null,
+        latestRunStatus: row.latest_run_status || null,
+        recordsRead: Number(row.records_read ?? 0),
+        recordsSent: Number(row.records_sent ?? 0),
+        message: row.message || "",
       };
     }
 
     return { hours: hourKeys, branches, rows: resultRows };
+  }
+
+  async getRecentSyncEvents({ hours = null, days = null, limit = 50 } = {}) {
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 200));
+    const safeHours = hours == null ? null : Math.max(1, Math.min(Number(hours) || 24, 168));
+    const safeDays = days == null ? null : Math.max(1, Math.min(Number(days) || 14, 90));
+
+    const filters = ["branch_code IS NOT NULL"];
+    const params = [];
+
+    if (safeHours != null) {
+      params.push(safeHours);
+      filters.push(`started_at >= NOW() - $${params.length} * INTERVAL '1 hour'`);
+    } else if (safeDays != null) {
+      params.push(safeDays);
+      filters.push(`started_at >= CURRENT_DATE - $${params.length} * INTERVAL '1 day'`);
+    }
+
+    params.push(safeLimit);
+
+    const { rows } = await this.pool.query(
+      `
+      SELECT
+        sync_run_id,
+        branch_code,
+        sync_type,
+        status,
+        started_at,
+        finished_at,
+        records_read,
+        records_sent,
+        message
+      FROM ingest.sync_runs
+      WHERE ${filters.join(" AND ")}
+      ORDER BY started_at DESC, sync_run_id DESC
+      LIMIT $${params.length}
+      `,
+      params,
+    );
+
+    return rows.map((row) => ({
+      syncRunId: row.sync_run_id,
+      branchCode: row.branch_code,
+      syncType: row.sync_type,
+      status: row.status,
+      startedAt: row.started_at,
+      finishedAt: row.finished_at,
+      recordsRead: Number(row.records_read ?? 0),
+      recordsSent: Number(row.records_sent ?? 0),
+      message: row.message || "",
+    }));
   }
 
   // ── Loyalty: member search ────────────────────────────────────────────────────
