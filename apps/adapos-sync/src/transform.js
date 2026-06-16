@@ -203,8 +203,10 @@ export function toBranchStockRecords(rows, branchCode) {
       productNameEng: row.product_name_eng || "",
       barcode: row.barcode || "",
       unit: row.unit || "",
-      qty: Number(row.qty ?? 0),
-      costAvg: Number(row.cost_avg ?? 0),
+      qty: Number(row.qty || 0),
+      // Send null (not 0) when cost is unknown so the server's COALESCE keeps any
+      // previously stored cost instead of overwriting it with a fake zero.
+      costAvg: row.cost_avg == null ? null : Number(row.cost_avg),
       syncedAt,
     });
   }
