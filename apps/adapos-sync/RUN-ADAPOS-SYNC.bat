@@ -13,13 +13,9 @@ echo.
 powershell -ExecutionPolicy Bypass -NoProfile -File "%~dp0open-adapos-and-sync.ps1"
 set "EXIT_CODE=%ERRORLEVEL%"
 
-echo.
-if "%EXIT_CODE%"=="0" (
-  echo การส่งข้อมูลเสร็จสมบูรณ์
-) else (
-  echo การส่งข้อมูลล้มเหลว ^(exit code %EXIT_CODE%^)
-  echo กรุณาตรวจสอบไฟล์ log ในโฟลเดอร์ logs ที่อยู่ในไดเรกทอรีเดียวกันนี้
-)
-echo.
-echo กดปุ่มใดก็ได้เพื่อออก
+REM Thai status message lives in show-result.ps1 (UTF-8). Keeping it out of this
+REM .bat means this file stays pure ASCII and renders correctly in any editor,
+REM while PowerShell prints the Thai text to the Thai (874) console correctly.
+powershell -ExecutionPolicy Bypass -NoProfile -File "%~dp0show-result.ps1" -ExitCode %EXIT_CODE%
+
 pause >nul
