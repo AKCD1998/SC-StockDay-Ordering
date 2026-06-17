@@ -1030,6 +1030,39 @@ button {
   font-size: 1.9rem;
 }
 
+.stock-cost-branch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stock-cost-branch-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid #d6deea;
+  border-radius: 18px;
+  background: #fbfcfe;
+}
+
+.stock-cost-branch-head,
+.stock-cost-branch-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.stock-cost-branch-head strong {
+  color: #16344d;
+}
+
+.stock-cost-branch-head span,
+.stock-cost-branch-meta {
+  color: #5f7084;
+}
+
 .stock-cost-table th,
 .stock-cost-table td {
   min-width: 120px;
@@ -1042,6 +1075,24 @@ button {
 .stock-cost-table th:nth-child(3),
 .stock-cost-table td:nth-child(3) {
   min-width: 180px;
+}
+
+.stock-cost-compare-table th:nth-child(1),
+.stock-cost-compare-table td:nth-child(1),
+.stock-cost-compare-table th:nth-child(2),
+.stock-cost-compare-table td:nth-child(2),
+.stock-cost-compare-table th:nth-child(3),
+.stock-cost-compare-table td:nth-child(3),
+.stock-cost-compare-table th:nth-child(4),
+.stock-cost-compare-table td:nth-child(4) {
+  min-width: 160px;
+}
+
+.stock-cost-compare-table th:nth-child(5),
+.stock-cost-compare-table td:nth-child(5),
+.stock-cost-compare-table th:nth-child(6),
+.stock-cost-compare-table td:nth-child(6) {
+  min-width: 130px;
 }
 
 .category-group-card {
@@ -3058,6 +3109,7 @@ select {
 [data-theme="dark"] .category-review-card,
 [data-theme="dark"] .spotlight-card,
 [data-theme="dark"] .request-card,
+[data-theme="dark"] .stock-cost-branch-card,
 [data-theme="dark"] .receipt-card,
 [data-theme="dark"] .taxonomy-report-card,
 [data-theme="dark"] .taxonomy-report-metric,
@@ -3089,6 +3141,8 @@ select {
 [data-theme="dark"] .taxonomy-report-meta,
 [data-theme="dark"] .taxonomy-report-metric span,
 [data-theme="dark"] .taxonomy-report-metric small,
+[data-theme="dark"] .stock-cost-branch-head span,
+[data-theme="dark"] .stock-cost-branch-meta,
 [data-theme="dark"] .meta,
 [data-theme="dark"] .meta-line,
 [data-theme="dark"] .pagination-info,
@@ -3179,6 +3233,7 @@ select {
 [data-theme="dark"] .taxonomy-report-header h3,
 [data-theme="dark"] .taxonomy-report-metric strong,
 [data-theme="dark"] .taxonomy-report-section summary,
+[data-theme="dark"] .stock-cost-branch-head strong,
 [data-theme="dark"] .auth-card-header h2,
 [data-theme="dark"] .category-metric strong,
 [data-theme="dark"] .receipt-grand,

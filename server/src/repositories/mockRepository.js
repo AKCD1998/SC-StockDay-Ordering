@@ -314,6 +314,15 @@ export class MockRepository {
     const detail = normalizedOptions.detail === true;
     const limit = Math.min(200, Math.max(1, Number(normalizedOptions.limit) || 25));
     const offset = Math.max(0, Number(normalizedOptions.offset) || 0);
+    const branchSummaries = _branchCode === "all"
+      ? [
+        { branchCode: "000", label: "สาขา 000 (HQ)", productsWithStock: 0, productsWithCost: 0, totalInventoryValue: 0 },
+        { branchCode: "001", label: "สาขา 001", productsWithStock: 0, productsWithCost: 0, totalInventoryValue: 0 },
+        { branchCode: "003", label: "สาขา 003", productsWithStock: 0, productsWithCost: 0, totalInventoryValue: 0 },
+        { branchCode: "004", label: "สาขา 004", productsWithStock: 0, productsWithCost: 0, totalInventoryValue: 0 },
+        { branchCode: "005", label: "สาขา 005", productsWithStock: 0, productsWithCost: 0, totalInventoryValue: 0 },
+      ]
+      : [];
 
     return {
       branchCode: _branchCode,
@@ -321,6 +330,7 @@ export class MockRepository {
       productsWithStock: 0,
       productsWithCost: 0,
       totalInventoryValue: 0,
+      ...(branchSummaries.length ? { branchSummaries } : {}),
       ...(detail ? {
         products: [],
         pagination: {
