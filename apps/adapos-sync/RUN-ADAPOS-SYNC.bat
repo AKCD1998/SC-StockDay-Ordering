@@ -15,10 +15,11 @@ set "EXIT_CODE=%ERRORLEVEL%"
 
 echo.
 if "%EXIT_CODE%"=="0" (
-  echo Sync finished successfully.
+  echo การส่งข้อมูลเสร็จสมบูรณ์
 ) else (
-  echo Sync failed with exit code %EXIT_CODE%.
-  echo Check the logs folder in this same directory for details.
+  echo การส่งข้อมูลล้มเหลว ^(exit code %EXIT_CODE%^)
+  echo กรุณาตรวจสอบไฟล์ log ในโฟลเดอร์ logs ที่อยู่ในไดเรกทอรีเดียวกันนี้
 )
 echo.
-pause
+echo กดปุ่มใดก็ได้เพื่อออก
+pause >nul
