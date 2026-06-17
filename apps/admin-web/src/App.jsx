@@ -1816,11 +1816,12 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
   const pageSize = 25;
   const pageFetchLimit = 10000;
   const branchExportOptions = [
-    { branchCode: "000", label: "สาขา 000 (HQ)" },
-    { branchCode: "001", label: "สาขา 001" },
-    { branchCode: "003", label: "สาขา 003" },
-    { branchCode: "004", label: "สาขา 004" },
-    { branchCode: "005", label: "สาขา 005" },
+    { branchCode: "all", label: "ทุกสาขา", description: "1 ชีทเปรียบเทียบทุกสาขา + 5 ชีทรายสาขา (ไฟล์เดียว)" },
+    { branchCode: "000", label: "สาขา 000 (HQ)", description: "ดึงเฉพาะคอลัมน์จำนวนของ สาขา 000 (HQ)" },
+    { branchCode: "001", label: "สาขา 001", description: "ดึงเฉพาะคอลัมน์จำนวนของ สาขา 001" },
+    { branchCode: "003", label: "สาขา 003", description: "ดึงเฉพาะคอลัมน์จำนวนของ สาขา 003" },
+    { branchCode: "004", label: "สาขา 004", description: "ดึงเฉพาะคอลัมน์จำนวนของ สาขา 004" },
+    { branchCode: "005", label: "สาขา 005", description: "ดึงเฉพาะคอลัมน์จำนวนของ สาขา 005" },
   ];
   const [records, setRecords] = useState([]);
   const [matchReport, setMatchReport] = useState(null);
@@ -2149,7 +2150,11 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
       const disposition = response.headers.get("content-disposition") || "";
       const fileNameMatch = disposition.match(/filename=\"?([^"]+)\"?/i);
       anchor.href = objectUrl;
-      anchor.download = fileNameMatch?.[1] || `branch-stock-${selectedExportBranch}.xlsx`;
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      const fallbackName = selectedExportBranch === "all"
+        ? `branch-stock-all-${dateStamp}.xlsx`
+        : `branch-stock-${selectedExportBranch}.xlsx`;
+      anchor.download = fileNameMatch?.[1] || fallbackName;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -2754,7 +2759,7 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
                   disabled={exporting}
                 >
                   <strong>{option.label}</strong>
-                  <span>ดึงเฉพาะคอลัมน์จำนวนของ {option.label}</span>
+                  <span>{option.description}</span>
                 </button>
               ))}
             </div>
@@ -2776,7 +2781,7 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
                 onClick={handleExportExcel}
                 disabled={exporting}
               >
-                {exporting ? "กำลังสร้างไฟล์..." : `ดาวน์โหลด ${selectedExportBranch}`}
+                {exporting ? "กำลังสร้างไฟล์..." : selectedExportBranch === "all" ? "ดาวน์โหลดทั้งหมด" : `ดาวน์โหลด ${selectedExportBranch}`}
               </button>
             </div>
           </div>
