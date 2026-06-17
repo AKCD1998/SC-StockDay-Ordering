@@ -178,6 +178,83 @@ function buildBranchStockExportWorkbook(records, branchCode) {
   return xlsx.write(workbook, { type: "buffer", bookType: "xlsx" });
 }
 
+function buildBranchSheetForMirror(records, branchCode) {
+  const branchConfig = BRANCH_EXPORT_CONFIG[branchCode];
+  const qtyKey = branchConfig.qtyKey;
+  const rows = [
+    [branchConfig.title],
+    ["ลำดับ", "รหัส", "ชื่อสินค้า", "BARCODE", "หน่วย", "จำนวน", "ประเภท", "รวมเงินช่องนี้", "นับ1", "นับ2", "นับ3"],
+    ...records.map((row, index) => ([
+      index + 1,
+      row.productCode || "",
+      row.productNameThai || "",
+      row.barcode || "",
+      row.unit || "",
+      Number(row[qtyKey] || 0),
+      row.category || "",
+      "",
+      "",
+      "",
+      "",
+    ])),
+  ];
+  const worksheet = xlsx.utils.aoa_to_sheet(rows);
+  worksheet["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 10 } }];
+  worksheet["!cols"] = [
+    { wch: 8 }, { wch: 14 }, { wch: 72 }, { wch: 18 }, { wch: 12 },
+    { wch: 12 }, { wch: 18 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+  ];
+  return worksheet;
+}
+
+const ALL_BRANCHES_EXPORT_ORDER_MIRROR = ["000", "001", "003", "004", "005"];
+
+function buildAllBranchesExportWorkbookMirror(records) {
+  const workbook = xlsx.utils.book_new();
+
+  const comparisonHeaders = [
+    "รหัสสินค้า", "ชื่อสินค้าไทย", "ชื่ออังกฤษ", "Barcode", "หน่วย",
+    "หมวดหมู่", "สถานะหมวดหมู่",
+    "สาขา 000", "สาขา 001", "สาขา 003", "สาขา 004", "สาขา 005",
+    "รวมทุกสาขา", "synced_at",
+  ];
+  const comparisonRows = [
+    comparisonHeaders,
+    ...records.map((row) => [
+      row.productCode || "",
+      row.productNameThai || "",
+      row.productNameEng || "",
+      row.barcode || "",
+      row.unit || "",
+      row.category || "",
+      row.categoryStatus || "",
+      Number(row.qtyBranch000 || 0),
+      Number(row.qtyBranch001 || 0),
+      Number(row.qtyBranch003 || 0),
+      Number(row.qtyBranch004 || 0),
+      Number(row.qtyBranch005 || 0),
+      Number(row.qtyTotalAllBranches || 0),
+      row.syncedAt || "",
+    ]),
+  ];
+  const comparisonSheet = xlsx.utils.aoa_to_sheet(comparisonRows);
+  comparisonSheet["!cols"] = [
+    { wch: 14 }, { wch: 50 }, { wch: 40 }, { wch: 18 }, { wch: 10 },
+    { wch: 20 }, { wch: 18 },
+    { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
+    { wch: 14 }, { wch: 24 },
+  ];
+  comparisonSheet["!autofilter"] = { ref: "A1:N1" };
+  comparisonSheet["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2" };
+  xlsx.utils.book_append_sheet(workbook, comparisonSheet, "ทุกสาขา");
+
+  for (const branchCode of ALL_BRANCHES_EXPORT_ORDER_MIRROR) {
+    xlsx.utils.book_append_sheet(workbook, buildBranchSheetForMirror(records, branchCode), branchCode);
+  }
+
+  return xlsx.write(workbook, { type: "buffer", bookType: "xlsx" });
+}
+
 function locateLatestTaxonomyReportPath() {
   if (!fs.existsSync(docsDir)) return null;
   const files = fs.readdirSync(docsDir)
@@ -580,16 +657,23 @@ export function createRouter(repository) {
 
   router.get("/api/branch-stock/export.xlsx", asyncHandler(async (req, res) => {
     const branchCode = String(req.query.branchCode || "").trim();
-    if (!BRANCH_EXPORT_CONFIG[branchCode]) {
-      return res.status(400).json({ message: "branchCode must be one of 000, 001, 003, 004, 005." });
+    const isAllBranches = branchCode === "all";
+    if (!isAllBranches && !BRANCH_EXPORT_CONFIG[branchCode]) {
+      return res.status(400).json({ message: "branchCode must be one of 000, 001, 003, 004, 005, or all." });
     }
 
     const records = await repository.getBranchStockExportRows({
       search: req.query.search || "",
     });
-    const buffer = buildBranchStockExportWorkbook(records, branchCode);
     const dateStamp = new Date().toISOString().slice(0, 10);
-    const fileName = `branch-stock-${branchCode}-${dateStamp}.xlsx`;
+    let buffer, fileName;
+    if (isAllBranches) {
+      buffer = buildAllBranchesExportWorkbookMirror(records);
+      fileName = `branch-stock-all-${dateStamp}.xlsx`;
+    } else {
+      buffer = buildBranchStockExportWorkbook(records, branchCode);
+      fileName = `branch-stock-${branchCode}-${dateStamp}.xlsx`;
+    }
 
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
