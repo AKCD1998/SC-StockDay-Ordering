@@ -622,6 +622,19 @@ button {
   min-width: min(420px, 100%);
 }
 
+.stock-cost-toolbar {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.stock-cost-toolbar input {
+  min-width: min(360px, 100%);
+}
+
+.stock-cost-toolbar select {
+  min-width: 180px;
+}
+
 .branch-stock-toolbar .excel-export-button,
 .branch-stock-toolbar .branch-stock-search-button,
 .branch-stock-toolbar .branch-stock-refresh-button {
@@ -1001,6 +1014,33 @@ button {
 .branch-stock-table td:nth-child(1),
 .branch-stock-table th:nth-child(2),
 .branch-stock-table td:nth-child(2) {
+  min-width: 180px;
+}
+
+.stock-cost-note {
+  margin-bottom: 18px;
+  color: #6f7f91;
+}
+
+.stock-cost-summary-grid {
+  margin-bottom: 20px;
+}
+
+.stock-cost-kpi strong {
+  font-size: 1.9rem;
+}
+
+.stock-cost-table th,
+.stock-cost-table td {
+  min-width: 120px;
+}
+
+.stock-cost-table th:nth-child(1),
+.stock-cost-table td:nth-child(1),
+.stock-cost-table th:nth-child(2),
+.stock-cost-table td:nth-child(2),
+.stock-cost-table th:nth-child(3),
+.stock-cost-table td:nth-child(3) {
   min-width: 180px;
 }
 

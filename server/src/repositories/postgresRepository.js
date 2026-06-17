@@ -1855,7 +1855,12 @@ export class PostgresRepository {
     };
   }
 
-  async getBranchStockInventoryValue(branchCode, detail = false) {
+  async getBranchStockInventoryValue(branchCode, options = {}) {
+    const normalizedOptions = typeof options === "boolean" ? { detail: options } : (options || {});
+    const detail = normalizedOptions.detail === true;
+    const normalizedSearch = normalizeQuery(normalizedOptions.search || "");
+    const safeLimit = Math.min(200, Math.max(1, Number(normalizedOptions.limit) || 25));
+    const safeOffset = Math.max(0, Number(normalizedOptions.offset) || 0);
     const col = `qty_branch_${branchCode}`;
     const costCol = `cost_avg_branch_${branchCode}`;
     const validBranches = ["000", "001", "002", "003", "004", "005"];
@@ -1867,36 +1872,89 @@ export class PostgresRepository {
       SELECT
         COUNT(*)::int                                           AS product_count,
         COUNT(*) FILTER (WHERE ${col} > 0)::int                AS products_with_stock,
-        COUNT(*) FILTER (WHERE ${costCol} IS NOT NULL)::int    AS products_with_cost,
+        COUNT(*) FILTER (WHERE ${col} > 0 AND ${costCol} IS NOT NULL)::int AS products_with_cost,
         ROUND(SUM(${col} * COALESCE(${costCol}, 0))::numeric, 2) AS total_inventory_value
       FROM branch_stock_snapshots
     `);
 
     const summary = {
       branchCode,
-      ...summaryResult.rows[0],
+      productCount: Number(summaryResult.rows[0]?.product_count || 0),
+      productsWithStock: Number(summaryResult.rows[0]?.products_with_stock || 0),
+      productsWithCost: Number(summaryResult.rows[0]?.products_with_cost || 0),
+      totalInventoryValue: Number(summaryResult.rows[0]?.total_inventory_value || 0),
     };
 
     if (!detail) return summary;
 
+    const countResult = await this.pool.query(
+      `
+      SELECT COUNT(*)::int AS total
+      FROM branch_stock_snapshots bs
+      LEFT JOIN products p ON p.product_code = bs.product_code
+      LEFT JOIN product_category pc ON pc.product_code = bs.product_code
+      WHERE ${col} > 0
+        AND (
+          $1::text IS NULL
+          OR LOWER(COALESCE(bs.product_code, '')) LIKE '%' || $1 || '%'
+          OR LOWER(COALESCE(bs.product_name_thai, '')) LIKE '%' || $1 || '%'
+          OR LOWER(COALESCE(bs.product_name_eng, '')) LIKE '%' || $1 || '%'
+          OR LOWER(COALESCE(bs.barcode, '')) LIKE '%' || $1 || '%'
+          OR LOWER(COALESCE(p.category, '')) LIKE '%' || $1 || '%'
+          OR LOWER(COALESCE(pc.clean_category, '')) LIKE '%' || $1 || '%'
+        )
+      `,
+      [normalizedSearch || null],
+    );
+
     const detailResult = await this.pool.query(`
       SELECT
-        product_code,
-        product_name_thai,
-        product_name_eng,
-        barcode,
-        unit,
+        bs.product_code,
+        bs.product_name_thai,
+        bs.product_name_eng,
+        bs.barcode,
+        bs.unit,
+        COALESCE(p.category, pc.clean_category, '') AS category,
         ${col}           AS qty,
         ${costCol}       AS unit_cost_avg,
-        ROUND((${col} * COALESCE(${costCol}, 0))::numeric, 2) AS inventory_value
-      FROM branch_stock_snapshots
+        ROUND((${col} * COALESCE(${costCol}, 0))::numeric, 2) AS inventory_value,
+        bs.synced_at
+      FROM branch_stock_snapshots bs
+      LEFT JOIN products p ON p.product_code = bs.product_code
+      LEFT JOIN product_category pc ON pc.product_code = bs.product_code
       WHERE ${col} > 0
-      ORDER BY inventory_value DESC
-    `);
+        AND (
+          $1::text IS NULL
+          OR LOWER(COALESCE(bs.product_code, '')) LIKE '%' || $1 || '%'
+          OR LOWER(COALESCE(bs.product_name_thai, '')) LIKE '%' || $1 || '%'
+          OR LOWER(COALESCE(bs.product_name_eng, '')) LIKE '%' || $1 || '%'
+          OR LOWER(COALESCE(bs.barcode, '')) LIKE '%' || $1 || '%'
+          OR LOWER(COALESCE(p.category, '')) LIKE '%' || $1 || '%'
+          OR LOWER(COALESCE(pc.clean_category, '')) LIKE '%' || $1 || '%'
+        )
+      ORDER BY inventory_value DESC, bs.product_code ASC
+      LIMIT $2 OFFSET $3
+    `, [normalizedSearch || null, safeLimit, safeOffset]);
 
     return {
       ...summary,
-      products: detailResult.rows,
+      products: detailResult.rows.map((row) => ({
+        productCode: row.product_code,
+        productNameThai: row.product_name_thai || "",
+        productNameEng: row.product_name_eng || "",
+        barcode: row.barcode || "",
+        unit: row.unit || "",
+        category: row.category || "",
+        qty: Number(row.qty || 0),
+        unitCostAvg: row.unit_cost_avg == null ? null : Number(row.unit_cost_avg),
+        inventoryValue: Number(row.inventory_value || 0),
+        syncedAt: row.synced_at || null,
+      })),
+      pagination: {
+        limit: safeLimit,
+        offset: safeOffset,
+        total: Number(countResult.rows[0]?.total || 0),
+      },
     };
   }
 

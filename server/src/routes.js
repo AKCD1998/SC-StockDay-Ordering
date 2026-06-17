@@ -686,7 +686,14 @@ export function createRouter(repository) {
     if (!branchCode) {
       return res.status(400).json({ message: "branchCode query param is required." });
     }
-    res.json(await repository.getBranchStockInventoryValue(branchCode, detail));
+    const limit = parsePageParam(req.query.limit, 25);
+    const offset = parseOffsetParam(req.query.offset, 0);
+    res.json(await repository.getBranchStockInventoryValue(branchCode, {
+      detail,
+      search: req.query.search || "",
+      limit,
+      offset,
+    }));
   }));
 
   router.get("/api/admin/taxonomy-match-report", asyncHandler(async (_req, res) => {

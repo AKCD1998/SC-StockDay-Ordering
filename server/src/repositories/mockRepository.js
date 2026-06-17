@@ -309,6 +309,29 @@ export class MockRepository {
     return [];
   }
 
+  async getBranchStockInventoryValue(_branchCode, options = {}) {
+    const normalizedOptions = typeof options === "boolean" ? { detail: options } : (options || {});
+    const detail = normalizedOptions.detail === true;
+    const limit = Math.min(200, Math.max(1, Number(normalizedOptions.limit) || 25));
+    const offset = Math.max(0, Number(normalizedOptions.offset) || 0);
+
+    return {
+      branchCode: _branchCode,
+      productCount: 0,
+      productsWithStock: 0,
+      productsWithCost: 0,
+      totalInventoryValue: 0,
+      ...(detail ? {
+        products: [],
+        pagination: {
+          limit,
+          offset,
+          total: 0,
+        },
+      } : {}),
+    };
+  }
+
   async getCategoryReviewQueue(options = {}) {
     return {
       records: [],
