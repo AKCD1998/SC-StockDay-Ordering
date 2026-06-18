@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import CartBadge from "./CartBadge";
+import NotificationBell from "./NotificationBell";
 
 function navClassName({ isActive }) {
   return isActive ? "app-nav-link active" : "app-nav-link";
@@ -55,6 +56,8 @@ export default function AppShell({ children }) {
         <NavLink to="/incoming" className={navClassName}>
           รับคำขอ
         </NavLink>
+        <div className="app-nav-spacer" />
+        <NotificationBell />
       </nav>
 
       <main>{children}</main>

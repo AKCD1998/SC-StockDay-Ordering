@@ -802,3 +802,97 @@ a.ghost {
   flex-basis: 100%;
   margin: 4px 0 0;
 }
+
+/* ---- WP-09: notification bell ---- */
+.app-nav-spacer {
+  flex: 1 1 auto;
+}
+
+.notification-bell {
+  position: relative;
+}
+
+.notification-bell-button {
+  position: relative;
+  font-size: 1.1rem;
+  padding: 8px 12px;
+}
+
+.notification-bell-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #d92d4f;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notification-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 320px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #e3e9f1;
+  border-radius: 12px;
+  box-shadow: 0 18px 40px rgba(13, 24, 40, 0.18);
+  z-index: 50;
+}
+
+.notification-dropdown-header {
+  padding: 12px 16px;
+  font-weight: 700;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.notification-empty {
+  padding: 18px 16px;
+  color: #66788d;
+  margin: 0;
+}
+
+.notification-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.notification-item {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  background: #fff;
+  color: inherit;
+  border: none;
+  border-bottom: 1px solid #f1f5fb;
+  border-radius: 0;
+  padding: 12px 16px;
+}
+
+.notification-item:hover:not(:disabled),
+.notification-item:focus-visible:not(:disabled) {
+  background: #f5f8fc;
+}
+
+.notification-item.unread {
+  background: #f0f7ff;
+}
+
+.notification-item.unread .notification-message {
+  font-weight: 700;
+}
+
+.notification-message {
+  display: block;
+}

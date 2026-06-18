@@ -161,4 +161,18 @@ export const api = {
       },
     );
   },
+
+  getNotifications() {
+    return requestJson("/api/notifications");
+  },
+
+  getUnreadNotificationCount() {
+    return requestJson("/api/notifications/unread-count");
+  },
+
+  markNotificationRead(notificationId) {
+    return requestJson(`/api/notifications/${encodeURIComponent(notificationId)}/read`, {
+      method: "POST",
+    });
+  },
 };
