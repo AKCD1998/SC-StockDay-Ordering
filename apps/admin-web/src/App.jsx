@@ -1989,6 +1989,10 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName }) {
   const [flyDots, setFlyDots] = useState([]);
 
   useEffect(() => {
+    if (branchCode) setRequestSubmitError("");
+  }, [branchCode]);
+
+  useEffect(() => {
     let active = true;
 
     async function loadBranchStock() {
@@ -2627,8 +2631,14 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName }) {
             ref={requestButtonRef}
             type="button"
             className={`request-entry-button${requestMode ? " active" : ""}`}
-            onClick={() => setRequestMode((value) => !value)}
-            disabled={!branchCode}
+            onClick={() => {
+              if (!branchCode) {
+                setRequestSubmitError("กรุณาเลือกสาขาที่ใช้งานก่อน โดยเลือกจาก dropdown 'สาขาที่ใช้งาน' ด้านบน");
+                return;
+              }
+              setRequestSubmitError("");
+              setRequestMode((value) => !value);
+            }}
           >
             {requestMode ? "ปิดโหมดขอสินค้า" : "ขอสินค้า"}
             {requestDraftCount > 0 ? (
@@ -6999,7 +7009,12 @@ export default function App() {
               <div className="branch-context-controls">
                 <select
                   value={selectedBranchContext}
-                  onChange={(event) => setSelectedBranchContext(event.target.value)}
+                  onChange={(event) => {
+                    setSelectedBranchContext(event.target.value);
+                    if (event.target.value) {
+                      handleApplyBranchContext(event.target.value);
+                    }
+                  }}
                   disabled={branchContextBusy}
                   aria-label="เลือกสาขาที่ใช้งาน"
                 >
