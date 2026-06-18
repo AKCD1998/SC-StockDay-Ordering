@@ -6,31 +6,50 @@ import { formatDateTime, statusLabel } from "../lib/requestStatus";
 
 function RequestDetail({ publicId }) {
   const [state, setState] = useState({ status: "loading", batch: null, events: [], error: "" });
+  const [ackingId, setAckingId] = useState(null);
+  const [ackError, setAckError] = useState("");
+
+  const loadDetail = useCallback(async () => {
+    setState({ status: "loading", batch: null, events: [], error: "" });
+    try {
+      const [detailPayload, eventsPayload] = await Promise.all([
+        api.getStockRequestDetail(publicId),
+        api.getStockRequestEvents(publicId),
+      ]);
+      setState({
+        status: "ready",
+        batch: detailPayload?.batch || null,
+        events: eventsPayload?.events || [],
+        error: "",
+      });
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "โหลดรายละเอียดไม่สำเร็จ";
+      setState({ status: "error", batch: null, events: [], error: message });
+    }
+  }, [publicId]);
 
   useEffect(() => {
-    let active = true;
-    setState({ status: "loading", batch: null, events: [], error: "" });
+    loadDetail();
+  }, [loadDetail]);
 
-    Promise.all([api.getStockRequestDetail(publicId), api.getStockRequestEvents(publicId)])
-      .then(([detailPayload, eventsPayload]) => {
-        if (!active) return;
-        setState({
-          status: "ready",
-          batch: detailPayload?.batch || null,
-          events: eventsPayload?.events || [],
-          error: "",
-        });
-      })
-      .catch((error) => {
-        if (!active) return;
-        const message = error instanceof ApiError ? error.message : "โหลดรายละเอียดไม่สำเร็จ";
-        setState({ status: "error", batch: null, events: [], error: message });
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [publicId]);
+  async function handleAcknowledge(request) {
+    setAckingId(request.publicId);
+    setAckError("");
+    try {
+      await api.acknowledgeStockRequest(request.publicId, { version: request.version });
+      await loadDetail();
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.status === 409
+            ? "คำขอนี้ถูกแก้ไขไปแล้ว กรุณาโหลดใหม่"
+            : error.message
+          : "รับทราบไม่สำเร็จ";
+      setAckError(message);
+    } finally {
+      setAckingId(null);
+    }
+  }
 
   if (state.status === "loading") {
     return <div className="notice compact-notice">กำลังโหลดรายละเอียด...</div>;
@@ -47,6 +66,7 @@ function RequestDetail({ publicId }) {
 
   return (
     <div className="request-detail">
+      {ackError ? <p className="message error-text">{ackError}</p> : null}
       <div className="request-detail-children">
         {batch.requests.map((request) => (
           <section key={request.publicId} className="cart-group-card">
@@ -76,6 +96,22 @@ function RequestDetail({ publicId }) {
                 </li>
               ))}
             </ul>
+            {request.status === "RESPONDED" ? (
+              <div className="child-actions">
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={ackingId === request.publicId}
+                  onClick={() => handleAcknowledge(request)}
+                >
+                  {ackingId === request.publicId ? "กำลังรับทราบ..." : "รับทราบการตอบกลับ"}
+                </button>
+              </div>
+            ) : request.acknowledgedAt ? (
+              <p className="subtle child-ack-note">
+                รับทราบเมื่อ {formatDateTime(request.acknowledgedAt)}
+              </p>
+            ) : null}
           </section>
         ))}
       </div>

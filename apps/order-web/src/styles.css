@@ -896,3 +896,15 @@ a.ghost {
 .notification-message {
   display: block;
 }
+
+/* ---- WP-11: acknowledge ---- */
+.child-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.child-ack-note {
+  margin: 8px 0 0;
+  text-align: right;
+}

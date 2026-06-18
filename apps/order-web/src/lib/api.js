@@ -162,6 +162,13 @@ export const api = {
     );
   },
 
+  acknowledgeStockRequest(requestPublicId, body) {
+    return requestJson(`/api/stock-requests/${encodeURIComponent(requestPublicId)}/acknowledge`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
   getNotifications() {
     return requestJson("/api/notifications");
   },
