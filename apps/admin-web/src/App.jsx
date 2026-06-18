@@ -36,7 +36,7 @@ const adminThemeStorageKey = "sc-stockday-admin-theme";
 const defaultAdminView = "receipts";
 const stockCostAuditView = "stock-cost-audit";
 const adminOnlyViews = [stockCostAuditView, "category-review", "ingredient-dictionary", "sync-log"];
-const adminViewKeys = [defaultAdminView, "branch-stock", "movement-trace", ...adminOnlyViews];
+const adminViewKeys = [defaultAdminView, "branch-stock", "movement-trace", "stock-requests", ...adminOnlyViews];
 
 function getNavigationGroups(isAdminUser) {
   return [
@@ -55,6 +55,7 @@ function getNavigationGroups(isAdminUser) {
       items: [
         { label: "ใบรับสินค้า", view: "receipts", description: "ตรวจใบรับสินค้าและโลโก้ Supplier" },
         { label: "สต็อกสาขา", view: "branch-stock", description: "สถานะสต็อกแยกตามสาขา" },
+        { label: "คำขอสินค้า", view: "stock-requests", description: "ส่งและติดตามคำขอสินค้าระหว่างสาขา" },
         { label: "Movement", view: "movement-trace", description: "ติดตาม movement รายสินค้า" },
         ...(isAdminUser ? [{
           label: "ตรวจสอบต้นทุนสต๊อกสินค้า",
@@ -184,6 +185,104 @@ const STOCK_COST_BRANCH_OPTIONS = [
   { branchCode: "all", label: "ทุกสาขา" },
   ...STOCK_COST_COMPARE_BRANCHES.map(({ branchCode, label }) => ({ branchCode, label })),
 ];
+
+function getBranchStockQty(row, branchCode) {
+  return Number(row?.[`qtyBranch${branchCode}`] || 0);
+}
+
+function formatBranchContextLabel(branchCode, branchName = "") {
+  if (!branchCode) return branchName || "ยังไม่ได้เลือกสาขา";
+  return branchName ? `${branchCode} - ${branchName}` : `สาขา ${branchCode}`;
+}
+
+function buildRequestDraftLineKey({ productCode, sourceBranchCode, unit }) {
+  return [productCode, sourceBranchCode, unit || ""].join("::");
+}
+
+function normalizeRequestedQty(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue <= 0) {
+    return 1;
+  }
+  return Math.max(1, Math.floor(numericValue));
+}
+
+function mergeRequestDraftItems(currentItems = [], addedItems = []) {
+  const merged = new Map();
+
+  currentItems.forEach((item) => {
+    merged.set(item.lineKey, item);
+  });
+
+  addedItems.forEach((item) => {
+    const lineKey = buildRequestDraftLineKey(item);
+    const normalized = {
+      ...item,
+      lineKey,
+      requestedQty: normalizeRequestedQty(item.requestedQty),
+      lineNote: String(item.lineNote || "").trim(),
+      snapshotQty: Number(item.snapshotQty || 0),
+      snapshotSyncedAt: item.snapshotSyncedAt || null,
+    };
+    const existing = merged.get(lineKey);
+    if (!existing) {
+      merged.set(lineKey, normalized);
+      return;
+    }
+    merged.set(lineKey, {
+      ...existing,
+      requestedQty: existing.requestedQty + normalized.requestedQty,
+      snapshotQty: Math.max(existing.snapshotQty || 0, normalized.snapshotQty || 0),
+      snapshotSyncedAt: normalized.snapshotSyncedAt || existing.snapshotSyncedAt,
+      lineNote: normalized.lineNote || existing.lineNote,
+    });
+  });
+
+  return Array.from(merged.values()).sort((left, right) =>
+    `${left.sourceBranchCode}-${left.productCode}`.localeCompare(
+      `${right.sourceBranchCode}-${right.productCode}`,
+      "th",
+      { numeric: true, sensitivity: "base" },
+    ),
+  );
+}
+
+function generateRequestIdempotencyKey() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `srq-${crypto.randomUUID()}`;
+  }
+  return `srq-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
+function buildStockRequestPayload(lines = [], { note = "", idempotencyKey } = {}) {
+  const groups = new Map();
+
+  lines.forEach((line) => {
+    if (!line?.sourceBranchCode || !line?.productCode || !line?.unit) {
+      return;
+    }
+    const requestedQty = normalizeRequestedQty(line.requestedQty);
+    if (!groups.has(line.sourceBranchCode)) {
+      groups.set(line.sourceBranchCode, {
+        sourceBranchCode: line.sourceBranchCode,
+        lines: [],
+      });
+    }
+    groups.get(line.sourceBranchCode).lines.push({
+      productCode: line.productCode,
+      requestedQty,
+      unit: line.unit,
+      snapshotQty: Number.isFinite(Number(line.snapshotQty)) ? Number(line.snapshotQty) : null,
+      snapshotSyncedAt: line.snapshotSyncedAt || null,
+    });
+  });
+
+  return {
+    idempotencyKey,
+    note: String(note || "").trim(),
+    groups: Array.from(groups.values()).filter((group) => group.lines.length > 0),
+  };
+}
 
 function normalizeFilterValue(value) {
   return String(value == null ? "" : value).trim();
@@ -1830,7 +1929,7 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
   );
 }
 
-function BranchStockPanel({ csrfToken, isAdminUser }) {
+function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName }) {
   const pageSize = 25;
   const pageFetchLimit = 10000;
   const branchExportOptions = [
@@ -1871,8 +1970,23 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
   const [selectedExportBranch, setSelectedExportBranch] = useState("001");
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
+  const [requestMode, setRequestMode] = useState(false);
+  const [requestDraftItems, setRequestDraftItems] = useState([]);
+  const [requestDialogProduct, setRequestDialogProduct] = useState(null);
+  const [requestQuantities, setRequestQuantities] = useState({});
+  const [requestLineNote, setRequestLineNote] = useState("");
+  const [requestBatchNote, setRequestBatchNote] = useState("");
+  const [requestDialogError, setRequestDialogError] = useState("");
+  const [requestSubmitError, setRequestSubmitError] = useState("");
+  const [requestSuccessMessage, setRequestSuccessMessage] = useState("");
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [checkoutConfirmOpen, setCheckoutConfirmOpen] = useState(false);
+  const [submittingRequest, setSubmittingRequest] = useState(false);
   const filterMenuRef = useRef(null);
   const [filterMenuAnchor, setFilterMenuAnchor] = useState(null);
+  const requestIdempotencyKeyRef = useRef(generateRequestIdempotencyKey());
+  const requestButtonRef = useRef(null);
+  const [flyDots, setFlyDots] = useState([]);
 
   useEffect(() => {
     let active = true;
@@ -2239,6 +2353,212 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
     }
   }, [offset, safeOffset]);
 
+  useEffect(() => {
+    if (!requestSuccessMessage) return undefined;
+    const timeoutId = window.setTimeout(() => setRequestSuccessMessage(""), 2600);
+    return () => window.clearTimeout(timeoutId);
+  }, [requestSuccessMessage]);
+
+  useEffect(() => {
+    setRequestDraftItems([]);
+    setRequestDialogProduct(null);
+    setRequestQuantities({});
+    setRequestLineNote("");
+    setRequestBatchNote("");
+    setRequestDialogError("");
+    setRequestSubmitError("");
+    setReviewDialogOpen(false);
+    requestIdempotencyKeyRef.current = generateRequestIdempotencyKey();
+  }, [branchCode]);
+
+  const requestBranchLabel = formatBranchContextLabel(branchCode, branchName);
+  const requestDraftCount = requestDraftItems.length;
+
+  const requestDraftByBranch = useMemo(() => {
+    const groups = new Map();
+    for (const item of requestDraftItems) {
+      const key = item.sourceBranchCode;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(item);
+    }
+    return groups;
+  }, [requestDraftItems]);
+  const requestDraftTotalQty = requestDraftItems.reduce(
+    (sum, item) => sum + Number(item.requestedQty || 0),
+    0,
+  );
+
+  function getRequestableBranches(row) {
+    return STOCK_COST_COMPARE_BRANCHES.filter(
+      (branch) => branch.branchCode !== branchCode && getBranchStockQty(row, branch.branchCode) > 0,
+    );
+  }
+
+  function canRequestProduct(row) {
+    if (!branchCode || !row?.productCode || !row?.unit) {
+      return false;
+    }
+    return getRequestableBranches(row).length > 0;
+  }
+
+  function openRequestDialogForRow(row) {
+    if (!canRequestProduct(row)) return;
+    const availableBranches = getRequestableBranches(row);
+    setRequestDialogProduct(row);
+    setRequestQuantities(
+      Object.fromEntries(availableBranches.map((branch) => [branch.branchCode, ""])),
+    );
+    setRequestLineNote("");
+    setRequestDialogError("");
+  }
+
+  function closeRequestDialog() {
+    setRequestDialogProduct(null);
+    setRequestQuantities({});
+    setRequestLineNote("");
+    setRequestDialogError("");
+  }
+
+  function handleAddDraftItem(event) {
+    if (!requestDialogProduct) return;
+    if (!requestDialogProduct.unit) {
+      setRequestDialogError("สินค้านี้ยังไม่มีหน่วย จึงยังเพิ่มคำขอไม่ได้");
+      return;
+    }
+    const selectedLines = [];
+    for (const branch of getRequestableBranches(requestDialogProduct)) {
+      const rawValue = requestQuantities[branch.branchCode];
+      if (rawValue === "" || rawValue == null) continue;
+      const requestedQty = normalizeRequestedQty(rawValue);
+      const snapshotQty = getBranchStockQty(requestDialogProduct, branch.branchCode);
+      if (requestedQty > snapshotQty) {
+        setRequestDialogError(`จำนวนที่ขอจาก ${branch.branchCode} มากกว่าสต็อกที่มีอยู่`);
+        return;
+      }
+
+      selectedLines.push({
+        productCode: requestDialogProduct.productCode,
+        productNameThai: requestDialogProduct.productNameThai || "",
+        productNameEng: requestDialogProduct.productNameEng || "",
+        unit: requestDialogProduct.unit || "",
+        sourceBranchCode: branch.branchCode,
+        sourceBranchName: BRANCH_LABELS[branch.branchCode] || `สาขา ${branch.branchCode}`,
+        requestedQty,
+        snapshotQty,
+        snapshotSyncedAt: requestDialogProduct.syncedAt || null,
+        lineNote: requestLineNote.trim(),
+      });
+    }
+
+    if (!selectedLines.length) {
+      setRequestDialogError("กรุณาระบุจำนวนอย่างน้อย 1 สาขา");
+      return;
+    }
+
+    setRequestDraftItems((current) => mergeRequestDraftItems(current, selectedLines));
+
+    if (event && requestButtonRef.current) {
+      const srcRect = event.currentTarget.getBoundingClientRect();
+      const dstRect = requestButtonRef.current.getBoundingClientRect();
+      const startX = srcRect.left + srcRect.width / 2;
+      const startY = srcRect.top + srcRect.height / 2;
+      const id = Date.now() + Math.random();
+      setFlyDots((dots) => [
+        ...dots,
+        {
+          id,
+          x: startX - 7,
+          y: startY - 7,
+          tx: dstRect.left + dstRect.width / 2 - startX,
+          ty: dstRect.top + dstRect.height / 2 - startY,
+        },
+      ]);
+      setTimeout(() => setFlyDots((dots) => dots.filter((d) => d.id !== id)), 520);
+    }
+
+    setRequestSuccessMessage(`เพิ่ม ${requestDialogProduct.productCode} เข้าคำขอสินค้าแล้ว`);
+    closeRequestDialog();
+  }
+
+  function patchDraftItem(lineKey, patch) {
+    setRequestDraftItems((current) =>
+      current
+        .map((item) =>
+          item.lineKey === lineKey
+            ? {
+                ...item,
+                ...patch,
+                requestedQty: patch.requestedQty == null ? item.requestedQty : normalizeRequestedQty(patch.requestedQty),
+                lineNote: patch.lineNote == null ? item.lineNote : String(patch.lineNote || "").trim(),
+              }
+            : item,
+        )
+        .filter((item) => normalizeRequestedQty(item.requestedQty) > 0),
+    );
+  }
+
+  function removeDraftItem(lineKey) {
+    setRequestDraftItems((current) => current.filter((item) => item.lineKey !== lineKey));
+  }
+
+  async function handleSubmitRequest() {
+    if (!branchCode) {
+      setRequestSubmitError("ต้องเลือกสาขาที่จะใช้งานก่อน จึงจะส่งคำขอสินค้าได้");
+      return;
+    }
+    if (!requestDraftItems.length) {
+      setRequestSubmitError("ยังไม่มีรายการสำหรับส่งคำขอ");
+      return;
+    }
+
+    const invalidItem = requestDraftItems.find((item) => !Number.isFinite(Number(item.requestedQty)) || Number(item.requestedQty) <= 0);
+    if (invalidItem) {
+      setRequestSubmitError(`จำนวนที่ขอของสินค้า ${invalidItem.productCode} ต้องมากกว่า 0`);
+      return;
+    }
+
+    setSubmittingRequest(true);
+    setRequestSubmitError("");
+    try {
+      const payload = buildStockRequestPayload(requestDraftItems, {
+        note: requestBatchNote,
+        idempotencyKey: requestIdempotencyKeyRef.current,
+      });
+
+      if (!payload.groups.length) {
+        throw new Error("ยังไม่มีรายการที่พร้อมส่งคำขอ");
+      }
+
+      const response = await apiFetch("/api/stock-requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken || "",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.message || result.error || `HTTP ${response.status}`);
+      }
+
+      setRequestDraftItems([]);
+      setRequestBatchNote("");
+      setReviewDialogOpen(false);
+      setCheckoutConfirmOpen(false);
+      setRequestMode(false);
+      requestIdempotencyKeyRef.current = generateRequestIdempotencyKey();
+      setRequestSuccessMessage(
+        `ส่งคำขอสินค้าแล้ว เลขที่ ${result.batchPublicId || "-"} จาก ${requestBranchLabel}`,
+      );
+    } catch (submitError) {
+      setRequestSubmitError(submitError.message || "ส่งคำขอสินค้าไม่สำเร็จ");
+    } finally {
+      setSubmittingRequest(false);
+    }
+  }
+
   function renderBranchStockCell(row, column) {
     if (column.key === "productCode") {
       return <strong>{row.productCode}</strong>;
@@ -2303,8 +2623,67 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
           >
             รีเฟรช
           </button>
+          <button
+            ref={requestButtonRef}
+            type="button"
+            className={`request-entry-button${requestMode ? " active" : ""}`}
+            onClick={() => setRequestMode((value) => !value)}
+            disabled={!branchCode}
+          >
+            {requestMode ? "ปิดโหมดขอสินค้า" : "ขอสินค้า"}
+            {requestDraftCount > 0 ? (
+              <span className="request-draft-badge">
+                {requestDraftCount > 99 ? "99+" : requestDraftCount}
+              </span>
+            ) : null}
+          </button>
         </form>
       </div>
+
+      {!branchCode ? (
+        <p className="notice warning compact">
+          ต้องเลือกสาขาที่จะใช้งานใน session ก่อน จึงจะเปิดใช้งานคำขอสินค้าได้อย่างปลอดภัย
+        </p>
+      ) : null}
+      {requestSuccessMessage ? <p className="notice success compact">{requestSuccessMessage}</p> : null}
+      {requestSubmitError ? <p className="notice error compact">{requestSubmitError}</p> : null}
+
+      {(requestMode || requestDraftCount > 0) && (
+        <section className="request-draft-card">
+          <div>
+            <strong>คำขอสินค้าของ {requestBranchLabel}</strong>
+            <p className="meta-line">
+              เลือกโหมดขอสินค้าแล้วกดปุ่ม <strong>+</strong> หน้าแต่ละรายการเพื่อเพิ่มเข้าคำขอ
+            </p>
+          </div>
+          <div className="request-draft-actions">
+            <span className="request-draft-chip">
+              {formatNumber(requestDraftCount)} รายการ · {formatNumber(requestDraftTotalQty)} หน่วย
+            </span>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => setReviewDialogOpen(true)}
+              disabled={!requestDraftCount}
+            >
+              ตรวจสอบคำขอ
+            </button>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => {
+                setRequestDraftItems([]);
+                setRequestBatchNote("");
+                setRequestSubmitError("");
+                requestIdempotencyKeyRef.current = generateRequestIdempotencyKey();
+              }}
+              disabled={!requestDraftCount}
+            >
+              ล้างรายการ
+            </button>
+          </div>
+        </section>
+      )}
 
       {isAdminUser ? (
       <section className={`taxonomy-report-card${taxonomyOpen ? " taxonomy-open" : " taxonomy-collapsed"}`}>
@@ -2588,9 +2967,10 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
       )}
 
       <div className="table-wrap">
-        <table className="branch-stock-table">
+        <table className={`branch-stock-table${requestMode ? " request-mode" : ""}`}>
           <thead>
             <tr>
+              {requestMode ? <th className="branch-stock-request-column">#</th> : null}
               {BRANCH_STOCK_COLUMNS.map((column) => {
                 const optionValues = columnOptions[column.key] || [];
                 const appliedValues = columnFilters[column.key] ? [...columnFilters[column.key]] : optionValues;
@@ -2701,6 +3081,19 @@ function BranchStockPanel({ csrfToken, isAdminUser }) {
           <tbody>
             {pagedRecords.map((row) => (
               <tr key={row.productCode}>
+                {requestMode ? (
+                  <td className="branch-stock-request-column">
+                    <button
+                      type="button"
+                      className="branch-stock-request-plus"
+                      onClick={() => openRequestDialogForRow(row)}
+                      disabled={!canRequestProduct(row)}
+                      aria-label={`เพิ่มคำขอสินค้า ${row.productCode}`}
+                    >
+                      +
+                    </button>
+                  </td>
+                ) : null}
                 {BRANCH_STOCK_COLUMNS.map((column) => (
                   <td key={`${row.productCode}-${column.key}`}>{renderBranchStockCell(row, column)}</td>
                 ))}
@@ -3125,6 +3518,754 @@ function StockCostAuditPanel({ branchCode }) {
             </p>
           ) : null}
         </div>
+      )}
+
+      {requestDialogProduct ? (
+        <div className="dialog-overlay" onClick={closeRequestDialog}>
+          <div
+            className="dialog-card request-dialog-card"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="request-product-title"
+          >
+            <div className="dialog-header">
+              <div>
+                <h3 id="request-product-title">เพิ่มรายการคำขอสินค้า</h3>
+                <p>สาขาผู้ขอ: {requestBranchLabel}</p>
+              </div>
+              <button type="button" className="ghost-button dialog-close-button" onClick={closeRequestDialog}>
+                ปิด
+              </button>
+            </div>
+
+            <div className="request-dialog-product">
+              <strong>{requestDialogProduct.productNameThai || requestDialogProduct.productNameEng || requestDialogProduct.productCode}</strong>
+              <p className="meta-line">
+                {requestDialogProduct.productCode} · หน่วย {requestDialogProduct.unit || "-"}
+              </p>
+            </div>
+
+            <div className="request-branch-availability">
+              {getRequestableBranches(requestDialogProduct).map((branch) => {
+                const qty = getBranchStockQty(requestDialogProduct, branch.branchCode);
+                return (
+                  <label
+                    key={`${requestDialogProduct.productCode}-${branch.branchCode}`}
+                    className="request-branch-pill available request-branch-input-card"
+                  >
+                    <span>{BRANCH_LABELS[branch.branchCode] || `สาขา ${branch.branchCode}`}</span>
+                    <strong>{formatNumber(qty, 2)} {requestDialogProduct.unit || ""}</strong>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={requestQuantities[branch.branchCode] ?? ""}
+                      onChange={(event) =>
+                        setRequestQuantities((current) => ({
+                          ...current,
+                          [branch.branchCode]: event.target.value,
+                        }))
+                      }
+                      placeholder="จำนวนที่ขอ"
+                    />
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="request-dialog-form">
+              <label>
+                หมายเหตุรายบรรทัด
+                <textarea
+                  rows="3"
+                  value={requestLineNote}
+                  onChange={(event) => setRequestLineNote(event.target.value)}
+                  placeholder="เช่น ขอเติมหน้าร้าน / ลูกค้าสั่งจอง"
+                />
+              </label>
+            </div>
+
+            {requestDialogError ? <p className="notice error compact">{requestDialogError}</p> : null}
+
+            <div className="dialog-actions">
+              <button type="button" className="ghost-button" onClick={closeRequestDialog}>
+                ยกเลิก
+              </button>
+              <button type="button" className="request-entry-button active" onClick={(e) => handleAddDraftItem(e)}>
+                เพิ่มเข้าคำขอ
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {reviewDialogOpen ? (
+        <div className="srq-checkout-overlay" role="dialog" aria-modal="true" aria-label="สร้างคำขอขอสินค้า">
+          <div className="srq-checkout-header">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => !submittingRequest && setReviewDialogOpen(false)}
+              disabled={submittingRequest}
+              aria-label="กลับ"
+            >
+              ← กลับ
+            </button>
+            <div>
+              <h3>สร้างคำขอขอสินค้า</h3>
+              <p className="meta-line">สาขาผู้ขอ: {requestBranchLabel} · {requestDraftCount} รายการ</p>
+            </div>
+          </div>
+
+          <div className="srq-checkout-body">
+            {[...requestDraftByBranch.entries()].map(([sourceBranchCode, items]) => (
+              <details key={sourceBranchCode} className="srq-branch-group" open>
+                <summary>
+                  ขอจาก: {BRANCH_LABELS[sourceBranchCode] ?? `สาขา ${sourceBranchCode}`}
+                  <span className="meta-line" style={{ fontWeight: 400, marginLeft: 8 }}>({items.length} รายการ)</span>
+                </summary>
+                <div className="srq-branch-group-body">
+                  {items.map((item) => (
+                    <div key={item.lineKey} className="srq-checkout-line">
+                      <div>
+                        <strong>{item.productNameThai || item.productNameEng || item.productCode}</strong>
+                        <span className="meta-line"> {item.productCode}</span>
+                      </div>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={item.requestedQty}
+                        onChange={(event) => patchDraftItem(item.lineKey, { requestedQty: event.target.value })}
+                        disabled={submittingRequest}
+                        aria-label="จำนวน"
+                      />
+                      <span>{item.unit || ""}</span>
+                      <input
+                        type="text"
+                        value={item.lineNote || ""}
+                        onChange={(event) => patchDraftItem(item.lineKey, { lineNote: event.target.value })}
+                        placeholder="หมายเหตุ"
+                        disabled={submittingRequest}
+                        aria-label="หมายเหตุรายบรรทัด"
+                      />
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() => removeDraftItem(item.lineKey)}
+                        disabled={submittingRequest}
+                        aria-label="ลบรายการ"
+                      >
+                        ลบ
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ))}
+
+            <div className="srq-checkout-note-section">
+              <label>
+                หมายเหตุรวมทั้งคำขอ
+                <textarea
+                  rows="3"
+                  value={requestBatchNote}
+                  onChange={(event) => setRequestBatchNote(event.target.value)}
+                  placeholder="เช่น เร่งด่วน / ใช้ขายหน้าร้าน / ลูกค้ารับของวันนี้"
+                  disabled={submittingRequest}
+                />
+              </label>
+            </div>
+
+            {requestSubmitError ? <p className="notice error compact">{requestSubmitError}</p> : null}
+          </div>
+
+          <div className="srq-checkout-actions">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => !submittingRequest && setReviewDialogOpen(false)}
+              disabled={submittingRequest}
+            >
+              กลับไปแก้ไข
+            </button>
+            <button
+              type="button"
+              className="srq-confirm-btn"
+              onClick={() => setCheckoutConfirmOpen(true)}
+              disabled={submittingRequest || !requestDraftCount}
+            >
+              ยืนยันส่งคำขอสินค้า
+            </button>
+          </div>
+
+          {checkoutConfirmOpen ? (
+            <div className="dialog-overlay" onClick={() => !submittingRequest && setCheckoutConfirmOpen(false)}>
+              <div className="dialog-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+                <div className="dialog-header">
+                  <h3>ยืนยันการส่งคำขอ?</h3>
+                </div>
+                <p style={{ padding: "0 0 16px" }}>
+                  รายการนี้จะถูกส่งไปยัง {requestDraftByBranch.size} สาขา รวม {requestDraftCount} รายการสินค้า
+                </p>
+                <div className="dialog-actions">
+                  <button type="button" className="ghost-button" onClick={() => setCheckoutConfirmOpen(false)} disabled={submittingRequest}>
+                    ยกเลิก
+                  </button>
+                  <button type="button" className="srq-confirm-btn" onClick={handleSubmitRequest} disabled={submittingRequest}>
+                    {submittingRequest ? "กำลังส่งคำขอ..." : "ยืนยัน"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {flyDots.map((dot) => (
+        <div
+          key={dot.id}
+          className="fly-dot flying"
+          style={{ left: dot.x, top: dot.y, "--tx": `${dot.tx}px`, "--ty": `${dot.ty}px` }}
+        />
+      ))}
+    </section>
+  );
+}
+
+function NotificationBell({ branchCode, onNavigate }) {
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!branchCode) return undefined;
+    let active = true;
+
+    async function fetchCount() {
+      try {
+        const res = await apiFetch("/api/notifications/unread-count");
+        if (!res.ok || !active) return;
+        const data = await res.json();
+        if (active) setUnreadCount(data.unreadCount || 0);
+      } catch {
+        // silent — bell is non-critical
+      }
+    }
+
+    fetchCount();
+    const interval = setInterval(fetchCount, 30_000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [branchCode]);
+
+  return (
+    <button
+      type="button"
+      className="notification-bell ghost-button"
+      aria-label={`การแจ้งเตือน${unreadCount ? ` (${unreadCount} ยังไม่ได้อ่าน)` : ""}`}
+      onClick={onNavigate}
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+      {unreadCount > 0 ? (
+        <span className="notification-badge" aria-hidden="true">
+          {unreadCount > 99 ? "99+" : unreadCount}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function SrqStatusChip({ status }) {
+  const STATUS_MAP = {
+    SUBMITTED:           { label: "รอตอบกลับ",        cls: "waiting" },
+    PARTIALLY_RESPONDED: { label: "ตอบกลับบางส่วน",   cls: "waiting" },
+    RESPONDED:           { label: "ตอบกลับแล้ว",       cls: "responded" },
+    ACKNOWLEDGED:        { label: "ยืนยันรับแล้ว",     cls: "responded" },
+    COMPLETED:           { label: "เสร็จสิ้น",          cls: "done" },
+    CANCELLED:           { label: "ยกเลิก",             cls: "cancelled" },
+    PENDING:             { label: "รอดำเนินการ",        cls: "waiting" },
+    APPROVED_FULL:       { label: "อนุมัติทั้งหมด",    cls: "responded" },
+    APPROVED_PARTIAL:    { label: "อนุมัติบางส่วน",    cls: "waiting" },
+    REJECTED:            { label: "ปฏิเสธ",             cls: "cancelled" },
+  };
+  const info = STATUS_MAP[status] || { label: status || "-", cls: "done" };
+  return <span className={`srq-status-chip ${info.cls}`}>{info.label}</span>;
+}
+
+function PackingDocumentModal({ requestPublicId, sourceBranchCode, requestingBranchCode, lines, lineStates, onClose }) {
+  return (
+    <div className="dialog-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="ใบส่งสินค้า">
+      <div className="dialog-card packing-document-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="dialog-header">
+          <div>
+            <h3>ใบส่งสินค้า</h3>
+            <p>สำหรับพิมพ์แนบไปกับพัสดุ</p>
+          </div>
+          <button type="button" className="ghost-button dialog-close-button" onClick={onClose}>ปิด</button>
+        </div>
+        <div className="packing-document-print">
+          <div className="packing-doc-header">
+            <div><strong>ใบส่งสินค้าระหว่างสาขา</strong></div>
+            <div>เลขที่: <span className="mono">{requestPublicId}</span></div>
+            <div>จาก: <strong>{BRANCH_LABELS[sourceBranchCode] ?? `สาขา ${sourceBranchCode}`}</strong></div>
+            <div>ถึง: <strong>{BRANCH_LABELS[requestingBranchCode] ?? `สาขา ${requestingBranchCode}`}</strong></div>
+            <div>วันที่พิมพ์: {new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}</div>
+          </div>
+          <table className="packing-doc-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>รหัสสินค้า</th>
+                <th>ชื่อสินค้า</th>
+                <th>จำนวนที่อนุมัติ</th>
+                <th>หน่วย</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(lines || []).map((line, idx) => {
+                const ls = lineStates[line.lineId] || {};
+                if (ls.choice === "REJECTED") return null;
+                const qty = ls.choice === "APPROVED_FULL" ? line.requestedQty : (Number(ls.approvedQty) || 0);
+                return (
+                  <tr key={line.lineId}>
+                    <td>{idx + 1}</td>
+                    <td className="mono">{line.productCode}</td>
+                    <td>{line.productNameThai || line.productNameEng || "-"}</td>
+                    <td>{formatNumber(qty, 0)}</td>
+                    <td>{line.unit}</td>
+                  </tr>
+                );
+              }).filter(Boolean)}
+            </tbody>
+          </table>
+        </div>
+        <div className="dialog-actions">
+          <button type="button" className="ghost-button" onClick={onClose}>ปิด</button>
+          <button type="button" className="primary-button" onClick={() => window.print()}>พิมพ์</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
+  const [detail, setDetail] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [lineStates, setLineStates] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [submitDone, setSubmitDone] = useState(false);
+  const [generatingDoc, setGeneratingDoc] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    apiFetch(`/api/stock-requests/incoming/${encodeURIComponent(publicId)}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+      .then((data) => {
+        if (!active) return;
+        setDetail(data.request);
+        const initial = {};
+        for (const line of data.request?.lines || []) {
+          initial[line.lineId] = line.response
+            ? {
+                choice: line.response.responseStatus,
+                approvedQty: String(line.response.approvedQty ?? line.requestedQty),
+                note: line.response.note || "",
+                saved: true,
+                saving: false,
+                saveError: "",
+              }
+            : { choice: "", approvedQty: "", note: "", saved: false, saving: false, saveError: "" };
+        }
+        setLineStates(initial);
+        if (data.request?.status === "RESPONDED" || data.request?.status === "ACKNOWLEDGED") {
+          setSubmitDone(true);
+        }
+      })
+      .catch((err) => { if (active) setError(err.message); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [publicId]);
+
+  function patchLine(lineId, patch) {
+    setLineStates((prev) => ({
+      ...prev,
+      [lineId]: { ...prev[lineId], ...patch },
+    }));
+  }
+
+  async function saveLine(lineId) {
+    const ls = lineStates[lineId];
+    const line = detail?.lines?.find((l) => l.lineId === lineId);
+    if (!ls?.choice || !line) return;
+
+    if ((ls.choice === "APPROVED_PARTIAL" || ls.choice === "REJECTED") && !ls.note?.trim()) {
+      patchLine(lineId, { saveError: "กรุณาระบุเหตุผล" });
+      return;
+    }
+    if (ls.choice === "APPROVED_PARTIAL") {
+      const qty = Number(ls.approvedQty);
+      if (!Number.isFinite(qty) || qty <= 0 || qty > line.requestedQty) {
+        patchLine(lineId, { saveError: `จำนวนต้องอยู่ระหว่าง 1 – ${line.requestedQty}` });
+        return;
+      }
+    }
+
+    patchLine(lineId, { saving: true, saveError: "" });
+    try {
+      const body = {
+        responseStatus: ls.choice,
+        approvedQty: ls.choice === "APPROVED_FULL" ? line.requestedQty : Number(ls.approvedQty),
+        note: ls.note?.trim() || null,
+      };
+      const res = await apiFetch(
+        `/api/stock-requests/incoming/${encodeURIComponent(publicId)}/lines/${encodeURIComponent(lineId)}/response`,
+        { method: "PUT", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken || "" }, body: JSON.stringify(body) },
+      );
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+      patchLine(lineId, { saved: true, saving: false, saveError: "" });
+    } catch (err) {
+      patchLine(lineId, { saving: false, saveError: err.message });
+    }
+  }
+
+  async function handleSubmitResponse() {
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      const res = await apiFetch(
+        `/api/stock-requests/incoming/${encodeURIComponent(publicId)}/submit-response`,
+        { method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken || "" }, body: JSON.stringify({}) },
+      );
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+      setSubmitDone(true);
+      onResponseSubmitted();
+    } catch (err) {
+      setSubmitError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleGenerateDoc() {
+    setGeneratingDoc(true);
+    setSubmitError("");
+    try {
+      const res = await apiFetch(
+        `/api/stock-requests/incoming/${encodeURIComponent(publicId)}/document`,
+        { method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken || "" }, body: JSON.stringify({}) },
+      );
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+      setPrintOpen(true);
+    } catch (err) {
+      setSubmitError(err.message);
+    } finally {
+      setGeneratingDoc(false);
+    }
+  }
+
+  if (loading) return <div className="srq-detail-body"><p className="notice compact">กำลังโหลดรายละเอียด...</p></div>;
+  if (error)   return <div className="srq-detail-body"><p className="notice error compact">{error}</p></div>;
+  if (!detail) return null;
+
+  const allLinesSaved = (detail.lines || []).length > 0 && (detail.lines || []).every((l) => lineStates[l.lineId]?.saved);
+  const canSubmit = !submitDone && allLinesSaved;
+
+  return (
+    <div className="srq-detail-body">
+      {(detail.lines || []).map((line) => {
+        const ls = lineStates[line.lineId] || {};
+        return (
+          <div key={line.lineId} className={`srq-line-row${ls.saved ? " saved" : ""}`}>
+            <div className="srq-line-info">
+              <strong>{line.productNameThai || line.productNameEng || line.productCode}</strong>
+              <span className="meta-line">
+                {line.productCode} · ขอ {formatNumber(line.requestedQty, 0)} {line.unit}
+                {line.snapshotQty != null ? ` · สต็อก ${formatNumber(line.snapshotQty, 2)} ${line.unit}` : ""}
+              </span>
+            </div>
+            {ls.saved || submitDone ? (
+              <div className="srq-line-saved">
+                <SrqStatusChip status={ls.choice} />
+                {ls.choice === "APPROVED_PARTIAL" ? <span className="meta-line">{formatNumber(ls.approvedQty, 0)} {line.unit}</span> : null}
+                {!submitDone ? (
+                  <button type="button" className="ghost-button srq-edit-btn" onClick={() => patchLine(line.lineId, { saved: false })}>แก้ไข</button>
+                ) : null}
+              </div>
+            ) : (
+              <div className="srq-line-form">
+                <div className="srq-response-choices">
+                  {[
+                    { value: "APPROVED_FULL",    label: "✓ อนุมัติทั้งหมด" },
+                    { value: "APPROVED_PARTIAL", label: "~ อนุมัติบางส่วน" },
+                    { value: "REJECTED",         label: "✗ ปฏิเสธ" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      className={`srq-response-btn${ls.choice === opt.value ? ` selected-${opt.value === "APPROVED_FULL" ? "approve" : opt.value === "APPROVED_PARTIAL" ? "partial" : "reject"}` : ""}`}
+                      onClick={() => patchLine(line.lineId, {
+                        choice: opt.value,
+                        approvedQty: opt.value === "APPROVED_FULL" ? String(line.requestedQty) : (ls.approvedQty || ""),
+                        saveError: "",
+                      })}
+                      disabled={ls.saving}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {ls.choice === "APPROVED_PARTIAL" ? (
+                  <input
+                    type="number"
+                    className="srq-qty-input"
+                    min="1"
+                    max={line.requestedQty}
+                    value={ls.approvedQty}
+                    onChange={(e) => patchLine(line.lineId, { approvedQty: e.target.value })}
+                    placeholder={`จำนวน (สูงสุด ${line.requestedQty})`}
+                    disabled={ls.saving}
+                  />
+                ) : null}
+                {(ls.choice === "APPROVED_PARTIAL" || ls.choice === "REJECTED") ? (
+                  <textarea
+                    className="srq-reason-input"
+                    value={ls.note}
+                    onChange={(e) => patchLine(line.lineId, { note: e.target.value })}
+                    placeholder="เหตุผล (จำเป็น)"
+                    rows="2"
+                    disabled={ls.saving}
+                  />
+                ) : null}
+                {ls.saveError ? <p className="notice error compact">{ls.saveError}</p> : null}
+                {ls.choice ? (
+                  <button type="button" className="ghost-button srq-save-line-btn" onClick={() => saveLine(line.lineId)} disabled={ls.saving}>
+                    {ls.saving ? "กำลังบันทึก..." : "บันทึก"}
+                  </button>
+                ) : null}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {submitError ? <p className="notice error compact">{submitError}</p> : null}
+
+      {!submitDone ? (
+        <div className="srq-detail-actions">
+          <button type="button" className="srq-submit-btn" onClick={handleSubmitResponse} disabled={!canSubmit || submitting}>
+            {submitting ? "กำลังส่งคำตอบ..." : "ส่งคำตอบทั้งหมด"}
+          </button>
+          {!allLinesSaved ? <span className="meta-line">ต้องบันทึกทุกรายการก่อนส่ง</span> : null}
+        </div>
+      ) : (
+        <div className="srq-detail-actions">
+          <span className="notice success compact">ส่งคำตอบแล้ว</span>
+          <button type="button" className="ghost-button" onClick={handleGenerateDoc} disabled={generatingDoc}>
+            {generatingDoc ? "กำลังสร้างเอกสาร..." : "สร้างใบส่งสินค้า"}
+          </button>
+        </div>
+      )}
+
+      {printOpen ? (
+        <PackingDocumentModal
+          requestPublicId={publicId}
+          sourceBranchCode={detail.sourceBranchCode}
+          requestingBranchCode={detail.requestingBranchCode}
+          lines={detail.lines}
+          lineStates={lineStates}
+          onClose={() => setPrintOpen(false)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function IncomingRequestsTab({ branchCode, csrfToken }) {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [expandedId, setExpandedId] = useState(null);
+
+  useEffect(() => {
+    if (!branchCode) return undefined;
+    let active = true;
+    setLoading(true);
+    setError("");
+    apiFetch("/api/stock-requests/incoming")
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+      .then((data) => { if (active) setRecords(data.records || []); })
+      .catch((err) => { if (active) setError(err.message); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [branchCode, refreshKey]);
+
+  if (!branchCode) return <p className="notice warning compact">ต้องเลือกสาขาที่ใช้งานก่อนจึงจะดูคำขอที่เข้ามาได้</p>;
+  if (loading)    return <p className="notice compact">กำลังโหลด...</p>;
+  if (error)      return <div><p className="notice error compact">{error}</p><button type="button" className="ghost-button" onClick={() => setRefreshKey((k) => k + 1)}>ลองใหม่</button></div>;
+
+  return (
+    <div className="srq-tab-body">
+      <div className="srq-tab-toolbar">
+        <span className="srq-total-label">{records.length} รายการ</span>
+        <button type="button" className="ghost-button" onClick={() => setRefreshKey((k) => k + 1)}>รีเฟรช</button>
+      </div>
+      {records.length === 0 ? (
+        <p className="notice compact">ยังไม่มีคำขอสินค้าเข้ามา</p>
+      ) : records.map((req) => (
+        <article key={req.publicId} className="srq-batch-card">
+          <button
+            type="button"
+            className="srq-batch-card-header"
+            onClick={() => setExpandedId((prev) => (prev === req.publicId ? null : req.publicId))}
+          >
+            <span className="srq-batch-id">{req.publicId}</span>
+            <span className="srq-batch-date">{formatDateTime(req.createdAt)}</span>
+            <span className="srq-from-label">จาก: <strong>{BRANCH_LABELS[req.requestingBranchCode] ?? `สาขา ${req.requestingBranchCode}`}</strong></span>
+            <SrqStatusChip status={req.status} />
+            <span className="srq-chevron">{expandedId === req.publicId ? "▾" : "▸"}</span>
+          </button>
+          {expandedId === req.publicId ? (
+            <IncomingRequestDetail
+              publicId={req.publicId}
+              csrfToken={csrfToken}
+              onResponseSubmitted={() => setRefreshKey((k) => k + 1)}
+            />
+          ) : null}
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function MyRequestsTab({ branchCode, csrfToken }) {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [expandedId, setExpandedId] = useState(null);
+  const [acknowledging, setAcknowledging] = useState("");
+  const [ackError, setAckError] = useState("");
+
+  useEffect(() => {
+    if (!branchCode) return undefined;
+    let active = true;
+    setLoading(true);
+    setError("");
+    apiFetch("/api/stock-requests/mine")
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+      .then((data) => { if (active) setRecords(data.records || []); })
+      .catch((err) => { if (active) setError(err.message); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [branchCode, refreshKey]);
+
+  async function handleAcknowledge(childPublicId) {
+    setAcknowledging(childPublicId);
+    setAckError("");
+    try {
+      const res = await apiFetch(`/api/stock-requests/${encodeURIComponent(childPublicId)}/acknowledge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken || "" },
+        body: JSON.stringify({}),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      setAckError(err.message);
+    } finally {
+      setAcknowledging("");
+    }
+  }
+
+  if (!branchCode) return <p className="notice warning compact">ต้องเลือกสาขาที่ใช้งานก่อนจึงจะดูคำขอสินค้าของฉันได้</p>;
+  if (loading)    return <p className="notice compact">กำลังโหลด...</p>;
+  if (error)      return <div><p className="notice error compact">{error}</p><button type="button" className="ghost-button" onClick={() => setRefreshKey((k) => k + 1)}>ลองใหม่</button></div>;
+
+  return (
+    <div className="srq-tab-body">
+      <div className="srq-tab-toolbar">
+        <span className="srq-total-label">{records.length} รายการ</span>
+        <button type="button" className="ghost-button" onClick={() => setRefreshKey((k) => k + 1)}>รีเฟรช</button>
+      </div>
+      {ackError ? <p className="notice error compact">{ackError}</p> : null}
+      {records.length === 0 ? (
+        <p className="notice compact">ยังไม่มีคำขอสินค้า</p>
+      ) : records.map((batch) => (
+        <article key={batch.batchPublicId} className="srq-batch-card">
+          <button
+            type="button"
+            className="srq-batch-card-header"
+            onClick={() => setExpandedId((prev) => (prev === batch.batchPublicId ? null : batch.batchPublicId))}
+          >
+            <span className="srq-batch-id">{batch.batchPublicId}</span>
+            <span className="srq-batch-date">{formatDateTime(batch.createdAt)}</span>
+            <SrqStatusChip status={batch.status} />
+            <span className="srq-chevron">{expandedId === batch.batchPublicId ? "▾" : "▸"}</span>
+          </button>
+          {expandedId === batch.batchPublicId ? (
+            <div className="srq-batch-body">
+              {(batch.requests || []).map((req) => (
+                <div key={req.publicId} className="srq-child-row">
+                  <span>จาก: <strong>{BRANCH_LABELS[req.sourceBranchCode] ?? `สาขา ${req.sourceBranchCode}`}</strong></span>
+                  <span>{req.lineCount} รายการ</span>
+                  <SrqStatusChip status={req.status} />
+                  {req.status === "RESPONDED" ? (
+                    <button
+                      type="button"
+                      className="ghost-button srq-ack-button"
+                      onClick={() => handleAcknowledge(req.publicId)}
+                      disabled={acknowledging === req.publicId}
+                    >
+                      {acknowledging === req.publicId ? "กำลังยืนยัน..." : "ยืนยันรับสินค้า"}
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+              {batch.note ? <p className="srq-batch-note">หมายเหตุ: {batch.note}</p> : null}
+            </div>
+          ) : null}
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function StockRequestsPanel({ branchCode, csrfToken }) {
+  const [activeTab, setActiveTab] = useState("mine");
+
+  return (
+    <section className="panel srq-panel">
+      <div className="panel-header stacked">
+        <div>
+          <h2>คำขอสินค้าระหว่างสาขา</h2>
+          <p>ส่งคำขอสินค้าไปยังสาขาอื่น และตอบรับคำขอจากสาขาที่ขอมา</p>
+        </div>
+        <div className="srq-subtabs">
+          <button type="button" className={`srq-subtab${activeTab === "mine" ? " active" : ""}`} onClick={() => setActiveTab("mine")}>
+            📤 คำขอของฉัน
+          </button>
+          <button type="button" className={`srq-subtab${activeTab === "incoming" ? " active" : ""}`} onClick={() => setActiveTab("incoming")}>
+            📥 รับคำขอ
+          </button>
+        </div>
+      </div>
+      {activeTab === "mine" ? (
+        <MyRequestsTab branchCode={branchCode} csrfToken={csrfToken} />
+      ) : (
+        <IncomingRequestsTab branchCode={branchCode} csrfToken={csrfToken} />
       )}
     </section>
   );
@@ -5268,6 +6409,10 @@ export default function App() {
   const [authenticating, setAuthenticating] = useState(false);
   const [authError, setAuthError] = useState("");
   const [session, setSession] = useState(null);
+  const [branchOptions, setBranchOptions] = useState([]);
+  const [branchContextBusy, setBranchContextBusy] = useState(false);
+  const [branchContextError, setBranchContextError] = useState("");
+  const [selectedBranchContext, setSelectedBranchContext] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [view, setView] = useState(() => {
     if (typeof window === "undefined") return defaultAdminView;
@@ -5285,7 +6430,6 @@ export default function App() {
   });
   const accountMenuRef = useRef(null);
   const navigationMenuRef = useRef(null);
-  const branchCode = import.meta.env.VITE_BRANCH_CODE || "005";
 
   useEffect(() => {
     let active = true;
@@ -5327,6 +6471,38 @@ export default function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!session) {
+      setBranchOptions([]);
+      setSelectedBranchContext("");
+      setBranchContextError("");
+      return undefined;
+    }
+
+    let active = true;
+
+    async function loadBranches() {
+      try {
+        const response = await apiFetch("/api/branches");
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        if (!active) return;
+        setBranchOptions(Array.isArray(data) ? data : []);
+      } catch (loadError) {
+        if (!active) return;
+        setBranchOptions([]);
+        setBranchContextError(loadError.message || "โหลดรายการสาขาไม่สำเร็จ");
+      }
+    }
+
+    loadBranches();
+    return () => {
+      active = false;
+    };
+  }, [session]);
 
   useEffect(() => {
     if (!session) return undefined;
@@ -5383,6 +6559,16 @@ export default function App() {
     };
   }, [session]);
 
+  const branchCode = session?.user?.effective_branch_code || session?.user?.branch_code || "";
+  const activeBranchOption = branchOptions.find((branch) => branch.branchCode === branchCode) || null;
+  const activeBranchName = activeBranchOption?.branchName || "";
+  const canSelectBranchContext =
+    session?.permissions?.can_select_branch_context ?? (session?.user?.role === "admin" || session?.user?.role === "staff");
+
+  useEffect(() => {
+    setSelectedBranchContext(branchCode || "");
+  }, [branchCode]);
+
   async function handleLogin(event) {
     event.preventDefault();
     setAuthenticating(true);
@@ -5408,6 +6594,11 @@ export default function App() {
       setSession({
         user: data.user,
         csrfToken: data.csrf_token,
+        permissions: {
+          can_select_branch_context: data.permissions?.can_select_branch_context
+            ?? (data.user?.role === "admin" || data.user?.role === "staff"),
+          allowed_branch_codes: data.permissions?.allowed_branch_codes ?? null,
+        },
       });
       setPassword("");
     } catch (loginError) {
@@ -5428,11 +6619,54 @@ export default function App() {
     } finally {
       setAccountMenuOpen(false);
       setSession(null);
+      setBranchOptions([]);
+      setSelectedBranchContext("");
+      setBranchContextError("");
       setLoading(false);
       setStockDay([]);
       setOrderRequests([]);
       setSyncStatus(null);
       setError("");
+    }
+  }
+
+  async function handleApplyBranchContext(nextBranchCode) {
+    if (!session || !canSelectBranchContext) return;
+
+    setBranchContextBusy(true);
+    setBranchContextError("");
+    try {
+      const response = nextBranchCode
+        ? await apiFetch("/admin/auth/branch-override", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRF-Token": session.csrfToken || "",
+            },
+            body: JSON.stringify({ branchCode: nextBranchCode }),
+          })
+        : await apiFetch("/admin/auth/branch-override", {
+            method: "DELETE",
+            headers: {
+              "X-CSRF-Token": session.csrfToken || "",
+            },
+          });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || data.message || `HTTP ${response.status}`);
+      }
+
+      setSession((current) => ({
+        ...(current || {}),
+        user: data.user,
+        csrfToken: data.csrf_token || current?.csrfToken || "",
+        permissions: current?.permissions || null,
+      }));
+    } catch (contextError) {
+      setBranchContextError(contextError.message || "เปลี่ยนสาขาที่ใช้งานไม่สำเร็จ");
+    } finally {
+      setBranchContextBusy(false);
     }
   }
 
@@ -5759,6 +6993,54 @@ export default function App() {
         </nav>
 
         <div className="account-actions">
+          <div className="branch-context-card">
+            <span className="branch-context-label">สาขาที่ใช้งาน</span>
+            {canSelectBranchContext ? (
+              <div className="branch-context-controls">
+                <select
+                  value={selectedBranchContext}
+                  onChange={(event) => setSelectedBranchContext(event.target.value)}
+                  disabled={branchContextBusy}
+                  aria-label="เลือกสาขาที่ใช้งาน"
+                >
+                  <option value="">เลือกสาขา</option>
+                  {branchOptions
+                    .filter((branch) => {
+                      const allowed = session?.permissions?.allowed_branch_codes;
+                      return !allowed || allowed.includes(branch.branchCode);
+                    })
+                    .map((branch) => (
+                      <option key={branch.branchCode} value={branch.branchCode}>
+                        {formatBranchContextLabel(branch.branchCode, branch.branchName)}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  className="ghost-button branch-context-apply-button"
+                  onClick={() => handleApplyBranchContext(selectedBranchContext)}
+                  disabled={branchContextBusy || selectedBranchContext === (branchCode || "")}
+                >
+                  {branchContextBusy ? "กำลังบันทึก..." : "ใช้สาขานี้"}
+                </button>
+              </div>
+            ) : (
+              <strong>{formatBranchContextLabel(branchCode, activeBranchName)}</strong>
+            )}
+            {branchCode ? (
+              <span className="branch-context-current">
+                ใช้งานอยู่: {formatBranchContextLabel(branchCode, activeBranchName)}
+              </span>
+            ) : (
+              <span className="branch-context-current warning">ยังไม่ได้ตั้ง branch context</span>
+            )}
+          </div>
+          {branchCode ? (
+            <NotificationBell
+              branchCode={branchCode}
+              onNavigate={() => setView("stock-requests")}
+            />
+          ) : null}
           <button
             type="button"
             className="ghost-button theme-toggle"
@@ -5805,6 +7087,7 @@ export default function App() {
       </div>
 
       {error && <div className="notice error">{error}</div>}
+      {branchContextError && <div className="notice warning">{branchContextError}</div>}
 
       {view === "receipts" ? (
         <PurchaseReceiptsPanel
@@ -5814,7 +7097,14 @@ export default function App() {
           csrfToken={session.csrfToken}
         />
       ) : view === "branch-stock" ? (
-        <BranchStockPanel csrfToken={session.csrfToken} isAdminUser={isAdminUser} />
+        <BranchStockPanel
+          csrfToken={session.csrfToken}
+          isAdminUser={isAdminUser}
+          branchCode={branchCode}
+          branchName={activeBranchName}
+        />
+      ) : view === "stock-requests" ? (
+        <StockRequestsPanel branchCode={branchCode} csrfToken={session.csrfToken} />
       ) : view === "movement-trace" ? (
         <ProductMovementTracePanel branchCode={branchCode} csrfToken={session.csrfToken} />
       ) : view === stockCostAuditView && isAdminUser ? (

@@ -30,6 +30,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20
+      - key: VITE_API_BASE_URL
+        sync: false
       - key: DATA_MODE
         sync: false
       - key: DATABASE_URL
