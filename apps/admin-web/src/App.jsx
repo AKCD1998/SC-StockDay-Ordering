@@ -6572,7 +6572,9 @@ export default function App() {
   const branchCode = session?.user?.effective_branch_code || session?.user?.branch_code || "";
   const activeBranchOption = branchOptions.find((branch) => branch.branchCode === branchCode) || null;
   const activeBranchName = activeBranchOption?.branchName || "";
-  const canSelectBranchContext = session?.user?.role === "admin";
+  const canSelectBranchContext =
+    session?.user?.role === "admin" ||
+    (session?.user?.role === "staff" && !branchCode);
 
   useEffect(() => {
     setSelectedBranchContext(branchCode || "");
