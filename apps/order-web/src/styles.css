@@ -1032,3 +1032,55 @@ a.ghost {
     padding: 0;
   }
 }
+
+/* ---- WP-13: dispatch / receipt fulfillment ---- */
+.fulfillment-section {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed #d6deea;
+}
+
+.fulfillment-section h3,
+.fulfillment-section h5 {
+  margin: 0 0 4px;
+}
+
+.fulfillment-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.fulfillment-row {
+  display: grid;
+  grid-template-columns: 1fr 110px auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.fulfillment-name {
+  font-weight: 600;
+}
+
+.fulfillment-report {
+  margin-top: 14px;
+}
+
+.fulfillment-report h4 {
+  margin: 0 0 8px;
+}
+
+.fulfillment-table tr.has-difference {
+  background: #fff6e9;
+}
+
+.fulfillment-table tr.has-difference td {
+  color: #8a5300;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .fulfillment-row {
+    grid-template-columns: 1fr 90px auto;
+  }
+}

@@ -176,6 +176,24 @@ export const api = {
     );
   },
 
+  dispatchStockRequest(requestPublicId, body) {
+    return requestJson(
+      `/api/stock-requests/incoming/${encodeURIComponent(requestPublicId)}/dispatch`,
+      { method: "POST", body: JSON.stringify(body) },
+    );
+  },
+
+  receiveStockRequest(requestPublicId, body) {
+    return requestJson(`/api/stock-requests/${encodeURIComponent(requestPublicId)}/receive`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
+  getStockRequestFulfillment(requestPublicId) {
+    return requestJson(`/api/stock-requests/${encodeURIComponent(requestPublicId)}/fulfillment`);
+  },
+
   getStockRequestDocument(requestPublicId) {
     return requestJson(`/api/stock-requests/${encodeURIComponent(requestPublicId)}/document`);
   },

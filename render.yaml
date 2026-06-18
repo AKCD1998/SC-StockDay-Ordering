@@ -1,4 +1,23 @@
 services:
+  - type: static
+    name: sc-stockday-order-web
+    runtime: static
+    rootDir: .
+    buildCommand: npm install && npm run build -w apps/order-web
+    staticPublishPath: apps/order-web/dist
+    autoDeploy: false
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: VITE_API_BASE_URL
+        sync: false
+      - key: VITE_FEATURE_STOCK_REQUESTS
+        value: "false"
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
   - type: web
     name: sc-stockday-ordering
     runtime: node

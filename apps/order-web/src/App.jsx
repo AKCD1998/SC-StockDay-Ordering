@@ -10,6 +10,9 @@ import MyRequestsPage from "./pages/MyRequestsPage";
 import PackingDocumentPage from "./pages/PackingDocumentPage";
 import ReviewPage from "./pages/ReviewPage";
 
+const stockRequestsEnabled =
+  String(import.meta.env.VITE_FEATURE_STOCK_REQUESTS ?? "true").toLowerCase() !== "false";
+
 function LoadingScreen() {
   return (
     <div className="page">
@@ -20,6 +23,17 @@ function LoadingScreen() {
 
 export default function App() {
   const { status, isAuthenticated } = useAuth();
+
+  if (!stockRequestsEnabled) {
+    return (
+      <div className="page">
+        <section className="panel">
+          <h2>ระบบคำขอสินค้าระหว่างสาขายังไม่เปิดใช้งาน</h2>
+          <p className="subtle">ผู้ดูแลระบบสามารถเปิดใช้งานหลังจากตรวจ migration และ pilot checklist แล้ว</p>
+        </section>
+      </div>
+    );
+  }
 
   if (status === "loading") {
     return <LoadingScreen />;

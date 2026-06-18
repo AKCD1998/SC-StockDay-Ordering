@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import ConfirmModal from "../components/ConfirmModal";
+import FulfillmentForm from "../components/FulfillmentForm";
+import FulfillmentReport from "../components/FulfillmentReport";
 import RequestStatusPill from "../components/RequestStatusPill";
 import { ApiError, api } from "../lib/api";
 import { formatBranchLabel } from "../lib/requestCart";
@@ -180,6 +182,37 @@ export default function IncomingRequestDetailPage() {
     }
   }
 
+  const [dispatching, setDispatching] = useState(false);
+  const [dispatchError, setDispatchError] = useState("");
+
+  async function handleDispatch(payloadLines) {
+    setDispatching(true);
+    setDispatchError("");
+    try {
+      await api.dispatchStockRequest(publicId, { version: request.version, lines: payloadLines });
+      await loadDetail();
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.status === 409
+            ? "สถานะคำขอเปลี่ยนไปแล้ว กรุณาโหลดใหม่"
+            : error.message
+          : "บันทึกการจัดส่งไม่สำเร็จ";
+      setDispatchError(message);
+    } finally {
+      setDispatching(false);
+    }
+  }
+
+  const dispatchLines = useMemo(
+    () =>
+      (request?.lines || []).map((line) => ({
+        ...line,
+        approvedQty: line.response?.approvedQty ?? line.requestedQty,
+      })),
+    [request],
+  );
+
   const summary = useMemo(() => {
     if (!request) return null;
     return {
@@ -258,11 +291,33 @@ export default function IncomingRequestDetailPage() {
               </div>
             </>
           ) : (
-            <div className="basket incoming-line-list">
-              {request.lines.map((line) => (
-                <ReadOnlyLine key={line.lineId} line={line} />
-              ))}
-            </div>
+            <>
+              <div className="basket incoming-line-list">
+                {request.lines.map((line) => (
+                  <ReadOnlyLine key={line.lineId} line={line} />
+                ))}
+              </div>
+
+              {request.status === "ACKNOWLEDGED" ? (
+                <section className="fulfillment-section">
+                  <h3>จัดส่งสินค้า</h3>
+                  <p className="subtle">ระบุจำนวนที่จัดส่งจริงต่อรายการ แล้วบันทึกการจัดส่ง</p>
+                  {dispatchError ? <p className="message error-text">{dispatchError}</p> : null}
+                  <FulfillmentForm
+                    lines={dispatchLines}
+                    qtyField="dispatchedQty"
+                    defaultQtyKey="approvedQty"
+                    submitLabel="บันทึกการจัดส่ง"
+                    busy={dispatching}
+                    onSubmit={handleDispatch}
+                  />
+                </section>
+              ) : null}
+
+              {["DISPATCHED", "RECEIVED", "COMPLETED"].includes(request.status) ? (
+                <FulfillmentReport publicId={publicId} />
+              ) : null}
+            </>
           )}
         </>
       )}

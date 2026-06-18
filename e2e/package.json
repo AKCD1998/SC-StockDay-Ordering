@@ -1,0 +1,14 @@
+{
+  "name": "@sc-stockday/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "bcryptjs": "^2.4.3",
+    "pg": "^8.13.1"
+  }
+}

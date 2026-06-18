@@ -1,13 +1,24 @@
 import { useCallback, useEffect, useState } from "react";
+import FulfillmentForm from "../components/FulfillmentForm";
+import FulfillmentReport from "../components/FulfillmentReport";
 import RequestStatusPill from "../components/RequestStatusPill";
 import { ApiError, api } from "../lib/api";
 import { formatBranchLabel } from "../lib/requestCart";
 import { formatDateTime, statusLabel } from "../lib/requestStatus";
 
+function receiveLinesFor(request) {
+  return request.lines.map((line) => ({
+    ...line,
+    approvedQty: line.response?.approvedQty ?? line.requestedQty,
+  }));
+}
+
 function RequestDetail({ publicId }) {
   const [state, setState] = useState({ status: "loading", batch: null, events: [], error: "" });
   const [ackingId, setAckingId] = useState(null);
   const [ackError, setAckError] = useState("");
+  const [receivingId, setReceivingId] = useState(null);
+  const [receiveError, setReceiveError] = useState("");
 
   const loadDetail = useCallback(async () => {
     setState({ status: "loading", batch: null, events: [], error: "" });
@@ -48,6 +59,25 @@ function RequestDetail({ publicId }) {
       setAckError(message);
     } finally {
       setAckingId(null);
+    }
+  }
+
+  async function handleReceive(request, payloadLines) {
+    setReceivingId(request.publicId);
+    setReceiveError("");
+    try {
+      await api.receiveStockRequest(request.publicId, { version: request.version, lines: payloadLines });
+      await loadDetail();
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.status === 409
+            ? "สถานะคำขอเปลี่ยนไปแล้ว กรุณาโหลดใหม่"
+            : error.message
+          : "บันทึกการรับสินค้าไม่สำเร็จ";
+      setReceiveError(message);
+    } finally {
+      setReceivingId(null);
     }
   }
 
@@ -107,9 +137,25 @@ function RequestDetail({ publicId }) {
                   {ackingId === request.publicId ? "กำลังรับทราบ..." : "รับทราบการตอบกลับ"}
                 </button>
               </div>
+            ) : request.status === "DISPATCHED" ? (
+              <section className="fulfillment-section">
+                <h5>รับสินค้า</h5>
+                <p className="subtle">สาขาต้นทางจัดส่งแล้ว ระบุจำนวนที่ได้รับจริงเพื่อบันทึกการรับ</p>
+                {receiveError ? <p className="message error-text">{receiveError}</p> : null}
+                <FulfillmentForm
+                  lines={receiveLinesFor(request)}
+                  qtyField="receivedQty"
+                  defaultQtyKey="approvedQty"
+                  submitLabel="บันทึกการรับสินค้า"
+                  busy={receivingId === request.publicId}
+                  onSubmit={(payloadLines) => handleReceive(request, payloadLines)}
+                />
+              </section>
+            ) : ["RECEIVED", "COMPLETED"].includes(request.status) ? (
+              <FulfillmentReport publicId={request.publicId} />
             ) : request.acknowledgedAt ? (
               <p className="subtle child-ack-note">
-                รับทราบเมื่อ {formatDateTime(request.acknowledgedAt)}
+                รับทราบเมื่อ {formatDateTime(request.acknowledgedAt)} · รอจัดส่ง
               </p>
             ) : null}
           </section>

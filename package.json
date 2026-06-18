@@ -20,6 +20,7 @@
     "db:migrate": "npm run db:migrate -w server",
     "db:seed": "npm run db:seed -w server",
     "lint": "npm run lint -ws --if-present",
+    "test:e2e": "npm --prefix e2e test",
     "sync:ada-agent": "node apps/adapos-sync/src/index.js"
   },
   "devDependencies": {
