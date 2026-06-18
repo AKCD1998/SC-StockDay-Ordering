@@ -169,6 +169,17 @@ export const api = {
     });
   },
 
+  generateStockRequestDocument(requestPublicId) {
+    return requestJson(
+      `/api/stock-requests/incoming/${encodeURIComponent(requestPublicId)}/document`,
+      { method: "POST" },
+    );
+  },
+
+  getStockRequestDocument(requestPublicId) {
+    return requestJson(`/api/stock-requests/${encodeURIComponent(requestPublicId)}/document`);
+  },
+
   getNotifications() {
     return requestJson("/api/notifications");
   },

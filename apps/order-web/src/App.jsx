@@ -7,6 +7,7 @@ import IncomingRequestDetailPage from "./pages/IncomingRequestDetailPage";
 import IncomingRequestsPage from "./pages/IncomingRequestsPage";
 import LoginPage from "./pages/LoginPage";
 import MyRequestsPage from "./pages/MyRequestsPage";
+import PackingDocumentPage from "./pages/PackingDocumentPage";
 import ReviewPage from "./pages/ReviewPage";
 
 function LoadingScreen() {
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/requests" element={<MyRequestsPage />} />
         <Route path="/incoming" element={<IncomingRequestsPage />} />
         <Route path="/incoming/:publicId" element={<IncomingRequestDetailPage />} />
+        <Route path="/incoming/:publicId/document" element={<PackingDocumentPage />} />
         <Route path="*" element={<Navigate to="/stock" replace />} />
       </Routes>
     </AppShell>

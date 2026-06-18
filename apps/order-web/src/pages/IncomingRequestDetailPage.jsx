@@ -200,9 +200,16 @@ export default function IncomingRequestDetailPage() {
           <h2>รายละเอียดคำขอเข้า</h2>
           <p>{publicId}</p>
         </div>
-        <Link to="/incoming" className="ghost">
-          กลับไปรายการคำขอ
-        </Link>
+        <div className="packing-actions">
+          {request && request.status !== "SUBMITTED" ? (
+            <Link to={`/incoming/${encodeURIComponent(publicId)}/document`} className="ghost">
+              เอกสารแพ็กสินค้า
+            </Link>
+          ) : null}
+          <Link to="/incoming" className="ghost">
+            กลับไปรายการคำขอ
+          </Link>
+        </div>
       </div>
 
       {state.status === "loading" ? (
