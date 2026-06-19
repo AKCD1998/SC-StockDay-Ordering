@@ -4105,7 +4105,7 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
         </div>
 
         {(detail.lines || []).map((line) => (
-          <div key={line.lineId} className="srq-line-row">
+          <div key={line.lineId} className="srq-detail-line-row">
             <div className="srq-line-info">
               <strong>{line.productNameThai || line.productNameEng || line.productCode}</strong>
               <span className="meta-line">{line.productCode}</span>

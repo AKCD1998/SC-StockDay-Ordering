@@ -4705,11 +4705,14 @@ select {
 
 /* ─── Line items table ───────────────────────────────────────────── */
 .srq-lines-table { padding: 6px 12px 10px; }
-.srq-lines-head, .srq-line-row {
+.srq-lines-table .srq-lines-head,
+.srq-lines-table .srq-line-row {
   display: grid;
-  grid-template-columns: 110px 1fr 56px 64px 1fr;
-  gap: 8px; align-items: center;
-  font-size: 0.82rem; padding: 5px 0;
+  grid-template-columns: 110px minmax(180px, 1fr) 64px 72px minmax(150px, 1fr);
+  column-gap: 10px;
+  align-items: center;
+  font-size: 0.82rem;
+  padding: 7px 0;
 }
 .srq-lines-head {
   color: #64748b; font-weight: 600; font-size: 0.75rem; text-transform: uppercase;
@@ -4717,12 +4720,13 @@ select {
 }
 .srq-lines-head span:nth-child(3) { text-align: right; }
 .srq-lines-head span:nth-child(4) { text-align: center; }
+.srq-lines-head span:nth-child(5) { text-align: left; }
 .srq-line-row + .srq-line-row { border-top: 1px solid rgba(255,255,255,0.04); }
 .srq-line-code { color: #94a3b8; font-family: monospace; font-size: 0.78rem; }
 .srq-line-name { color: #e2e8f0; }
 .srq-line-qty  { text-align: right; color: #f8fafc; font-weight: 600; }
 .srq-line-unit { text-align: center; color: #94a3b8; font-size: 0.8rem; }
-.srq-line-resp { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.srq-line-resp { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-start; min-width: 0; }
 .srq-resp-tag {
   display: inline-block; padding: 2px 8px; border-radius: 999px;
   font-size: 0.75rem; font-weight: 600;
@@ -4760,7 +4764,7 @@ select {
   display: flex;
   align-items: center;
 }
-.srq-line-row {
+.srq-detail-line-row {
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 12px 14px;
@@ -4943,7 +4947,7 @@ select {
 [data-theme="dark"] .srq-status-chip.cancelled   { background: #fee2e2; color: #991b1b; border-color: rgba(153, 27, 27, 0.22); }
 [data-theme="dark"] .srq-branch-group            { background: #111d2b; border-color: #263547; }
 [data-theme="dark"] .srq-branch-group summary    { background: #162030; }
-[data-theme="dark"] .srq-line-row                { background: #0e1929; border-color: #263547; }
+[data-theme="dark"] .srq-detail-line-row         { background: #0e1929; border-color: #263547; }
 [data-theme="dark"] .srq-action-grid-head,
 [data-theme="dark"] .srq-action-cell             { background: #102033; border-color: #263547; color: #d7dfeb; }
 [data-theme="dark"] .srq-action-grid-head        { background: #18304a; }
