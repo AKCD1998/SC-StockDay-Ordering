@@ -33,6 +33,7 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const syncEventLogEnabled = String(import.meta.env.VITE_ENABLE_SYNC_EVENT_LOG || "").toLowerCase() === "true";
 const adminViewStorageKey = "sc-stockday-admin-view";
 const adminThemeStorageKey = "sc-stockday-admin-theme";
+const HQ_BRANCH_CODE = "000";
 const defaultAdminView = "receipts";
 const stockCostAuditView = "stock-cost-audit";
 const adminOnlyViews = [stockCostAuditView, "category-review", "ingredient-dictionary", "sync-log"];
@@ -195,8 +196,8 @@ function formatBranchContextLabel(branchCode, branchName = "") {
   return branchName ? `${branchCode} - ${branchName}` : `สาขา ${branchCode}`;
 }
 
-function buildRequestDraftLineKey({ productCode, sourceBranchCode, unit }) {
-  return [productCode, sourceBranchCode, unit || ""].join("::");
+function buildRequestDraftLineKey({ productCode, sourceBranchCode, unit, requestMode }) {
+  return [productCode, sourceBranchCode, unit || "", requestMode || "STANDARD"].join("::");
 }
 
 function normalizeRequestedQty(value) {
@@ -221,6 +222,7 @@ function mergeRequestDraftItems(currentItems = [], addedItems = []) {
       lineKey,
       requestedQty: normalizeRequestedQty(item.requestedQty),
       lineNote: String(item.lineNote || "").trim(),
+      requestMode: item.requestMode || "STANDARD",
       snapshotQty: Number(item.snapshotQty || 0),
       snapshotSyncedAt: item.snapshotSyncedAt || null,
     };
@@ -232,6 +234,9 @@ function mergeRequestDraftItems(currentItems = [], addedItems = []) {
     merged.set(lineKey, {
       ...existing,
       requestedQty: existing.requestedQty + normalized.requestedQty,
+      requestMode: existing.requestMode === "ADMIN_ALERT" || normalized.requestMode === "ADMIN_ALERT"
+        ? "ADMIN_ALERT"
+        : (normalized.requestMode || existing.requestMode || "STANDARD"),
       snapshotQty: Math.max(existing.snapshotQty || 0, normalized.snapshotQty || 0),
       snapshotSyncedAt: normalized.snapshotSyncedAt || existing.snapshotSyncedAt,
       lineNote: normalized.lineNote || existing.lineNote,
@@ -265,8 +270,12 @@ function buildStockRequestPayload(lines = [], { note = "", idempotencyKey } = {}
     if (!groups.has(line.sourceBranchCode)) {
       groups.set(line.sourceBranchCode, {
         sourceBranchCode: line.sourceBranchCode,
+        requestMode: line.requestMode || "STANDARD",
         lines: [],
       });
+    }
+    if (line.requestMode === "ADMIN_ALERT") {
+      groups.get(line.sourceBranchCode).requestMode = "ADMIN_ALERT";
     }
     groups.get(line.sourceBranchCode).lines.push({
       productCode: line.productCode,
@@ -2386,16 +2395,44 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
     );
   }
 
+  function getAdminAlertTarget(row) {
+    if (!branchCode || branchCode === HQ_BRANCH_CODE || !row?.productCode || !row?.unit) {
+      return [];
+    }
+    if (getRequestableBranches(row).length > 0) {
+      return [];
+    }
+    return [{
+      branchCode: HQ_BRANCH_CODE,
+      label: BRANCH_LABELS[HQ_BRANCH_CODE] || `สาขา ${HQ_BRANCH_CODE}`,
+      shortLabel: HQ_BRANCH_CODE,
+      requestMode: "ADMIN_ALERT",
+      isAdminAlert: true,
+    }];
+  }
+
+  function getRequestTargets(row) {
+    const standardTargets = getRequestableBranches(row).map((branch) => ({
+      ...branch,
+      requestMode: "STANDARD",
+      isAdminAlert: false,
+    }));
+    if (standardTargets.length > 0) {
+      return standardTargets;
+    }
+    return getAdminAlertTarget(row);
+  }
+
   function canRequestProduct(row) {
     if (!branchCode || !row?.productCode || !row?.unit) {
       return false;
     }
-    return getRequestableBranches(row).length > 0;
+    return getRequestTargets(row).length > 0;
   }
 
   function openRequestDialogForRow(row) {
     if (!canRequestProduct(row)) return;
-    const availableBranches = getRequestableBranches(row);
+    const availableBranches = getRequestTargets(row);
     setRequestDialogProduct(row);
     setRequestQuantities(
       Object.fromEntries(availableBranches.map((branch) => [branch.branchCode, ""])),
@@ -2418,12 +2455,12 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
       return;
     }
     const selectedLines = [];
-    for (const branch of getRequestableBranches(requestDialogProduct)) {
+    for (const branch of getRequestTargets(requestDialogProduct)) {
       const rawValue = requestQuantities[branch.branchCode];
       if (rawValue === "" || rawValue == null) continue;
       const requestedQty = normalizeRequestedQty(rawValue);
       const snapshotQty = getBranchStockQty(requestDialogProduct, branch.branchCode);
-      if (requestedQty > snapshotQty) {
+      if (branch.requestMode !== "ADMIN_ALERT" && requestedQty > snapshotQty) {
         setRequestDialogError(`จำนวนที่ขอจาก ${branch.branchCode} มากกว่าสต็อกที่มีอยู่`);
         return;
       }
@@ -2435,6 +2472,7 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
         unit: requestDialogProduct.unit || "",
         sourceBranchCode: branch.branchCode,
         sourceBranchName: BRANCH_LABELS[branch.branchCode] || `สาขา ${branch.branchCode}`,
+        requestMode: branch.requestMode || "STANDARD",
         requestedQty,
         snapshotQty,
         snapshotSyncedAt: requestDialogProduct.syncedAt || null,
@@ -3124,6 +3162,9 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
         const currentBranchStockQty = branchCode
           ? getBranchStockQty(requestDialogProduct, branchCode)
           : 0;
+        const requestTargets = getRequestTargets(requestDialogProduct);
+        const isAdminAlertOnlyMode =
+          requestTargets.length > 0 && requestTargets.every((target) => target.requestMode === "ADMIN_ALERT");
         return (
           <div className="rq-overlay" onClick={closeRequestDialog}>
             <div
@@ -3170,15 +3211,20 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
                     <span>จำนวนที่ขอ</span>
                     <span>หน่วย</span>
                   </div>
-                  {getRequestableBranches(requestDialogProduct).map((branch) => {
+                  {requestTargets.map((branch) => {
                     const stockQty = getBranchStockQty(requestDialogProduct, branch.branchCode);
                     const reqQty = Number(requestQuantities[branch.branchCode] || 0);
                     return (
-                      <div key={branch.branchCode} className="rq-branch-row">
+                      <div
+                        key={`${branch.branchCode}-${branch.requestMode || "STANDARD"}`}
+                        className={`rq-branch-row${branch.requestMode === "ADMIN_ALERT" ? " admin-alert" : ""}`}
+                      >
                         <span className="rq-branch-name">
                           {BRANCH_LABELS[branch.branchCode] || `สาขา ${branch.branchCode}`}
                         </span>
-                        <span className="rq-branch-stock">{formatNumber(stockQty, 2)}</span>
+                        <span className="rq-branch-stock">
+                          {branch.requestMode === "ADMIN_ALERT" ? "แจ้ง admin" : formatNumber(stockQty, 2)}
+                        </span>
                         <div className="rq-qty-stepper">
                           <button
                             type="button"
@@ -3225,6 +3271,11 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
                     );
                   })}
                 </div>
+                {isAdminAlertOnlyMode ? (
+                  <p className="rq-admin-alert-hint">
+                    ไม่มีสาขาอื่นที่มีสต็อกพร้อมให้ ระบบจะส่งคำขอแจ้งสินค้าไม่พอไปที่ admin / HQ
+                  </p>
+                ) : null}
 
                 {/* Summary panel */}
                 <div className="rq-dialog-summary">
@@ -4186,15 +4237,19 @@ function IncomingRequestsTab({ branchCode, csrfToken, onIncomingNotificationsCha
       {records.length === 0 ? (
         <p className="notice compact">ยังไม่มีคำขอสินค้าเข้ามา</p>
       ) : records.map((req) => (
-        <article key={req.requestPublicId} className="srq-batch-card">
+        <article
+          key={req.requestPublicId}
+          className={`srq-batch-card${req.isAdminAlert && req.status === "SUBMITTED" && !req.responseResult ? " srq-batch-card-admin-alert" : ""}`}
+        >
           <button
             type="button"
-            className="srq-batch-card-header"
+            className={`srq-batch-card-header${req.isAdminAlert && req.status === "SUBMITTED" && !req.responseResult ? " srq-batch-card-header-admin-alert" : ""}`}
             onClick={() => setExpandedId((prev) => (prev === req.requestPublicId ? null : req.requestPublicId))}
           >
             <span className="srq-batch-id">{req.requestPublicId}</span>
             <span className="srq-batch-date">{formatDateTime(req.createdAt)}</span>
             <span className="srq-from-label">จาก: <strong>{BRANCH_LABELS[req.requestingBranchCode] ?? `สาขา ${req.requestingBranchCode}`}</strong></span>
+            {req.isAdminAlert ? <span className="srq-admin-alert-pill">สินค้าหมด / แจ้ง admin</span> : null}
             <SrqStatusChip status={req.responseResult || req.status} />
             <span className="srq-chevron">{expandedId === req.requestPublicId ? "▾" : "▸"}</span>
           </button>
