@@ -2467,8 +2467,6 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
       ]);
       setTimeout(() => setFlyDots((dots) => dots.filter((d) => d.id !== id)), 520);
     }
-
-    setRequestSuccessMessage(`เพิ่ม ${requestDialogProduct.productCode} เข้าคำขอสินค้าแล้ว`);
     closeRequestDialog();
   }
 
@@ -3649,59 +3647,117 @@ function SrqStatusChip({ status }) {
     CANCELLED:           { label: "ยกเลิก",             cls: "cancelled" },
     PENDING:             { label: "รอดำเนินการ",        cls: "waiting" },
     APPROVED_FULL:       { label: "อนุมัติทั้งหมด",    cls: "responded" },
-    APPROVED_PARTIAL:    { label: "อนุมัติบางส่วน",    cls: "waiting" },
+    CUSTOM:              { label: "กำหนดจำนวน",        cls: "waiting" },
     REJECTED:            { label: "ปฏิเสธ",             cls: "cancelled" },
+    FULLY_APPROVED:      { label: "อนุมัติทั้งหมด",    cls: "responded" },
+    PARTIALLY_APPROVED:  { label: "อนุมัติบางส่วน",    cls: "waiting" },
+    FULLY_REJECTED:      { label: "ไม่อนุมัติทั้งหมด", cls: "cancelled" },
   };
   const info = STATUS_MAP[status] || { label: status || "-", cls: "done" };
   return <span className={`srq-status-chip ${info.cls}`}>{info.label}</span>;
 }
 
-function PackingDocumentModal({ requestPublicId, sourceBranchCode, requestingBranchCode, lines, lineStates, onClose }) {
+function createIncomingLineState(line) {
+  const response = line?.response || null;
+  const responseStatus = response?.responseStatus || response?.status || "";
+  if (responseStatus === "APPROVED_FULL") {
+    return {
+      choice: "APPROVED_FULL",
+      approvedQty: String(line.requestedQty),
+      note: response?.note || "",
+      reasonCode: response?.reasonCode || "",
+    };
+  }
+  if (responseStatus === "REJECTED") {
+    return {
+      choice: "REJECTED",
+      approvedQty: "0",
+      note: response?.note || "",
+      reasonCode: response?.reasonCode || "",
+    };
+  }
+  if (responseStatus === "CUSTOM") {
+    return {
+      choice: "CUSTOM",
+      approvedQty: String(response?.approvedQty ?? ""),
+      note: response?.note || "",
+      reasonCode: response?.reasonCode || "",
+    };
+  }
+  return {
+    choice: "",
+    approvedQty: String(line?.requestedQty ?? ""),
+    note: "",
+    reasonCode: "",
+  };
+}
+
+function RequestDocumentsModal({ requestPublicId, documents, onClose }) {
   return (
-    <div className="dialog-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="ใบส่งสินค้า">
-      <div className="dialog-card packing-document-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="dialog-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="เอกสารคำขอสินค้า">
+      <div className="dialog-card packing-document-modal srq-documents-modal" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-header">
           <div>
-            <h3>ใบส่งสินค้า</h3>
-            <p>สำหรับพิมพ์แนบไปกับพัสดุ</p>
+            <h3>เอกสารคำขอสินค้า</h3>
+            <p>เลขที่คำขอ {requestPublicId}</p>
           </div>
           <button type="button" className="ghost-button dialog-close-button" onClick={onClose}>ปิด</button>
         </div>
         <div className="packing-document-print">
-          <div className="packing-doc-header">
-            <div><strong>ใบส่งสินค้าระหว่างสาขา</strong></div>
-            <div>เลขที่: <span className="mono">{requestPublicId}</span></div>
-            <div>จาก: <strong>{BRANCH_LABELS[sourceBranchCode] ?? `สาขา ${sourceBranchCode}`}</strong></div>
-            <div>ถึง: <strong>{BRANCH_LABELS[requestingBranchCode] ?? `สาขา ${requestingBranchCode}`}</strong></div>
-            <div>วันที่พิมพ์: {new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}</div>
-          </div>
-          <table className="packing-doc-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>รหัสสินค้า</th>
-                <th>ชื่อสินค้า</th>
-                <th>จำนวนที่อนุมัติ</th>
-                <th>หน่วย</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(lines || []).map((line, idx) => {
-                const ls = lineStates[line.lineId] || {};
-                if (ls.choice === "REJECTED") return null;
-                const qty = ls.choice === "APPROVED_FULL" ? line.requestedQty : (Number(ls.approvedQty) || 0);
-                return (
-                  <tr key={line.lineId}>
-                    <td>{idx + 1}</td>
-                    <td className="mono">{line.productCode}</td>
-                    <td>{line.productNameThai || line.productNameEng || "-"}</td>
-                    <td>{formatNumber(qty, 0)}</td>
-                    <td>{line.unit}</td>
+          {(documents || []).map((doc) => (
+            <section key={`${doc.documentType}-${doc.documentId || doc.version}`} className="srq-doc-sheet">
+              <div className="packing-doc-header">
+                <div><strong>{doc.documentType === "RESPONSE_SUMMARY" ? "เอกสารสรุปการดำเนินการคำขอ" : "ใบปะหน้าส่งของ"}</strong></div>
+                <div>เลขที่คำขอ: <span className="mono">{doc.document?.requestPublicId || requestPublicId}</span></div>
+                <div>จาก: <strong>{BRANCH_LABELS[doc.document?.sourceBranchCode] ?? `สาขา ${doc.document?.sourceBranchCode}`}</strong></div>
+                <div>ถึง: <strong>{BRANCH_LABELS[doc.document?.requestingBranchCode] ?? `สาขา ${doc.document?.requestingBranchCode}`}</strong></div>
+                <div>วันที่ออกเอกสาร: {formatDateTime(doc.document?.generatedAt || new Date().toISOString())}</div>
+                {doc.document?.responseResult ? (
+                  <div>ผลการดำเนินการ: <strong>{(function mapResult(value) {
+                    if (value === "FULLY_APPROVED") return "อนุมัติทั้งหมด";
+                    if (value === "PARTIALLY_APPROVED") return "อนุมัติบางส่วน";
+                    if (value === "FULLY_REJECTED") return "ไม่อนุมัติทั้งหมด";
+                    return value || "-";
+                  })(doc.document.responseResult)}</strong></div>
+                ) : null}
+                {doc.document?.responseNote ? <div>หมายเหตุรวม: {doc.document.responseNote}</div> : null}
+              </div>
+
+              <table className="packing-doc-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>รหัสสินค้า</th>
+                    <th>ชื่อสินค้า</th>
+                    <th>จำนวนที่ขอ</th>
+                    <th>จำนวนที่อนุมัติ</th>
+                    <th>หน่วย</th>
+                    {doc.documentType === "RESPONSE_SUMMARY" ? <th>ผลการดำเนินการ</th> : null}
+                    {doc.documentType === "RESPONSE_SUMMARY" ? <th>เหตุผล</th> : null}
                   </tr>
-                );
-              }).filter(Boolean)}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {(doc.document?.lines || []).map((line, idx) => (
+                    <tr key={line.lineId || `${line.productCode}-${idx}`}>
+                      <td>{idx + 1}</td>
+                      <td className="mono">{line.productCode}</td>
+                      <td>{line.productNameThai || line.productNameEng || "-"}</td>
+                      <td>{formatNumber(line.requestedQty, 0)}</td>
+                      <td>{formatNumber(line.approvedQty, 0)}</td>
+                      <td>{line.unit}</td>
+                      {doc.documentType === "RESPONSE_SUMMARY" ? <td>{(function mapLineStatus(value) {
+                        if (value === "APPROVED_FULL") return "อนุมัติทั้งหมด";
+                        if (value === "CUSTOM") return "กำหนดจำนวน";
+                        if (value === "REJECTED") return "ปฏิเสธ";
+                        return value || "-";
+                      })(line.responseStatus)}</td> : null}
+                      {doc.documentType === "RESPONSE_SUMMARY" ? <td>{line.note || line.reasonCode || "-"}</td> : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          ))}
         </div>
         <div className="dialog-actions">
           <button type="button" className="ghost-button" onClick={onClose}>ปิด</button>
@@ -3712,241 +3768,377 @@ function PackingDocumentModal({ requestPublicId, sourceBranchCode, requestingBra
   );
 }
 
-function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
-  const [detail, setDetail] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [lineStates, setLineStates] = useState({});
-  const [submitting, setSubmitting] = useState(false);
+function IncomingRequestActionModal({ detail, csrfToken, onClose, onCompleted }) {
+  const [lineStates, setLineStates] = useState(() => {
+    const initial = {};
+    for (const line of detail?.lines || []) {
+      initial[line.lineId] = createIncomingLineState(line);
+    }
+    return initial;
+  });
+  const [decisionNote, setDecisionNote] = useState(detail?.responseNote || "");
   const [submitError, setSubmitError] = useState("");
-  const [submitDone, setSubmitDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [generatingDoc, setGeneratingDoc] = useState(false);
-  const [printOpen, setPrintOpen] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    apiFetch(`/api/stock-requests/incoming/${encodeURIComponent(publicId)}`)
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
-      .then((data) => {
-        if (!active) return;
-        setDetail(data.request);
-        const initial = {};
-        for (const line of data.request?.lines || []) {
-          initial[line.lineId] = line.response
-            ? {
-                choice: line.response.responseStatus,
-                approvedQty: String(line.response.approvedQty ?? line.requestedQty),
-                note: line.response.note || "",
-                saved: true,
-                saving: false,
-                saveError: "",
-              }
-            : { choice: "", approvedQty: "", note: "", saved: false, saving: false, saveError: "" };
-        }
-        setLineStates(initial);
-        if (data.request?.status === "RESPONDED" || data.request?.status === "ACKNOWLEDGED") {
-          setSubmitDone(true);
-        }
-      })
-      .catch((err) => { if (active) setError(err.message); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [publicId]);
+  const [documents, setDocuments] = useState([]);
+  const [documentsOpen, setDocumentsOpen] = useState(false);
+  const [requestVersion, setRequestVersion] = useState(detail?.version || 1);
+  const [workflowDone, setWorkflowDone] = useState(detail?.status === "RESPONDED" || detail?.status === "ACKNOWLEDGED");
+  const [responseResult, setResponseResult] = useState(detail?.responseResult || null);
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   function patchLine(lineId, patch) {
-    setLineStates((prev) => ({
-      ...prev,
-      [lineId]: { ...prev[lineId], ...patch },
+    setLineStates((current) => ({
+      ...current,
+      [lineId]: {
+        ...(current[lineId] || {}),
+        ...patch,
+      },
     }));
   }
 
-  async function saveLine(lineId) {
-    const ls = lineStates[lineId];
-    const line = detail?.lines?.find((l) => l.lineId === lineId);
-    if (!ls?.choice || !line) return;
+  function openRejectDialog(line) {
+    const current = lineStates[line.lineId] || createIncomingLineState(line);
+    setRejectTarget(line);
+    setRejectReason(current.note || "");
+  }
 
-    if ((ls.choice === "APPROVED_PARTIAL" || ls.choice === "REJECTED") && !ls.note?.trim()) {
-      patchLine(lineId, { saveError: "กรุณาระบุเหตุผล" });
+  function confirmRejectDialog() {
+    if (!rejectTarget || !rejectReason.trim()) {
+      setSubmitError("กรุณาระบุเหตุผลที่ไม่อนุมัติ");
       return;
     }
-    if (ls.choice === "APPROVED_PARTIAL") {
-      const qty = Number(ls.approvedQty);
-      if (!Number.isFinite(qty) || qty <= 0 || qty > line.requestedQty) {
-        patchLine(lineId, { saveError: `จำนวนต้องอยู่ระหว่าง 1 – ${line.requestedQty}` });
-        return;
-      }
-    }
-
-    patchLine(lineId, { saving: true, saveError: "" });
-    try {
-      const body = {
-        responseStatus: ls.choice,
-        approvedQty: ls.choice === "APPROVED_FULL" ? line.requestedQty : Number(ls.approvedQty),
-        note: ls.note?.trim() || null,
-      };
-      const res = await apiFetch(
-        `/api/stock-requests/incoming/${encodeURIComponent(publicId)}/lines/${encodeURIComponent(lineId)}/response`,
-        { method: "PUT", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken || "" }, body: JSON.stringify(body) },
-      );
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
-      patchLine(lineId, { saved: true, saving: false, saveError: "" });
-    } catch (err) {
-      patchLine(lineId, { saving: false, saveError: err.message });
-    }
-  }
-
-  async function handleSubmitResponse() {
-    setSubmitting(true);
+    patchLine(rejectTarget.lineId, {
+      choice: "REJECTED",
+      approvedQty: "0",
+      note: rejectReason.trim(),
+      reasonCode: "MANUAL_REJECT",
+    });
+    setRejectTarget(null);
+    setRejectReason("");
     setSubmitError("");
-    try {
-      const res = await apiFetch(
-        `/api/stock-requests/incoming/${encodeURIComponent(publicId)}/submit-response`,
-        { method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken || "" }, body: JSON.stringify({}) },
-      );
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
-      setSubmitDone(true);
-      onResponseSubmitted();
-    } catch (err) {
-      setSubmitError(err.message);
-    } finally {
-      setSubmitting(false);
-    }
   }
 
-  async function handleGenerateDoc() {
+  const allDecided = (detail?.lines || []).length > 0 && (detail?.lines || []).every((line) => {
+    const state = lineStates[line.lineId];
+    if (!state?.choice) return false;
+    if (state.choice === "REJECTED") return Boolean(state.note?.trim());
+    if (state.choice === "CUSTOM") return Number.isFinite(Number(state.approvedQty)) && Number(state.approvedQty) >= 0;
+    return true;
+  });
+
+  function buildSubmitPayload() {
+    return {
+      version: requestVersion,
+      decisionNote: decisionNote.trim() || null,
+      responses: (detail?.lines || []).map((line) => {
+        const state = lineStates[line.lineId] || {};
+        if (state.choice === "APPROVED_FULL") {
+          return {
+            lineId: line.lineId,
+            responseStatus: "APPROVED_FULL",
+          };
+        }
+        if (state.choice === "REJECTED") {
+          return {
+            lineId: line.lineId,
+            responseStatus: "REJECTED",
+            approvedQty: 0,
+            reasonCode: state.reasonCode || "MANUAL_REJECT",
+            note: state.note?.trim() || null,
+          };
+        }
+        return {
+          lineId: line.lineId,
+          responseStatus: "CUSTOM",
+          approvedQty: Number(state.approvedQty),
+          reasonCode: Number(state.approvedQty) === 0 ? (state.reasonCode || "MANUAL_REJECT") : (state.reasonCode || "MANUAL_OVERRIDE"),
+          note: state.note?.trim() || null,
+        };
+      }),
+    };
+  }
+
+  async function handleGenerateDocuments() {
     setGeneratingDoc(true);
     setSubmitError("");
     try {
       const res = await apiFetch(
-        `/api/stock-requests/incoming/${encodeURIComponent(publicId)}/document`,
-        { method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken || "" }, body: JSON.stringify({}) },
+        `/api/stock-requests/incoming/${encodeURIComponent(detail.publicId)}/documents`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken || "" },
+          body: JSON.stringify({ version: requestVersion, autoGenerate: true }),
+        },
       );
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
-      setPrintOpen(true);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setDocuments(data.documents || []);
+      setDocumentsOpen(true);
     } catch (err) {
-      setSubmitError(err.message);
+      setSubmitError(err.message || "สร้างเอกสารไม่สำเร็จ");
     } finally {
       setGeneratingDoc(false);
     }
   }
 
+  async function handleSubmitAndGenerate() {
+    if (!allDecided) {
+      setSubmitError("กรุณาดำเนินการทุกรายการก่อนยืนยัน");
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      const res = await apiFetch(
+        `/api/stock-requests/incoming/${encodeURIComponent(detail.publicId)}/submit-response`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken || "" },
+          body: JSON.stringify(buildSubmitPayload()),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setWorkflowDone(true);
+      setRequestVersion(data.version || requestVersion);
+      setResponseResult(data.responseResult || null);
+      onCompleted();
+      await handleGenerateDocuments();
+    } catch (err) {
+      setSubmitError(err.message || "ส่งคำตอบไม่สำเร็จ");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="dialog-overlay" onClick={() => !submitting && !generatingDoc && onClose()}>
+        <div className="dialog-card srq-action-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+          <div className="dialog-header">
+            <div>
+              <h3>ดำเนินการคำขอสินค้า</h3>
+              <p>
+                เลขที่ <span className="mono">{detail.publicId}</span> จาก {BRANCH_LABELS[detail.requestingBranchCode] ?? `สาขา ${detail.requestingBranchCode}`}
+              </p>
+            </div>
+            <button type="button" className="ghost-button dialog-close-button" onClick={onClose} disabled={submitting || generatingDoc}>ปิด</button>
+          </div>
+
+          <div className="srq-action-grid">
+            <div className="srq-action-grid-head srq-action-product">รายการสินค้า</div>
+            <div className="srq-action-grid-head">จำนวนที่ขอ</div>
+            <div className="srq-action-grid-head">หน่วย</div>
+            <div className="srq-action-grid-head">การดำเนินการ</div>
+
+            {(detail.lines || []).map((line) => {
+              const state = lineStates[line.lineId] || createIncomingLineState(line);
+              const customSelected = state.choice === "CUSTOM";
+              return (
+                <Fragment key={line.lineId}>
+                  <div className="srq-action-cell srq-action-product">
+                    <strong>{line.productCode}</strong>
+                    <span>{line.productNameThai || line.productNameEng || "-"}</span>
+                  </div>
+                  <div className="srq-action-cell srq-action-requested">{formatNumber(line.requestedQty, 0)}</div>
+                  <div className="srq-action-cell srq-action-unit">{line.unit}</div>
+                  <div className="srq-action-cell srq-action-controls">
+                    <button
+                      type="button"
+                      className={`srq-traffic-btn approve${state.choice === "APPROVED_FULL" ? " active" : ""}`}
+                      onClick={() => patchLine(line.lineId, {
+                        choice: "APPROVED_FULL",
+                        approvedQty: String(line.requestedQty),
+                        note: "",
+                        reasonCode: "",
+                      })}
+                      disabled={workflowDone || submitting || generatingDoc}
+                      aria-label="อนุมัติทั้งหมด"
+                    />
+                    <button
+                      type="button"
+                      className={`srq-traffic-btn reject${state.choice === "REJECTED" ? " active" : ""}`}
+                      onClick={() => openRejectDialog(line)}
+                      disabled={workflowDone || submitting || generatingDoc}
+                      aria-label="ไม่อนุมัติ"
+                    />
+                    <button
+                      type="button"
+                      className={`srq-traffic-btn custom${customSelected ? " active" : ""}`}
+                      onClick={() => patchLine(line.lineId, {
+                        choice: "CUSTOM",
+                        approvedQty: customSelected ? state.approvedQty : String(line.requestedQty),
+                        reasonCode: state.reasonCode || "",
+                      })}
+                      disabled={workflowDone || submitting || generatingDoc}
+                      aria-label="กำหนดจำนวน"
+                    />
+                    {customSelected ? (
+                      <input
+                        type="number"
+                        className="srq-custom-qty-input"
+                        min="0"
+                        step="1"
+                        value={state.approvedQty}
+                        onChange={(e) => patchLine(line.lineId, { approvedQty: e.target.value })}
+                        disabled={workflowDone || submitting || generatingDoc}
+                      />
+                    ) : null}
+                    {state.choice ? <SrqStatusChip status={state.choice === "CUSTOM" && Number(state.approvedQty) === 0 ? "REJECTED" : state.choice} /> : null}
+                    {state.choice === "CUSTOM" ? <span className="meta-line">ให้ {formatNumber(state.approvedQty, 0)} {line.unit}</span> : null}
+                    {state.choice === "REJECTED" && state.note ? <span className="meta-line">เหตุผล: {state.note}</span> : null}
+                  </div>
+                </Fragment>
+              );
+            })}
+          </div>
+
+          <label className="srq-decision-note">
+            หมายเหตุรวมการดำเนินการ
+            <textarea
+              rows="3"
+              value={decisionNote}
+              onChange={(e) => setDecisionNote(e.target.value)}
+              placeholder="เช่น ของไม่พอบางรายการ / อนุมัติเพิ่มตามสต็อกจริง"
+              disabled={submitting || generatingDoc}
+            />
+          </label>
+
+          {responseResult ? <p className="meta-line">ผลล่าสุด: <strong>{responseResult}</strong></p> : null}
+          {submitError ? <p className="notice error compact">{submitError}</p> : null}
+
+          <div className="dialog-actions">
+            <button type="button" className="ghost-button" onClick={onClose} disabled={submitting || generatingDoc}>ยกเลิก</button>
+            {workflowDone ? (
+              <button type="button" className="srq-submit-btn" onClick={handleGenerateDocuments} disabled={generatingDoc}>
+                {generatingDoc ? "กำลังสร้างเอกสาร..." : "สร้างเอกสารอีกครั้ง"}
+              </button>
+            ) : (
+              <button type="button" className="srq-submit-btn" onClick={handleSubmitAndGenerate} disabled={!allDecided || submitting || generatingDoc}>
+                {submitting || generatingDoc ? "กำลังดำเนินการ..." : "ยืนยันและรับเอกสารปะหน้า"}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {rejectTarget ? (
+        <div className="dialog-overlay" onClick={() => setRejectTarget(null)}>
+          <div className="dialog-card srq-reject-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="dialog-header">
+              <div>
+                <h3>ระบุเหตุผลที่ไม่อนุมัติ</h3>
+                <p>{rejectTarget.productCode} · {rejectTarget.productNameThai || rejectTarget.productNameEng || "-"}</p>
+              </div>
+            </div>
+            <textarea
+              className="srq-reason-input"
+              rows="4"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="เช่น ของหมด / สินค้าถูกจอง / ต้องเก็บไว้ใช้ในสาขา"
+            />
+            <div className="dialog-actions">
+              <button type="button" className="ghost-button" onClick={() => setRejectTarget(null)}>ยกเลิก</button>
+              <button type="button" className="ghost-button srq-clear-draft-btn" onClick={confirmRejectDialog}>ยืนยันไม่อนุมัติ</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {documentsOpen ? (
+        <RequestDocumentsModal
+          requestPublicId={detail.publicId}
+          documents={documents}
+          onClose={() => setDocumentsOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
+  const [detail, setDetail] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [actionOpen, setActionOpen] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    apiFetch(`/api/stock-requests/incoming/${encodeURIComponent(publicId)}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+      .then((data) => {
+        if (!active) return;
+        setDetail(data.request);
+      })
+      .catch((err) => { if (active) setError(err.message); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [publicId, refreshKey]);
+
   if (loading) return <div className="srq-detail-body"><p className="notice compact">กำลังโหลดรายละเอียด...</p></div>;
   if (error)   return <div className="srq-detail-body"><p className="notice error compact">{error}</p></div>;
   if (!detail) return null;
 
-  const allLinesSaved = (detail.lines || []).length > 0 && (detail.lines || []).every((l) => lineStates[l.lineId]?.saved);
-  const canSubmit = !submitDone && allLinesSaved;
-
   return (
-    <div className="srq-detail-body">
-      {(detail.lines || []).map((line) => {
-        const ls = lineStates[line.lineId] || {};
-        return (
-          <div key={line.lineId} className={`srq-line-row${ls.saved ? " saved" : ""}`}>
+    <>
+      <div className="srq-detail-body">
+        <div className="srq-detail-summary">
+          <div>
+            <strong>จาก {BRANCH_LABELS[detail.requestingBranchCode] ?? `สาขา ${detail.requestingBranchCode}`}</strong>
+            <p className="meta-line">คำขอ {detail.lines?.length || 0} รายการ · เวอร์ชัน {detail.version}</p>
+          </div>
+          <div className="srq-detail-summary-status">
+            <SrqStatusChip status={detail.responseResult || detail.status} />
+          </div>
+        </div>
+
+        {(detail.lines || []).map((line) => (
+          <div key={line.lineId} className="srq-line-row">
             <div className="srq-line-info">
               <strong>{line.productNameThai || line.productNameEng || line.productCode}</strong>
-              <span className="meta-line">
-                {line.productCode} · ขอ {formatNumber(line.requestedQty, 0)} {line.unit}
-                {line.snapshotQty != null ? ` · สต็อก ${formatNumber(line.snapshotQty, 2)} ${line.unit}` : ""}
-              </span>
+              <span className="meta-line">{line.productCode}</span>
             </div>
-            {ls.saved || submitDone ? (
-              <div className="srq-line-saved">
-                <SrqStatusChip status={ls.choice} />
-                {ls.choice === "APPROVED_PARTIAL" ? <span className="meta-line">{formatNumber(ls.approvedQty, 0)} {line.unit}</span> : null}
-                {!submitDone ? (
-                  <button type="button" className="ghost-button srq-edit-btn" onClick={() => patchLine(line.lineId, { saved: false })}>แก้ไข</button>
-                ) : null}
-              </div>
-            ) : (
-              <div className="srq-line-form">
-                <div className="srq-response-choices">
-                  {[
-                    { value: "APPROVED_FULL",    label: "✓ อนุมัติทั้งหมด" },
-                    { value: "APPROVED_PARTIAL", label: "~ อนุมัติบางส่วน" },
-                    { value: "REJECTED",         label: "✗ ปฏิเสธ" },
-                  ].map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      className={`srq-response-btn${ls.choice === opt.value ? ` selected-${opt.value === "APPROVED_FULL" ? "approve" : opt.value === "APPROVED_PARTIAL" ? "partial" : "reject"}` : ""}`}
-                      onClick={() => patchLine(line.lineId, {
-                        choice: opt.value,
-                        approvedQty: opt.value === "APPROVED_FULL" ? String(line.requestedQty) : (ls.approvedQty || ""),
-                        saveError: "",
-                      })}
-                      disabled={ls.saving}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                {ls.choice === "APPROVED_PARTIAL" ? (
-                  <input
-                    type="number"
-                    className="srq-qty-input"
-                    min="1"
-                    max={line.requestedQty}
-                    value={ls.approvedQty}
-                    onChange={(e) => patchLine(line.lineId, { approvedQty: e.target.value })}
-                    placeholder={`จำนวน (สูงสุด ${line.requestedQty})`}
-                    disabled={ls.saving}
-                  />
-                ) : null}
-                {(ls.choice === "APPROVED_PARTIAL" || ls.choice === "REJECTED") ? (
-                  <textarea
-                    className="srq-reason-input"
-                    value={ls.note}
-                    onChange={(e) => patchLine(line.lineId, { note: e.target.value })}
-                    placeholder="เหตุผล (จำเป็น)"
-                    rows="2"
-                    disabled={ls.saving}
-                  />
-                ) : null}
-                {ls.saveError ? <p className="notice error compact">{ls.saveError}</p> : null}
-                {ls.choice ? (
-                  <button type="button" className="ghost-button srq-save-line-btn" onClick={() => saveLine(line.lineId)} disabled={ls.saving}>
-                    {ls.saving ? "กำลังบันทึก..." : "บันทึก"}
-                  </button>
-                ) : null}
-              </div>
-            )}
+            <div className="srq-line-preview-metrics">
+              <span>ขอ {formatNumber(line.requestedQty, 0)} {line.unit}</span>
+              {line.response ? (
+                <>
+                  <SrqStatusChip status={line.response.status} />
+                  <span>ให้ {formatNumber(line.response.approvedQty, 0)} {line.unit}</span>
+                </>
+              ) : (
+                <span className="meta-line">ยังไม่ตอบกลับ</span>
+              )}
+            </div>
           </div>
-        );
-      })}
+        ))}
 
-      {submitError ? <p className="notice error compact">{submitError}</p> : null}
+        {detail.responseNote ? <p className="meta-line">หมายเหตุล่าสุด: {detail.responseNote}</p> : null}
 
-      {!submitDone ? (
         <div className="srq-detail-actions">
-          <button type="button" className="srq-submit-btn" onClick={handleSubmitResponse} disabled={!canSubmit || submitting}>
-            {submitting ? "กำลังส่งคำตอบ..." : "ส่งคำตอบทั้งหมด"}
-          </button>
-          {!allLinesSaved ? <span className="meta-line">ต้องบันทึกทุกรายการก่อนส่ง</span> : null}
-        </div>
-      ) : (
-        <div className="srq-detail-actions">
-          <span className="notice success compact">ส่งคำตอบแล้ว</span>
-          <button type="button" className="ghost-button" onClick={handleGenerateDoc} disabled={generatingDoc}>
-            {generatingDoc ? "กำลังสร้างเอกสาร..." : "สร้างใบส่งสินค้า"}
+          <button type="button" className="srq-submit-btn" onClick={() => setActionOpen(true)}>
+            {detail.status === "SUBMITTED" ? "ดำเนินการ" : "ดูผลการดำเนินการ"}
           </button>
         </div>
-      )}
+      </div>
 
-      {printOpen ? (
-        <PackingDocumentModal
-          requestPublicId={publicId}
-          sourceBranchCode={detail.sourceBranchCode}
-          requestingBranchCode={detail.requestingBranchCode}
-          lines={detail.lines}
-          lineStates={lineStates}
-          onClose={() => setPrintOpen(false)}
+      {actionOpen ? (
+        <IncomingRequestActionModal
+          detail={detail}
+          csrfToken={csrfToken}
+          onClose={() => setActionOpen(false)}
+          onCompleted={() => {
+            setRefreshKey((current) => current + 1);
+            onResponseSubmitted();
+          }}
         />
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -3980,21 +4172,21 @@ function IncomingRequestsTab({ branchCode, csrfToken }) {
       {records.length === 0 ? (
         <p className="notice compact">ยังไม่มีคำขอสินค้าเข้ามา</p>
       ) : records.map((req) => (
-        <article key={req.publicId} className="srq-batch-card">
+        <article key={req.requestPublicId} className="srq-batch-card">
           <button
             type="button"
             className="srq-batch-card-header"
-            onClick={() => setExpandedId((prev) => (prev === req.publicId ? null : req.publicId))}
+            onClick={() => setExpandedId((prev) => (prev === req.requestPublicId ? null : req.requestPublicId))}
           >
-            <span className="srq-batch-id">{req.publicId}</span>
+            <span className="srq-batch-id">{req.requestPublicId}</span>
             <span className="srq-batch-date">{formatDateTime(req.createdAt)}</span>
             <span className="srq-from-label">จาก: <strong>{BRANCH_LABELS[req.requestingBranchCode] ?? `สาขา ${req.requestingBranchCode}`}</strong></span>
-            <SrqStatusChip status={req.status} />
-            <span className="srq-chevron">{expandedId === req.publicId ? "▾" : "▸"}</span>
+            <SrqStatusChip status={req.responseResult || req.status} />
+            <span className="srq-chevron">{expandedId === req.requestPublicId ? "▾" : "▸"}</span>
           </button>
-          {expandedId === req.publicId ? (
+          {expandedId === req.requestPublicId ? (
             <IncomingRequestDetail
-              publicId={req.publicId}
+              publicId={req.requestPublicId}
               csrfToken={csrfToken}
               onResponseSubmitted={() => setRefreshKey((k) => k + 1)}
             />
@@ -4006,8 +4198,8 @@ function IncomingRequestsTab({ branchCode, csrfToken }) {
 }
 
 const RESPONSE_STATUS_LABELS = {
-  APPROVED: "อนุมัติ",
-  PARTIAL: "อนุมัติบางส่วน",
+  APPROVED_FULL: "อนุมัติทั้งหมด",
+  CUSTOM: "กำหนดจำนวน",
   REJECTED: "ปฏิเสธ",
 };
 
