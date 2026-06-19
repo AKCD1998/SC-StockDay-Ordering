@@ -7004,7 +7004,7 @@ export default function App() {
         </nav>
 
         <div className="account-actions">
-          <div className="branch-context-card">
+          {(session?.user?.role === "admin" || !branchCode) ? <div className="branch-context-card">
             <span className="branch-context-label">สาขาที่ใช้งาน</span>
             {canSelectBranchContext ? (
               <div className="branch-context-controls">
@@ -7050,7 +7050,7 @@ export default function App() {
             ) : (
               <span className="branch-context-current warning">ยังไม่ได้ตั้ง branch context</span>
             )}
-          </div>
+          </div> : null}
           {branchCode ? (
             <NotificationBell
               branchCode={branchCode}
