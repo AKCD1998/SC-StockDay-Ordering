@@ -2651,11 +2651,6 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
             }}
           >
             {requestMode ? "ปิดโหมดขอสินค้า" : "ขอสินค้า"}
-            {requestDraftCount > 0 ? (
-              <span className="request-draft-badge">
-                {requestDraftCount > 99 ? "99+" : requestDraftCount}
-              </span>
-            ) : null}
           </button>
         </form>
       </div>
