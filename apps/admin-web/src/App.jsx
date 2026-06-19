@@ -3179,7 +3179,7 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
         return (
           <div className="rq-overlay" onClick={closeRequestDialog}>
             <div
-              className="rq-dialog"
+              className={isAdminAlertOnlyMode ? "rq-dialog stockout" : "rq-dialog"}
               onClick={(event) => event.stopPropagation()}
               role="dialog"
               aria-modal="true"
@@ -3282,12 +3282,6 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
                     );
                   })}
                 </div>
-                {isAdminAlertOnlyMode ? (
-                  <p className="rq-admin-alert-hint">
-                    ไม่มีสาขาอื่นที่มีสต็อกพร้อมให้ ระบบจะส่งคำขอแจ้งสินค้าไม่พอไปที่ admin / HQ
-                  </p>
-                ) : null}
-
                 {/* Summary panel */}
                 <div className="rq-dialog-summary">
                   <div className="rq-summary-item">
