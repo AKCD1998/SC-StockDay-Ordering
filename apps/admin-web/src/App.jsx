@@ -3884,13 +3884,15 @@ function IncomingRequestActionModal({ detail, csrfToken, onClose, onCompleted })
     setSubmitError("");
   }
 
+  const hasAnyCustom = Object.values(lineStates).some((s) => s.choice === "CUSTOM");
+
   const allDecided = (detail?.lines || []).length > 0 && (detail?.lines || []).every((line) => {
     const state = lineStates[line.lineId];
     if (!state?.choice) return false;
     if (state.choice === "REJECTED") return Boolean(state.note?.trim());
     if (state.choice === "CUSTOM") return Number.isFinite(Number(state.approvedQty)) && Number(state.approvedQty) >= 0;
     return true;
-  });
+  }) && (!hasAnyCustom || Boolean(decisionNote.trim()));
 
   function buildSubmitPayload() {
     return {
@@ -4047,15 +4049,29 @@ function IncomingRequestActionModal({ detail, csrfToken, onClose, onCompleted })
                       ระบุ
                     </button>
                     {customSelected ? (
-                      <input
-                        type="number"
-                        className="srq-custom-qty-input"
-                        min="0"
-                        step="1"
-                        value={state.approvedQty}
-                        onChange={(e) => patchLine(line.lineId, { approvedQty: e.target.value })}
-                        disabled={workflowDone || submitting || generatingDoc}
-                      />
+                      <>
+                        <input
+                          type="number"
+                          className={`srq-custom-qty-input${line.snapshotQty != null && Number(state.approvedQty) > line.snapshotQty ? " srq-custom-qty-over" : ""}`}
+                          min="0"
+                          max={line.snapshotQty ?? undefined}
+                          step="1"
+                          value={state.approvedQty}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const parsed = Number(raw);
+                            if (line.snapshotQty != null && Number.isFinite(parsed) && parsed > line.snapshotQty) {
+                              patchLine(line.lineId, { approvedQty: String(line.snapshotQty) });
+                            } else {
+                              patchLine(line.lineId, { approvedQty: raw });
+                            }
+                          }}
+                          disabled={workflowDone || submitting || generatingDoc}
+                        />
+                        {line.snapshotQty != null ? (
+                          <span className="srq-snapshot-hint">สต็อก {formatNumber(line.snapshotQty, 0)} {line.unit}</span>
+                        ) : null}
+                      </>
                     ) : null}
                     {state.choice ? <SrqStatusChip status={state.choice === "CUSTOM" && Number(state.approvedQty) === 0 ? "REJECTED" : state.choice} /> : null}
                     {state.choice === "CUSTOM" ? <span className="meta-line">ให้ {formatNumber(state.approvedQty, 0)} {line.unit}</span> : null}
@@ -4066,13 +4082,13 @@ function IncomingRequestActionModal({ detail, csrfToken, onClose, onCompleted })
             })}
           </div>
 
-          <label className="srq-decision-note">
-            หมายเหตุรวมการดำเนินการ
+          <label className={`srq-decision-note${hasAnyCustom ? " srq-decision-note-required" : ""}`}>
+            หมายเหตุรวมการดำเนินการ{hasAnyCustom ? <span className="srq-required-mark"> * จำเป็นเมื่อมีการระบุจำนวน</span> : null}
             <textarea
               rows="3"
               value={decisionNote}
               onChange={(e) => setDecisionNote(e.target.value)}
-              placeholder="เช่น ของไม่พอบางรายการ / อนุมัติเพิ่มตามสต็อกจริง"
+              placeholder={hasAnyCustom ? "ระบุเหตุผลที่ให้จำนวนไม่ตรงกับที่ขอ..." : "เช่น ของไม่พอบางรายการ / อนุมัติเพิ่มตามสต็อกจริง"}
               disabled={submitting || generatingDoc}
             />
           </label>

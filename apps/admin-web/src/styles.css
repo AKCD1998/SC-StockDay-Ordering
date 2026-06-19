@@ -4974,6 +4974,18 @@ select {
 .srq-submit-btn:disabled { opacity: 0.55; cursor: default; }
 .srq-action-modal {
   width: min(1100px, 100%);
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+.srq-action-modal .dialog-header {
+  flex-shrink: 0;
+}
+.srq-action-modal .srq-decision-note {
+  flex-shrink: 0;
+}
+.srq-action-modal .dialog-actions {
+  flex-shrink: 0;
 }
 .srq-action-grid {
   display: grid;
@@ -4981,6 +4993,10 @@ select {
   gap: 10px;
   align-items: stretch;
   margin-top: 8px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-right: 4px;
 }
 .srq-action-grid-head,
 .srq-action-cell {
@@ -5047,6 +5063,18 @@ select {
   padding: 7px 10px;
   font: inherit;
 }
+
+.srq-custom-qty-over {
+  border-color: #dc2626;
+  outline: 2px solid rgba(220, 38, 38, 0.25);
+}
+
+.srq-snapshot-hint {
+  font-size: 0.72rem;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
 .srq-decision-note {
   display: grid;
   gap: 8px;
@@ -5061,6 +5089,16 @@ select {
   padding: 10px 12px;
   font: inherit;
   resize: vertical;
+}
+.srq-decision-note-required textarea {
+  border-color: #d97706;
+  outline: 2px solid rgba(217, 119, 6, 0.2);
+}
+.srq-required-mark {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #d97706;
+  margin-left: 4px;
 }
 .srq-reject-modal {
   width: min(560px, 100%);
