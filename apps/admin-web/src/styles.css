@@ -4707,20 +4707,22 @@ select {
 .srq-lines-table { padding: 6px 12px 10px; }
 .srq-lines-head, .srq-line-row {
   display: grid;
-  grid-template-columns: 100px 1fr 60px 60px 140px;
-  gap: 6px; align-items: center;
+  grid-template-columns: 110px 1fr 56px 64px 1fr;
+  gap: 8px; align-items: center;
   font-size: 0.82rem; padding: 5px 0;
 }
 .srq-lines-head {
   color: #64748b; font-weight: 600; font-size: 0.75rem; text-transform: uppercase;
   border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 6px; margin-bottom: 2px;
 }
+.srq-lines-head span:nth-child(3) { text-align: right; }
+.srq-lines-head span:nth-child(4) { text-align: center; }
 .srq-line-row + .srq-line-row { border-top: 1px solid rgba(255,255,255,0.04); }
 .srq-line-code { color: #94a3b8; font-family: monospace; font-size: 0.78rem; }
 .srq-line-name { color: #e2e8f0; }
 .srq-line-qty  { text-align: right; color: #f8fafc; font-weight: 600; }
-.srq-line-unit { color: #94a3b8; font-size: 0.8rem; }
-.srq-line-resp { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.srq-line-unit { text-align: center; color: #94a3b8; font-size: 0.8rem; }
+.srq-line-resp { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .srq-resp-tag {
   display: inline-block; padding: 2px 8px; border-radius: 999px;
   font-size: 0.75rem; font-weight: 600;
