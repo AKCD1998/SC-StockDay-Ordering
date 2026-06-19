@@ -4610,6 +4610,20 @@ select {
 }
 .srq-confirm-btn:hover { background: #15803d; }
 .srq-confirm-btn:disabled { opacity: 0.55; cursor: default; }
+.srq-clear-draft-btn {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+}
+.srq-clear-draft-btn:hover { background: #b91c1c; }
+.srq-clear-draft-btn:disabled { opacity: 0.55; cursor: default; }
+.srq-remove-line-btn {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+}
+.srq-remove-line-btn:hover { background: #b91c1c; }
+.srq-remove-line-btn:disabled { opacity: 0.55; cursor: default; }
 
 /* ─── Stock Requests Panel ──────────────────────────────────────── */
 .srq-panel .panel-header { flex-wrap: wrap; gap: 14px; }
@@ -4815,6 +4829,10 @@ select {
 [data-theme="dark"] .srq-checkout-overlay        { background: #0c1520; }
 [data-theme="dark"] .srq-checkout-header         { background: rgba(16,26,40,0.95); border-color: #263547; }
 [data-theme="dark"] .srq-checkout-actions        { background: rgba(16,26,40,0.95); border-color: #263547; }
+[data-theme="dark"] .srq-clear-draft-btn         { background: #dc2626; color: #fff; }
+[data-theme="dark"] .srq-clear-draft-btn:hover   { background: #b91c1c; }
+[data-theme="dark"] .srq-remove-line-btn         { background: #dc2626; color: #fff; }
+[data-theme="dark"] .srq-remove-line-btn:hover   { background: #b91c1c; }
 [data-theme="dark"] .srq-batch-card              { background: #111d2b; border-color: #263547; }
 [data-theme="dark"] .srq-batch-card-header       { background: #162030; }
 [data-theme="dark"] .srq-batch-card-header:hover { background: #1c2a3c; }

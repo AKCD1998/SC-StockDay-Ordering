@@ -3953,7 +3953,6 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
 function IncomingRequestsTab({ branchCode, csrfToken }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [expandedId, setExpandedId] = useState(null);
 
@@ -3961,18 +3960,16 @@ function IncomingRequestsTab({ branchCode, csrfToken }) {
     if (!branchCode) return undefined;
     let active = true;
     setLoading(true);
-    setError("");
     apiFetch("/api/stock-requests/incoming")
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then((data) => { if (active) setRecords(data.records || []); })
-      .catch((err) => { if (active) setError(err.message); })
+      .catch(() => { if (active) setRecords([]); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [branchCode, refreshKey]);
 
   if (!branchCode) return <p className="notice warning compact">ต้องเลือกสาขาที่ใช้งานก่อนจึงจะดูคำขอที่เข้ามาได้</p>;
   if (loading)    return <p className="notice compact">กำลังโหลด...</p>;
-  if (error)      return <div><p className="notice error compact">{error}</p><button type="button" className="ghost-button" onClick={() => setRefreshKey((k) => k + 1)}>ลองใหม่</button></div>;
 
   return (
     <div className="srq-tab-body">
@@ -4017,7 +4014,6 @@ const RESPONSE_STATUS_LABELS = {
 function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDraftItems, requestBatchNote, setRequestBatchNote, onSubmitDraft, onClearDraft }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [expandedId, setExpandedId] = useState(null);
   const [detailCache, setDetailCache] = useState({});
@@ -4028,6 +4024,7 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
 
   const draftItems = requestDraftItems || [];
   const draftCount = draftItems.length;
@@ -4086,11 +4083,10 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
     if (!branchCode) return undefined;
     let active = true;
     setLoading(true);
-    setError("");
     apiFetch("/api/stock-requests/mine")
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then((data) => { if (active) setRecords(data.records || []); })
-      .catch((err) => { if (active) setError(err.message); })
+      .catch(() => { if (active) setRecords([]); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [branchCode, refreshKey]);
@@ -4144,13 +4140,20 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
               <h3>สร้างคำขอสินค้า</h3>
               <p className="meta-line">สาขาผู้ขอ: {BRANCH_LABELS[branchCode] ?? `สาขา ${branchCode}`} · {draftCount} รายการ</p>
             </div>
-            <button type="button" className="ghost-button" onClick={onClearDraft} disabled={submittingRequest}>ล้างรายการ</button>
+            <button
+              type="button"
+              className="ghost-button srq-clear-draft-btn"
+              onClick={() => setClearConfirmOpen(true)}
+              disabled={submittingRequest}
+            >
+              ล้างรายการ
+            </button>
           </div>
           <div className="srq-checkout-body">
             {[...draftByBranch.entries()].map(([sourceBranchCode, items]) => (
               <details key={sourceBranchCode} className="srq-branch-group" open>
                 <summary>
-                  ขอจาก: {BRANCH_LABELS[sourceBranchCode] ?? `สาขา ${sourceBranchCode}`}
+                  ส่งคำขอสินค้าไปที่ : {BRANCH_LABELS[sourceBranchCode] ?? `สาขา ${sourceBranchCode}`}
                   <span className="meta-line" style={{ fontWeight: 400, marginLeft: 8 }}>({items.length} รายการ)</span>
                 </summary>
                 <div className="srq-branch-group-body">
@@ -4167,7 +4170,7 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
                       <input type="text" value={item.lineNote || ""}
                         onChange={(e) => patchDraftItem(item.lineKey, { lineNote: e.target.value })}
                         placeholder="หมายเหตุ" disabled={submittingRequest} aria-label="หมายเหตุรายบรรทัด" />
-                      <button type="button" className="ghost-button"
+                      <button type="button" className="ghost-button srq-remove-line-btn"
                         onClick={() => removeDraftItem(item.lineKey)} disabled={submittingRequest}>ลบ</button>
                     </div>
                   ))}
@@ -4206,6 +4209,30 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
               </div>
             </div>
           ) : null}
+          {clearConfirmOpen ? (
+            <div className="dialog-overlay" onClick={() => !submittingRequest && setClearConfirmOpen(false)}>
+              <div className="dialog-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+                <div className="dialog-header"><h3>ยืนยันจะล้างรายการ?</h3></div>
+                <p style={{ padding: "0 0 16px" }}>
+                  รายการร่างทั้งหมด {draftCount} รายการจะถูกล้างออกจากหน้านี้
+                </p>
+                <div className="dialog-actions">
+                  <button type="button" className="ghost-button" onClick={() => setClearConfirmOpen(false)} disabled={submittingRequest}>ยกเลิก</button>
+                  <button
+                    type="button"
+                    className="ghost-button srq-clear-draft-btn"
+                    onClick={() => {
+                      onClearDraft();
+                      setClearConfirmOpen(false);
+                    }}
+                    disabled={submittingRequest}
+                  >
+                    ยืนยันล้างรายการ
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -4215,9 +4242,8 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
         <span className="srq-total-label">{loading ? "กำลังโหลด..." : `${records.length} รายการ`}</span>
         <button type="button" className="ghost-button" onClick={() => setRefreshKey((k) => k + 1)}>รีเฟรช</button>
       </div>
-      {error ? <div><p className="notice error compact">{error}</p><button type="button" className="ghost-button" onClick={() => setRefreshKey((k) => k + 1)}>ลองใหม่</button></div> : null}
       {ackError ? <p className="notice error compact">{ackError}</p> : null}
-      {records.length === 0 ? (
+      {records.length === 0 && draftCount === 0 ? (
         <p className="notice compact">ยังไม่มีคำขอสินค้า</p>
       ) : records.map((batch) => {
         const isOpen = expandedId === batch.batchPublicId;
