@@ -4674,14 +4674,16 @@ select {
   border: none;
   cursor: pointer;
   font: inherit;
+  color: #1f2937;
   text-align: left;
   flex-wrap: wrap;
 }
 .srq-batch-card-header:hover { background: #eef2f8; }
-.srq-batch-id { font-family: ui-monospace, monospace; font-size: 0.85rem; color: #1f2933; font-weight: 600; }
-.srq-batch-date { color: #526578; font-size: 0.85rem; }
-.srq-from-label { font-size: 0.88rem; }
-.srq-chevron { margin-left: auto; color: #526578; }
+.srq-batch-id { font-family: inherit; font-size: 0.93rem; color: inherit; font-weight: 700; letter-spacing: 0.01em; }
+.srq-batch-date { color: #526578; font-size: 0.86rem; font-weight: 500; }
+.srq-from-label { font-size: 0.9rem; color: #243b53; }
+.srq-from-label strong { color: #102a43; font-weight: 700; }
+.srq-chevron { margin-left: auto; color: #526578; font-size: 1rem; }
 .srq-batch-body { padding: 12px 16px; display: grid; gap: 8px; }
 .srq-child-row {
   display: flex;
@@ -4914,8 +4916,17 @@ select {
 [data-theme="dark"] .srq-remove-line-btn         { background: #dc2626; color: #fff; }
 [data-theme="dark"] .srq-remove-line-btn:hover   { background: #b91c1c; }
 [data-theme="dark"] .srq-batch-card              { background: #111d2b; border-color: #263547; }
-[data-theme="dark"] .srq-batch-card-header       { background: #162030; }
+[data-theme="dark"] .srq-batch-card-header       { background: #162030; color: #e5edf7; }
 [data-theme="dark"] .srq-batch-card-header:hover { background: #1c2a3c; }
+[data-theme="dark"] .srq-batch-id                { color: #f8fbff; }
+[data-theme="dark"] .srq-batch-date              { color: #b8c7d9; }
+[data-theme="dark"] .srq-from-label              { color: #d7e2f0; }
+[data-theme="dark"] .srq-from-label strong       { color: #ffffff; }
+[data-theme="dark"] .srq-chevron                 { color: #c5d2e3; }
+[data-theme="dark"] .srq-status-chip.waiting     { background: #fff1dc; color: #9a3412; border-color: rgba(154, 52, 18, 0.24); }
+[data-theme="dark"] .srq-status-chip.responded   { background: #dcfce7; color: #166534; border-color: rgba(22, 101, 52, 0.2); }
+[data-theme="dark"] .srq-status-chip.done        { background: #e5e7eb; color: #374151; border-color: rgba(55, 65, 81, 0.18); }
+[data-theme="dark"] .srq-status-chip.cancelled   { background: #fee2e2; color: #991b1b; border-color: rgba(153, 27, 27, 0.22); }
 [data-theme="dark"] .srq-branch-group            { background: #111d2b; border-color: #263547; }
 [data-theme="dark"] .srq-branch-group summary    { background: #162030; }
 [data-theme="dark"] .srq-line-row                { background: #0e1929; border-color: #263547; }
