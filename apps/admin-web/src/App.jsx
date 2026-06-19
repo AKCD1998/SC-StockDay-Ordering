@@ -6595,22 +6595,6 @@ export default function App() {
   }, [session]);
 
   useEffect(() => {
-    if (!branchCode) { setUnreadNotifCount(0); return undefined; }
-    let active = true;
-    async function fetchUnread() {
-      try {
-        const res = await apiFetch("/api/notifications/unread-count");
-        if (!res.ok || !active) return;
-        const data = await res.json();
-        if (active) setUnreadNotifCount(data.unreadCount || 0);
-      } catch { /* silent */ }
-    }
-    fetchUnread();
-    const id = setInterval(fetchUnread, 30_000);
-    return () => { active = false; clearInterval(id); };
-  }, [branchCode]);
-
-  useEffect(() => {
     if (!session) return undefined;
 
     let active = true;
@@ -6684,6 +6668,22 @@ export default function App() {
     handleApplyBranchContext(allowedCodes[0]);
     return undefined;
   }, [session, branchCode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!branchCode) { setUnreadNotifCount(0); return undefined; }
+    let active = true;
+    async function fetchUnread() {
+      try {
+        const res = await apiFetch("/api/notifications/unread-count");
+        if (!res.ok || !active) return;
+        const data = await res.json();
+        if (active) setUnreadNotifCount(data.unreadCount || 0);
+      } catch { /* silent */ }
+    }
+    fetchUnread();
+    const id = setInterval(fetchUnread, 30_000);
+    return () => { active = false; clearInterval(id); };
+  }, [branchCode]);
 
   async function handleLogin(event) {
     event.preventDefault();
