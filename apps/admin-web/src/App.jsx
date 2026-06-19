@@ -4148,7 +4148,7 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
   );
 }
 
-function IncomingRequestsTab({ branchCode, csrfToken }) {
+function IncomingRequestsTab({ branchCode, csrfToken, onIncomingNotificationsChanged }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -4194,7 +4194,10 @@ function IncomingRequestsTab({ branchCode, csrfToken }) {
             <IncomingRequestDetail
               publicId={req.requestPublicId}
               csrfToken={csrfToken}
-              onResponseSubmitted={() => setRefreshKey((k) => k + 1)}
+              onResponseSubmitted={() => {
+                setRefreshKey((k) => k + 1);
+                onIncomingNotificationsChanged?.();
+              }}
             />
           ) : null}
         </article>
@@ -4529,6 +4532,7 @@ function StockRequestsPanel({
   onSubmitDraft,
   onClearDraft,
   incomingNotifCount = 0,
+  onIncomingNotificationsChanged,
 }) {
   const [activeTab, setActiveTab] = useState("mine");
 
@@ -4565,7 +4569,11 @@ function StockRequestsPanel({
           onClearDraft={onClearDraft}
         />
       ) : (
-        <IncomingRequestsTab branchCode={branchCode} csrfToken={csrfToken} />
+        <IncomingRequestsTab
+          branchCode={branchCode}
+          csrfToken={csrfToken}
+          onIncomingNotificationsChanged={onIncomingNotificationsChanged}
+        />
       )}
     </section>
   );
@@ -6884,6 +6892,21 @@ export default function App() {
     return undefined;
   }, [session, branchCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const refreshUnreadNotifCount = useCallback(async () => {
+    if (!branchCode) {
+      setUnreadNotifCount(0);
+      return;
+    }
+    try {
+      const res = await apiFetch("/api/notifications/unread-count");
+      if (!res.ok) return;
+      const data = await res.json();
+      setUnreadNotifCount(data.unreadCount || 0);
+    } catch {
+      // silent
+    }
+  }, [branchCode]);
+
   useEffect(() => {
     if (!branchCode) { setUnreadNotifCount(0); return undefined; }
     let active = true;
@@ -7485,6 +7508,7 @@ export default function App() {
           onSubmitDraft={handleSubmitDraft}
           onClearDraft={handleClearDraft}
           incomingNotifCount={unreadNotifCount}
+          onIncomingNotificationsChanged={refreshUnreadNotifCount}
         />
       ) : view === "movement-trace" ? (
         <ProductMovementTracePanel branchCode={branchCode} csrfToken={session.csrfToken} />
