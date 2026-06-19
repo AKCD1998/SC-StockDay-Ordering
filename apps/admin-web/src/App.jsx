@@ -4180,7 +4180,6 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
             <p className="meta-line">คำขอ {detail.lines?.length || 0} รายการ · เวอร์ชัน {detail.version}</p>
           </div>
           <div className="srq-detail-summary-status">
-            <SrqStatusChip status={detail.responseResult || detail.status} />
             <button type="button" className="srq-submit-btn srq-submit-btn-compact" onClick={() => setActionOpen(true)}>
               {detail.status === "SUBMITTED" ? "ดำเนินการ" : "ดูผลการดำเนินการ"}
             </button>
@@ -4554,7 +4553,6 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
                       <div key={req.publicId} className="srq-branch-section">
                         <div className="srq-branch-section-header">
                           <span className="srq-branch-label">📦 ขอจาก: <strong>{BRANCH_LABELS[req.sourceBranchCode] ?? `สาขา ${req.sourceBranchCode}`}</strong></span>
-                          <SrqStatusChip status={req.status} />
                           {req.status === "RESPONDED" ? (
                             <button
                               type="button"
