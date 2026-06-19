@@ -4801,6 +4801,27 @@ select {
 .srq-batch-card-header-admin-alert:hover {
   background: linear-gradient(180deg, rgba(153, 27, 27, 0.98), rgba(103, 19, 19, 0.98));
 }
+
+.srq-batch-card-mixed {
+  border-color: rgba(194, 120, 3, 0.4);
+  box-shadow: 0 0 0 1px rgba(194, 120, 3, 0.16), 0 0 0 0 rgba(245, 158, 11, 0.18);
+  animation: srqAdminAlertPulse 2s ease-in-out infinite;
+}
+.srq-batch-card-header-mixed {
+  background: linear-gradient(180deg, rgba(120, 53, 15, 0.92), rgba(92, 38, 5, 0.92));
+  color: #fef3c7;
+}
+.srq-batch-card-header-mixed:hover {
+  background: linear-gradient(180deg, rgba(146, 64, 14, 0.98), rgba(110, 46, 6, 0.98));
+}
+
+.srq-branch-section-alert {
+  border-color: rgba(220, 38, 38, 0.4);
+}
+.srq-branch-section-alert .srq-branch-section-header {
+  background: rgba(127, 29, 29, 0.1);
+  border-bottom-color: rgba(220, 38, 38, 0.2);
+}
 .srq-batch-id { font-family: inherit; font-size: 0.93rem; color: inherit; font-weight: 700; letter-spacing: 0.01em; }
 .srq-batch-date { color: #526578; font-size: 0.86rem; font-weight: 500; }
 .srq-from-label { font-size: 0.9rem; color: #243b53; }
@@ -5232,6 +5253,19 @@ select {
 }
 [data-theme="dark"] .srq-batch-card-header-admin-alert:hover {
   background: linear-gradient(180deg, rgba(127, 29, 29, 0.98), rgba(82, 18, 18, 0.98));
+}
+[data-theme="dark"] .srq-batch-card-mixed         { border-color: rgba(245, 158, 11, 0.45); }
+[data-theme="dark"] .srq-batch-card-header-mixed {
+  background: linear-gradient(180deg, rgba(100, 50, 5, 0.98), rgba(70, 35, 3, 0.98));
+  color: #fef3c7;
+}
+[data-theme="dark"] .srq-batch-card-header-mixed:hover {
+  background: linear-gradient(180deg, rgba(120, 60, 6, 0.98), rgba(84, 42, 4, 0.98));
+}
+[data-theme="dark"] .srq-branch-section-alert     { border-color: rgba(239, 68, 68, 0.4); }
+[data-theme="dark"] .srq-branch-section-alert .srq-branch-section-header {
+  background: rgba(127, 29, 29, 0.22);
+  border-bottom-color: rgba(220, 38, 38, 0.3);
 }
 [data-theme="dark"] .srq-batch-id                { color: #f8fbff; }
 [data-theme="dark"] .srq-batch-date              { color: #b8c7d9; }

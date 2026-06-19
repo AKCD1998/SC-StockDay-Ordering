@@ -4613,16 +4613,21 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
       ) : records.map((batch) => {
         const isOpen = expandedId === batch.batchPublicId;
         const detail = detailCache[batch.batchPublicId] || null;
+        const isPureAlert = batch.isAdminAlert && !batch.isMixedMode && batch.status === "SUBMITTED";
+        const isMixed = batch.isAdminAlert && batch.isMixedMode && batch.status === "SUBMITTED";
+        const cardExtra = isPureAlert ? " srq-batch-card-admin-alert" : isMixed ? " srq-batch-card-mixed" : "";
+        const headerExtra = isPureAlert ? " srq-batch-card-header-admin-alert" : isMixed ? " srq-batch-card-header-mixed" : "";
+        const pillLabel = batch.isMixedMode ? "📋 แจ้งจัดซื้อ + ขอจากสาขา" : "📋 แจ้งจัดซื้อ";
         return (
-          <article key={batch.batchPublicId} className={`srq-batch-card${batch.isAdminAlert && batch.status === "SUBMITTED" ? " srq-batch-card-admin-alert" : ""}`}>
+          <article key={batch.batchPublicId} className={`srq-batch-card${cardExtra}`}>
             <button
               type="button"
-              className={`srq-batch-card-header${batch.isAdminAlert && batch.status === "SUBMITTED" ? " srq-batch-card-header-admin-alert" : ""}`}
+              className={`srq-batch-card-header${headerExtra}`}
               onClick={() => handleExpand(batch.batchPublicId)}
             >
               <span className="srq-batch-id">{batch.batchPublicId}</span>
               <span className="srq-batch-date">{formatDateTime(batch.createdAt)}</span>
-              {batch.isAdminAlert ? <span className="srq-procurement-pill">📋 แจ้งจัดซื้อ</span> : null}
+              {batch.isAdminAlert ? <span className="srq-procurement-pill">{pillLabel}</span> : null}
               <SrqStatusChip status={batch.status} />
               <span className="srq-chevron">{isOpen ? "▾" : "▸"}</span>
             </button>
@@ -4634,7 +4639,7 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
                   <>
                     {detail.note ? <p className="srq-batch-note">📝 {detail.note}</p> : null}
                     {(detail.requests || []).map((req) => (
-                      <div key={req.publicId} className="srq-branch-section">
+                      <div key={req.publicId} className={`srq-branch-section${req.requestMode === "ADMIN_ALERT" ? " srq-branch-section-alert" : ""}`}>
                         <div className="srq-branch-section-header">
                           <span className="srq-branch-label">📦 ขอจาก: <strong>{BRANCH_LABELS[req.sourceBranchCode] ?? `สาขา ${req.sourceBranchCode}`}</strong></span>
                           {req.status === "RESPONDED" ? (
