@@ -4991,6 +4991,36 @@ select {
   padding: 7px 16px;
   font-size: 0.85rem;
 }
+.srq-batch-context-panel {
+  border: 1px solid #d1c4e9;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 14px;
+  background: #f9f7ff;
+}
+.srq-batch-context-header {
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #5b21b6;
+  background: #ede9fe;
+  border-bottom: 1px solid #d1c4e9;
+}
+.srq-batch-context-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #ede9fe;
+  flex-wrap: wrap;
+}
+.srq-batch-context-row:last-child { border-bottom: none; }
+.srq-batch-context-row.alert { background: rgba(127,29,29,0.06); }
+.srq-batch-context-branch { font-size: 0.82rem; font-weight: 700; color: #374151; white-space: nowrap; min-width: 130px; }
+.srq-batch-context-lines { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.srq-batch-context-line { font-size: 0.78rem; color: #526578; }
+.srq-batch-context-line strong { color: #102a43; }
+
 .srq-detail-line-row {
   border: 1px solid #e2e8f0;
   border-radius: 8px;
@@ -5297,6 +5327,13 @@ select {
 [data-theme="dark"] .srq-branch-group summary    { background: #162030; }
 [data-theme="dark"] .srq-detail-line-row         { background: #0e1929; border-color: #263547; }
 [data-theme="dark"] .srq-action-grid-head,
+[data-theme="dark"] .srq-batch-context-panel     { background: #0e1220; border-color: #3b2f6e; }
+[data-theme="dark"] .srq-batch-context-header    { background: #1e1545; color: #c4b5fd; border-bottom-color: #3b2f6e; }
+[data-theme="dark"] .srq-batch-context-row       { border-bottom-color: #2a1f5e; }
+[data-theme="dark"] .srq-batch-context-row.alert { background: rgba(127,29,29,0.18); }
+[data-theme="dark"] .srq-batch-context-branch    { color: #e2e8f0; }
+[data-theme="dark"] .srq-batch-context-line      { color: #8fa3b8; }
+[data-theme="dark"] .srq-batch-context-line strong { color: #c8d3e2; }
 [data-theme="dark"] .srq-action-cell             { background: #102033; border-color: #263547; color: #d7dfeb; }
 [data-theme="dark"] .srq-action-grid-head        { background: #18304a; }
 [data-theme="dark"] .srq-custom-qty-input,

@@ -4217,6 +4217,7 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [actionOpen, setActionOpen] = useState(false);
+  const [batchSiblings, setBatchSiblings] = useState([]);
 
   useEffect(() => {
     let active = true;
@@ -4225,7 +4226,17 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then((data) => {
         if (!active) return;
-        setDetail(data.request);
+        const req = data.request;
+        setDetail(req);
+        if (req?.batchPublicId) {
+          apiFetch(`/api/stock-requests/${encodeURIComponent(req.batchPublicId)}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((bd) => {
+              if (!active || !bd?.batch?.requests) return;
+              setBatchSiblings(bd.batch.requests.filter((r) => r.publicId !== req.publicId));
+            })
+            .catch(() => {});
+        }
       })
       .catch((err) => { if (active) setError(err.message); })
       .finally(() => { if (active) setLoading(false); });
@@ -4250,6 +4261,29 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
             </button>
           </div>
         </div>
+
+        {batchSiblings.length > 0 ? (
+          <div className="srq-batch-context-panel">
+            <div className="srq-batch-context-header">
+              🔗 คำขอร่วมในชุดเดียวกัน ({batchSiblings.length} รายการ)
+            </div>
+            {batchSiblings.map((sib) => (
+              <div key={sib.publicId} className={`srq-batch-context-row${sib.requestMode === "ADMIN_ALERT" ? " alert" : ""}`}>
+                <span className="srq-batch-context-branch">
+                  {sib.requestMode === "ADMIN_ALERT" ? "📋" : "📦"} {BRANCH_LABELS[sib.sourceBranchCode] ?? `สาขา ${sib.sourceBranchCode}`}
+                </span>
+                <div className="srq-batch-context-lines">
+                  {(sib.lines || []).map((ln) => (
+                    <span key={ln.lineId} className="srq-batch-context-line">
+                      {ln.productNameThai || ln.productCode} · <strong>{formatNumber(ln.requestedQty, 0)} {ln.unit}</strong>
+                    </span>
+                  ))}
+                </div>
+                <SrqStatusChip status={sib.responseResult || sib.status} />
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         {(detail.lines || []).map((line) => (
           <div key={line.lineId} className="srq-detail-line-row">
