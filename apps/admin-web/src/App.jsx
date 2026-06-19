@@ -2629,7 +2629,7 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
         </form>
       </div>
 
-      {!branchCode ? (
+      {!branchCode && !isAdminUser ? (
         <p className="notice warning compact">
           ต้องเลือกสาขาที่จะใช้งานใน session ก่อน จึงจะเปิดใช้งานคำขอสินค้าได้อย่างปลอดภัย
         </p>
