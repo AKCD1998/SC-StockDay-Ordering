@@ -1929,7 +1929,7 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
   );
 }
 
-function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNavigate, onDraftCountChange }) {
+function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNavigate, requestDraftItems, setRequestDraftItems, onClearDraft }) {
   const pageSize = 25;
   const pageFetchLimit = 10000;
   const branchExportOptions = [
@@ -1971,20 +1971,12 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
   const [requestMode, setRequestMode] = useState(false);
-  const [requestDraftItems, setRequestDraftItems] = useState([]);
   const [requestDialogProduct, setRequestDialogProduct] = useState(null);
   const [requestQuantities, setRequestQuantities] = useState({});
   const [requestLineNote, setRequestLineNote] = useState("");
-  const [requestBatchNote, setRequestBatchNote] = useState("");
   const [requestDialogError, setRequestDialogError] = useState("");
-  const [requestSubmitError, setRequestSubmitError] = useState("");
-  const [requestSuccessMessage, setRequestSuccessMessage] = useState("");
-  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
-  const [checkoutConfirmOpen, setCheckoutConfirmOpen] = useState(false);
-  const [submittingRequest, setSubmittingRequest] = useState(false);
   const filterMenuRef = useRef(null);
   const [filterMenuAnchor, setFilterMenuAnchor] = useState(null);
-  const requestIdempotencyKeyRef = useRef(generateRequestIdempotencyKey());
   const requestButtonRef = useRef(null);
   const [flyDots, setFlyDots] = useState([]);
 
@@ -2367,30 +2359,16 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
     }
   }, [offset, safeOffset]);
 
-  useEffect(() => {
-    if (!requestSuccessMessage) return undefined;
-    const timeoutId = window.setTimeout(() => setRequestSuccessMessage(""), 2600);
-    return () => window.clearTimeout(timeoutId);
-  }, [requestSuccessMessage]);
 
   useEffect(() => {
-    setRequestDraftItems([]);
     setRequestDialogProduct(null);
     setRequestQuantities({});
     setRequestLineNote("");
-    setRequestBatchNote("");
     setRequestDialogError("");
-    setRequestSubmitError("");
-    setReviewDialogOpen(false);
-    requestIdempotencyKeyRef.current = generateRequestIdempotencyKey();
   }, [branchCode]);
 
   const requestBranchLabel = formatBranchContextLabel(branchCode, branchName);
   const requestDraftCount = requestDraftItems.length;
-
-  useEffect(() => {
-    if (onDraftCountChange) onDraftCountChange(requestDraftCount);
-  }, [requestDraftCount, onDraftCountChange]);
 
   const requestDraftByBranch = useMemo(() => {
     const groups = new Map();
@@ -2519,64 +2497,6 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
     setRequestDraftItems((current) => current.filter((item) => item.lineKey !== lineKey));
   }
 
-  async function handleSubmitRequest() {
-    if (!branchCode) {
-      setRequestSubmitError("ต้องเลือกสาขาที่จะใช้งานก่อน จึงจะส่งคำขอสินค้าได้");
-      return;
-    }
-    if (!requestDraftItems.length) {
-      setRequestSubmitError("ยังไม่มีรายการสำหรับส่งคำขอ");
-      return;
-    }
-
-    const invalidItem = requestDraftItems.find((item) => !Number.isFinite(Number(item.requestedQty)) || Number(item.requestedQty) <= 0);
-    if (invalidItem) {
-      setRequestSubmitError(`จำนวนที่ขอของสินค้า ${invalidItem.productCode} ต้องมากกว่า 0`);
-      return;
-    }
-
-    setSubmittingRequest(true);
-    setRequestSubmitError("");
-    try {
-      const payload = buildStockRequestPayload(requestDraftItems, {
-        note: requestBatchNote,
-        idempotencyKey: requestIdempotencyKeyRef.current,
-      });
-
-      if (!payload.groups.length) {
-        throw new Error("ยังไม่มีรายการที่พร้อมส่งคำขอ");
-      }
-
-      const response = await apiFetch("/api/stock-requests", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": csrfToken || "",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(result.message || result.error || `HTTP ${response.status}`);
-      }
-
-      setRequestDraftItems([]);
-      setRequestBatchNote("");
-      setReviewDialogOpen(false);
-      setCheckoutConfirmOpen(false);
-      setRequestMode(false);
-      requestIdempotencyKeyRef.current = generateRequestIdempotencyKey();
-      setRequestSuccessMessage(
-        `ส่งคำขอสินค้าแล้ว เลขที่ ${result.batchPublicId || "-"} จาก ${requestBranchLabel}`,
-      );
-    } catch (submitError) {
-      setRequestSubmitError(submitError.message || "ส่งคำขอสินค้าไม่สำเร็จ");
-    } finally {
-      setSubmittingRequest(false);
-    }
-  }
-
   function renderBranchStockCell(row, column) {
     if (column.key === "productCode") {
       return <strong>{row.productCode}</strong>;
@@ -2645,14 +2565,7 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
             ref={requestButtonRef}
             type="button"
             className={`request-entry-button${requestMode ? " active" : ""}`}
-            onClick={() => {
-              if (!branchCode) {
-                setRequestSubmitError("กรุณาเลือกสาขาที่ใช้งานก่อน โดยเลือกจาก dropdown 'สาขาที่ใช้งาน' ด้านบน");
-                return;
-              }
-              setRequestSubmitError("");
-              setRequestMode((value) => !value);
-            }}
+            onClick={() => setRequestMode((value) => !value)}
           >
             {requestMode ? "ปิดโหมดขอสินค้า" : "ขอสินค้า"}
           </button>
@@ -2664,9 +2577,6 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
           ต้องเลือกสาขาที่จะใช้งานใน session ก่อน จึงจะเปิดใช้งานคำขอสินค้าได้อย่างปลอดภัย
         </p>
       ) : null}
-      {requestSuccessMessage ? <p className="notice success compact">{requestSuccessMessage}</p> : null}
-      {requestSubmitError ? <p className="notice error compact">{requestSubmitError}</p> : null}
-
       {(requestMode || requestDraftCount > 0) && (
         <section className="request-draft-card">
           <div>
@@ -2682,20 +2592,7 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
             <button
               type="button"
               className="ghost-button"
-              onClick={() => setReviewDialogOpen(true)}
-              disabled={!requestDraftCount}
-            >
-              ตรวจสอบคำขอ
-            </button>
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => {
-                setRequestDraftItems([]);
-                setRequestBatchNote("");
-                setRequestSubmitError("");
-                requestIdempotencyKeyRef.current = generateRequestIdempotencyKey();
-              }}
+              onClick={() => onClearDraft()}
               disabled={!requestDraftCount}
             >
               ล้างรายการ
@@ -3367,128 +3264,6 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
         );
       })() : null}
 
-      {reviewDialogOpen ? (
-        <div className="srq-checkout-overlay" role="dialog" aria-modal="true" aria-label="สร้างคำขอขอสินค้า">
-          <div className="srq-checkout-header">
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => !submittingRequest && setReviewDialogOpen(false)}
-              disabled={submittingRequest}
-              aria-label="กลับ"
-            >
-              ← กลับ
-            </button>
-            <div>
-              <h3>สร้างคำขอขอสินค้า</h3>
-              <p className="meta-line">สาขาผู้ขอ: {requestBranchLabel} · {requestDraftCount} รายการ</p>
-            </div>
-          </div>
-
-          <div className="srq-checkout-body">
-            {[...requestDraftByBranch.entries()].map(([sourceBranchCode, items]) => (
-              <details key={sourceBranchCode} className="srq-branch-group" open>
-                <summary>
-                  ขอจาก: {BRANCH_LABELS[sourceBranchCode] ?? `สาขา ${sourceBranchCode}`}
-                  <span className="meta-line" style={{ fontWeight: 400, marginLeft: 8 }}>({items.length} รายการ)</span>
-                </summary>
-                <div className="srq-branch-group-body">
-                  {items.map((item) => (
-                    <div key={item.lineKey} className="srq-checkout-line">
-                      <div>
-                        <strong>{item.productNameThai || item.productNameEng || item.productCode}</strong>
-                        <span className="meta-line"> {item.productCode}</span>
-                      </div>
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={item.requestedQty}
-                        onChange={(event) => patchDraftItem(item.lineKey, { requestedQty: event.target.value })}
-                        disabled={submittingRequest}
-                        aria-label="จำนวน"
-                      />
-                      <span>{item.unit || ""}</span>
-                      <input
-                        type="text"
-                        value={item.lineNote || ""}
-                        onChange={(event) => patchDraftItem(item.lineKey, { lineNote: event.target.value })}
-                        placeholder="หมายเหตุ"
-                        disabled={submittingRequest}
-                        aria-label="หมายเหตุรายบรรทัด"
-                      />
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        onClick={() => removeDraftItem(item.lineKey)}
-                        disabled={submittingRequest}
-                        aria-label="ลบรายการ"
-                      >
-                        ลบ
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </details>
-            ))}
-
-            <div className="srq-checkout-note-section">
-              <label>
-                หมายเหตุรวมทั้งคำขอ
-                <textarea
-                  rows="3"
-                  value={requestBatchNote}
-                  onChange={(event) => setRequestBatchNote(event.target.value)}
-                  placeholder="เช่น เร่งด่วน / ใช้ขายหน้าร้าน / ลูกค้ารับของวันนี้"
-                  disabled={submittingRequest}
-                />
-              </label>
-            </div>
-
-            {requestSubmitError ? <p className="notice error compact">{requestSubmitError}</p> : null}
-          </div>
-
-          <div className="srq-checkout-actions">
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => !submittingRequest && setReviewDialogOpen(false)}
-              disabled={submittingRequest}
-            >
-              กลับไปแก้ไข
-            </button>
-            <button
-              type="button"
-              className="srq-confirm-btn"
-              onClick={() => setCheckoutConfirmOpen(true)}
-              disabled={submittingRequest || !requestDraftCount}
-            >
-              ยืนยันส่งคำขอสินค้า
-            </button>
-          </div>
-
-          {checkoutConfirmOpen ? (
-            <div className="dialog-overlay" onClick={() => !submittingRequest && setCheckoutConfirmOpen(false)}>
-              <div className="dialog-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-                <div className="dialog-header">
-                  <h3>ยืนยันการส่งคำขอ?</h3>
-                </div>
-                <p style={{ padding: "0 0 16px" }}>
-                  รายการนี้จะถูกส่งไปยัง {requestDraftByBranch.size} สาขา รวม {requestDraftCount} รายการสินค้า
-                </p>
-                <div className="dialog-actions">
-                  <button type="button" className="ghost-button" onClick={() => setCheckoutConfirmOpen(false)} disabled={submittingRequest}>
-                    ยกเลิก
-                  </button>
-                  <button type="button" className="srq-confirm-btn" onClick={handleSubmitRequest} disabled={submittingRequest}>
-                    {submittingRequest ? "กำลังส่งคำขอ..." : "ยืนยัน"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
 
       {flyDots.map((dot) => (
         <div
@@ -4243,7 +4018,7 @@ const RESPONSE_STATUS_LABELS = {
   REJECTED: "ปฏิเสธ",
 };
 
-function MyRequestsTab({ branchCode, csrfToken }) {
+function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDraftItems, requestBatchNote, setRequestBatchNote, onSubmitDraft, onClearDraft }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -4253,6 +4028,63 @@ function MyRequestsTab({ branchCode, csrfToken }) {
   const [loadingDetail, setLoadingDetail] = useState("");
   const [acknowledging, setAcknowledging] = useState("");
   const [ackError, setAckError] = useState("");
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [submitSuccess, setSubmitSuccess] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const draftItems = requestDraftItems || [];
+  const draftCount = draftItems.length;
+  const draftByBranch = useMemo(() => {
+    const groups = new Map();
+    for (const item of draftItems) {
+      if (!groups.has(item.sourceBranchCode)) groups.set(item.sourceBranchCode, []);
+      groups.get(item.sourceBranchCode).push(item);
+    }
+    return groups;
+  }, [draftItems]);
+
+  function patchDraftItem(lineKey, patch) {
+    setRequestDraftItems((current) =>
+      current
+        .map((item) =>
+          item.lineKey === lineKey
+            ? {
+                ...item,
+                ...patch,
+                requestedQty: patch.requestedQty == null ? item.requestedQty : normalizeRequestedQty(patch.requestedQty),
+                lineNote: patch.lineNote == null ? item.lineNote : String(patch.lineNote || "").trim(),
+              }
+            : item,
+        )
+        .filter((item) => normalizeRequestedQty(item.requestedQty) > 0),
+    );
+  }
+
+  function removeDraftItem(lineKey) {
+    setRequestDraftItems((current) => current.filter((item) => item.lineKey !== lineKey));
+  }
+
+  function handleSubmit() {
+    const invalid = draftItems.find((item) => !Number.isFinite(Number(item.requestedQty)) || Number(item.requestedQty) <= 0);
+    if (invalid) { setSubmitError(`จำนวนที่ขอของสินค้า ${invalid.productCode} ต้องมากกว่า 0`); return; }
+    setConfirmOpen(true);
+  }
+
+  function handleConfirmedSubmit() {
+    setSubmitError("");
+    onSubmitDraft({
+      onStart: () => setSubmittingRequest(true),
+      onSuccess: (result) => {
+        setConfirmOpen(false);
+        setSubmitSuccess(`ส่งคำขอสินค้าแล้ว เลขที่ ${result.batchPublicId || "-"}`);
+        setRefreshKey((k) => k + 1);
+        setTimeout(() => setSubmitSuccess(""), 4000);
+      },
+      onError: (err) => setSubmitError(err.message || "ส่งคำขอสินค้าไม่สำเร็จ"),
+      onFinally: () => setSubmittingRequest(false),
+    });
+  }
 
   useEffect(() => {
     if (!branchCode) return undefined;
@@ -4305,15 +4137,89 @@ function MyRequestsTab({ branchCode, csrfToken }) {
   }
 
   if (!branchCode) return <p className="notice warning compact">ต้องเลือกสาขาที่ใช้งานก่อนจึงจะดูคำขอสินค้าของฉันได้</p>;
-  if (loading)    return <p className="notice compact">กำลังโหลด...</p>;
-  if (error)      return <div><p className="notice error compact">{error}</p><button type="button" className="ghost-button" onClick={() => setRefreshKey((k) => k + 1)}>ลองใหม่</button></div>;
 
   return (
     <div className="srq-tab-body">
+
+      {draftCount > 0 ? (
+        <div className="srq-draft-inline">
+          <div className="srq-checkout-header">
+            <div>
+              <h3>สร้างคำขอสินค้า</h3>
+              <p className="meta-line">สาขาผู้ขอ: {BRANCH_LABELS[branchCode] ?? `สาขา ${branchCode}`} · {draftCount} รายการ</p>
+            </div>
+            <button type="button" className="ghost-button" onClick={onClearDraft} disabled={submittingRequest}>ล้างรายการ</button>
+          </div>
+          <div className="srq-checkout-body">
+            {[...draftByBranch.entries()].map(([sourceBranchCode, items]) => (
+              <details key={sourceBranchCode} className="srq-branch-group" open>
+                <summary>
+                  ขอจาก: {BRANCH_LABELS[sourceBranchCode] ?? `สาขา ${sourceBranchCode}`}
+                  <span className="meta-line" style={{ fontWeight: 400, marginLeft: 8 }}>({items.length} รายการ)</span>
+                </summary>
+                <div className="srq-branch-group-body">
+                  {items.map((item) => (
+                    <div key={item.lineKey} className="srq-checkout-line">
+                      <div>
+                        <strong>{item.productNameThai || item.productNameEng || item.productCode}</strong>
+                        <span className="meta-line"> {item.productCode}</span>
+                      </div>
+                      <input type="number" min="1" step="1" value={item.requestedQty}
+                        onChange={(e) => patchDraftItem(item.lineKey, { requestedQty: e.target.value })}
+                        disabled={submittingRequest} aria-label="จำนวน" />
+                      <span>{item.unit || ""}</span>
+                      <input type="text" value={item.lineNote || ""}
+                        onChange={(e) => patchDraftItem(item.lineKey, { lineNote: e.target.value })}
+                        placeholder="หมายเหตุ" disabled={submittingRequest} aria-label="หมายเหตุรายบรรทัด" />
+                      <button type="button" className="ghost-button"
+                        onClick={() => removeDraftItem(item.lineKey)} disabled={submittingRequest}>ลบ</button>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ))}
+            <div className="srq-checkout-note-section">
+              <label>
+                หมายเหตุรวมทั้งคำขอ
+                <textarea rows="3" value={requestBatchNote}
+                  onChange={(e) => setRequestBatchNote(e.target.value)}
+                  placeholder="เช่น เร่งด่วน / ใช้ขายหน้าร้าน / ลูกค้ารับของวันนี้"
+                  disabled={submittingRequest} />
+              </label>
+            </div>
+            {submitError ? <p className="notice error compact">{submitError}</p> : null}
+          </div>
+          <div className="srq-checkout-actions">
+            <button type="button" className="srq-confirm-btn" onClick={handleSubmit} disabled={submittingRequest || !draftCount}>
+              ยืนยันส่งคำขอสินค้า
+            </button>
+          </div>
+          {confirmOpen ? (
+            <div className="dialog-overlay" onClick={() => !submittingRequest && setConfirmOpen(false)}>
+              <div className="dialog-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+                <div className="dialog-header"><h3>ยืนยันการส่งคำขอ?</h3></div>
+                <p style={{ padding: "0 0 16px" }}>
+                  รายการนี้จะถูกส่งไปยัง {draftByBranch.size} สาขา รวม {draftCount} รายการสินค้า
+                </p>
+                <div className="dialog-actions">
+                  <button type="button" className="ghost-button" onClick={() => setConfirmOpen(false)} disabled={submittingRequest}>ยกเลิก</button>
+                  <button type="button" className="srq-confirm-btn" onClick={handleConfirmedSubmit} disabled={submittingRequest}>
+                    {submittingRequest ? "กำลังส่งคำขอ..." : "ยืนยัน"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {submitSuccess ? <p className="notice success compact">{submitSuccess}</p> : null}
+
       <div className="srq-tab-toolbar">
-        <span className="srq-total-label">{records.length} รายการ</span>
+        <span className="srq-total-label">{loading ? "กำลังโหลด..." : `${records.length} รายการ`}</span>
         <button type="button" className="ghost-button" onClick={() => setRefreshKey((k) => k + 1)}>รีเฟรช</button>
       </div>
+      {error ? <div><p className="notice error compact">{error}</p><button type="button" className="ghost-button" onClick={() => setRefreshKey((k) => k + 1)}>ลองใหม่</button></div> : null}
       {ackError ? <p className="notice error compact">{ackError}</p> : null}
       {records.length === 0 ? (
         <p className="notice compact">ยังไม่มีคำขอสินค้า</p>
@@ -4393,7 +4299,7 @@ function MyRequestsTab({ branchCode, csrfToken }) {
   );
 }
 
-function StockRequestsPanel({ branchCode, csrfToken }) {
+function StockRequestsPanel({ branchCode, csrfToken, requestDraftItems, setRequestDraftItems, requestBatchNote, setRequestBatchNote, onSubmitDraft, onClearDraft }) {
   const [activeTab, setActiveTab] = useState("mine");
 
   return (
@@ -4413,7 +4319,16 @@ function StockRequestsPanel({ branchCode, csrfToken }) {
         </div>
       </div>
       {activeTab === "mine" ? (
-        <MyRequestsTab branchCode={branchCode} csrfToken={csrfToken} />
+        <MyRequestsTab
+          branchCode={branchCode}
+          csrfToken={csrfToken}
+          requestDraftItems={requestDraftItems}
+          setRequestDraftItems={setRequestDraftItems}
+          requestBatchNote={requestBatchNote}
+          setRequestBatchNote={setRequestBatchNote}
+          onSubmitDraft={onSubmitDraft}
+          onClearDraft={onClearDraft}
+        />
       ) : (
         <IncomingRequestsTab branchCode={branchCode} csrfToken={csrfToken} />
       )}
@@ -6574,7 +6489,9 @@ export default function App() {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [openNavGroup, setOpenNavGroup] = useState(null);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
-  const [stockRequestDraftCount, setStockRequestDraftCount] = useState(0);
+  const [requestDraftItems, setRequestDraftItems] = useState([]);
+  const [requestBatchNote, setRequestBatchNote] = useState("");
+  const requestIdempotencyKeyRef = useRef(generateRequestIdempotencyKey());
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "dark";
     const savedTheme = window.localStorage.getItem(adminThemeStorageKey);
@@ -6848,6 +6765,36 @@ export default function App() {
     }
   }
 
+  function handleClearDraft() {
+    setRequestDraftItems([]);
+    setRequestBatchNote("");
+    requestIdempotencyKeyRef.current = generateRequestIdempotencyKey();
+  }
+
+  async function handleSubmitDraft({ onStart, onSuccess, onError, onFinally } = {}) {
+    if (onStart) onStart();
+    try {
+      const payload = buildStockRequestPayload(requestDraftItems, {
+        note: requestBatchNote,
+        idempotencyKey: requestIdempotencyKeyRef.current,
+      });
+      if (!payload.groups.length) throw new Error("ยังไม่มีรายการที่พร้อมส่งคำขอ");
+      const response = await apiFetch("/api/stock-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": session?.csrfToken || "" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || result.error || `HTTP ${response.status}`);
+      handleClearDraft();
+      if (onSuccess) onSuccess(result);
+    } catch (err) {
+      if (onError) onError(err);
+    } finally {
+      if (onFinally) onFinally();
+    }
+  }
+
   const filteredStock = useMemo(() => {
     return stockDay.filter((item) => {
       const matchesStatus = statusFilter === "all" || item.status === statusFilter;
@@ -7079,7 +7026,7 @@ export default function App() {
             const activeItem = group.items.find((item) => item.view === view);
             const isOpen = openNavGroup === group.id;
             const hasDropdown = group.items.length > 1 || group.items.some((item) => item.disabled);
-            const groupHasNotif = stockRequestDraftCount > 0 && group.items.some((item) => item.view === "stock-requests");
+            const groupHasNotif = requestDraftItems.length > 0 && group.items.some((item) => item.view === "stock-requests");
             const triggerClassName = [
               "view-nav-btn",
               "hero-nav-trigger",
@@ -7133,7 +7080,7 @@ export default function App() {
                   <span className="hero-nav-label">{group.label}</span>
                   <span className="hero-nav-chevron" aria-hidden="true">▾</span>
                   {groupHasNotif ? (
-                    <span className="nav-notif-badge nav-trigger-badge">{stockRequestDraftCount > 99 ? "99+" : stockRequestDraftCount}</span>
+                    <span className="nav-notif-badge nav-trigger-badge">{requestDraftItems.length > 99 ? "99+" : requestDraftItems.length}</span>
                   ) : null}
                 </button>
                 <div
@@ -7163,8 +7110,8 @@ export default function App() {
                         <span className="hero-nav-item-main">
                           <span>{item.label}</span>
                           {item.disabled ? <span className="view-nav-badge">เร็วๆนี้</span> : null}
-                          {item.view === "stock-requests" && stockRequestDraftCount > 0 ? (
-                            <span className="nav-notif-badge">{stockRequestDraftCount > 99 ? "99+" : stockRequestDraftCount}</span>
+                          {item.view === "stock-requests" && requestDraftItems.length > 0 ? (
+                            <span className="nav-notif-badge">{requestDraftItems.length > 99 ? "99+" : requestDraftItems.length}</span>
                           ) : null}
                         </span>
                         <span className="hero-nav-item-desc">{item.description}</span>
@@ -7287,10 +7234,21 @@ export default function App() {
           branchCode={branchCode}
           branchName={activeBranchName}
           onNavigate={() => setView("stock-requests")}
-          onDraftCountChange={setStockRequestDraftCount}
+          requestDraftItems={requestDraftItems}
+          setRequestDraftItems={setRequestDraftItems}
+          onClearDraft={handleClearDraft}
         />
       ) : view === "stock-requests" ? (
-        <StockRequestsPanel branchCode={branchCode} csrfToken={session.csrfToken} />
+        <StockRequestsPanel
+          branchCode={branchCode}
+          csrfToken={session.csrfToken}
+          requestDraftItems={requestDraftItems}
+          setRequestDraftItems={setRequestDraftItems}
+          requestBatchNote={requestBatchNote}
+          setRequestBatchNote={setRequestBatchNote}
+          onSubmitDraft={handleSubmitDraft}
+          onClearDraft={handleClearDraft}
+        />
       ) : view === "movement-trace" ? (
         <ProductMovementTracePanel branchCode={branchCode} csrfToken={session.csrfToken} />
       ) : view === stockCostAuditView && isAdminUser ? (
