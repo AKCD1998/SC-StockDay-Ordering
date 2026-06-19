@@ -4677,7 +4677,43 @@ select {
   flex-wrap: wrap;
 }
 .srq-ack-button { padding: 5px 12px; font-size: 0.85rem; }
-.srq-batch-note { margin: 4px 0 0; font-size: 0.88rem; color: #526578; }
+.srq-batch-note { margin: 0 0 10px; font-size: 0.88rem; color: #94a3b8; }
+
+/* ─── Branch section inside expanded batch ───────────────────────── */
+.srq-branch-section { margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; overflow: hidden; }
+.srq-branch-section-header {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  background: rgba(255,255,255,0.04); flex-wrap: wrap;
+}
+.srq-branch-label { font-size: 0.9rem; color: #cbd5e1; flex: 1; }
+
+/* ─── Line items table ───────────────────────────────────────────── */
+.srq-lines-table { padding: 6px 12px 10px; }
+.srq-lines-head, .srq-line-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 60px 60px 140px;
+  gap: 6px; align-items: center;
+  font-size: 0.82rem; padding: 5px 0;
+}
+.srq-lines-head {
+  color: #64748b; font-weight: 600; font-size: 0.75rem; text-transform: uppercase;
+  border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 6px; margin-bottom: 2px;
+}
+.srq-line-row + .srq-line-row { border-top: 1px solid rgba(255,255,255,0.04); }
+.srq-line-code { color: #94a3b8; font-family: monospace; font-size: 0.78rem; }
+.srq-line-name { color: #e2e8f0; }
+.srq-line-qty  { text-align: right; color: #f8fafc; font-weight: 600; }
+.srq-line-unit { color: #94a3b8; font-size: 0.8rem; }
+.srq-line-resp { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.srq-resp-tag {
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 600;
+}
+.srq-resp-approved  { background: #14532d; color: #86efac; }
+.srq-resp-partial   { background: #431407; color: #fdba74; }
+.srq-resp-rejected  { background: #450a0a; color: #fca5a5; }
+.srq-resp-qty  { color: #86efac; font-size: 0.82rem; }
+.srq-resp-pending { color: #475569; font-size: 0.8rem; font-style: italic; }
 
 /* ─── Status Chips ──────────────────────────────────────────────── */
 .srq-status-chip {

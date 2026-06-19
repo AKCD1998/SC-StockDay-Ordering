@@ -4237,12 +4237,20 @@ function IncomingRequestsTab({ branchCode, csrfToken }) {
   );
 }
 
+const RESPONSE_STATUS_LABELS = {
+  APPROVED: "อนุมัติ",
+  PARTIAL: "อนุมัติบางส่วน",
+  REJECTED: "ปฏิเสธ",
+};
+
 function MyRequestsTab({ branchCode, csrfToken }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [expandedId, setExpandedId] = useState(null);
+  const [detailCache, setDetailCache] = useState({});
+  const [loadingDetail, setLoadingDetail] = useState("");
   const [acknowledging, setAcknowledging] = useState("");
   const [ackError, setAckError] = useState("");
 
@@ -4259,7 +4267,24 @@ function MyRequestsTab({ branchCode, csrfToken }) {
     return () => { active = false; };
   }, [branchCode, refreshKey]);
 
-  async function handleAcknowledge(childPublicId) {
+  async function handleExpand(batchPublicId) {
+    if (expandedId === batchPublicId) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(batchPublicId);
+    if (detailCache[batchPublicId]) return;
+    setLoadingDetail(batchPublicId);
+    try {
+      const res = await apiFetch(`/api/stock-requests/${encodeURIComponent(batchPublicId)}`);
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+      setDetailCache((c) => ({ ...c, [batchPublicId]: d.batch }));
+    } catch { /* show nothing extra on error */ }
+    finally { setLoadingDetail(""); }
+  }
+
+  async function handleAcknowledge(childPublicId, batchPublicId) {
     setAcknowledging(childPublicId);
     setAckError("");
     try {
@@ -4270,6 +4295,7 @@ function MyRequestsTab({ branchCode, csrfToken }) {
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+      setDetailCache((c) => { const copy = { ...c }; delete copy[batchPublicId]; return copy; });
       setRefreshKey((k) => k + 1);
     } catch (err) {
       setAckError(err.message);
@@ -4291,42 +4317,78 @@ function MyRequestsTab({ branchCode, csrfToken }) {
       {ackError ? <p className="notice error compact">{ackError}</p> : null}
       {records.length === 0 ? (
         <p className="notice compact">ยังไม่มีคำขอสินค้า</p>
-      ) : records.map((batch) => (
-        <article key={batch.batchPublicId} className="srq-batch-card">
-          <button
-            type="button"
-            className="srq-batch-card-header"
-            onClick={() => setExpandedId((prev) => (prev === batch.batchPublicId ? null : batch.batchPublicId))}
-          >
-            <span className="srq-batch-id">{batch.batchPublicId}</span>
-            <span className="srq-batch-date">{formatDateTime(batch.createdAt)}</span>
-            <SrqStatusChip status={batch.status} />
-            <span className="srq-chevron">{expandedId === batch.batchPublicId ? "▾" : "▸"}</span>
-          </button>
-          {expandedId === batch.batchPublicId ? (
-            <div className="srq-batch-body">
-              {(batch.requests || []).map((req) => (
-                <div key={req.publicId} className="srq-child-row">
-                  <span>จาก: <strong>{BRANCH_LABELS[req.sourceBranchCode] ?? `สาขา ${req.sourceBranchCode}`}</strong></span>
-                  <span>{req.lineCount} รายการ</span>
-                  <SrqStatusChip status={req.status} />
-                  {req.status === "RESPONDED" ? (
-                    <button
-                      type="button"
-                      className="ghost-button srq-ack-button"
-                      onClick={() => handleAcknowledge(req.publicId)}
-                      disabled={acknowledging === req.publicId}
-                    >
-                      {acknowledging === req.publicId ? "กำลังยืนยัน..." : "ยืนยันรับสินค้า"}
-                    </button>
-                  ) : null}
-                </div>
-              ))}
-              {batch.note ? <p className="srq-batch-note">หมายเหตุ: {batch.note}</p> : null}
-            </div>
-          ) : null}
-        </article>
-      ))}
+      ) : records.map((batch) => {
+        const isOpen = expandedId === batch.batchPublicId;
+        const detail = detailCache[batch.batchPublicId] || null;
+        return (
+          <article key={batch.batchPublicId} className="srq-batch-card">
+            <button
+              type="button"
+              className="srq-batch-card-header"
+              onClick={() => handleExpand(batch.batchPublicId)}
+            >
+              <span className="srq-batch-id">{batch.batchPublicId}</span>
+              <span className="srq-batch-date">{formatDateTime(batch.createdAt)}</span>
+              <SrqStatusChip status={batch.status} />
+              <span className="srq-chevron">{isOpen ? "▾" : "▸"}</span>
+            </button>
+            {isOpen ? (
+              <div className="srq-batch-body">
+                {loadingDetail === batch.batchPublicId ? (
+                  <p className="notice compact">กำลังโหลดรายการ...</p>
+                ) : detail ? (
+                  <>
+                    {detail.note ? <p className="srq-batch-note">📝 {detail.note}</p> : null}
+                    {(detail.requests || []).map((req) => (
+                      <div key={req.publicId} className="srq-branch-section">
+                        <div className="srq-branch-section-header">
+                          <span className="srq-branch-label">📦 ขอจาก: <strong>{BRANCH_LABELS[req.sourceBranchCode] ?? `สาขา ${req.sourceBranchCode}`}</strong></span>
+                          <SrqStatusChip status={req.status} />
+                          {req.status === "RESPONDED" ? (
+                            <button
+                              type="button"
+                              className="ghost-button srq-ack-button"
+                              onClick={() => handleAcknowledge(req.publicId, batch.batchPublicId)}
+                              disabled={acknowledging === req.publicId}
+                            >
+                              {acknowledging === req.publicId ? "กำลังยืนยัน..." : "ยืนยันรับสินค้า"}
+                            </button>
+                          ) : null}
+                        </div>
+                        <div className="srq-lines-table">
+                          <div className="srq-lines-head">
+                            <span>รหัส</span><span>ชื่อสินค้า</span><span>ขอ</span><span>หน่วย</span><span>ผล</span>
+                          </div>
+                          {(req.lines || []).map((line) => (
+                            <div key={line.lineId} className="srq-line-row">
+                              <span className="srq-line-code">{line.productCode}</span>
+                              <span className="srq-line-name">{line.productNameThai || line.productNameEng || "-"}</span>
+                              <span className="srq-line-qty">{formatNumber(line.requestedQty, 0)}</span>
+                              <span className="srq-line-unit">{line.unit || "-"}</span>
+                              <span className="srq-line-resp">
+                                {line.response ? (
+                                  <>
+                                    <span className={`srq-resp-tag srq-resp-${(line.response.status || "").toLowerCase()}`}>
+                                      {RESPONSE_STATUS_LABELS[line.response.status] || line.response.status}
+                                    </span>
+                                    {line.response.approvedQty > 0 ? <span className="srq-resp-qty"> {formatNumber(line.response.approvedQty, 0)} {line.unit || ""}</span> : null}
+                                  </>
+                                ) : <span className="srq-resp-pending">รอตอบ</span>}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <p className="notice compact">ไม่สามารถโหลดรายละเอียดได้</p>
+                )}
+              </div>
+            ) : null}
+          </article>
+        );
+      })}
     </div>
   );
 }
