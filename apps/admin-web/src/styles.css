@@ -1152,6 +1152,15 @@ button {
   cursor: default;
 }
 
+.branch-stock-request-plus.stockout {
+  width: auto;
+  padding: 0 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: linear-gradient(180deg, #e05555 0%, #b82020 100%);
+  white-space: nowrap;
+}
+
 .request-draft-card {
   display: flex;
   align-items: center;

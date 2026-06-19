@@ -3037,15 +3037,26 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
               <tr key={row.productCode}>
                 {requestMode ? (
                   <td className="branch-stock-request-column">
-                    <button
-                      type="button"
-                      className="branch-stock-request-plus"
-                      onClick={() => openRequestDialogForRow(row)}
-                      disabled={!canRequestProduct(row)}
-                      aria-label={`เพิ่มคำขอสินค้า ${row.productCode}`}
-                    >
-                      +
-                    </button>
+                    {getAdminAlertTarget(row).length > 0 ? (
+                      <button
+                        type="button"
+                        className="branch-stock-request-plus stockout"
+                        onClick={() => openRequestDialogForRow(row)}
+                        aria-label={`แจ้งสินค้าหมด ${row.productCode}`}
+                      >
+                        ยาหมด สั่งยาเพิ่ม
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="branch-stock-request-plus"
+                        onClick={() => openRequestDialogForRow(row)}
+                        disabled={!canRequestProduct(row)}
+                        aria-label={`เพิ่มคำขอสินค้า ${row.productCode}`}
+                      >
+                        +
+                      </button>
+                    )}
                   </td>
                 ) : null}
                 {BRANCH_STOCK_COLUMNS.map((column) => (
