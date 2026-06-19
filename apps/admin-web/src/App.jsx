@@ -4519,7 +4519,17 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
   );
 }
 
-function StockRequestsPanel({ branchCode, csrfToken, requestDraftItems, setRequestDraftItems, requestBatchNote, setRequestBatchNote, onSubmitDraft, onClearDraft }) {
+function StockRequestsPanel({
+  branchCode,
+  csrfToken,
+  requestDraftItems,
+  setRequestDraftItems,
+  requestBatchNote,
+  setRequestBatchNote,
+  onSubmitDraft,
+  onClearDraft,
+  incomingNotifCount = 0,
+}) {
   const [activeTab, setActiveTab] = useState("mine");
 
   return (
@@ -4534,7 +4544,12 @@ function StockRequestsPanel({ branchCode, csrfToken, requestDraftItems, setReque
             📤 คำขอของฉัน
           </button>
           <button type="button" className={`srq-subtab${activeTab === "incoming" ? " active" : ""}`} onClick={() => setActiveTab("incoming")}>
-            📥 รับคำขอ
+            <span>📥 รับคำขอ</span>
+            {incomingNotifCount > 0 ? (
+              <span className="nav-notif-badge" aria-label={`${incomingNotifCount} คำขอใหม่`}>
+                {incomingNotifCount > 99 ? "99+" : incomingNotifCount}
+              </span>
+            ) : null}
           </button>
         </div>
       </div>
@@ -6851,6 +6866,7 @@ export default function App() {
   const branchCode = session?.user?.effective_branch_code || session?.user?.branch_code || "";
   const activeBranchOption = branchOptions.find((branch) => branch.branchCode === branchCode) || null;
   const activeBranchName = activeBranchOption?.branchName || "";
+  const stockRequestBadgeCount = requestDraftItems.length + unreadNotifCount;
   const canSelectBranchContext =
     session?.user?.role === "admin" ||
     (session?.user?.role === "staff" && !branchCode);
@@ -7246,7 +7262,7 @@ export default function App() {
             const activeItem = group.items.find((item) => item.view === view);
             const isOpen = openNavGroup === group.id;
             const hasDropdown = group.items.length > 1 || group.items.some((item) => item.disabled);
-            const groupHasNotif = requestDraftItems.length > 0 && group.items.some((item) => item.view === "stock-requests");
+            const groupHasNotif = stockRequestBadgeCount > 0 && group.items.some((item) => item.view === "stock-requests");
             const triggerClassName = [
               "view-nav-btn",
               "hero-nav-trigger",
@@ -7300,7 +7316,7 @@ export default function App() {
                   <span className="hero-nav-label">{group.label}</span>
                   <span className="hero-nav-chevron" aria-hidden="true">▾</span>
                   {groupHasNotif ? (
-                    <span className="nav-notif-badge nav-trigger-badge">{requestDraftItems.length > 99 ? "99+" : requestDraftItems.length}</span>
+                    <span className="nav-notif-badge nav-trigger-badge">{stockRequestBadgeCount > 99 ? "99+" : stockRequestBadgeCount}</span>
                   ) : null}
                 </button>
                 <div
@@ -7330,8 +7346,8 @@ export default function App() {
                         <span className="hero-nav-item-main">
                           <span>{item.label}</span>
                           {item.disabled ? <span className="view-nav-badge">เร็วๆนี้</span> : null}
-                          {item.view === "stock-requests" && requestDraftItems.length > 0 ? (
-                            <span className="nav-notif-badge">{requestDraftItems.length > 99 ? "99+" : requestDraftItems.length}</span>
+                          {item.view === "stock-requests" && stockRequestBadgeCount > 0 ? (
+                            <span className="nav-notif-badge">{stockRequestBadgeCount > 99 ? "99+" : stockRequestBadgeCount}</span>
                           ) : null}
                         </span>
                         <span className="hero-nav-item-desc">{item.description}</span>
@@ -7468,6 +7484,7 @@ export default function App() {
           setRequestBatchNote={setRequestBatchNote}
           onSubmitDraft={handleSubmitDraft}
           onClearDraft={handleClearDraft}
+          incomingNotifCount={unreadNotifCount}
         />
       ) : view === "movement-trace" ? (
         <ProductMovementTracePanel branchCode={branchCode} csrfToken={session.csrfToken} />

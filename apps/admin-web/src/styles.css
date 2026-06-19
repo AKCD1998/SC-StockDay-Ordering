@@ -4633,6 +4633,9 @@ select {
   flex-wrap: wrap;
 }
 .srq-subtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   background: none;
   border: 2px solid #c8d3e2;
   border-radius: 8px;
