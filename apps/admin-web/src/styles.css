@@ -2778,6 +2778,21 @@ select {
   letter-spacing: 0.06em;
 }
 
+.nav-notif-badge {
+  background: #ef4444;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  line-height: 1;
+}
+
 .hero-nav-menu {
   position: absolute;
   top: calc(100% + 10px);

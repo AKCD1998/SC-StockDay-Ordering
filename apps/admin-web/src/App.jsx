@@ -2657,9 +2657,6 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
               </span>
             ) : null}
           </button>
-          {branchCode ? (
-            <NotificationBell branchCode={branchCode} onNavigate={onNavigate} />
-          ) : null}
         </form>
       </div>
 
@@ -6515,6 +6512,7 @@ export default function App() {
   });
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [openNavGroup, setOpenNavGroup] = useState(null);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "dark";
     const savedTheme = window.localStorage.getItem(adminThemeStorageKey);
@@ -6595,6 +6593,22 @@ export default function App() {
       active = false;
     };
   }, [session]);
+
+  useEffect(() => {
+    if (!branchCode) { setUnreadNotifCount(0); return undefined; }
+    let active = true;
+    async function fetchUnread() {
+      try {
+        const res = await apiFetch("/api/notifications/unread-count");
+        if (!res.ok || !active) return;
+        const data = await res.json();
+        if (active) setUnreadNotifCount(data.unreadCount || 0);
+      } catch { /* silent */ }
+    }
+    fetchUnread();
+    const id = setInterval(fetchUnread, 30_000);
+    return () => { active = false; clearInterval(id); };
+  }, [branchCode]);
 
   useEffect(() => {
     if (!session) return undefined;
@@ -7083,6 +7097,9 @@ export default function App() {
                         <span className="hero-nav-item-main">
                           <span>{item.label}</span>
                           {item.disabled ? <span className="view-nav-badge">เร็วๆนี้</span> : null}
+                          {item.view === "stock-requests" && unreadNotifCount > 0 ? (
+                            <span className="nav-notif-badge">{unreadNotifCount > 99 ? "99+" : unreadNotifCount}</span>
+                          ) : null}
                         </span>
                         <span className="hero-nav-item-desc">{item.description}</span>
                       </button>
