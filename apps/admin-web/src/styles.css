@@ -4770,6 +4770,19 @@ select {
 .srq-from-label { font-size: 0.9rem; color: #243b53; }
 .srq-from-label strong { color: #102a43; font-weight: 700; }
 .srq-chevron { margin-left: auto; color: #526578; font-size: 1rem; }
+.srq-procurement-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(127, 29, 29, 0.85);
+  color: #fecaca;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  flex-shrink: 0;
+}
+
 .srq-admin-alert-pill {
   display: inline-flex;
   align-items: center;

@@ -4526,6 +4526,7 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
             >
               <span className="srq-batch-id">{batch.batchPublicId}</span>
               <span className="srq-batch-date">{formatDateTime(batch.createdAt)}</span>
+              {batch.isAdminAlert ? <span className="srq-procurement-pill">📋 แจ้งจัดซื้อ</span> : null}
               <SrqStatusChip status={batch.status} />
               <span className="srq-chevron">{isOpen ? "▾" : "▸"}</span>
             </button>
