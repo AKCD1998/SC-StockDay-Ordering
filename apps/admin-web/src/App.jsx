@@ -4181,6 +4181,9 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
           </div>
           <div className="srq-detail-summary-status">
             <SrqStatusChip status={detail.responseResult || detail.status} />
+            <button type="button" className="srq-submit-btn srq-submit-btn-compact" onClick={() => setActionOpen(true)}>
+              {detail.status === "SUBMITTED" ? "ดำเนินการ" : "ดูผลการดำเนินการ"}
+            </button>
           </div>
         </div>
 
@@ -4205,12 +4208,6 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
         ))}
 
         {detail.responseNote ? <p className="meta-line">หมายเหตุล่าสุด: {detail.responseNote}</p> : null}
-
-        <div className="srq-detail-actions">
-          <button type="button" className="srq-submit-btn" onClick={() => setActionOpen(true)}>
-            {detail.status === "SUBMITTED" ? "ดำเนินการ" : "ดูผลการดำเนินการ"}
-          </button>
-        </div>
       </div>
 
       {actionOpen ? (

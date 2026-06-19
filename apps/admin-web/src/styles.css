@@ -4927,6 +4927,12 @@ select {
 .srq-detail-summary-status {
   display: flex;
   align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.srq-submit-btn-compact {
+  padding: 7px 16px;
+  font-size: 0.85rem;
 }
 .srq-detail-line-row {
   border: 1px solid #e2e8f0;
@@ -4977,6 +4983,15 @@ select {
   max-height: calc(100vh - 48px);
   display: flex;
   flex-direction: column;
+}
+.srq-action-modal .ghost-button {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+.srq-action-modal .ghost-button:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
 }
 .srq-action-modal .dialog-header {
   flex-shrink: 0;
