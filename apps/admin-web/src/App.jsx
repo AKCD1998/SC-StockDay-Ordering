@@ -3121,6 +3121,9 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
         const totalRequestedQty = Object.values(requestQuantities).reduce(
           (sum, v) => sum + (Number(v) || 0), 0
         );
+        const currentBranchStockQty = branchCode
+          ? getBranchStockQty(requestDialogProduct, branchCode)
+          : 0;
         return (
           <div className="rq-overlay" onClick={closeRequestDialog}>
             <div
@@ -3229,12 +3232,17 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
                     <span className="rq-summary-label">สาขาของคุณ</span>
                     <span className="rq-summary-val">{requestBranchLabel}</span>
                   </div>
+                  <div className="rq-summary-item rq-summary-stock-box">
+                    <span className="rq-summary-label">ที่ฉันมีตอนนี้</span>
+                    <span className="rq-summary-stock-num">{formatNumber(currentBranchStockQty, 0)}</span>
+                    <span className="rq-summary-stock-unit">{requestDialogProduct.unit || "-"}</span>
+                  </div>
                   <div className="rq-summary-item rq-summary-total-box">
-                    <span className="rq-summary-label">จำนวนทั้งหมดที่ขอ</span>
+                    <span className="rq-summary-label">จำนวน</span>
                     <span className="rq-total-num">{totalRequestedQty}</span>
                   </div>
                   <div className="rq-summary-item">
-                    <span className="rq-summary-label">หน่วยสินค้า</span>
+                    <span className="rq-summary-label">หน่วย</span>
                     <span className="rq-summary-val">{requestDialogProduct.unit || "-"}</span>
                   </div>
                 </div>
