@@ -4371,20 +4371,26 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
       </div>
       {records.length === 0 ? (
         <p className="notice compact">ยังไม่มีคำขอสินค้าเข้ามา</p>
-      ) : records.map((req) => (
+      ) : records.map((req) => {
+        const isPureAlert = req.isAdminAlert && !req.isMixedMode && req.status === "SUBMITTED" && !req.responseResult;
+        const isMixedIncoming = req.isAdminAlert && req.isMixedMode && req.status === "SUBMITTED" && !req.responseResult;
+        const inCardExtra = isPureAlert ? " srq-batch-card-admin-alert" : isMixedIncoming ? " srq-batch-card-mixed" : "";
+        const inHeaderExtra = isPureAlert ? " srq-batch-card-header-admin-alert" : isMixedIncoming ? " srq-batch-card-header-mixed" : "";
+        const alertPillLabel = req.isMixedMode ? "ขอสาขาอื่น + สั่งเพิ่ม" : "สินค้าหมด / แจ้ง admin";
+        return (
         <article
           key={req.requestPublicId}
-          className={`srq-batch-card${req.isAdminAlert && req.status === "SUBMITTED" && !req.responseResult ? " srq-batch-card-admin-alert" : ""}`}
+          className={`srq-batch-card${inCardExtra}`}
         >
           <button
             type="button"
-            className={`srq-batch-card-header${req.isAdminAlert && req.status === "SUBMITTED" && !req.responseResult ? " srq-batch-card-header-admin-alert" : ""}`}
+            className={`srq-batch-card-header${inHeaderExtra}`}
             onClick={() => setExpandedId((prev) => (prev === req.requestPublicId ? null : req.requestPublicId))}
           >
             <span className="srq-batch-id">{req.requestPublicId}</span>
             <span className="srq-batch-date">{formatDateTime(req.createdAt)}</span>
             <span className="srq-from-label">จาก: <strong>{BRANCH_LABELS[req.requestingBranchCode] ?? `สาขา ${req.requestingBranchCode}`}</strong></span>
-            {req.isAdminAlert ? <span className="srq-admin-alert-pill">สินค้าหมด / แจ้ง admin</span> : null}
+            {req.isAdminAlert ? <span className="srq-admin-alert-pill">{alertPillLabel}</span> : null}
             <SrqStatusChip status={req.responseResult || req.status} />
             <span className="srq-chevron">{expandedId === req.requestPublicId ? "▾" : "▸"}</span>
           </button>
@@ -4399,7 +4405,8 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
             />
           ) : null}
         </article>
-      ))}
+        );
+      })}
     </div>
   );
 }
