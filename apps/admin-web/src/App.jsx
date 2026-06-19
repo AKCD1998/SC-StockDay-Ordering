@@ -6598,6 +6598,15 @@ export default function App() {
     setSelectedBranchContext(branchCode || "");
   }, [branchCode]);
 
+  // Auto-apply for staff with exactly one allowed branch so the selector never appears
+  useEffect(() => {
+    if (branchCode || session?.user?.role !== "staff") return undefined;
+    const allowedCodes = session?.permissions?.allowed_branch_codes;
+    if (!Array.isArray(allowedCodes) || allowedCodes.length !== 1) return undefined;
+    handleApplyBranchContext(allowedCodes[0]);
+    return undefined;
+  }, [session, branchCode]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function handleLogin(event) {
     event.preventDefault();
     setAuthenticating(true);
