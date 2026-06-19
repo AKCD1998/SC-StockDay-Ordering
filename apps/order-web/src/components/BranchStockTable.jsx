@@ -17,6 +17,10 @@ function canRequestFromOtherBranch(row, currentBranchCode, branchOptions) {
   );
 }
 
+function isStockoutEverywhere(row, branchOptions) {
+  return branchOptions.every((branch) => getBranchQty(row, branch.branchCode) < 1);
+}
+
 export default function BranchStockTable({
   rows,
   currentBranchCode,
@@ -53,20 +57,32 @@ export default function BranchStockTable({
         <tbody>
           {rows.map((row) => {
             const requestable = canRequestFromOtherBranch(row, currentBranchCode, branchOptions);
+            const stockout = isStockoutEverywhere(row, branchOptions);
 
             return (
               <tr key={`${row.productCode}-${row.unit || "unit"}`}>
                 {requestMode ? (
                   <td className="action-column">
-                    <button
-                      type="button"
-                      className="request-plus-button"
-                      disabled={!requestable}
-                      onClick={() => onPickProduct(row)}
-                      aria-label={`ขอสินค้า ${row.productCode}`}
-                    >
-                      +
-                    </button>
+                    {stockout ? (
+                      <button
+                        type="button"
+                        className="request-plus-button stockout"
+                        onClick={() => onPickProduct(row)}
+                        aria-label={`แจ้งสินค้าหมด ${row.productCode}`}
+                      >
+                        ยาหมด สั่งยาเพิ่ม
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="request-plus-button"
+                        disabled={!requestable}
+                        onClick={() => onPickProduct(row)}
+                        aria-label={`ขอสินค้า ${row.productCode}`}
+                      >
+                        +
+                      </button>
+                    )}
                   </td>
                 ) : null}
                 <td>

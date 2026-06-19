@@ -414,6 +414,17 @@ button.ghost {
   color: #7990a6;
 }
 
+.request-plus-button.stockout {
+  width: auto;
+  height: 38px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #e05555 0%, #b82020 100%);
+  color: #fff;
+  white-space: nowrap;
+}
+
 .current-branch-column {
   background: rgba(25, 50, 74, 0.04);
 }
