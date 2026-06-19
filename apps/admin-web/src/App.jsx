@@ -1997,7 +1997,7 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName }) {
     const id = setTimeout(() => {
       setLoading(false);
       setError("โหลดข้อมูลนานเกินไป กรุณาลองกด รีเฟรช");
-    }, 20000);
+    }, 45000);
     return () => clearTimeout(id);
   }, [loading]);
 
@@ -2022,6 +2022,7 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName }) {
         const data = await response.json();
         if (!active) return;
         setRecords(data.records || []);
+        setError("");
         setPagination(
           data.pagination || {
             limit: pageFetchLimit,
