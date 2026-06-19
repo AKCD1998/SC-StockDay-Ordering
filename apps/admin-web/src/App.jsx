@@ -7012,6 +7012,7 @@ export default function App() {
             const activeItem = group.items.find((item) => item.view === view);
             const isOpen = openNavGroup === group.id;
             const hasDropdown = group.items.length > 1 || group.items.some((item) => item.disabled);
+            const groupHasNotif = unreadNotifCount > 0 && group.items.some((item) => item.view === "stock-requests");
             const triggerClassName = [
               "view-nav-btn",
               "hero-nav-trigger",
@@ -7064,6 +7065,9 @@ export default function App() {
                   <span className="hero-nav-mark" aria-hidden="true">{group.shortLabel}</span>
                   <span className="hero-nav-label">{group.label}</span>
                   <span className="hero-nav-chevron" aria-hidden="true">▾</span>
+                  {groupHasNotif ? (
+                    <span className="nav-notif-badge nav-trigger-badge">{unreadNotifCount > 99 ? "99+" : unreadNotifCount}</span>
+                  ) : null}
                 </button>
                 <div
                   className="hero-nav-menu"
