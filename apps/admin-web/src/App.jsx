@@ -4579,6 +4579,11 @@ function StockRequestsPanel({
   );
 }
 
+function countPendingIncomingRequests(records) {
+  const list = Array.isArray(records) ? records : [];
+  return list.filter((record) => record?.status === "SUBMITTED" && !record?.responseResult).length;
+}
+
 function CategoryReviewPanel({ decidedBy }) {
   const pageSize = 20;
   const [records, setRecords] = useState([]);
@@ -6902,9 +6907,7 @@ export default function App() {
       if (!res.ok) return;
       const data = await res.json();
       const records = Array.isArray(data.records) ? data.records : [];
-      setIncomingRequestBadgeCount(
-        records.filter((record) => record?.status === "SUBMITTED").length,
-      );
+      setIncomingRequestBadgeCount(countPendingIncomingRequests(records));
     } catch {
       // silent
     }
@@ -6920,9 +6923,7 @@ export default function App() {
         const data = await res.json();
         if (!active) return;
         const records = Array.isArray(data.records) ? data.records : [];
-        setIncomingRequestBadgeCount(
-          records.filter((record) => record?.status === "SUBMITTED").length,
-        );
+        setIncomingRequestBadgeCount(countPendingIncomingRequests(records));
       } catch { /* silent */ }
     }
     fetchIncomingBadgeCount();
