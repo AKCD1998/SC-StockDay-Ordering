@@ -1475,6 +1475,32 @@ button {
   background: rgba(127, 29, 29, 0.12);
 }
 
+.rq-procurement-toggle {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 9px 16px;
+  border: none;
+  border-radius: 10px;
+  background: #dc2626;
+  color: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+.rq-procurement-toggle:hover { background: #b91c1c; }
+.rq-procurement-toggle.active { background: #6b7280; }
+.rq-procurement-toggle.active:hover { background: #4b5563; }
+
+.rq-procurement-row {
+  border-color: rgba(220, 38, 38, 0.45) !important;
+  background: rgba(127, 29, 29, 0.14) !important;
+  margin-top: 4px;
+}
+
 .rq-admin-alert-hint {
   margin: 12px 0 0;
   padding: 10px 12px;

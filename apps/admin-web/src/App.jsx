@@ -1984,6 +1984,8 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
   const [requestQuantities, setRequestQuantities] = useState({});
   const [requestLineNote, setRequestLineNote] = useState("");
   const [requestDialogError, setRequestDialogError] = useState("");
+  const [procurementQty, setProcurementQty] = useState("");
+  const [procurementRowOpen, setProcurementRowOpen] = useState(false);
   const filterMenuRef = useRef(null);
   const [filterMenuAnchor, setFilterMenuAnchor] = useState(null);
   const requestButtonRef = useRef(null);
@@ -2439,6 +2441,8 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
     );
     setRequestLineNote("");
     setRequestDialogError("");
+    setProcurementQty("");
+    setProcurementRowOpen(false);
   }
 
   function closeRequestDialog() {
@@ -2446,6 +2450,8 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
     setRequestQuantities({});
     setRequestLineNote("");
     setRequestDialogError("");
+    setProcurementQty("");
+    setProcurementRowOpen(false);
   }
 
   function handleAddDraftItem(event) {
@@ -2480,8 +2486,27 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
       });
     }
 
+    if (procurementRowOpen && procurementQty !== "" && procurementQty != null) {
+      const qty = normalizeRequestedQty(procurementQty);
+      if (qty > 0) {
+        selectedLines.push({
+          productCode: requestDialogProduct.productCode,
+          productNameThai: requestDialogProduct.productNameThai || "",
+          productNameEng: requestDialogProduct.productNameEng || "",
+          unit: requestDialogProduct.unit || "",
+          sourceBranchCode: "000",
+          sourceBranchName: BRANCH_LABELS["000"] || "สาขา 000 (HQ)",
+          requestMode: "ADMIN_ALERT",
+          requestedQty: qty,
+          snapshotQty: null,
+          snapshotSyncedAt: null,
+          lineNote: requestLineNote.trim(),
+        });
+      }
+    }
+
     if (!selectedLines.length) {
-      setRequestDialogError("กรุณาระบุจำนวนอย่างน้อย 1 สาขา");
+      setRequestDialogError("กรุณาระบุจำนวนอย่างน้อย 1 สาขา หรือจำนวนที่แจ้งจัดซื้อ");
       return;
     }
 
@@ -3281,6 +3306,46 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
                       </div>
                     );
                   })}
+                  {/* Procurement toggle button */}
+                  <button
+                    type="button"
+                    className={`rq-procurement-toggle${procurementRowOpen ? " active" : ""}`}
+                    onClick={() => { setProcurementRowOpen((v) => !v); setProcurementQty(""); }}
+                  >
+                    {procurementRowOpen ? "✕ ยกเลิกแจ้งจัดซื้อเพิ่ม" : "📋 แจ้งจัดซื้อเพิ่มด้วย"}
+                  </button>
+                  {procurementRowOpen ? (
+                    <div className="rq-branch-row rq-procurement-row">
+                      <span className="rq-branch-name">จัดซื้อ / HQ</span>
+                      <span className="rq-branch-stock">—</span>
+                      <div className="rq-qty-stepper">
+                        <button
+                          type="button"
+                          className="rq-qty-btn rq-qty-minus"
+                          onClick={() => setProcurementQty((v) => String(Math.max(0, Number(v || 0) - 1)))}
+                          disabled={Number(procurementQty || 0) <= 0}
+                        >−</button>
+                        <input
+                          type="number"
+                          className="rq-qty-input"
+                          min="0"
+                          step="1"
+                          placeholder="0"
+                          value={procurementQty}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (v === "" || (/^\d+$/.test(v) && Number(v) >= 0)) setProcurementQty(v);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="rq-qty-btn rq-qty-plus"
+                          onClick={() => setProcurementQty((v) => String(Number(v || 0) + 1))}
+                        >+</button>
+                      </div>
+                      <span className="rq-branch-unit">{requestDialogProduct.unit || "-"}</span>
+                    </div>
+                  ) : null}
                 </div>
                 {/* Summary panel */}
                 <div className="rq-dialog-summary">
