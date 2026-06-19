@@ -4846,15 +4846,27 @@ select {
   justify-content: flex-start;
 }
 .srq-traffic-btn {
-  width: 40px;
-  height: 40px;
+  min-width: 74px;
+  min-height: 40px;
+  padding: 0 14px;
   border-radius: 999px;
   border: 2px solid rgba(15, 23, 42, 0.35);
   cursor: pointer;
+  color: #fff;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
 }
 .srq-traffic-btn.approve { background: #65a30d; }
 .srq-traffic-btn.reject { background: #ef4444; }
 .srq-traffic-btn.custom { background: #f59e0b; }
+.srq-traffic-btn:disabled { opacity: 0.65; cursor: default; }
 .srq-traffic-btn.active {
   box-shadow: 0 0 0 3px rgba(255,255,255,0.92), 0 0 0 5px rgba(37, 99, 235, 0.36);
 }

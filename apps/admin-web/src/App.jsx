@@ -3957,14 +3957,18 @@ function IncomingRequestActionModal({ detail, csrfToken, onClose, onCompleted })
                       })}
                       disabled={workflowDone || submitting || generatingDoc}
                       aria-label="อนุมัติทั้งหมด"
-                    />
+                    >
+                      อนุมัติ
+                    </button>
                     <button
                       type="button"
                       className={`srq-traffic-btn reject${state.choice === "REJECTED" ? " active" : ""}`}
                       onClick={() => openRejectDialog(line)}
                       disabled={workflowDone || submitting || generatingDoc}
                       aria-label="ไม่อนุมัติ"
-                    />
+                    >
+                      ปฏิเสธ
+                    </button>
                     <button
                       type="button"
                       className={`srq-traffic-btn custom${customSelected ? " active" : ""}`}
@@ -3975,7 +3979,9 @@ function IncomingRequestActionModal({ detail, csrfToken, onClose, onCompleted })
                       })}
                       disabled={workflowDone || submitting || generatingDoc}
                       aria-label="กำหนดจำนวน"
-                    />
+                    >
+                      ระบุ
+                    </button>
                     {customSelected ? (
                       <input
                         type="number"
