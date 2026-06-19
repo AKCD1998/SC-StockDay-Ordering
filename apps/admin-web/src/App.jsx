@@ -1981,10 +1981,6 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
   const [flyDots, setFlyDots] = useState([]);
 
   useEffect(() => {
-    if (branchCode) setRequestSubmitError("");
-  }, [branchCode]);
-
-  useEffect(() => {
     if (!loading) return undefined;
     const id = setTimeout(() => {
       setLoading(false);
