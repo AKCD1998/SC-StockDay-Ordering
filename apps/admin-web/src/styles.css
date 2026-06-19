@@ -4478,3 +4478,38 @@ select {
 [data-theme="dark"] .srq-response-btn            { border-color: #263547; color: #c8d3e2; }
 [data-theme="dark"] .notification-bell:hover     { background: rgba(255,255,255,0.08); }
 
+/* ─── Branch stock loading overlay ─────────────────────────────── */
+.branch-stock-loading-wrap {
+  position: relative;
+  min-height: 120px;
+}
+.branch-stock-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 21, 32, 0.72);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  z-index: 10;
+  border-radius: 8px;
+  color: #c8d3e2;
+  font-size: 0.92rem;
+  backdrop-filter: blur(2px);
+}
+.branch-stock-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.12);
+  border-top-color: #f97316;
+  border-radius: 50%;
+  animation: bsSpinAnim 0.75s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes bsSpinAnim { to { transform: rotate(360deg); } }
+[data-theme="light"] .branch-stock-loading-overlay {
+  background: rgba(240, 245, 255, 0.82);
+  color: #1f2933;
+}
+

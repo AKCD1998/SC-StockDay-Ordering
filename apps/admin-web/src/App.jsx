@@ -1993,6 +1993,15 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName }) {
   }, [branchCode]);
 
   useEffect(() => {
+    if (!loading) return undefined;
+    const id = setTimeout(() => {
+      setLoading(false);
+      setError("โหลดข้อมูลนานเกินไป กรุณาลองกด รีเฟรช");
+    }, 20000);
+    return () => clearTimeout(id);
+  }, [loading]);
+
+  useEffect(() => {
     let active = true;
 
     async function loadBranchStock() {
@@ -2971,11 +2980,17 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName }) {
       ) : null}
 
       {error && <p className="notice error compact">เชื่อมต่อไม่ได้: {error}</p>}
-      {loading && <p className="empty-state">กำลังโหลดข้อมูลสต็อกสาขา...</p>}
       {!loading && !error && !records.length && (
         <p className="empty-state">ไม่พบข้อมูลสต็อกสาขาตามเงื่อนไขที่ค้นหา</p>
       )}
 
+      <div className="branch-stock-loading-wrap">
+        {loading && (
+          <div className="branch-stock-loading-overlay" aria-live="polite" aria-label="กำลังโหลดข้อมูล">
+            <div className="branch-stock-spinner" />
+            <span>กำลังโหลดข้อมูลสต็อกสาขา...</span>
+          </div>
+        )}
       <div className="table-wrap">
         <table className={`branch-stock-table${requestMode ? " request-mode" : ""}`}>
           <thead>
@@ -3111,6 +3126,8 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName }) {
             ))}
           </tbody>
         </table>
+      </div>
+
       </div>
 
       {!loading && !error && records.length > 0 && pagedRecords.length === 0 && (
