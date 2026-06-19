@@ -1929,7 +1929,7 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
   );
 }
 
-function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNavigate }) {
+function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNavigate, onDraftCountChange }) {
   const pageSize = 25;
   const pageFetchLimit = 10000;
   const branchExportOptions = [
@@ -2387,6 +2387,10 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
 
   const requestBranchLabel = formatBranchContextLabel(branchCode, branchName);
   const requestDraftCount = requestDraftItems.length;
+
+  useEffect(() => {
+    if (onDraftCountChange) onDraftCountChange(requestDraftCount);
+  }, [requestDraftCount, onDraftCountChange]);
 
   const requestDraftByBranch = useMemo(() => {
     const groups = new Map();
@@ -6508,6 +6512,7 @@ export default function App() {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [openNavGroup, setOpenNavGroup] = useState(null);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [stockRequestDraftCount, setStockRequestDraftCount] = useState(0);
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "dark";
     const savedTheme = window.localStorage.getItem(adminThemeStorageKey);
@@ -7012,7 +7017,7 @@ export default function App() {
             const activeItem = group.items.find((item) => item.view === view);
             const isOpen = openNavGroup === group.id;
             const hasDropdown = group.items.length > 1 || group.items.some((item) => item.disabled);
-            const groupHasNotif = unreadNotifCount > 0 && group.items.some((item) => item.view === "stock-requests");
+            const groupHasNotif = stockRequestDraftCount > 0 && group.items.some((item) => item.view === "stock-requests");
             const triggerClassName = [
               "view-nav-btn",
               "hero-nav-trigger",
@@ -7066,7 +7071,7 @@ export default function App() {
                   <span className="hero-nav-label">{group.label}</span>
                   <span className="hero-nav-chevron" aria-hidden="true">▾</span>
                   {groupHasNotif ? (
-                    <span className="nav-notif-badge nav-trigger-badge">{unreadNotifCount > 99 ? "99+" : unreadNotifCount}</span>
+                    <span className="nav-notif-badge nav-trigger-badge">{stockRequestDraftCount > 99 ? "99+" : stockRequestDraftCount}</span>
                   ) : null}
                 </button>
                 <div
@@ -7096,8 +7101,8 @@ export default function App() {
                         <span className="hero-nav-item-main">
                           <span>{item.label}</span>
                           {item.disabled ? <span className="view-nav-badge">เร็วๆนี้</span> : null}
-                          {item.view === "stock-requests" && unreadNotifCount > 0 ? (
-                            <span className="nav-notif-badge">{unreadNotifCount > 99 ? "99+" : unreadNotifCount}</span>
+                          {item.view === "stock-requests" && stockRequestDraftCount > 0 ? (
+                            <span className="nav-notif-badge">{stockRequestDraftCount > 99 ? "99+" : stockRequestDraftCount}</span>
                           ) : null}
                         </span>
                         <span className="hero-nav-item-desc">{item.description}</span>
@@ -7220,6 +7225,7 @@ export default function App() {
           branchCode={branchCode}
           branchName={activeBranchName}
           onNavigate={() => setView("stock-requests")}
+          onDraftCountChange={setStockRequestDraftCount}
         />
       ) : view === "stock-requests" ? (
         <StockRequestsPanel branchCode={branchCode} csrfToken={session.csrfToken} />
