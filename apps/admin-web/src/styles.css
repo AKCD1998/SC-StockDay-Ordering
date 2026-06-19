@@ -4735,7 +4735,37 @@ select {
 .srq-resp-partial   { background: #431407; color: #fdba74; }
 .srq-resp-rejected  { background: #450a0a; color: #fca5a5; }
 .srq-resp-qty  { color: #86efac; font-size: 0.82rem; }
-.srq-resp-pending { color: #475569; font-size: 0.8rem; font-style: italic; }
+.srq-resp-pending {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+.srq-resp-pending::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #fb923c;
+  box-shadow: 0 0 0 0 rgba(251, 146, 60, 0.4);
+  animation: srqPendingPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes srqPendingPulse {
+  0%, 100% {
+    transform: scale(0.92);
+    opacity: 0.82;
+    box-shadow: 0 0 0 0 rgba(251, 146, 60, 0.12);
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+    box-shadow: 0 0 0 8px rgba(251, 146, 60, 0.08);
+  }
+}
 
 /* ─── Status Chips ──────────────────────────────────────────────── */
 .srq-status-chip {
