@@ -3311,7 +3311,7 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
               {/* Footer */}
               <div className="rq-dialog-footer">
                 <button type="button" className="rq-btn-confirm" onClick={(e) => handleAddDraftItem(e)}>
-                  ยืนยันใส่ตะกร้า
+                  {isAdminAlertOnlyMode ? "ใส่ตะกร้า แจ้งจัดซื้อ" : "ยืนยันใส่ตะกร้า"}
                 </button>
                 <button type="button" className="rq-btn-cancel" onClick={closeRequestDialog}>
                   ยกเลิก
@@ -4518,10 +4518,10 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
         const isOpen = expandedId === batch.batchPublicId;
         const detail = detailCache[batch.batchPublicId] || null;
         return (
-          <article key={batch.batchPublicId} className="srq-batch-card">
+          <article key={batch.batchPublicId} className={`srq-batch-card${batch.isAdminAlert && batch.status === "SUBMITTED" ? " srq-batch-card-admin-alert" : ""}`}>
             <button
               type="button"
-              className="srq-batch-card-header"
+              className={`srq-batch-card-header${batch.isAdminAlert && batch.status === "SUBMITTED" ? " srq-batch-card-header-admin-alert" : ""}`}
               onClick={() => handleExpand(batch.batchPublicId)}
             >
               <span className="srq-batch-id">{batch.batchPublicId}</span>
@@ -4548,7 +4548,7 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
                               onClick={() => handleAcknowledge(req.publicId, batch.batchPublicId)}
                               disabled={acknowledging === req.publicId}
                             >
-                              {acknowledging === req.publicId ? "กำลังยืนยัน..." : "ยืนยันรับสินค้า"}
+                              {acknowledging === req.publicId ? "กำลังบันทึก..." : "รับทราบผลการดำเนินการ"}
                             </button>
                           ) : null}
                         </div>

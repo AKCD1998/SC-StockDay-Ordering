@@ -1535,8 +1535,16 @@ button {
 }
 
 .rq-summary-stock-box {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 5px 0;
   background: rgba(20, 83, 45, 0.16);
   border-color: rgba(34, 197, 94, 0.28);
+}
+
+.rq-summary-stock-box .rq-summary-label {
+  grid-column: 1 / -1;
 }
 
 .rq-summary-stock-num {
@@ -1544,12 +1552,15 @@ button {
   font-weight: 800;
   color: #22c55e;
   line-height: 1;
+  align-self: end;
 }
 
 .rq-summary-stock-unit {
   font-size: 0.84rem;
   font-weight: 700;
   color: #86efac;
+  align-self: end;
+  padding-bottom: 3px;
 }
 
 .rq-total-num {
