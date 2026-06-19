@@ -6731,7 +6731,7 @@ export default function App() {
   });
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [openNavGroup, setOpenNavGroup] = useState(null);
-  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [incomingRequestBadgeCount, setIncomingRequestBadgeCount] = useState(0);
   const [requestDraftItems, setRequestDraftItems] = useState([]);
   const [requestBatchNote, setRequestBatchNote] = useState("");
   const requestIdempotencyKeyRef = useRef(generateRequestIdempotencyKey());
@@ -6874,7 +6874,7 @@ export default function App() {
   const branchCode = session?.user?.effective_branch_code || session?.user?.branch_code || "";
   const activeBranchOption = branchOptions.find((branch) => branch.branchCode === branchCode) || null;
   const activeBranchName = activeBranchOption?.branchName || "";
-  const stockRequestBadgeCount = requestDraftItems.length + unreadNotifCount;
+  const stockRequestBadgeCount = requestDraftItems.length + incomingRequestBadgeCount;
   const canSelectBranchContext =
     session?.user?.role === "admin" ||
     (session?.user?.role === "staff" && !branchCode);
@@ -6892,34 +6892,41 @@ export default function App() {
     return undefined;
   }, [session, branchCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const refreshUnreadNotifCount = useCallback(async () => {
+  const refreshIncomingRequestBadgeCount = useCallback(async () => {
     if (!branchCode) {
-      setUnreadNotifCount(0);
+      setIncomingRequestBadgeCount(0);
       return;
     }
     try {
-      const res = await apiFetch("/api/notifications/unread-count");
+      const res = await apiFetch("/api/stock-requests/incoming");
       if (!res.ok) return;
       const data = await res.json();
-      setUnreadNotifCount(data.unreadCount || 0);
+      const records = Array.isArray(data.records) ? data.records : [];
+      setIncomingRequestBadgeCount(
+        records.filter((record) => record?.status === "SUBMITTED").length,
+      );
     } catch {
       // silent
     }
   }, [branchCode]);
 
   useEffect(() => {
-    if (!branchCode) { setUnreadNotifCount(0); return undefined; }
+    if (!branchCode) { setIncomingRequestBadgeCount(0); return undefined; }
     let active = true;
-    async function fetchUnread() {
+    async function fetchIncomingBadgeCount() {
       try {
-        const res = await apiFetch("/api/notifications/unread-count");
+        const res = await apiFetch("/api/stock-requests/incoming");
         if (!res.ok || !active) return;
         const data = await res.json();
-        if (active) setUnreadNotifCount(data.unreadCount || 0);
+        if (!active) return;
+        const records = Array.isArray(data.records) ? data.records : [];
+        setIncomingRequestBadgeCount(
+          records.filter((record) => record?.status === "SUBMITTED").length,
+        );
       } catch { /* silent */ }
     }
-    fetchUnread();
-    const id = setInterval(fetchUnread, 30_000);
+    fetchIncomingBadgeCount();
+    const id = setInterval(fetchIncomingBadgeCount, 30_000);
     return () => { active = false; clearInterval(id); };
   }, [branchCode]);
 
@@ -7507,8 +7514,8 @@ export default function App() {
           setRequestBatchNote={setRequestBatchNote}
           onSubmitDraft={handleSubmitDraft}
           onClearDraft={handleClearDraft}
-          incomingNotifCount={unreadNotifCount}
-          onIncomingNotificationsChanged={refreshUnreadNotifCount}
+          incomingNotifCount={incomingRequestBadgeCount}
+          onIncomingNotificationsChanged={refreshIncomingRequestBadgeCount}
         />
       ) : view === "movement-trace" ? (
         <ProductMovementTracePanel branchCode={branchCode} csrfToken={session.csrfToken} />
