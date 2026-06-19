@@ -4737,6 +4737,8 @@ select {
   padding: 6px 10px;
   font: inherit;
   font-size: 0.85rem;
+  width: 160px;
+  flex-shrink: 0;
 }
 
 /* ─── Batch / Incoming Cards ────────────────────────────────────── */
