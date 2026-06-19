@@ -1929,7 +1929,7 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
   );
 }
 
-function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName }) {
+function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNavigate }) {
   const pageSize = 25;
   const pageFetchLimit = 10000;
   const branchExportOptions = [
@@ -2657,6 +2657,9 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName }) {
               </span>
             ) : null}
           </button>
+          {branchCode ? (
+            <NotificationBell branchCode={branchCode} onNavigate={onNavigate} />
+          ) : null}
         </form>
       </div>
 
@@ -7139,12 +7142,6 @@ export default function App() {
               <span className="branch-context-current warning">ยังไม่ได้ตั้ง branch context</span>
             )}
           </div> : null}
-          {branchCode ? (
-            <NotificationBell
-              branchCode={branchCode}
-              onNavigate={() => setView("stock-requests")}
-            />
-          ) : null}
           <button
             type="button"
             className="ghost-button theme-toggle"
@@ -7206,6 +7203,7 @@ export default function App() {
           isAdminUser={isAdminUser}
           branchCode={branchCode}
           branchName={activeBranchName}
+          onNavigate={() => setView("stock-requests")}
         />
       ) : view === "stock-requests" ? (
         <StockRequestsPanel branchCode={branchCode} csrfToken={session.csrfToken} />
