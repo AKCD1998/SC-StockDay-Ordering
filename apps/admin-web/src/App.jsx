@@ -3227,85 +3227,146 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName }) {
         </div>
       )}
 
-      {requestDialogProduct ? (
-        <div className="dialog-overlay" onClick={closeRequestDialog}>
-          <div
-            className="dialog-card request-dialog-card"
-            onClick={(event) => event.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="request-product-title"
-          >
-            <div className="dialog-header">
-              <div>
-                <h3 id="request-product-title">เพิ่มรายการคำขอสินค้า</h3>
-                <p>สาขาผู้ขอ: {requestBranchLabel}</p>
+      {requestDialogProduct ? (() => {
+        const totalRequestedQty = Object.values(requestQuantities).reduce(
+          (sum, v) => sum + (Number(v) || 0), 0
+        );
+        return (
+          <div className="rq-overlay" onClick={closeRequestDialog}>
+            <div
+              className="rq-dialog"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="rq-dialog-title"
+            >
+              {/* Product info header */}
+              <div className="rq-dialog-header">
+                <div className="rq-dialog-product-info" id="rq-dialog-title">
+                  <span className="rq-product-code">{requestDialogProduct.productCode}</span>
+                  {requestDialogProduct.productNameThai ? (
+                    <span className="rq-product-name-th">{requestDialogProduct.productNameThai}</span>
+                  ) : null}
+                  {requestDialogProduct.productNameEng ? (
+                    <span className="rq-product-name-en">{requestDialogProduct.productNameEng}</span>
+                  ) : null}
+                  {requestDialogProduct.barcode ? (
+                    <span className="rq-product-meta">บาร์โค้ด: {requestDialogProduct.barcode}</span>
+                  ) : null}
+                  {requestDialogProduct.category ? (
+                    <span className="rq-product-meta">หมวด: {requestDialogProduct.category}</span>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  className="rq-close-btn"
+                  onClick={closeRequestDialog}
+                  aria-label="ปิด"
+                >
+                  ✕
+                </button>
               </div>
-              <button type="button" className="ghost-button dialog-close-button" onClick={closeRequestDialog}>
-                ปิด
-              </button>
-            </div>
 
-            <div className="request-dialog-product">
-              <strong>{requestDialogProduct.productNameThai || requestDialogProduct.productNameEng || requestDialogProduct.productCode}</strong>
-              <p className="meta-line">
-                {requestDialogProduct.productCode} · หน่วย {requestDialogProduct.unit || "-"}
-              </p>
-            </div>
+              {/* Body */}
+              <div className="rq-dialog-body">
+                {/* Branch rows */}
+                <div className="rq-branch-table">
+                  <div className="rq-branch-table-head">
+                    <span>สาขา</span>
+                    <span>คงเหลือ</span>
+                    <span>จำนวนที่ขอ</span>
+                    <span>หน่วย</span>
+                  </div>
+                  {getRequestableBranches(requestDialogProduct).map((branch) => {
+                    const stockQty = getBranchStockQty(requestDialogProduct, branch.branchCode);
+                    const reqQty = Number(requestQuantities[branch.branchCode] || 0);
+                    return (
+                      <div key={branch.branchCode} className="rq-branch-row">
+                        <span className="rq-branch-name">
+                          {BRANCH_LABELS[branch.branchCode] || `สาขา ${branch.branchCode}`}
+                        </span>
+                        <span className="rq-branch-stock">{formatNumber(stockQty, 2)}</span>
+                        <div className="rq-qty-stepper">
+                          <button
+                            type="button"
+                            className="rq-qty-btn rq-qty-minus"
+                            onClick={() =>
+                              setRequestQuantities((c) => ({
+                                ...c,
+                                [branch.branchCode]: Math.max(0, Number(c[branch.branchCode] || 0) - 1),
+                              }))
+                            }
+                            disabled={reqQty <= 0}
+                          >
+                            −
+                          </button>
+                          <input
+                            type="number"
+                            className="rq-qty-input"
+                            min="0"
+                            step="1"
+                            value={requestQuantities[branch.branchCode] ?? ""}
+                            onChange={(event) =>
+                              setRequestQuantities((c) => ({
+                                ...c,
+                                [branch.branchCode]: event.target.value,
+                              }))
+                            }
+                            placeholder="0"
+                          />
+                          <button
+                            type="button"
+                            className="rq-qty-btn rq-qty-plus"
+                            onClick={() =>
+                              setRequestQuantities((c) => ({
+                                ...c,
+                                [branch.branchCode]: Number(c[branch.branchCode] || 0) + 1,
+                              }))
+                            }
+                          >
+                            +
+                          </button>
+                        </div>
+                        <span className="rq-branch-unit">{requestDialogProduct.unit || "-"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
 
-            <div className="request-branch-availability">
-              {getRequestableBranches(requestDialogProduct).map((branch) => {
-                const qty = getBranchStockQty(requestDialogProduct, branch.branchCode);
-                return (
-                  <label
-                    key={`${requestDialogProduct.productCode}-${branch.branchCode}`}
-                    className="request-branch-pill available request-branch-input-card"
-                  >
-                    <span>{BRANCH_LABELS[branch.branchCode] || `สาขา ${branch.branchCode}`}</span>
-                    <strong>{formatNumber(qty, 2)} {requestDialogProduct.unit || ""}</strong>
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      value={requestQuantities[branch.branchCode] ?? ""}
-                      onChange={(event) =>
-                        setRequestQuantities((current) => ({
-                          ...current,
-                          [branch.branchCode]: event.target.value,
-                        }))
-                      }
-                      placeholder="จำนวนที่ขอ"
-                    />
-                  </label>
-                );
-              })}
-            </div>
+                {/* Summary panel */}
+                <div className="rq-dialog-summary">
+                  <div className="rq-summary-item">
+                    <span className="rq-summary-label">สาขาของคุณ</span>
+                    <span className="rq-summary-val">{requestBranchLabel}</span>
+                  </div>
+                  <div className="rq-summary-item rq-summary-total-box">
+                    <span className="rq-summary-label">จำนวนทั้งหมดที่ขอ</span>
+                    <span className="rq-total-num">{totalRequestedQty}</span>
+                  </div>
+                  <div className="rq-summary-item">
+                    <span className="rq-summary-label">หน่วยสินค้า</span>
+                    <span className="rq-summary-val">{requestDialogProduct.unit || "-"}</span>
+                  </div>
+                </div>
+              </div>
 
-            <div className="request-dialog-form">
-              <label>
-                หมายเหตุรายบรรทัด
-                <textarea
-                  rows="3"
-                  value={requestLineNote}
-                  onChange={(event) => setRequestLineNote(event.target.value)}
-                  placeholder="เช่น ขอเติมหน้าร้าน / ลูกค้าสั่งจอง"
-                />
-              </label>
-            </div>
+              {requestDialogError ? (
+                <p className="notice error compact" style={{ margin: "0 20px" }}>{requestDialogError}</p>
+              ) : null}
 
-            {requestDialogError ? <p className="notice error compact">{requestDialogError}</p> : null}
-
-            <div className="dialog-actions">
-              <button type="button" className="ghost-button" onClick={closeRequestDialog}>
-                ยกเลิก
-              </button>
-              <button type="button" className="request-entry-button active" onClick={(e) => handleAddDraftItem(e)}>
-                เพิ่มเข้าคำขอ
-              </button>
+              {/* Footer */}
+              <div className="rq-dialog-footer">
+                <button type="button" className="rq-btn-confirm" onClick={(e) => handleAddDraftItem(e)}>
+                  ยืนยันใส่ตะกร้า
+                </button>
+                <button type="button" className="rq-btn-cancel" onClick={closeRequestDialog}>
+                  ยกเลิก
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      ) : null}
+        );
+      })() : null}
 
       {reviewDialogOpen ? (
         <div className="srq-checkout-overlay" role="dialog" aria-modal="true" aria-label="สร้างคำขอขอสินค้า">
