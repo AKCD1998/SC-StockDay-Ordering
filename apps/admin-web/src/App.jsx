@@ -3226,6 +3226,217 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName }) {
           </div>
         </div>
       )}
+
+      {requestDialogProduct ? (
+        <div className="dialog-overlay" onClick={closeRequestDialog}>
+          <div
+            className="dialog-card request-dialog-card"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="request-product-title"
+          >
+            <div className="dialog-header">
+              <div>
+                <h3 id="request-product-title">เพิ่มรายการคำขอสินค้า</h3>
+                <p>สาขาผู้ขอ: {requestBranchLabel}</p>
+              </div>
+              <button type="button" className="ghost-button dialog-close-button" onClick={closeRequestDialog}>
+                ปิด
+              </button>
+            </div>
+
+            <div className="request-dialog-product">
+              <strong>{requestDialogProduct.productNameThai || requestDialogProduct.productNameEng || requestDialogProduct.productCode}</strong>
+              <p className="meta-line">
+                {requestDialogProduct.productCode} · หน่วย {requestDialogProduct.unit || "-"}
+              </p>
+            </div>
+
+            <div className="request-branch-availability">
+              {getRequestableBranches(requestDialogProduct).map((branch) => {
+                const qty = getBranchStockQty(requestDialogProduct, branch.branchCode);
+                return (
+                  <label
+                    key={`${requestDialogProduct.productCode}-${branch.branchCode}`}
+                    className="request-branch-pill available request-branch-input-card"
+                  >
+                    <span>{BRANCH_LABELS[branch.branchCode] || `สาขา ${branch.branchCode}`}</span>
+                    <strong>{formatNumber(qty, 2)} {requestDialogProduct.unit || ""}</strong>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={requestQuantities[branch.branchCode] ?? ""}
+                      onChange={(event) =>
+                        setRequestQuantities((current) => ({
+                          ...current,
+                          [branch.branchCode]: event.target.value,
+                        }))
+                      }
+                      placeholder="จำนวนที่ขอ"
+                    />
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="request-dialog-form">
+              <label>
+                หมายเหตุรายบรรทัด
+                <textarea
+                  rows="3"
+                  value={requestLineNote}
+                  onChange={(event) => setRequestLineNote(event.target.value)}
+                  placeholder="เช่น ขอเติมหน้าร้าน / ลูกค้าสั่งจอง"
+                />
+              </label>
+            </div>
+
+            {requestDialogError ? <p className="notice error compact">{requestDialogError}</p> : null}
+
+            <div className="dialog-actions">
+              <button type="button" className="ghost-button" onClick={closeRequestDialog}>
+                ยกเลิก
+              </button>
+              <button type="button" className="request-entry-button active" onClick={(e) => handleAddDraftItem(e)}>
+                เพิ่มเข้าคำขอ
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {reviewDialogOpen ? (
+        <div className="srq-checkout-overlay" role="dialog" aria-modal="true" aria-label="สร้างคำขอขอสินค้า">
+          <div className="srq-checkout-header">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => !submittingRequest && setReviewDialogOpen(false)}
+              disabled={submittingRequest}
+              aria-label="กลับ"
+            >
+              ← กลับ
+            </button>
+            <div>
+              <h3>สร้างคำขอขอสินค้า</h3>
+              <p className="meta-line">สาขาผู้ขอ: {requestBranchLabel} · {requestDraftCount} รายการ</p>
+            </div>
+          </div>
+
+          <div className="srq-checkout-body">
+            {[...requestDraftByBranch.entries()].map(([sourceBranchCode, items]) => (
+              <details key={sourceBranchCode} className="srq-branch-group" open>
+                <summary>
+                  ขอจาก: {BRANCH_LABELS[sourceBranchCode] ?? `สาขา ${sourceBranchCode}`}
+                  <span className="meta-line" style={{ fontWeight: 400, marginLeft: 8 }}>({items.length} รายการ)</span>
+                </summary>
+                <div className="srq-branch-group-body">
+                  {items.map((item) => (
+                    <div key={item.lineKey} className="srq-checkout-line">
+                      <div>
+                        <strong>{item.productNameThai || item.productNameEng || item.productCode}</strong>
+                        <span className="meta-line"> {item.productCode}</span>
+                      </div>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={item.requestedQty}
+                        onChange={(event) => patchDraftItem(item.lineKey, { requestedQty: event.target.value })}
+                        disabled={submittingRequest}
+                        aria-label="จำนวน"
+                      />
+                      <span>{item.unit || ""}</span>
+                      <input
+                        type="text"
+                        value={item.lineNote || ""}
+                        onChange={(event) => patchDraftItem(item.lineKey, { lineNote: event.target.value })}
+                        placeholder="หมายเหตุ"
+                        disabled={submittingRequest}
+                        aria-label="หมายเหตุรายบรรทัด"
+                      />
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() => removeDraftItem(item.lineKey)}
+                        disabled={submittingRequest}
+                        aria-label="ลบรายการ"
+                      >
+                        ลบ
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ))}
+
+            <div className="srq-checkout-note-section">
+              <label>
+                หมายเหตุรวมทั้งคำขอ
+                <textarea
+                  rows="3"
+                  value={requestBatchNote}
+                  onChange={(event) => setRequestBatchNote(event.target.value)}
+                  placeholder="เช่น เร่งด่วน / ใช้ขายหน้าร้าน / ลูกค้ารับของวันนี้"
+                  disabled={submittingRequest}
+                />
+              </label>
+            </div>
+
+            {requestSubmitError ? <p className="notice error compact">{requestSubmitError}</p> : null}
+          </div>
+
+          <div className="srq-checkout-actions">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => !submittingRequest && setReviewDialogOpen(false)}
+              disabled={submittingRequest}
+            >
+              กลับไปแก้ไข
+            </button>
+            <button
+              type="button"
+              className="srq-confirm-btn"
+              onClick={() => setCheckoutConfirmOpen(true)}
+              disabled={submittingRequest || !requestDraftCount}
+            >
+              ยืนยันส่งคำขอสินค้า
+            </button>
+          </div>
+
+          {checkoutConfirmOpen ? (
+            <div className="dialog-overlay" onClick={() => !submittingRequest && setCheckoutConfirmOpen(false)}>
+              <div className="dialog-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+                <div className="dialog-header">
+                  <h3>ยืนยันการส่งคำขอ?</h3>
+                </div>
+                <p style={{ padding: "0 0 16px" }}>
+                  รายการนี้จะถูกส่งไปยัง {requestDraftByBranch.size} สาขา รวม {requestDraftCount} รายการสินค้า
+                </p>
+                <div className="dialog-actions">
+                  <button type="button" className="ghost-button" onClick={() => setCheckoutConfirmOpen(false)} disabled={submittingRequest}>
+                    ยกเลิก
+                  </button>
+                  <button type="button" className="srq-confirm-btn" onClick={handleSubmitRequest} disabled={submittingRequest}>
+                    {submittingRequest ? "กำลังส่งคำขอ..." : "ยืนยัน"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {flyDots.map((dot) => (
+        <div
+          key={dot.id}
+          className="fly-dot flying"
+          style={{ left: dot.x, top: dot.y, "--tx": `${dot.tx}px`, "--ty": `${dot.ty}px` }}
+        />
+      ))}
     </section>
   );
 }
@@ -3547,217 +3758,6 @@ function StockCostAuditPanel({ branchCode }) {
           ) : null}
         </div>
       )}
-
-      {requestDialogProduct ? (
-        <div className="dialog-overlay" onClick={closeRequestDialog}>
-          <div
-            className="dialog-card request-dialog-card"
-            onClick={(event) => event.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="request-product-title"
-          >
-            <div className="dialog-header">
-              <div>
-                <h3 id="request-product-title">เพิ่มรายการคำขอสินค้า</h3>
-                <p>สาขาผู้ขอ: {requestBranchLabel}</p>
-              </div>
-              <button type="button" className="ghost-button dialog-close-button" onClick={closeRequestDialog}>
-                ปิด
-              </button>
-            </div>
-
-            <div className="request-dialog-product">
-              <strong>{requestDialogProduct.productNameThai || requestDialogProduct.productNameEng || requestDialogProduct.productCode}</strong>
-              <p className="meta-line">
-                {requestDialogProduct.productCode} · หน่วย {requestDialogProduct.unit || "-"}
-              </p>
-            </div>
-
-            <div className="request-branch-availability">
-              {getRequestableBranches(requestDialogProduct).map((branch) => {
-                const qty = getBranchStockQty(requestDialogProduct, branch.branchCode);
-                return (
-                  <label
-                    key={`${requestDialogProduct.productCode}-${branch.branchCode}`}
-                    className="request-branch-pill available request-branch-input-card"
-                  >
-                    <span>{BRANCH_LABELS[branch.branchCode] || `สาขา ${branch.branchCode}`}</span>
-                    <strong>{formatNumber(qty, 2)} {requestDialogProduct.unit || ""}</strong>
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      value={requestQuantities[branch.branchCode] ?? ""}
-                      onChange={(event) =>
-                        setRequestQuantities((current) => ({
-                          ...current,
-                          [branch.branchCode]: event.target.value,
-                        }))
-                      }
-                      placeholder="จำนวนที่ขอ"
-                    />
-                  </label>
-                );
-              })}
-            </div>
-
-            <div className="request-dialog-form">
-              <label>
-                หมายเหตุรายบรรทัด
-                <textarea
-                  rows="3"
-                  value={requestLineNote}
-                  onChange={(event) => setRequestLineNote(event.target.value)}
-                  placeholder="เช่น ขอเติมหน้าร้าน / ลูกค้าสั่งจอง"
-                />
-              </label>
-            </div>
-
-            {requestDialogError ? <p className="notice error compact">{requestDialogError}</p> : null}
-
-            <div className="dialog-actions">
-              <button type="button" className="ghost-button" onClick={closeRequestDialog}>
-                ยกเลิก
-              </button>
-              <button type="button" className="request-entry-button active" onClick={(e) => handleAddDraftItem(e)}>
-                เพิ่มเข้าคำขอ
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {reviewDialogOpen ? (
-        <div className="srq-checkout-overlay" role="dialog" aria-modal="true" aria-label="สร้างคำขอขอสินค้า">
-          <div className="srq-checkout-header">
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => !submittingRequest && setReviewDialogOpen(false)}
-              disabled={submittingRequest}
-              aria-label="กลับ"
-            >
-              ← กลับ
-            </button>
-            <div>
-              <h3>สร้างคำขอขอสินค้า</h3>
-              <p className="meta-line">สาขาผู้ขอ: {requestBranchLabel} · {requestDraftCount} รายการ</p>
-            </div>
-          </div>
-
-          <div className="srq-checkout-body">
-            {[...requestDraftByBranch.entries()].map(([sourceBranchCode, items]) => (
-              <details key={sourceBranchCode} className="srq-branch-group" open>
-                <summary>
-                  ขอจาก: {BRANCH_LABELS[sourceBranchCode] ?? `สาขา ${sourceBranchCode}`}
-                  <span className="meta-line" style={{ fontWeight: 400, marginLeft: 8 }}>({items.length} รายการ)</span>
-                </summary>
-                <div className="srq-branch-group-body">
-                  {items.map((item) => (
-                    <div key={item.lineKey} className="srq-checkout-line">
-                      <div>
-                        <strong>{item.productNameThai || item.productNameEng || item.productCode}</strong>
-                        <span className="meta-line"> {item.productCode}</span>
-                      </div>
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={item.requestedQty}
-                        onChange={(event) => patchDraftItem(item.lineKey, { requestedQty: event.target.value })}
-                        disabled={submittingRequest}
-                        aria-label="จำนวน"
-                      />
-                      <span>{item.unit || ""}</span>
-                      <input
-                        type="text"
-                        value={item.lineNote || ""}
-                        onChange={(event) => patchDraftItem(item.lineKey, { lineNote: event.target.value })}
-                        placeholder="หมายเหตุ"
-                        disabled={submittingRequest}
-                        aria-label="หมายเหตุรายบรรทัด"
-                      />
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        onClick={() => removeDraftItem(item.lineKey)}
-                        disabled={submittingRequest}
-                        aria-label="ลบรายการ"
-                      >
-                        ลบ
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </details>
-            ))}
-
-            <div className="srq-checkout-note-section">
-              <label>
-                หมายเหตุรวมทั้งคำขอ
-                <textarea
-                  rows="3"
-                  value={requestBatchNote}
-                  onChange={(event) => setRequestBatchNote(event.target.value)}
-                  placeholder="เช่น เร่งด่วน / ใช้ขายหน้าร้าน / ลูกค้ารับของวันนี้"
-                  disabled={submittingRequest}
-                />
-              </label>
-            </div>
-
-            {requestSubmitError ? <p className="notice error compact">{requestSubmitError}</p> : null}
-          </div>
-
-          <div className="srq-checkout-actions">
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => !submittingRequest && setReviewDialogOpen(false)}
-              disabled={submittingRequest}
-            >
-              กลับไปแก้ไข
-            </button>
-            <button
-              type="button"
-              className="srq-confirm-btn"
-              onClick={() => setCheckoutConfirmOpen(true)}
-              disabled={submittingRequest || !requestDraftCount}
-            >
-              ยืนยันส่งคำขอสินค้า
-            </button>
-          </div>
-
-          {checkoutConfirmOpen ? (
-            <div className="dialog-overlay" onClick={() => !submittingRequest && setCheckoutConfirmOpen(false)}>
-              <div className="dialog-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-                <div className="dialog-header">
-                  <h3>ยืนยันการส่งคำขอ?</h3>
-                </div>
-                <p style={{ padding: "0 0 16px" }}>
-                  รายการนี้จะถูกส่งไปยัง {requestDraftByBranch.size} สาขา รวม {requestDraftCount} รายการสินค้า
-                </p>
-                <div className="dialog-actions">
-                  <button type="button" className="ghost-button" onClick={() => setCheckoutConfirmOpen(false)} disabled={submittingRequest}>
-                    ยกเลิก
-                  </button>
-                  <button type="button" className="srq-confirm-btn" onClick={handleSubmitRequest} disabled={submittingRequest}>
-                    {submittingRequest ? "กำลังส่งคำขอ..." : "ยืนยัน"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {flyDots.map((dot) => (
-        <div
-          key={dot.id}
-          className="fly-dot flying"
-          style={{ left: dot.x, top: dot.y, "--tx": `${dot.tx}px`, "--ty": `${dot.ty}px` }}
-        />
-      ))}
     </section>
   );
 }
