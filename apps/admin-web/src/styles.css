@@ -4729,7 +4729,15 @@ select {
   gap: 12px;
   padding-bottom: 6px;
 }
-.srq-total-label { color: #526578; font-size: 0.9rem; }
+.srq-total-label { color: #526578; font-size: 0.9rem; flex: 1; }
+.srq-alert-count { color: #dc2626; font-weight: 700; }
+.srq-branch-filter {
+  border: 1px solid #c8d3e2;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 0.85rem;
+}
 
 /* ─── Batch / Incoming Cards ────────────────────────────────────── */
 .srq-batch-card {

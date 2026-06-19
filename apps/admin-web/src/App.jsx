@@ -4224,31 +4224,50 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
   );
 }
 
-function IncomingRequestsTab({ branchCode, csrfToken, onIncomingNotificationsChanged }) {
+function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomingNotificationsChanged }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [expandedId, setExpandedId] = useState(null);
+  const [filterBranch, setFilterBranch] = useState("");
+
+  const canLoad = isAdmin || Boolean(branchCode);
 
   useEffect(() => {
-    if (!branchCode) return undefined;
+    if (!canLoad) return undefined;
     let active = true;
     setLoading(true);
-    apiFetch("/api/stock-requests/incoming")
+    const params = isAdmin && filterBranch ? `?branch=${encodeURIComponent(filterBranch)}` : "";
+    apiFetch(`/api/stock-requests/incoming${params}`)
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then((data) => { if (active) setRecords(data.records || []); })
       .catch(() => { if (active) setRecords([]); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [branchCode, refreshKey]);
+  }, [branchCode, isAdmin, filterBranch, refreshKey, canLoad]);
 
-  if (!branchCode) return <p className="notice warning compact">ต้องเลือกสาขาที่ใช้งานก่อนจึงจะดูคำขอที่เข้ามาได้</p>;
-  if (loading)    return <p className="notice compact">กำลังโหลด...</p>;
+  if (!canLoad) return <p className="notice warning compact">ต้องเลือกสาขาที่ใช้งานก่อนจึงจะดูคำขอที่เข้ามาได้</p>;
+  if (loading)  return <p className="notice compact">กำลังโหลด...</p>;
+
+  const adminAlertCount = records.filter((r) => r.isAdminAlert && r.status === "SUBMITTED" && !r.responseResult).length;
 
   return (
     <div className="srq-tab-body">
       <div className="srq-tab-toolbar">
-        <span className="srq-total-label">{records.length} รายการ</span>
+        <span className="srq-total-label">{records.length} รายการ{adminAlertCount > 0 ? <span className="srq-alert-count"> · 🔴 {adminAlertCount} แจ้งจัดซื้อรอดำเนินการ</span> : null}</span>
+        {isAdmin ? (
+          <select
+            className="srq-branch-filter"
+            value={filterBranch}
+            onChange={(e) => { setFilterBranch(e.target.value); setExpandedId(null); }}
+            aria-label="กรองตามสาขา"
+          >
+            <option value="">ทุกสาขา</option>
+            {["000","001","003","004","005"].map((code) => (
+              <option key={code} value={code}>{BRANCH_LABELS[code] ?? `สาขา ${code}`}</option>
+            ))}
+          </select>
+        ) : null}
         <button type="button" className="ghost-button" onClick={() => setRefreshKey((k) => k + 1)}>รีเฟรช</button>
       </div>
       {records.length === 0 ? (
@@ -4604,6 +4623,7 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
 
 function StockRequestsPanel({
   branchCode,
+  isAdmin = false,
   csrfToken,
   requestDraftItems,
   setRequestDraftItems,
@@ -4614,7 +4634,7 @@ function StockRequestsPanel({
   incomingNotifCount = 0,
   onIncomingNotificationsChanged,
 }) {
-  const [activeTab, setActiveTab] = useState("mine");
+  const [activeTab, setActiveTab] = useState(isAdmin ? "incoming" : "mine");
 
   return (
     <section className="panel srq-panel">
@@ -4651,6 +4671,7 @@ function StockRequestsPanel({
       ) : (
         <IncomingRequestsTab
           branchCode={branchCode}
+          isAdmin={isAdmin}
           csrfToken={csrfToken}
           onIncomingNotificationsChanged={onIncomingNotificationsChanged}
         />
@@ -7472,7 +7493,7 @@ export default function App() {
         </nav>
 
         <div className="account-actions">
-          {(session?.user?.role === "admin" || !branchCode) ? <div className="branch-context-card">
+          {(!branchCode && session?.user?.role !== "admin") ? <div className="branch-context-card">
             <span className="branch-context-label">สาขาที่ใช้งาน</span>
             {canSelectBranchContext ? (
               <div className="branch-context-controls">
@@ -7588,6 +7609,7 @@ export default function App() {
       ) : view === "stock-requests" ? (
         <StockRequestsPanel
           branchCode={branchCode}
+          isAdmin={isAdminUser}
           csrfToken={session.csrfToken}
           requestDraftItems={requestDraftItems}
           setRequestDraftItems={setRequestDraftItems}
