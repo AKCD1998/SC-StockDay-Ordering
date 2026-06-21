@@ -5516,13 +5516,13 @@ select {
   background-size: 100% 22px;
 }
 .srq-preview-table tr > *:first-child {
-  border-left: none;
+  border-left: 1px solid #c8d3e2;
 }
 .srq-preview-table tr > *:last-child {
-  border-right: none;
+  border-right: 1px solid #c8d3e2;
 }
 .srq-preview-table tbody tr:last-child td {
-  border-bottom: none;
+  border-bottom: 1px solid #c8d3e2;
 }
 
 @media print {

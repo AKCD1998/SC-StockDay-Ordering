@@ -4196,6 +4196,8 @@ function PackingPreviewModal({ detail, onClose }) {
                     <th colSpan="6">
                       <div className="srq-preview-header-grid">
                         <div className="packing-doc-header srq-preview-meta-block">
+                          <div><strong>เอกสารตรวจนับสินค้าก่อนจัดแพ๊ค</strong></div>
+                          <div>เลขที่คำขอ: <span className="mono">{detail?.publicId || "-"}</span></div>
                           <div>จากสาขาต้นทาง: <strong>{requestingBranchLabel}</strong></div>
                           <div>ตรวจที่สาขาผู้ถูกขอ: <strong>{sourceBranchLabel}</strong></div>
                           <div>พิมพ์เมื่อ: {formatDateTime(new Date().toISOString())}</div>
