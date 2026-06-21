@@ -3897,6 +3897,73 @@ function RequestDocumentsModal({ requestPublicId, documents, onClose }) {
   );
 }
 
+function PackingPreviewModal({ detail, onClose }) {
+  const pendingLines = (detail?.lines || []).filter((line) => !line?.response);
+  const sourceBranchLabel = BRANCH_LABELS[detail?.sourceBranchCode] ?? `สาขา ${detail?.sourceBranchCode || "-"}`;
+  const requestingBranchLabel = BRANCH_LABELS[detail?.requestingBranchCode] ?? `สาขา ${detail?.requestingBranchCode || "-"}`;
+
+  return (
+    <div className="dialog-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="พรีวิวเอกสารสำหรับจัดแพ๊ค">
+      <div className="dialog-card packing-document-modal srq-preview-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="dialog-header">
+          <div>
+            <h3>พรีวิวเอกสารสำหรับจัดแพ๊ค</h3>
+            <p>เลขที่คำขอ {detail?.publicId}</p>
+          </div>
+          <button type="button" className="ghost-button dialog-close-button" onClick={onClose}>ปิด</button>
+        </div>
+        <div className="packing-document-print">
+          <section className="srq-doc-sheet srq-preview-sheet">
+            <div className="packing-doc-header">
+              <div><strong>เอกสารตรวจนับสินค้าก่อนจัดแพ๊ค</strong></div>
+              <div>เลขที่คำขอ: <span className="mono">{detail?.publicId || "-"}</span></div>
+              <div>จากสาขาต้นทาง: <strong>{requestingBranchLabel}</strong></div>
+              <div>ตรวจที่สาขาผู้ถูกขอ: <strong>{sourceBranchLabel}</strong></div>
+              <div>พิมพ์เมื่อ: {formatDateTime(new Date().toISOString())}</div>
+              <div>รายการที่ยังไม่ผ่านการดำเนินการ: <strong>{formatNumber(pendingLines.length, 0)}</strong> รายการ</div>
+            </div>
+
+            {pendingLines.length > 0 ? (
+              <table className="packing-doc-table srq-preview-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>รหัสสินค้าของบริษัท</th>
+                    <th>ชื่อยาภาษาไทย</th>
+                    <th>สต๊อกสาขาผู้ถูกขอ</th>
+                    <th>จำนวนที่สาขาต้นทางขอ</th>
+                    <th>ทดว่าจะให้เท่าไหร่</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingLines.map((line, index) => (
+                    <tr key={line.lineId || `${line.productCode}-${index}`}>
+                      <td>{index + 1}</td>
+                      <td className="mono">{line.productCode || "-"}</td>
+                      <td>{line.productNameThai || line.productNameEng || "-"}</td>
+                      <td>{line.snapshotQty != null ? `${formatNumber(line.snapshotQty, 0)} ${line.unit || ""}`.trim() : "-"}</td>
+                      <td>{`${formatNumber(line.requestedQty, 0)} ${line.unit || ""}`.trim()}</td>
+                      <td className="srq-preview-note-cell">&nbsp;</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="notice compact">คำขอนี้ดำเนินการครบแล้ว ไม่มีรายการค้างสำหรับพรีวิวเอกสาร</p>
+            )}
+          </section>
+        </div>
+        <div className="dialog-actions">
+          <button type="button" className="ghost-button" onClick={onClose}>ปิด</button>
+          <button type="button" className="primary-button" onClick={() => window.print()} disabled={pendingLines.length === 0}>
+            พิมพ์ / บันทึก PDF
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function IncomingRequestActionModal({ detail, csrfToken, onClose, onCompleted }) {
   const [lineStates, setLineStates] = useState(() => {
     const initial = {};
@@ -4217,6 +4284,7 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [actionOpen, setActionOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [batchSiblings, setBatchSiblings] = useState([]);
 
   useEffect(() => {
@@ -4247,6 +4315,8 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
   if (error)   return <div className="srq-detail-body"><p className="notice error compact">{error}</p></div>;
   if (!detail) return null;
 
+  const pendingPreviewLines = (detail.lines || []).filter((line) => !line?.response);
+
   return (
     <>
       <div className="srq-detail-body">
@@ -4256,6 +4326,16 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
             <p className="meta-line">คำขอ {detail.lines?.length || 0} รายการ · เวอร์ชัน {detail.version}</p>
           </div>
           <div className="srq-detail-summary-status">
+            <button
+              type="button"
+              className="ghost-button srq-preview-btn"
+              onClick={() => setPreviewOpen(true)}
+              disabled={pendingPreviewLines.length === 0}
+              title={pendingPreviewLines.length === 0 ? "คำขอนี้ดำเนินการครบแล้ว" : "พรีวิวเอกสารสำหรับจัดแพ๊ค"}
+            >
+              <span aria-hidden="true">👁</span>
+              <span>พรีวิวเอกสารสำหรับจัดแพ๊ค</span>
+            </button>
             <button type="button" className="srq-submit-btn srq-submit-btn-compact" onClick={() => setActionOpen(true)}>
               {detail.status === "SUBMITTED" ? "ดำเนินการ" : "ดูผลการดำเนินการ"}
             </button>
@@ -4317,6 +4397,13 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
             setRefreshKey((current) => current + 1);
             onResponseSubmitted();
           }}
+        />
+      ) : null}
+
+      {previewOpen ? (
+        <PackingPreviewModal
+          detail={detail}
+          onClose={() => setPreviewOpen(false)}
         />
       ) : null}
     </>
