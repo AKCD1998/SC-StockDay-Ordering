@@ -39,6 +39,53 @@ const defaultAdminView = "receipts";
 const stockCostAuditView = "stock-cost-audit";
 const adminOnlyViews = [stockCostAuditView, "category-review", "ingredient-dictionary", "sync-log"];
 const adminViewKeys = [defaultAdminView, "branch-stock", "movement-trace", "stock-requests", ...adminOnlyViews];
+const STOCK_REQUEST_BRANCH_FILTER_CODES = ["000", "001", "003", "004", "005"];
+const CODE39_PATTERNS = {
+  "0": "nnnwwnwnn",
+  "1": "wnnwnnnnw",
+  "2": "nnwwnnnnw",
+  "3": "wnwwnnnnn",
+  "4": "nnnwwnnnw",
+  "5": "wnnwwnnnn",
+  "6": "nnwwwnnnn",
+  "7": "nnnwnnwnw",
+  "8": "wnnwnnwnn",
+  "9": "nnwwnnwnn",
+  A: "wnnnnwnnw",
+  B: "nnwnnwnnw",
+  C: "wnwnnwnnn",
+  D: "nnnnwwnnw",
+  E: "wnnnwwnnn",
+  F: "nnwnwwnnn",
+  G: "nnnnnwwnw",
+  H: "wnnnnwwnn",
+  I: "nnwnnwwnn",
+  J: "nnnnwwwnn",
+  K: "wnnnnnnww",
+  L: "nnwnnnnww",
+  M: "wnwnnnnwn",
+  N: "nnnnwnnww",
+  O: "wnnnwnnwn",
+  P: "nnwnwnnwn",
+  Q: "nnnnnnwww",
+  R: "wnnnnnwwn",
+  S: "nnwnnnwwn",
+  T: "nnnnwnwwn",
+  U: "wwnnnnnnw",
+  V: "nwwnnnnnw",
+  W: "wwwnnnnnn",
+  X: "nwnnwnnnw",
+  Y: "wwnnwnnnn",
+  Z: "nwwnwnnnn",
+  "-": "nwnnnnwnw",
+  ".": "wwnnnnwnn",
+  " ": "nwwnnnwnn",
+  $: "nwnwnwnnn",
+  "/": "nwnwnnnwn",
+  "+": "nwnnnwnwn",
+  "%": "nnnwnwnwn",
+  "*": "nwnnwnwnn",
+};
 
 function getNavigationGroups(isAdminUser) {
   return [
@@ -116,6 +163,222 @@ function formatDateInputValue(value) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function dedupeBranchCodes(values = []) {
+  return Array.from(new Set((values || []).filter(Boolean)));
+}
+
+function normalizeSearchNeedle(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function includesNeedle(haystackParts = [], needle = "") {
+  if (!needle) return true;
+  const haystack = haystackParts
+    .filter((part) => part !== null && part !== undefined && part !== "")
+    .map((part) => String(part).toLowerCase())
+    .join(" ");
+  return haystack.includes(needle);
+}
+
+function getBatchSourceBranchCodes(record, batchDetail = null) {
+  if (Array.isArray(record?.sourceBranchCodes) && record.sourceBranchCodes.length > 0) {
+    return dedupeBranchCodes(record.sourceBranchCodes);
+  }
+  if (record?.sourceBranchCode) {
+    return [record.sourceBranchCode];
+  }
+  if (Array.isArray(batchDetail?.requests) && batchDetail.requests.length > 0) {
+    return dedupeBranchCodes(batchDetail.requests.map((request) => request.sourceBranchCode));
+  }
+  return [];
+}
+
+function matchesIncomingSearch(record, detail, needle) {
+  if (!needle) return true;
+  const baseParts = [
+    record?.requestPublicId,
+    record?.requestingBranchCode,
+    BRANCH_LABELS[record?.requestingBranchCode] ?? "",
+    record?.status,
+  ];
+  const lineParts = (detail?.lines || []).flatMap((line) => ([
+    line?.productCode,
+    line?.productNameThai,
+    line?.productNameEng,
+    line?.barcode,
+  ]));
+  return includesNeedle([...baseParts, ...lineParts], needle);
+}
+
+function matchesMyRequestSearch(record, batchDetail, needle) {
+  if (!needle) return true;
+  const requestSourceCodes = getBatchSourceBranchCodes(record, batchDetail);
+  const requestSourceLabels = requestSourceCodes.map((code) => BRANCH_LABELS[code] ?? `สาขา ${code}`);
+  const baseParts = [
+    record?.batchPublicId,
+    ...(record?.sourceBranchCodes || []),
+    ...requestSourceLabels,
+    record?.status,
+    batchDetail?.note,
+  ];
+  const requestParts = (batchDetail?.requests || []).flatMap((request) => ([
+    request?.publicId,
+    request?.sourceBranchCode,
+    BRANCH_LABELS[request?.sourceBranchCode] ?? "",
+    ...(request?.lines || []).flatMap((line) => ([
+      line?.productCode,
+      line?.productNameThai,
+      line?.productNameEng,
+      line?.barcode,
+    ])),
+  ]));
+  return includesNeedle([...baseParts, ...requestParts], needle);
+}
+
+function BranchMultiSelectFilter({ label, selectedCodes, onChange, active = false }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+  const selectedCount = selectedCodes.length;
+  const allSelected = selectedCount === STOCK_REQUEST_BRANCH_FILTER_CODES.length;
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function handlePointerDown(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+    function handleEscape(event) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [open]);
+
+  function toggleBranch(branchCode) {
+    if (selectedCodes.includes(branchCode)) {
+      onChange(selectedCodes.filter((code) => code !== branchCode));
+      return;
+    }
+    onChange([...selectedCodes, branchCode].sort());
+  }
+
+  const summaryText = allSelected
+    ? `${label}: ทุกสาขา`
+    : selectedCount === 0
+      ? `${label}: ไม่เลือก`
+      : `${label}: ${selectedCount} สาขา`;
+
+  return (
+    <div className="srq-branch-multifilter" ref={containerRef}>
+      <button
+        type="button"
+        className={`ghost-button srq-branch-multifilter-button${active ? " srq-filter-active" : ""}`}
+        onClick={() => setOpen((current) => !current)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <span>{summaryText}</span>
+        <span className="srq-branch-multifilter-chevron" aria-hidden="true">{open ? "▴" : "▾"}</span>
+      </button>
+      {open ? (
+        <div className="srq-branch-multifilter-menu" role="menu" aria-label={label}>
+          <div className="srq-branch-multifilter-actions">
+            <button
+              type="button"
+              className="ghost-button srq-branch-multifilter-action"
+              onClick={() => onChange([...STOCK_REQUEST_BRANCH_FILTER_CODES])}
+            >
+              เลือกทั้งหมด
+            </button>
+            <button
+              type="button"
+              className="ghost-button srq-branch-multifilter-action"
+              onClick={() => onChange([])}
+            >
+              ไม่เลือก
+            </button>
+          </div>
+          <div className="srq-branch-multifilter-list">
+            {STOCK_REQUEST_BRANCH_FILTER_CODES.map((branchCode) => (
+              <label key={branchCode} className="srq-branch-multifilter-option">
+                <input
+                  type="checkbox"
+                  checked={selectedCodes.includes(branchCode)}
+                  onChange={() => toggleBranch(branchCode)}
+                />
+                <span>{BRANCH_LABELS[branchCode] ?? `สาขา ${branchCode}`}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Code39Barcode({ value, height = 56, narrow = 2, wide = 5, gap = 2 }) {
+  const normalizedValue = String(value || "").trim().toUpperCase();
+  if (!normalizedValue) return null;
+
+  const encoded = `*${normalizedValue}*`;
+  const patterns = [];
+  for (const char of encoded) {
+    const pattern = CODE39_PATTERNS[char];
+    if (!pattern) return null;
+    patterns.push(pattern);
+  }
+
+  const rects = [];
+  let cursor = 0;
+  patterns.forEach((pattern, patternIndex) => {
+    for (let i = 0; i < pattern.length; i += 1) {
+      const width = pattern[i] === "w" ? wide : narrow;
+      const isBar = i % 2 === 0;
+      if (isBar) {
+        rects.push(
+          <rect
+            key={`${patternIndex}-${i}-${cursor}`}
+            x={cursor}
+            y="0"
+            width={width}
+            height={height}
+            rx="0.4"
+          />,
+        );
+      }
+      cursor += width;
+    }
+    if (patternIndex < patterns.length - 1) {
+      cursor += gap;
+    }
+  });
+
+  return (
+    <div className="srq-barcode-block" aria-label={`บาร์โค้ด ${normalizedValue}`}>
+      <svg
+        className="srq-barcode-svg"
+        viewBox={`0 0 ${cursor} ${height}`}
+        width="100%"
+        height={height}
+        role="img"
+        aria-hidden="true"
+      >
+        <g fill="currentColor">
+          {rects}
+        </g>
+      </svg>
+      <div className="srq-barcode-text mono">{normalizedValue}</div>
+    </div>
+  );
 }
 
 function translateStatus(status) {
@@ -3932,6 +4195,10 @@ function PackingPreviewModal({ detail, onClose }) {
               <div>พิมพ์เมื่อ: {formatDateTime(new Date().toISOString())}</div>
               <div>รายการสินค้าที่สาขาต้นทางขอมา: <strong>{formatNumber(requestLines.length, 0)}</strong> รายการ</div>
             </div>
+            <div className="srq-preview-barcode-panel">
+              <div className="srq-preview-barcode-label">บาร์โค้ดเลขที่คำขอ</div>
+              <Code39Barcode value={detail?.publicId || ""} />
+            </div>
 
             {requestLines.length > 0 ? (
               <table className="packing-doc-table srq-preview-table">
@@ -4428,8 +4695,46 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
   const [filterSingleDate, setFilterSingleDate] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
+  const [selectedRequestingBranches, setSelectedRequestingBranches] = useState(() => [...STOCK_REQUEST_BRANCH_FILTER_CODES]);
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchDetailCache, setSearchDetailCache] = useState({});
 
   const canLoad = isAdmin || Boolean(branchCode);
+
+  useEffect(() => {
+    setSelectedRequestingBranches([...STOCK_REQUEST_BRANCH_FILTER_CODES]);
+  }, [branchCode, isAdmin]);
+
+  async function ensureSearchDetails(candidateRecords) {
+    const missingIds = candidateRecords
+      .map((record) => record.requestPublicId)
+      .filter((publicId) => publicId && !searchDetailCache[publicId]);
+
+    if (missingIds.length === 0) return;
+
+    const results = await Promise.all(
+      missingIds.map(async (publicId) => {
+        try {
+          const res = await apiFetch(`/api/stock-requests/incoming/${encodeURIComponent(publicId)}`);
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) return [publicId, null];
+          return [publicId, data.request || null];
+        } catch {
+          return [publicId, null];
+        }
+      }),
+    );
+
+    setSearchDetailCache((current) => {
+      const next = { ...current };
+      results.forEach(([publicId, detail]) => {
+        next[publicId] = detail;
+      });
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!canLoad) return undefined;
@@ -4444,10 +4749,13 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
     return () => { active = false; };
   }, [branchCode, isAdmin, filterBranch, refreshKey, canLoad]);
 
-  if (!canLoad) return <p className="notice warning compact">ต้องเลือกสาขาที่ใช้งานก่อนจึงจะดูคำขอที่เข้ามาได้</p>;
-  if (loading)  return <p className="notice compact">กำลังโหลด...</p>;
-
-  const filteredRecords = records.filter((record) => {
+  const baseFilteredRecords = records.filter((record) => {
+    if (selectedRequestingBranches.length > 0 && !selectedRequestingBranches.includes(record.requestingBranchCode)) {
+      return false;
+    }
+    if (selectedRequestingBranches.length === 0) {
+      return false;
+    }
     const createdDate = formatDateInputValue(record.createdAt);
     if (dateFilterMode === "single") {
       return !filterSingleDate || createdDate === filterSingleDate;
@@ -4459,16 +4767,63 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
     return true;
   });
 
+  const normalizedAppliedSearch = normalizeSearchNeedle(appliedSearch);
+  const filteredRecords = baseFilteredRecords.filter((record) =>
+    matchesIncomingSearch(record, searchDetailCache[record.requestPublicId], normalizedAppliedSearch),
+  );
+  const searchCandidateKey = baseFilteredRecords.map((record) => record.requestPublicId).join("|");
+
   const adminAlertCount = filteredRecords.filter((r) => r.isAdminAlert && r.status === "SUBMITTED" && !r.responseResult).length;
   const hasActiveDateFilter =
     dateFilterMode === "single"
-      ? Boolean(filterSingleDate)
+      ? dateFilterMode !== "all"
       : dateFilterMode === "range"
-        ? Boolean(filterDateFrom || filterDateTo)
+        ? dateFilterMode !== "all"
         : false;
+  const hasActiveRequestingBranchFilter = selectedRequestingBranches.length !== STOCK_REQUEST_BRANCH_FILTER_CODES.length;
+  const hasActiveSearch = Boolean(normalizedAppliedSearch);
+
+  useEffect(() => {
+    let active = true;
+    if (!normalizedAppliedSearch) return undefined;
+    setSearching(true);
+    ensureSearchDetails(baseFilteredRecords)
+      .finally(() => {
+        if (active) setSearching(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [normalizedAppliedSearch, searchCandidateKey]);
+
+  async function handleSearchSubmit(event) {
+    event?.preventDefault?.();
+    const nextSearch = normalizeSearchNeedle(searchInput);
+    setSearching(true);
+    try {
+      if (nextSearch) {
+        await ensureSearchDetails(baseFilteredRecords);
+      }
+      setAppliedSearch(searchInput);
+      setExpandedId(null);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  if (!canLoad) return <p className="notice warning compact">ต้องเลือกสาขาที่ใช้งานก่อนจึงจะดูคำขอที่เข้ามาได้</p>;
+  if (loading)  return <p className="notice compact">กำลังโหลด...</p>;
 
   return (
-    <div className="srq-tab-body">
+    <div className="srq-tab-body srq-filter-shell">
+      {searching ? (
+        <div className="srq-search-loading-overlay" aria-live="polite" aria-label="กำลังค้นหารายการคำขอ">
+          <div className="srq-search-loading-card">
+            <strong>กำลังค้นหา...</strong>
+            <span>กำลังสืบค้น transaction และรายการสินค้า</span>
+          </div>
+        </div>
+      ) : null}
       <div className="srq-tab-toolbar">
         <span className="srq-total-label">{filteredRecords.length} รายการ{adminAlertCount > 0 ? <span className="srq-alert-count"> · 🔴 {adminAlertCount} แจ้งจัดซื้อรอดำเนินการ</span> : null}</span>
         {isAdmin ? (
@@ -4484,9 +4839,31 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
             ))}
           </select>
         ) : null}
+        <BranchMultiSelectFilter
+          label="สาขาที่ขอมา"
+          selectedCodes={selectedRequestingBranches}
+          onChange={(codes) => {
+            setSelectedRequestingBranches(codes);
+            setExpandedId(null);
+          }}
+          active={hasActiveRequestingBranchFilter}
+        />
+        <form className="srq-search-form" onSubmit={handleSearchSubmit}>
+          <input
+            type="text"
+            className={`srq-search-input${hasActiveSearch ? " srq-filter-active" : ""}`}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="ค้นหา transaction, IC, 630, ชื่อยา, barcode"
+            aria-label="ค้นหา transaction หรือสินค้าในคำขอที่รับเข้า"
+          />
+          <button type="submit" className="ghost-button srq-search-submit" disabled={searching}>
+            {searching ? "กำลังค้นหา..." : "ค้นหา"}
+          </button>
+        </form>
         <div className="srq-date-filter-group">
           <select
-            className="srq-branch-filter srq-date-filter-mode"
+            className={`srq-branch-filter srq-date-filter-mode${hasActiveDateFilter ? " srq-filter-active" : ""}`}
             value={dateFilterMode}
             onChange={(e) => {
               const nextMode = e.target.value;
@@ -4507,7 +4884,7 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
           {dateFilterMode === "single" ? (
             <input
               type="date"
-              className="srq-branch-filter srq-date-filter-input"
+              className={`srq-branch-filter srq-date-filter-input${hasActiveDateFilter ? " srq-filter-active" : ""}`}
               value={filterSingleDate}
               onChange={(e) => { setFilterSingleDate(e.target.value); setExpandedId(null); }}
               aria-label="เลือกวันเดียว"
@@ -4517,7 +4894,7 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
             <>
               <input
                 type="date"
-                className="srq-branch-filter srq-date-filter-input"
+                className={`srq-branch-filter srq-date-filter-input${hasActiveDateFilter ? " srq-filter-active" : ""}`}
                 value={filterDateFrom}
                 onChange={(e) => { setFilterDateFrom(e.target.value); setExpandedId(null); }}
                 aria-label="วันที่เริ่มต้น"
@@ -4525,7 +4902,7 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
               <span className="srq-date-filter-separator">ถึง</span>
               <input
                 type="date"
-                className="srq-branch-filter srq-date-filter-input"
+                className={`srq-branch-filter srq-date-filter-input${hasActiveDateFilter ? " srq-filter-active" : ""}`}
                 value={filterDateTo}
                 min={filterDateFrom || undefined}
                 onChange={(e) => { setFilterDateTo(e.target.value); setExpandedId(null); }}
@@ -4549,10 +4926,31 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
             </button>
           ) : null}
         </div>
+        {hasActiveSearch ? (
+          <button
+            type="button"
+            className="ghost-button srq-date-filter-clear"
+            onClick={() => {
+              setSearchInput("");
+              setAppliedSearch("");
+              setExpandedId(null);
+            }}
+          >
+            ล้างค้นหา
+          </button>
+        ) : null}
         <button type="button" className="ghost-button" onClick={() => setRefreshKey((k) => k + 1)}>รีเฟรช</button>
       </div>
       {filteredRecords.length === 0 ? (
-        <p className="notice compact">{records.length === 0 ? "ยังไม่มีคำขอสินค้าเข้ามา" : "ไม่พบคำขอสินค้าในช่วงวันที่ที่เลือก"}</p>
+        <p className="notice compact">
+          {records.length === 0
+            ? "ยังไม่มีคำขอสินค้าเข้ามา"
+            : hasActiveSearch
+              ? "ไม่พบ transaction หรือสินค้าที่ตรงกับคำค้น"
+              : (hasActiveDateFilter || hasActiveRequestingBranchFilter)
+                ? "ไม่พบคำขอสินค้าที่ตรงกับตัวกรองที่เลือก"
+                : "ยังไม่มีคำขอสินค้าเข้ามา"}
+        </p>
       ) : filteredRecords.map((req) => {
         const isPureAlert = req.isAdminAlert && !req.isMixedMode && req.status === "SUBMITTED" && !req.responseResult;
         const isMixedIncoming = req.isAdminAlert && req.isMixedMode && req.status === "SUBMITTED" && !req.responseResult;
@@ -4617,6 +5015,10 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
   const [filterSingleDate, setFilterSingleDate] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
+  const [selectedSourceBranches, setSelectedSourceBranches] = useState(() => [...STOCK_REQUEST_BRANCH_FILTER_CODES]);
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [searching, setSearching] = useState(false);
 
   const draftItems = requestDraftItems || [];
   const draftCount = draftItems.length;
@@ -4683,6 +5085,39 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
     return () => { active = false; };
   }, [branchCode, refreshKey]);
 
+  useEffect(() => {
+    setSelectedSourceBranches([...STOCK_REQUEST_BRANCH_FILTER_CODES]);
+  }, [branchCode]);
+
+  async function ensureBatchDetails(candidateRecords) {
+    const missingIds = candidateRecords
+      .map((record) => record.batchPublicId)
+      .filter((publicId) => publicId && !detailCache[publicId]);
+
+    if (missingIds.length === 0) return;
+
+    const results = await Promise.all(
+      missingIds.map(async (publicId) => {
+        try {
+          const res = await apiFetch(`/api/stock-requests/${encodeURIComponent(publicId)}`);
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) return [publicId, null];
+          return [publicId, data.batch || null];
+        } catch {
+          return [publicId, null];
+        }
+      }),
+    );
+
+    setDetailCache((current) => {
+      const next = { ...current };
+      results.forEach(([publicId, detail]) => {
+        next[publicId] = detail;
+      });
+      return next;
+    });
+  }
+
   async function handleExpand(batchPublicId) {
     if (expandedId === batchPublicId) {
       setExpandedId(null);
@@ -4720,9 +5155,14 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
     }
   }
 
-  if (!branchCode) return <p className="notice warning compact">ต้องเลือกสาขาที่ใช้งานก่อนจึงจะดูคำขอสินค้าของฉันได้</p>;
-
-  const filteredRecords = records.filter((record) => {
+  const baseFilteredRecords = records.filter((record) => {
+    const sourceBranchCodes = getBatchSourceBranchCodes(record, detailCache[record.batchPublicId]);
+    if (selectedSourceBranches.length === 0) {
+      return false;
+    }
+    if (sourceBranchCodes.length > 0 && !sourceBranchCodes.some((code) => selectedSourceBranches.includes(code))) {
+      return false;
+    }
     const createdDate = formatDateInputValue(record.createdAt);
     if (dateFilterMode === "single") {
       return !filterSingleDate || createdDate === filterSingleDate;
@@ -4734,15 +5174,61 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
     return true;
   });
 
+  const normalizedAppliedSearch = normalizeSearchNeedle(appliedSearch);
+  const filteredRecords = baseFilteredRecords.filter((record) =>
+    matchesMyRequestSearch(record, detailCache[record.batchPublicId], normalizedAppliedSearch),
+  );
+  const searchCandidateKey = baseFilteredRecords.map((record) => record.batchPublicId).join("|");
+
   const hasActiveDateFilter =
     dateFilterMode === "single"
-      ? Boolean(filterSingleDate)
+      ? dateFilterMode !== "all"
       : dateFilterMode === "range"
-        ? Boolean(filterDateFrom || filterDateTo)
+        ? dateFilterMode !== "all"
         : false;
+  const hasActiveSourceBranchFilter = selectedSourceBranches.length !== STOCK_REQUEST_BRANCH_FILTER_CODES.length;
+  const hasActiveSearch = Boolean(normalizedAppliedSearch);
+
+  useEffect(() => {
+    let active = true;
+    if (!normalizedAppliedSearch) return undefined;
+    setSearching(true);
+    ensureBatchDetails(baseFilteredRecords)
+      .finally(() => {
+        if (active) setSearching(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [normalizedAppliedSearch, searchCandidateKey]);
+
+  async function handleSearchSubmit(event) {
+    event?.preventDefault?.();
+    setSearching(true);
+    try {
+      const nextSearch = normalizeSearchNeedle(searchInput);
+      if (nextSearch) {
+        await ensureBatchDetails(baseFilteredRecords);
+      }
+      setAppliedSearch(searchInput);
+      setExpandedId(null);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  if (!branchCode) return <p className="notice warning compact">ต้องเลือกสาขาที่ใช้งานก่อนจึงจะดูคำขอสินค้าของฉันได้</p>;
 
   return (
-    <div className="srq-tab-body">
+    <div className="srq-tab-body srq-filter-shell">
+      {searching ? (
+        <div className="srq-search-loading-overlay" aria-live="polite" aria-label="กำลังค้นหารายการคำขอ">
+          <div className="srq-search-loading-card">
+            <strong>กำลังค้นหา...</strong>
+            <span>กำลังสืบค้น transaction และรายการสินค้า</span>
+          </div>
+        </div>
+      ) : null}
 
       {draftCount > 0 ? (
         <div className="srq-draft-inline">
@@ -4851,9 +5337,31 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
 
       <div className="srq-tab-toolbar">
         <span className="srq-total-label">{loading ? "กำลังโหลด..." : `${filteredRecords.length} รายการ`}</span>
+        <BranchMultiSelectFilter
+          label="สาขาที่ขอไป"
+          selectedCodes={selectedSourceBranches}
+          onChange={(codes) => {
+            setSelectedSourceBranches(codes);
+            setExpandedId(null);
+          }}
+          active={hasActiveSourceBranchFilter}
+        />
+        <form className="srq-search-form" onSubmit={handleSearchSubmit}>
+          <input
+            type="text"
+            className={`srq-search-input${hasActiveSearch ? " srq-filter-active" : ""}`}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="ค้นหา transaction, IC, 630, ชื่อยา, barcode"
+            aria-label="ค้นหา transaction หรือสินค้าในคำขอของฉัน"
+          />
+          <button type="submit" className="ghost-button srq-search-submit" disabled={searching}>
+            {searching ? "กำลังค้นหา..." : "ค้นหา"}
+          </button>
+        </form>
         <div className="srq-date-filter-group">
           <select
-            className="srq-branch-filter srq-date-filter-mode"
+            className={`srq-branch-filter srq-date-filter-mode${hasActiveDateFilter ? " srq-filter-active" : ""}`}
             value={dateFilterMode}
             onChange={(e) => {
               const nextMode = e.target.value;
@@ -4874,7 +5382,7 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
           {dateFilterMode === "single" ? (
             <input
               type="date"
-              className="srq-branch-filter srq-date-filter-input"
+              className={`srq-branch-filter srq-date-filter-input${hasActiveDateFilter ? " srq-filter-active" : ""}`}
               value={filterSingleDate}
               onChange={(e) => { setFilterSingleDate(e.target.value); setExpandedId(null); }}
               aria-label="เลือกวันเดียว"
@@ -4884,7 +5392,7 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
             <>
               <input
                 type="date"
-                className="srq-branch-filter srq-date-filter-input"
+                className={`srq-branch-filter srq-date-filter-input${hasActiveDateFilter ? " srq-filter-active" : ""}`}
                 value={filterDateFrom}
                 onChange={(e) => { setFilterDateFrom(e.target.value); setExpandedId(null); }}
                 aria-label="วันที่เริ่มต้น"
@@ -4892,7 +5400,7 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
               <span className="srq-date-filter-separator">ถึง</span>
               <input
                 type="date"
-                className="srq-branch-filter srq-date-filter-input"
+                className={`srq-branch-filter srq-date-filter-input${hasActiveDateFilter ? " srq-filter-active" : ""}`}
                 value={filterDateTo}
                 min={filterDateFrom || undefined}
                 onChange={(e) => { setFilterDateTo(e.target.value); setExpandedId(null); }}
@@ -4916,11 +5424,32 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
             </button>
           ) : null}
         </div>
+        {hasActiveSearch ? (
+          <button
+            type="button"
+            className="ghost-button srq-date-filter-clear"
+            onClick={() => {
+              setSearchInput("");
+              setAppliedSearch("");
+              setExpandedId(null);
+            }}
+          >
+            ล้างค้นหา
+          </button>
+        ) : null}
         <button type="button" className="ghost-button" onClick={() => setRefreshKey((k) => k + 1)}>รีเฟรช</button>
       </div>
       {ackError ? <p className="notice error compact">{ackError}</p> : null}
       {filteredRecords.length === 0 && draftCount === 0 ? (
-        <p className="notice compact">{records.length === 0 ? "ยังไม่มีคำขอสินค้า" : "ไม่พบคำขอสินค้าในช่วงวันที่ที่เลือก"}</p>
+        <p className="notice compact">
+          {records.length === 0
+            ? "ยังไม่มีคำขอสินค้า"
+            : hasActiveSearch
+              ? "ไม่พบ transaction หรือสินค้าที่ตรงกับคำค้น"
+              : (hasActiveDateFilter || hasActiveSourceBranchFilter)
+                ? "ไม่พบคำขอสินค้าที่ตรงกับตัวกรองที่เลือก"
+                : "ยังไม่มีคำขอสินค้า"}
+        </p>
       ) : filteredRecords.map((batch) => {
         const isOpen = expandedId === batch.batchPublicId;
         const detail = detailCache[batch.batchPublicId] || null;

@@ -4749,6 +4749,9 @@ select {
   background: #fff7ed;
 }
 .srq-tab-body { display: grid; gap: 10px; }
+.srq-filter-shell {
+  position: relative;
+}
 .srq-tab-toolbar {
   display: flex;
   align-items: center;
@@ -4766,6 +4769,68 @@ select {
   font-size: 0.85rem;
   width: 160px;
   flex-shrink: 0;
+}
+.srq-filter-active {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.22);
+}
+.srq-branch-multifilter {
+  position: relative;
+  flex-shrink: 0;
+}
+.srq-branch-multifilter-button {
+  min-width: 178px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.srq-branch-multifilter-chevron {
+  font-size: 0.76rem;
+}
+.srq-branch-multifilter-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: 260px;
+  padding: 12px;
+  border: 1px solid #d7dfeb;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+  display: grid;
+  gap: 10px;
+}
+.srq-branch-multifilter-actions {
+  display: flex;
+  gap: 8px;
+}
+.srq-branch-multifilter-action {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+}
+.srq-branch-multifilter-list {
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.srq-branch-multifilter-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: #1f2937;
+  cursor: pointer;
+}
+.srq-branch-multifilter-option:hover {
+  background: #f5f8fc;
+}
+.srq-branch-multifilter-option input {
+  margin: 0;
 }
 .srq-date-filter-group {
   display: inline-flex;
@@ -4787,6 +4852,55 @@ select {
 .srq-date-filter-clear {
   padding: 8px 12px;
   font-size: 0.82rem;
+}
+.srq-search-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.srq-search-input {
+  width: min(360px, 42vw);
+  min-width: 240px;
+  border: 1px solid #c8d3e2;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 0.85rem;
+  background: #ffffff;
+  color: #1f2937;
+}
+.srq-search-submit {
+  padding: 8px 14px;
+  font-size: 0.82rem;
+}
+.srq-search-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  background: rgba(248, 250, 252, 0.72);
+  backdrop-filter: blur(2px);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.srq-search-loading-card {
+  min-width: 240px;
+  display: grid;
+  gap: 4px;
+  text-align: center;
+  padding: 16px 18px;
+  border: 1px solid #d7dfeb;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #16324f;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+}
+.srq-search-loading-card span {
+  color: #526578;
+  font-size: 0.84rem;
 }
 
 /* ─── Batch / Incoming Cards ────────────────────────────────────── */
@@ -5278,6 +5392,37 @@ select {
 .srq-preview-sheet {
   margin-bottom: 0;
 }
+.srq-preview-barcode-panel {
+  display: grid;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 8px;
+  padding: 10px 12px 8px;
+  border: 1px solid #d7dfeb;
+  border-radius: 12px;
+  background: #ffffff;
+}
+.srq-preview-barcode-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #526578;
+}
+.srq-barcode-block {
+  display: grid;
+  gap: 6px;
+  width: min(100%, 420px);
+  color: #111827;
+}
+.srq-barcode-svg {
+  display: block;
+}
+.srq-barcode-text {
+  text-align: center;
+  font-size: 0.86rem;
+  letter-spacing: 0.08em;
+  color: #111827;
+}
 .packing-doc-table {
   width: 100%;
   min-width: 860px;
@@ -5390,6 +5535,12 @@ select {
   body > .srq-preview-overlay .packing-doc-header {
     margin: 0 0 12px !important;
   }
+  body > .srq-preview-overlay .srq-preview-barcode-panel,
+  body > .srq-preview-overlay .srq-barcode-block,
+  body > .srq-preview-overlay .srq-barcode-text {
+    background: #fff !important;
+    color: #111827 !important;
+  }
   body > .srq-preview-overlay .packing-doc-table th,
   body > .srq-preview-overlay .packing-doc-table td {
     border-color: #94a3b8 !important;
@@ -5406,6 +5557,14 @@ select {
 [data-theme="dark"] .srq-checkout-overlay        { background: #0c1520; }
 [data-theme="dark"] .srq-checkout-header         { background: rgba(16,26,40,0.95); border-color: #263547; }
 [data-theme="dark"] .srq-checkout-actions        { background: rgba(16,26,40,0.95); border-color: #263547; }
+[data-theme="dark"] .srq-search-input            { background: #132133; border-color: #263547; color: #e5edf7; }
+[data-theme="dark"] .srq-search-loading-overlay  { background: rgba(12, 21, 32, 0.72); }
+[data-theme="dark"] .srq-search-loading-card     { background: rgba(19, 33, 51, 0.96); border-color: #263547; color: #f8fbff; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.42); }
+[data-theme="dark"] .srq-search-loading-card span { color: #b8c7d9; }
+[data-theme="dark"] .srq-filter-active           { box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.28); }
+[data-theme="dark"] .srq-branch-multifilter-menu { background: rgba(15, 25, 39, 0.98); border-color: #263547; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.38); }
+[data-theme="dark"] .srq-branch-multifilter-option { color: #e5edf7; }
+[data-theme="dark"] .srq-branch-multifilter-option:hover { background: #1a2a3d; }
 [data-theme="dark"] .srq-preview-close-btn       { color: #ffffff; }
 [data-theme="dark"] .srq-preview-print-btn       { color: #ffffff; }
 [data-theme="dark"] .srq-clear-draft-btn         { background: #dc2626; color: #fff; }
@@ -5443,6 +5602,10 @@ select {
 [data-theme="dark"] .srq-chevron                 { color: #c5d2e3; }
 [data-theme="dark"] .srq-admin-alert-pill        { background: rgba(255, 228, 230, 0.94); color: #9f1239; }
 [data-theme="dark"] .srq-batch-body              { background: #0f1927; }
+[data-theme="dark"] .srq-preview-barcode-panel   { background: #132133; border-color: #263547; }
+[data-theme="dark"] .srq-preview-barcode-label   { color: #b8c7d9; }
+[data-theme="dark"] .srq-barcode-block,
+[data-theme="dark"] .srq-barcode-text            { color: #f8fbff; }
 [data-theme="dark"] .srq-status-chip.waiting     { background: #fff1dc; color: #9a3412; border-color: rgba(154, 52, 18, 0.24); }
 [data-theme="dark"] .srq-status-chip.responded   { background: #dcfce7; color: #166534; border-color: rgba(22, 101, 52, 0.2); }
 [data-theme="dark"] .srq-status-chip.done        { background: #e5e7eb; color: #374151; border-color: rgba(55, 65, 81, 0.18); }
