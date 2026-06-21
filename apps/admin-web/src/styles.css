@@ -5410,10 +5410,10 @@ select {
   display: grid;
   gap: 8px;
   width: 100%;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
+  padding: 10px 12px 8px;
+  border: 1px solid #d7dfeb;
+  border-radius: 12px;
+  background: #ffffff;
 }
 .srq-preview-barcode-label {
   font-size: 0.82rem;
@@ -5514,6 +5514,15 @@ select {
   height: 46px;
   background-image: linear-gradient(to bottom, transparent calc(100% - 1px), rgba(15, 23, 42, 0.12) 0);
   background-size: 100% 22px;
+}
+.srq-preview-table tr > *:first-child {
+  border-left: none;
+}
+.srq-preview-table tr > *:last-child {
+  border-right: none;
+}
+.srq-preview-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 @media print {
