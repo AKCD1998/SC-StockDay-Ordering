@@ -4754,6 +4754,7 @@ select {
   align-items: center;
   gap: 12px;
   padding-bottom: 6px;
+  flex-wrap: wrap;
 }
 .srq-total-label { color: #526578; font-size: 0.9rem; flex: 1; }
 .srq-alert-count { color: #dc2626; font-weight: 700; }
@@ -4765,6 +4766,27 @@ select {
   font-size: 0.85rem;
   width: 160px;
   flex-shrink: 0;
+}
+.srq-date-filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.srq-date-filter-mode {
+  width: 122px;
+}
+.srq-date-filter-input {
+  width: 150px;
+}
+.srq-date-filter-separator {
+  color: #526578;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+.srq-date-filter-clear {
+  padding: 8px 12px;
+  font-size: 0.82rem;
 }
 
 /* ─── Batch / Incoming Cards ────────────────────────────────────── */
@@ -5006,6 +5028,15 @@ select {
 .srq-preview-close-btn:hover {
   background: #b91c1c;
   border-color: #b91c1c;
+}
+.srq-preview-print-btn {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #111827;
+}
+.srq-preview-print-btn:hover {
+  background: #15803d;
+  border-color: #15803d;
 }
 .srq-submit-btn-compact {
   padding: 7px 16px;
@@ -5376,6 +5407,7 @@ select {
 [data-theme="dark"] .srq-checkout-header         { background: rgba(16,26,40,0.95); border-color: #263547; }
 [data-theme="dark"] .srq-checkout-actions        { background: rgba(16,26,40,0.95); border-color: #263547; }
 [data-theme="dark"] .srq-preview-close-btn       { color: #ffffff; }
+[data-theme="dark"] .srq-preview-print-btn       { color: #ffffff; }
 [data-theme="dark"] .srq-clear-draft-btn         { background: #dc2626; color: #fff; }
 [data-theme="dark"] .srq-clear-draft-btn:hover   { background: #b91c1c; }
 [data-theme="dark"] .srq-remove-line-btn         { background: #dc2626; color: #fff; }

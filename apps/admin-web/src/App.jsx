@@ -108,6 +108,16 @@ function formatDateTime(value) {
   return new Date(value).toLocaleString("th-TH");
 }
 
+function formatDateInputValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function translateStatus(status) {
   if (status === "Reorder soon") return "ควรสั่งซื้อเพิ่ม";
   if (status === "Overstock / slow moving") return "ค้างสต็อก / เคลื่อนไหวช้า";
@@ -3955,7 +3965,7 @@ function PackingPreviewModal({ detail, onClose }) {
         </div>
         <div className="dialog-actions">
           <button type="button" className="ghost-button srq-preview-close-btn" onClick={onClose}>ปิด</button>
-          <button type="button" className="primary-button" onClick={() => window.print()} disabled={requestLines.length === 0}>
+          <button type="button" className="primary-button srq-preview-print-btn" onClick={() => window.print()} disabled={requestLines.length === 0}>
             พิมพ์ / บันทึก PDF
           </button>
         </div>
@@ -4414,6 +4424,10 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
   const [refreshKey, setRefreshKey] = useState(0);
   const [expandedId, setExpandedId] = useState(null);
   const [filterBranch, setFilterBranch] = useState("");
+  const [dateFilterMode, setDateFilterMode] = useState("all");
+  const [filterSingleDate, setFilterSingleDate] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
 
   const canLoad = isAdmin || Boolean(branchCode);
 
@@ -4433,12 +4447,30 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
   if (!canLoad) return <p className="notice warning compact">ต้องเลือกสาขาที่ใช้งานก่อนจึงจะดูคำขอที่เข้ามาได้</p>;
   if (loading)  return <p className="notice compact">กำลังโหลด...</p>;
 
-  const adminAlertCount = records.filter((r) => r.isAdminAlert && r.status === "SUBMITTED" && !r.responseResult).length;
+  const filteredRecords = records.filter((record) => {
+    const createdDate = formatDateInputValue(record.createdAt);
+    if (dateFilterMode === "single") {
+      return !filterSingleDate || createdDate === filterSingleDate;
+    }
+    if (dateFilterMode === "range") {
+      if (filterDateFrom && createdDate < filterDateFrom) return false;
+      if (filterDateTo && createdDate > filterDateTo) return false;
+    }
+    return true;
+  });
+
+  const adminAlertCount = filteredRecords.filter((r) => r.isAdminAlert && r.status === "SUBMITTED" && !r.responseResult).length;
+  const hasActiveDateFilter =
+    dateFilterMode === "single"
+      ? Boolean(filterSingleDate)
+      : dateFilterMode === "range"
+        ? Boolean(filterDateFrom || filterDateTo)
+        : false;
 
   return (
     <div className="srq-tab-body">
       <div className="srq-tab-toolbar">
-        <span className="srq-total-label">{records.length} รายการ{adminAlertCount > 0 ? <span className="srq-alert-count"> · 🔴 {adminAlertCount} แจ้งจัดซื้อรอดำเนินการ</span> : null}</span>
+        <span className="srq-total-label">{filteredRecords.length} รายการ{adminAlertCount > 0 ? <span className="srq-alert-count"> · 🔴 {adminAlertCount} แจ้งจัดซื้อรอดำเนินการ</span> : null}</span>
         {isAdmin ? (
           <select
             className="srq-branch-filter"
@@ -4452,11 +4484,76 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
             ))}
           </select>
         ) : null}
+        <div className="srq-date-filter-group">
+          <select
+            className="srq-branch-filter srq-date-filter-mode"
+            value={dateFilterMode}
+            onChange={(e) => {
+              const nextMode = e.target.value;
+              setDateFilterMode(nextMode);
+              setExpandedId(null);
+              if (nextMode === "all") {
+                setFilterSingleDate("");
+                setFilterDateFrom("");
+                setFilterDateTo("");
+              }
+            }}
+            aria-label="รูปแบบการกรองวัน"
+          >
+            <option value="all">ทุกวัน</option>
+            <option value="single">เฉพาะวัน</option>
+            <option value="range">ช่วงวันที่</option>
+          </select>
+          {dateFilterMode === "single" ? (
+            <input
+              type="date"
+              className="srq-branch-filter srq-date-filter-input"
+              value={filterSingleDate}
+              onChange={(e) => { setFilterSingleDate(e.target.value); setExpandedId(null); }}
+              aria-label="เลือกวันเดียว"
+            />
+          ) : null}
+          {dateFilterMode === "range" ? (
+            <>
+              <input
+                type="date"
+                className="srq-branch-filter srq-date-filter-input"
+                value={filterDateFrom}
+                onChange={(e) => { setFilterDateFrom(e.target.value); setExpandedId(null); }}
+                aria-label="วันที่เริ่มต้น"
+              />
+              <span className="srq-date-filter-separator">ถึง</span>
+              <input
+                type="date"
+                className="srq-branch-filter srq-date-filter-input"
+                value={filterDateTo}
+                min={filterDateFrom || undefined}
+                onChange={(e) => { setFilterDateTo(e.target.value); setExpandedId(null); }}
+                aria-label="วันที่สิ้นสุด"
+              />
+            </>
+          ) : null}
+          {hasActiveDateFilter ? (
+            <button
+              type="button"
+              className="ghost-button srq-date-filter-clear"
+              onClick={() => {
+                setDateFilterMode("all");
+                setFilterSingleDate("");
+                setFilterDateFrom("");
+                setFilterDateTo("");
+                setExpandedId(null);
+              }}
+            >
+              ล้างวัน
+            </button>
+          ) : null}
+        </div>
         <button type="button" className="ghost-button" onClick={() => setRefreshKey((k) => k + 1)}>รีเฟรช</button>
       </div>
-      {records.length === 0 ? (
-        <p className="notice compact">ยังไม่มีคำขอสินค้าเข้ามา</p>
-      ) : records.map((req) => {
+      {filteredRecords.length === 0 ? (
+        <p className="notice compact">{records.length === 0 ? "ยังไม่มีคำขอสินค้าเข้ามา" : "ไม่พบคำขอสินค้าในช่วงวันที่ที่เลือก"}</p>
+      ) : filteredRecords.map((req) => {
         const isPureAlert = req.isAdminAlert && !req.isMixedMode && req.status === "SUBMITTED" && !req.responseResult;
         const isMixedIncoming = req.isAdminAlert && req.isMixedMode && req.status === "SUBMITTED" && !req.responseResult;
         const inCardExtra = isPureAlert ? " srq-batch-card-admin-alert" : isMixedIncoming ? " srq-batch-card-mixed" : "";
