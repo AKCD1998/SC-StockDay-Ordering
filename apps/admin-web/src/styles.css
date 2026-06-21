@@ -4998,6 +4998,15 @@ select {
   opacity: 0.55;
   cursor: not-allowed;
 }
+.srq-preview-close-btn {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #111827;
+}
+.srq-preview-close-btn:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
 .srq-submit-btn-compact {
   padding: 7px 16px;
   font-size: 0.85rem;
@@ -5366,6 +5375,7 @@ select {
 [data-theme="dark"] .srq-checkout-overlay        { background: #0c1520; }
 [data-theme="dark"] .srq-checkout-header         { background: rgba(16,26,40,0.95); border-color: #263547; }
 [data-theme="dark"] .srq-checkout-actions        { background: rgba(16,26,40,0.95); border-color: #263547; }
+[data-theme="dark"] .srq-preview-close-btn       { color: #ffffff; }
 [data-theme="dark"] .srq-clear-draft-btn         { background: #dc2626; color: #fff; }
 [data-theme="dark"] .srq-clear-draft-btn:hover   { background: #b91c1c; }
 [data-theme="dark"] .srq-remove-line-btn         { background: #dc2626; color: #fff; }

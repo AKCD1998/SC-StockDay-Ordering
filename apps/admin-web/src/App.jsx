@@ -3913,13 +3913,10 @@ function PackingPreviewModal({ detail, onClose }) {
             <h3>พรีวิวเอกสารสำหรับจัดแพ๊ค</h3>
             <p>เลขที่คำขอ {detail?.publicId}</p>
           </div>
-          <button type="button" className="ghost-button dialog-close-button" onClick={onClose}>ปิด</button>
         </div>
         <div className="packing-document-print">
           <section className="srq-doc-sheet srq-preview-sheet">
             <div className="packing-doc-header">
-              <div><strong>เอกสารตรวจนับสินค้าก่อนจัดแพ๊ค</strong></div>
-              <div>เลขที่คำขอ: <span className="mono">{detail?.publicId || "-"}</span></div>
               <div>จากสาขาต้นทาง: <strong>{requestingBranchLabel}</strong></div>
               <div>ตรวจที่สาขาผู้ถูกขอ: <strong>{sourceBranchLabel}</strong></div>
               <div>พิมพ์เมื่อ: {formatDateTime(new Date().toISOString())}</div>
@@ -3957,7 +3954,7 @@ function PackingPreviewModal({ detail, onClose }) {
           </section>
         </div>
         <div className="dialog-actions">
-          <button type="button" className="ghost-button" onClick={onClose}>ปิด</button>
+          <button type="button" className="ghost-button srq-preview-close-btn" onClick={onClose}>ปิด</button>
           <button type="button" className="primary-button" onClick={() => window.print()} disabled={requestLines.length === 0}>
             พิมพ์ / บันทึก PDF
           </button>
