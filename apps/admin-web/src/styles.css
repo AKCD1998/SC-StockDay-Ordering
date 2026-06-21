@@ -5470,20 +5470,29 @@ select {
 .packing-doc-table td:nth-child(8) { width: 120px; }
 .srq-preview-table {
   min-width: 980px;
+  table-layout: fixed;
+}
+.srq-preview-table th:nth-child(1),
+.srq-preview-table td:nth-child(1) {
+  width: 30px;
 }
 .srq-preview-table th:nth-child(2),
 .srq-preview-table td:nth-child(2) {
-  width: 140px;
+  width: 96px;
+}
+.srq-preview-table th:nth-child(3),
+.srq-preview-table td:nth-child(3) {
+  width: auto;
 }
 .srq-preview-table th:nth-child(4),
 .srq-preview-table td:nth-child(4),
 .srq-preview-table th:nth-child(5),
 .srq-preview-table td:nth-child(5) {
-  width: 140px;
+  width: 82px;
 }
 .srq-preview-table th:nth-child(6),
 .srq-preview-table td:nth-child(6) {
-  width: 180px;
+  width: 100px;
 }
 .srq-preview-note-cell {
   height: 46px;
