@@ -5583,7 +5583,7 @@ select {
     margin: 0 !important;
   }
   body > .srq-preview-overlay .srq-preview-header-row th {
-    padding: 0 0 10px !important;
+    padding: 10px 12px 10px !important;
     background: #fff !important;
   }
   body > .srq-preview-overlay .srq-preview-header-grid {
