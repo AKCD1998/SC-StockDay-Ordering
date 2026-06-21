@@ -5392,12 +5392,24 @@ select {
 .srq-preview-sheet {
   margin-bottom: 0;
 }
+.srq-preview-header-row th {
+  padding: 0 0 12px;
+  border: none;
+  background: transparent;
+}
+.srq-preview-header-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  gap: 16px;
+  align-items: start;
+}
+.srq-preview-meta-block {
+  margin-bottom: 0;
+}
 .srq-preview-barcode-panel {
   display: grid;
   gap: 8px;
-  width: fit-content;
-  max-width: 100%;
-  margin-bottom: 8px;
+  width: 100%;
   padding: 10px 12px 8px;
   border: 1px solid #d7dfeb;
   border-radius: 12px;
@@ -5411,16 +5423,17 @@ select {
 .srq-barcode-block {
   display: grid;
   gap: 6px;
-  width: min(100%, 420px);
+  width: 100%;
   color: #111827;
 }
 .srq-barcode-svg {
   display: block;
+  height: 42px;
 }
 .srq-barcode-text {
   text-align: center;
-  font-size: 0.86rem;
-  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
   color: #111827;
 }
 .packing-doc-table {
@@ -5533,7 +5546,15 @@ select {
     page-break-after: auto !important;
   }
   body > .srq-preview-overlay .packing-doc-header {
-    margin: 0 0 12px !important;
+    margin: 0 !important;
+  }
+  body > .srq-preview-overlay .srq-preview-header-row th {
+    padding: 0 0 10px !important;
+    background: #fff !important;
+  }
+  body > .srq-preview-overlay .srq-preview-header-grid {
+    grid-template-columns: minmax(0, 1fr) 240px !important;
+    gap: 12px !important;
   }
   body > .srq-preview-overlay .srq-preview-barcode-panel,
   body > .srq-preview-overlay .srq-barcode-block,
@@ -5602,6 +5623,7 @@ select {
 [data-theme="dark"] .srq-chevron                 { color: #c5d2e3; }
 [data-theme="dark"] .srq-admin-alert-pill        { background: rgba(255, 228, 230, 0.94); color: #9f1239; }
 [data-theme="dark"] .srq-batch-body              { background: #0f1927; }
+[data-theme="dark"] .srq-preview-header-row th   { background: transparent; }
 [data-theme="dark"] .srq-preview-barcode-panel   { background: #132133; border-color: #263547; }
 [data-theme="dark"] .srq-preview-barcode-label   { color: #b8c7d9; }
 [data-theme="dark"] .srq-barcode-block,

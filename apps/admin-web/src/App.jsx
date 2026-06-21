@@ -4189,20 +4189,25 @@ function PackingPreviewModal({ detail, onClose }) {
         </div>
         <div className="packing-document-print">
           <section className="srq-doc-sheet srq-preview-sheet">
-            <div className="packing-doc-header">
-              <div>จากสาขาต้นทาง: <strong>{requestingBranchLabel}</strong></div>
-              <div>ตรวจที่สาขาผู้ถูกขอ: <strong>{sourceBranchLabel}</strong></div>
-              <div>พิมพ์เมื่อ: {formatDateTime(new Date().toISOString())}</div>
-              <div>รายการสินค้าที่สาขาต้นทางขอมา: <strong>{formatNumber(requestLines.length, 0)}</strong> รายการ</div>
-            </div>
-            <div className="srq-preview-barcode-panel">
-              <div className="srq-preview-barcode-label">บาร์โค้ดเลขที่คำขอ</div>
-              <Code39Barcode value={detail?.publicId || ""} />
-            </div>
-
             {requestLines.length > 0 ? (
               <table className="packing-doc-table srq-preview-table">
                 <thead>
+                  <tr className="srq-preview-header-row">
+                    <th colSpan="6">
+                      <div className="srq-preview-header-grid">
+                        <div className="packing-doc-header srq-preview-meta-block">
+                          <div>จากสาขาต้นทาง: <strong>{requestingBranchLabel}</strong></div>
+                          <div>ตรวจที่สาขาผู้ถูกขอ: <strong>{sourceBranchLabel}</strong></div>
+                          <div>พิมพ์เมื่อ: {formatDateTime(new Date().toISOString())}</div>
+                          <div>รายการสินค้าที่สาขาต้นทางขอมา: <strong>{formatNumber(requestLines.length, 0)}</strong> รายการ</div>
+                        </div>
+                        <div className="srq-preview-barcode-panel">
+                          <div className="srq-preview-barcode-label">บาร์โค้ดเลขที่คำขอ</div>
+                          <Code39Barcode value={detail?.publicId || ""} />
+                        </div>
+                      </div>
+                    </th>
+                  </tr>
                   <tr>
                     <th>#</th>
                     <th>รหัสสินค้าของบริษัท</th>
