@@ -3898,7 +3898,7 @@ function RequestDocumentsModal({ requestPublicId, documents, onClose }) {
 }
 
 function PackingPreviewModal({ detail, onClose }) {
-  const pendingLines = (detail?.lines || []).filter((line) => !line?.response);
+  const requestLines = detail?.lines || [];
   const sourceBranchLabel = BRANCH_LABELS[detail?.sourceBranchCode] ?? `สาขา ${detail?.sourceBranchCode || "-"}`;
   const requestingBranchLabel = BRANCH_LABELS[detail?.requestingBranchCode] ?? `สาขา ${detail?.requestingBranchCode || "-"}`;
 
@@ -3920,10 +3920,10 @@ function PackingPreviewModal({ detail, onClose }) {
               <div>จากสาขาต้นทาง: <strong>{requestingBranchLabel}</strong></div>
               <div>ตรวจที่สาขาผู้ถูกขอ: <strong>{sourceBranchLabel}</strong></div>
               <div>พิมพ์เมื่อ: {formatDateTime(new Date().toISOString())}</div>
-              <div>รายการที่ยังไม่ผ่านการดำเนินการ: <strong>{formatNumber(pendingLines.length, 0)}</strong> รายการ</div>
+              <div>รายการสินค้าที่สาขาต้นทางขอมา: <strong>{formatNumber(requestLines.length, 0)}</strong> รายการ</div>
             </div>
 
-            {pendingLines.length > 0 ? (
+            {requestLines.length > 0 ? (
               <table className="packing-doc-table srq-preview-table">
                 <thead>
                   <tr>
@@ -3936,7 +3936,7 @@ function PackingPreviewModal({ detail, onClose }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {pendingLines.map((line, index) => (
+                  {requestLines.map((line, index) => (
                     <tr key={line.lineId || `${line.productCode}-${index}`}>
                       <td>{index + 1}</td>
                       <td className="mono">{line.productCode || "-"}</td>
@@ -3949,13 +3949,13 @@ function PackingPreviewModal({ detail, onClose }) {
                 </tbody>
               </table>
             ) : (
-              <p className="notice compact">คำขอนี้ดำเนินการครบแล้ว ไม่มีรายการค้างสำหรับพรีวิวเอกสาร</p>
+              <p className="notice compact">คำขอนี้ยังไม่มีรายการสินค้า</p>
             )}
           </section>
         </div>
         <div className="dialog-actions">
           <button type="button" className="ghost-button" onClick={onClose}>ปิด</button>
-          <button type="button" className="primary-button" onClick={() => window.print()} disabled={pendingLines.length === 0}>
+          <button type="button" className="primary-button" onClick={() => window.print()} disabled={requestLines.length === 0}>
             พิมพ์ / บันทึก PDF
           </button>
         </div>
@@ -4315,8 +4315,6 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
   if (error)   return <div className="srq-detail-body"><p className="notice error compact">{error}</p></div>;
   if (!detail) return null;
 
-  const pendingPreviewLines = (detail.lines || []).filter((line) => !line?.response);
-
   return (
     <>
       <div className="srq-detail-body">
@@ -4330,8 +4328,7 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
               type="button"
               className="ghost-button srq-preview-btn"
               onClick={() => setPreviewOpen(true)}
-              disabled={pendingPreviewLines.length === 0}
-              title={pendingPreviewLines.length === 0 ? "คำขอนี้ดำเนินการครบแล้ว" : "พรีวิวเอกสารสำหรับจัดแพ๊ค"}
+              title="พรีวิวเอกสารสำหรับจัดแพ๊ค"
             >
               <span aria-hidden="true">👁</span>
               <span>พรีวิวเอกสารสำหรับจัดแพ๊ค</span>
