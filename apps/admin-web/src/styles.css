@@ -5298,25 +5298,27 @@ select {
   body {
     background: #fff !important;
   }
-  body * {
-    visibility: hidden !important;
+  body > * {
+    display: none !important;
   }
-  .dialog-overlay,
-  .dialog-overlay * {
-    visibility: visible !important;
-  }
-  .dialog-overlay {
-    position: static !important;
-    inset: auto !important;
+  body > .srq-preview-overlay {
+    display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
     padding: 0 !important;
     background: #fff !important;
   }
-  .packing-document-modal {
+  body > .srq-preview-overlay .packing-document-modal {
     width: 100% !important;
     max-width: none !important;
     max-height: none !important;
     overflow: visible !important;
     margin: 0 !important;
+    padding: 0 !important;
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
@@ -5325,27 +5327,39 @@ select {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .packing-document-print,
-  .srq-doc-sheet,
-  .packing-doc-header,
-  .packing-doc-table,
-  .packing-doc-table th,
-  .packing-doc-table td {
+  body > .srq-preview-overlay .packing-document-print,
+  body > .srq-preview-overlay .srq-doc-sheet,
+  body > .srq-preview-overlay .packing-doc-header,
+  body > .srq-preview-overlay .packing-doc-table,
+  body > .srq-preview-overlay .packing-doc-table th,
+  body > .srq-preview-overlay .packing-doc-table td {
     background: #fff !important;
     color: #111827 !important;
     box-shadow: none !important;
     text-shadow: none !important;
   }
-  .packing-doc-table th,
-  .packing-doc-table td {
+  body > .srq-preview-overlay .packing-document-print {
+    overflow: visible !important;
+  }
+  body > .srq-preview-overlay .srq-doc-sheet {
+    gap: 10px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    page-break-after: auto !important;
+  }
+  body > .srq-preview-overlay .packing-doc-header {
+    margin: 0 0 12px !important;
+  }
+  body > .srq-preview-overlay .packing-doc-table th,
+  body > .srq-preview-overlay .packing-doc-table td {
     border-color: #94a3b8 !important;
   }
-  .srq-preview-note-cell {
+  body > .srq-preview-overlay .srq-preview-note-cell {
     color: #111827 !important;
     background-image: linear-gradient(to bottom, transparent calc(100% - 1px), rgba(15, 23, 42, 0.2) 0) !important;
   }
-  .packing-document-modal .dialog-header,
-  .packing-document-modal .dialog-actions { display: none !important; }
+  body > .srq-preview-overlay .packing-document-modal .dialog-header,
+  body > .srq-preview-overlay .packing-document-modal .dialog-actions { display: none !important; }
 }
 
 /* ─── Dark mode overrides ───────────────────────────────────────── */

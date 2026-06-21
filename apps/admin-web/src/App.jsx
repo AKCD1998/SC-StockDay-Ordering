@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import dkshLogoUrl from "./assets/dksh.svg";
 import hansaLogoUrl from "./assets/hansa-logo.png";
 import tnpHealthcareLogoUrl from "./assets/tnp-healthcare-logo.svg";
@@ -3902,8 +3903,10 @@ function PackingPreviewModal({ detail, onClose }) {
   const sourceBranchLabel = BRANCH_LABELS[detail?.sourceBranchCode] ?? `สาขา ${detail?.sourceBranchCode || "-"}`;
   const requestingBranchLabel = BRANCH_LABELS[detail?.requestingBranchCode] ?? `สาขา ${detail?.requestingBranchCode || "-"}`;
 
-  return (
-    <div className="dialog-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="พรีวิวเอกสารสำหรับจัดแพ๊ค">
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div className="dialog-overlay srq-preview-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="พรีวิวเอกสารสำหรับจัดแพ๊ค">
       <div className="dialog-card packing-document-modal srq-preview-modal" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-header">
           <div>
@@ -3960,7 +3963,8 @@ function PackingPreviewModal({ detail, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
