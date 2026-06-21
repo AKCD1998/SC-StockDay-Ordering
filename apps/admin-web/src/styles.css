@@ -5410,10 +5410,10 @@ select {
   display: grid;
   gap: 8px;
   width: 100%;
-  padding: 10px 12px 8px;
-  border: 1px solid #d7dfeb;
-  border-radius: 12px;
-  background: #ffffff;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 .srq-preview-barcode-label {
   font-size: 0.82rem;
