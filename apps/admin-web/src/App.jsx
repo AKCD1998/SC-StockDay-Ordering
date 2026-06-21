@@ -4181,12 +4181,6 @@ function PackingPreviewModal({ detail, onClose }) {
   return createPortal(
     <div className="dialog-overlay srq-preview-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="พรีวิวเอกสารสำหรับจัดแพ๊ค">
       <div className="dialog-card packing-document-modal srq-preview-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-header">
-          <div>
-            <h3>พรีวิวเอกสารสำหรับจัดแพ๊ค</h3>
-            <p>เลขที่คำขอ {detail?.publicId}</p>
-          </div>
-        </div>
         <div className="packing-document-print">
           <section className="srq-doc-sheet srq-preview-sheet">
             {requestLines.length > 0 ? (
