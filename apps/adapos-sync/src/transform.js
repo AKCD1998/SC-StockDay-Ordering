@@ -223,3 +223,125 @@ export function toSalesRecords(rows, branchCode, periodDays) {
     avgDailyUsage: Number(r.sold_qty_base ?? 0) / periodDays,
   }));
 }
+
+// ── Product prices: master defaults + per-branch overrides ──────────────────────
+// AdaAcc stores an *unset* price slot as 0 (master, float NOT NULL) or NULL
+// (per-branch override). Neither is a real price: the backend resolves
+// override -> master per slot, so an absent slot must simply be omitted from the
+// payload, never shipped as 0 or null. isRealPrice() centralises that rule.
+function isRealPrice(value) {
+  if (value == null) return false;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0;
+}
+
+// Combine the SQL-side 'YYYY-MM-DD' date (CONVERT style 23 — language independent,
+// so the stored year is preserved verbatim) with FTTimeUpd ('HH:MM:SS' varchar)
+// into an ISO-8601 local timestamp. Returns null when no date is present.
+// Safety net for the known ADA Buddhist-Era bug: if a stray BE year slips through
+// (year > 2400) subtract 543 so it is not shipped as a year-2569 timestamp.
+function combineSourceTimestamp(dateStr, timeStr) {
+  if (!dateStr) return null;
+  let [year, month, day] = String(dateStr).split("-");
+  if (Number(year) > 2400) year = String(Number(year) - 543);
+  const time = (timeStr && String(timeStr).trim()) || "00:00:00";
+  return `${year}-${month}-${day}T${time}`;
+}
+
+// unitSize -> source fields for unit code/factor/name. S is the base unit (factor 1).
+const PRICE_UNIT_SIZES = [
+  { unitSize: "S", codeField: "FTPdtSUnit", factorField: "FCPdtSFactor", nameField: "unitNameS", defaultFactor: 1 },
+  { unitSize: "M", codeField: "FTPdtMUnit", factorField: "FCPdtMFactor", nameField: "unitNameM", defaultFactor: null },
+  { unitSize: "L", codeField: "FTPdtLUnit", factorField: "FCPdtLFactor", nameField: "unitNameL", defaultFactor: null },
+];
+
+// retail = price levels 1..3, wholesale = 1..5. These are price *tiers/levels*, not
+// quantity-based tiers. Phase 1 carries no promotion/qty-tier data, but the
+// {channel, unitSize, priceLevel} record shape leaves room to add those later
+// (e.g. a future "channel": "promo" with a qty range + effective dates).
+const PRICE_CHANNELS = [
+  { channel: "retail",    colTag: "Ret", levels: [1, 2, 3] },
+  { channel: "wholesale", colTag: "Whs", levels: [1, 2, 3, 4, 5] },
+];
+
+/**
+ * Master price rows (getProductPriceDefaultRows) -> one normalized record per
+ * non-zero price slot. priceScope is always "master"; sourceUpdatedAt is null
+ * (the master table's update stamp is not tracked at slot granularity).
+ */
+export function toProductPriceDefaultRecords(rows) {
+  const syncedAt = new Date().toISOString();
+  const records = [];
+
+  for (const r of rows) {
+    const allowBranchOverride = String(r.FTPdtStaSetPri ?? "") === "1";
+
+    for (const u of PRICE_UNIT_SIZES) {
+      const unitName = r[u.nameField] || r[u.codeField] || null;
+      const factor = r[u.factorField] != null ? Number(r[u.factorField]) : u.defaultFactor;
+
+      for (const ch of PRICE_CHANNELS) {
+        for (const priceLevel of ch.levels) {
+          const raw = r[`FCPdt${ch.colTag}Pri${u.unitSize}${priceLevel}`];
+          if (!isRealPrice(raw)) continue;
+
+          records.push({
+            productCode: r.FTPdtCode,
+            channel: ch.channel,
+            unitSize: u.unitSize,
+            priceLevel,
+            priceAmount: Number(raw),
+            unitName,
+            factor,
+            priceScope: "master",
+            allowBranchOverride,
+            sourceUpdatedAt: null,
+            syncedAt,
+          });
+        }
+      }
+    }
+  }
+
+  return records;
+}
+
+/**
+ * Branch override rows (getBranchPriceOverrideRows) -> one normalized record per
+ * non-null override slot. NULL slots are dropped (no override -> backend falls
+ * back to master). priceScope is always "override". branchCode is normalized to
+ * three digits and validated against the known branch whitelist.
+ */
+export function toProductBranchPriceOverrideRecords(rows) {
+  const syncedAt = new Date().toISOString();
+  const records = [];
+
+  for (const r of rows) {
+    const branchCode = String(r.FTBchCode || "").padStart(3, "0");
+    if (!BRANCH_STOCK_SYNC_BRANCHES.has(branchCode)) continue; // never route an unknown branch
+    const sourceUpdatedAt = combineSourceTimestamp(r.FDDateUpdStr, r.FTTimeUpd);
+
+    for (const u of PRICE_UNIT_SIZES) {
+      for (const ch of PRICE_CHANNELS) {
+        for (const priceLevel of ch.levels) {
+          const raw = r[`FCPbp${ch.colTag}Pri${u.unitSize}${priceLevel}`];
+          if (!isRealPrice(raw)) continue; // null / 0 = no override -> omit
+
+          records.push({
+            branchCode,
+            productCode: r.FTPdtCode,
+            channel: ch.channel,
+            unitSize: u.unitSize,
+            priceLevel,
+            priceAmount: Number(raw),
+            priceScope: "override",
+            sourceUpdatedAt,
+            syncedAt,
+          });
+        }
+      }
+    }
+  }
+
+  return records;
+}

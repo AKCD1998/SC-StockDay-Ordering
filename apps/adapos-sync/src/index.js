@@ -14,9 +14,11 @@ import {
   getApprovedReceiptHeaderRows,
   getApprovedReceiptLineRows,
   getBranchStockRows,
+  getProductPriceDefaultRows,
+  getBranchPriceOverrideRows,
 } from "./queries.js";
 import { postJson } from "./client.js";
-import { toProductRecords, toSalesRecords, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords } from "./transform.js";
+import { toProductRecords, toSalesRecords, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
 
 const PERIOD_DAYS = 30;
 
@@ -89,6 +91,14 @@ async function fetchDatasets(pool) {
   }
   if (datasets.includes("branch_stock")) {
     data.branch_stock = await getBranchStockRows(pool, branchCode);
+  }
+  // Price datasets are all-branch and read from the consolidated HQ/mother DB.
+  // They are NOT scoped by branchCode — grouping per branch happens at post time.
+  if (datasets.includes("price_defaults")) {
+    data.price_defaults = await getProductPriceDefaultRows(pool);
+  }
+  if (datasets.includes("branch_price_overrides")) {
+    data.branch_price_overrides = await getBranchPriceOverrideRows(pool);
   }
 
   return data;
@@ -170,12 +180,28 @@ async function runOnce() {
           console.log(JSON.stringify(rows[0], null, 2));
         }
       }
+      // Price datasets ship a *normalized* shape, not the raw row — print a
+      // transformed sample so the payload can be verified before --execute.
+      if (data.price_defaults) {
+        const recs = toProductPriceDefaultRecords(data.price_defaults);
+        console.log(`\n[price_defaults] ${data.price_defaults.length} rows -> ${recs.length} normalized records`);
+        if (recs.length) console.log(JSON.stringify(recs[0], null, 2));
+      }
+      if (data.branch_price_overrides) {
+        const recs = toProductBranchPriceOverrideRecords(data.branch_price_overrides);
+        console.log(`\n[branch_price_overrides] ${data.branch_price_overrides.length} rows -> ${recs.length} normalized records`);
+        if (recs.length) console.log(JSON.stringify(recs[0], null, 2));
+      }
+
       console.log("\nDone. Verify output, then run with --execute to post to API.");
       return;
     }
 
     // Live execute — post each dataset to the API.
     const runId = `sync-${Date.now()}`;
+    // One snapshot id per run, shared by both price datasets, so the backend can
+    // apply snapshot-purge semantics (drop stale slots not present in this run).
+    const snapshotId = `price-snap-${Date.now()}`;
     const startedAt = new Date().toISOString();
     let totalSent = 0;
 
@@ -288,6 +314,56 @@ async function runOnce() {
           console.log(`  Failed doc nos: ${failedDocNos.join(", ")}`);
         }
         totalSent += approvedUpserted;
+      }
+
+      // ── Price defaults (master) ───────────────────────────────────────────────
+      // Sent as { snapshotId, records } in batches of 500.
+      if (data.price_defaults?.length) {
+        const records = toProductPriceDefaultRecords(data.price_defaults);
+        console.log(`Posting price defaults: ${data.price_defaults.length} rows -> ${records.length} records...`);
+        const sent = await postBatches(
+          `${syncConfig.apiBaseUrl}/api/sync/ada/prices/defaults`,
+          records,
+          500,
+          { snapshotId },
+        );
+        console.log(`  price_defaults: ${sent} sent`);
+        totalSent += sent;
+      }
+
+      // ── Per-branch price overrides ────────────────────────────────────────────
+      // Grouped by branchCode so the server applies per-branch snapshot purge.
+      // Each branch's batches carry { snapshotId, branchCode, batchSeq, isLastBatch,
+      // records }; isLastBatch=true on the final batch signals "snapshot complete".
+      if (data.branch_price_overrides?.length) {
+        const records = toProductBranchPriceOverrideRecords(data.branch_price_overrides);
+        console.log(`Posting branch price overrides: ${data.branch_price_overrides.length} rows -> ${records.length} records...`);
+
+        const byBranch = new Map();
+        for (const rec of records) {
+          if (!byBranch.has(rec.branchCode)) byBranch.set(rec.branchCode, []);
+          byBranch.get(rec.branchCode).push(rec);
+        }
+
+        const batchSize = 500;
+        let overridesSent = 0;
+        for (const [bch, branchRecords] of byBranch) {
+          const totalBatches = Math.max(1, Math.ceil(branchRecords.length / batchSize));
+          for (let b = 0; b < totalBatches; b++) {
+            const batchSeq = b + 1;
+            await postJson(`${syncConfig.apiBaseUrl}/api/sync/ada/prices/branch-overrides`, {
+              snapshotId,
+              branchCode: bch,
+              batchSeq,
+              isLastBatch: batchSeq === totalBatches,
+              records: branchRecords.slice(b * batchSize, (b + 1) * batchSize),
+            });
+          }
+          console.log(`  branch ${bch}: ${branchRecords.length} override records in ${totalBatches} batch(es)`);
+          overridesSent += branchRecords.length;
+        }
+        console.log(`  branch_price_overrides: ${overridesSent} sent across ${byBranch.size} branch(es)`);
+        totalSent += overridesSent;
       }
 
       const finishedAt = new Date().toISOString();

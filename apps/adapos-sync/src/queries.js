@@ -332,6 +332,76 @@ export async function getBranchStockRows(pool, branchCode) {
   return result.recordset;
 }
 
+// ── Product price defaults (master) ────────────────────────────────────────────
+// Master/default prices live on the global product master TCNMPdt — one row per
+// product, no branch dimension. These are the fallback the backend applies when a
+// branch has no override. Real AdaAcc column names (verified on this HQ instance):
+//   retail levels 1..3:    FCPdtRetPri{S,M,L}{1..3}   (float)
+//   wholesale levels 1..5: FCPdtWhsPri{S,M,L}{1..5}   (float)
+// Unit *names* (e.g. แผง/โหล) are resolved from TCNMPdtUnit because TCNMPdt stores
+// only unit codes. Active products only, to stay aligned with getProductMasterRows.
+export async function getProductPriceDefaultRows(pool) {
+  const result = await pool.request().query(`
+    SELECT
+      p.FTPdtCode,
+      p.FTPdtName,
+      p.FTPdtNameOth,
+      p.FTPdtBarCode1,
+      p.FTPdtBarCode2,
+      p.FTPdtBarCode3,
+      p.FTPdtStaSetPri,
+      p.FTPdtSUnit, p.FCPdtSFactor, uS.FTPunName AS unitNameS,
+      p.FTPdtMUnit, p.FCPdtMFactor, uM.FTPunName AS unitNameM,
+      p.FTPdtLUnit, p.FCPdtLFactor, uL.FTPunName AS unitNameL,
+      p.FCPdtRetPriS1, p.FCPdtRetPriS2, p.FCPdtRetPriS3,
+      p.FCPdtRetPriM1, p.FCPdtRetPriM2, p.FCPdtRetPriM3,
+      p.FCPdtRetPriL1, p.FCPdtRetPriL2, p.FCPdtRetPriL3,
+      p.FCPdtWhsPriS1, p.FCPdtWhsPriS2, p.FCPdtWhsPriS3, p.FCPdtWhsPriS4, p.FCPdtWhsPriS5,
+      p.FCPdtWhsPriM1, p.FCPdtWhsPriM2, p.FCPdtWhsPriM3, p.FCPdtWhsPriM4, p.FCPdtWhsPriM5,
+      p.FCPdtWhsPriL1, p.FCPdtWhsPriL2, p.FCPdtWhsPriL3, p.FCPdtWhsPriL4, p.FCPdtWhsPriL5
+    FROM TCNMPdt p
+    LEFT JOIN TCNMPdtUnit uS ON uS.FTPunCode = p.FTPdtSUnit
+    LEFT JOIN TCNMPdtUnit uM ON uM.FTPunCode = p.FTPdtMUnit
+    LEFT JOIN TCNMPdtUnit uL ON uL.FTPunCode = p.FTPdtLUnit
+    WHERE p.FTPdtStaActive = 1
+    ORDER BY p.FTPdtCode
+  `);
+  return result.recordset;
+}
+
+// ── Per-branch price overrides ─────────────────────────────────────────────────
+// TCNTPdtBchPrice holds branch-specific overrides, keyed (FTPdtCode, FTBchCode).
+// The HQ/mother DB is consolidated, so this returns rows for ALL branches (000–005)
+// — grouping per branch happens at post time. NOT branch-filtered here on purpose.
+// Override columns are NULLABLE: a NULL means "no override for this slot" and must
+// fall back to master at the backend — the transform never ships NULL as a price.
+//   retail levels 1..3:    FCPbpRetPri{S,M,L}{1..3}
+//   wholesale levels 1..5: FCPbpWhsPri{S,M,L}{1..5}
+// FDDateUpd is converted in SQL with style 23 ('YYYY-MM-DD') — language-independent,
+// so the raw stored year survives (no Thai Buddhist-Era rendering from CONVERT).
+// Inner-joined to active products to keep scope identical to the defaults dataset.
+export async function getBranchPriceOverrideRows(pool) {
+  const result = await pool.request().query(`
+    SELECT
+      bp.FTBchCode,
+      bp.FTPdtCode,
+      bp.FCPbpRetPriS1, bp.FCPbpRetPriS2, bp.FCPbpRetPriS3,
+      bp.FCPbpRetPriM1, bp.FCPbpRetPriM2, bp.FCPbpRetPriM3,
+      bp.FCPbpRetPriL1, bp.FCPbpRetPriL2, bp.FCPbpRetPriL3,
+      bp.FCPbpWhsPriS1, bp.FCPbpWhsPriS2, bp.FCPbpWhsPriS3, bp.FCPbpWhsPriS4, bp.FCPbpWhsPriS5,
+      bp.FCPbpWhsPriM1, bp.FCPbpWhsPriM2, bp.FCPbpWhsPriM3, bp.FCPbpWhsPriM4, bp.FCPbpWhsPriM5,
+      bp.FCPbpWhsPriL1, bp.FCPbpWhsPriL2, bp.FCPbpWhsPriL3, bp.FCPbpWhsPriL4, bp.FCPbpWhsPriL5,
+      CONVERT(char(10), bp.FDDateUpd, 23) AS FDDateUpdStr,
+      bp.FTTimeUpd
+    FROM TCNTPdtBchPrice bp
+    INNER JOIN TCNMPdt p
+      ON  p.FTPdtCode      = bp.FTPdtCode
+      AND p.FTPdtStaActive = 1
+    ORDER BY bp.FTBchCode, bp.FTPdtCode
+  `);
+  return result.recordset;
+}
+
 // ── Approved purchase receipt lines ───────────────────────────────────────────
 // Date filter mirrors getApprovedReceiptHeaderRows — pass same options.
 export async function getApprovedReceiptLineRows(

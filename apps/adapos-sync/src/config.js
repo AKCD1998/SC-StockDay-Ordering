@@ -45,7 +45,10 @@ export const syncConfig = {
     ?? "",
   dateCutoff:  process.env.ADAPOS_SYNC_DATE_CUTOFF  ?? new Date().toISOString().slice(0, 10),
   branchCode: cliBranch || process.env.ADAPOS_SYNC_BRANCH_CODE || "",
-  datasets: ((cliDatasets || process.env.ADAPOS_SYNC_DATASETS || "products,sales,transfers,transfer_lines"))
+  // price_defaults / branch_price_overrides are HQ-only (consolidated all-branch DB).
+  // They are recognised here so a bare run can include them; the scheduled HQ run
+  // enables them via ADAPOS_SYNC_DATASETS in .env.
+  datasets: ((cliDatasets || process.env.ADAPOS_SYNC_DATASETS || "products,sales,transfers,transfer_lines,price_defaults,branch_price_overrides"))
     .split(",")
     .map((d) => d.trim())
     .filter(Boolean),
