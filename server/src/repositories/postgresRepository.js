@@ -23,6 +23,11 @@ export const BRANCH_STOCK_COLUMNS = {
 };
 const ALL_BRANCH_CODES = Object.keys(BRANCH_STOCK_COLUMNS);
 const DISPLAY_BRANCH_STOCK_CODES = ["000", "001", "003", "004", "005"];
+
+// Branches that participate in the price sync and PDA scan features.
+// Must stay in sync with BRANCH_STOCK_COLUMNS; separated so price-specific
+// code never accidentally reads stock-column names from here.
+export const PRICE_BRANCH_WHITELIST = ["000", "001", "002", "003", "004", "005"];
 const DISPLAY_BRANCH_LABELS = {
   "000": "สาขา 000 (HQ)",
   "001": "สาขา 001",
@@ -2779,6 +2784,344 @@ export class PostgresRepository {
     } finally {
       client.release();
     }
+  }
+
+  // ── Product price sync ───────────────────────────────────────────────────────
+
+  // Upsert HQ master prices from TCNMPdt.
+  // payload: { snapshotId?, isFinal?, records: [{ productCode, channel, unitSize,
+  //            priceLevel, priceAmount, unitName?, factor?, syncedAt? }] }
+  // When isFinal=true the rows not belonging to snapshotId are purged so HQ
+  // can remove a SKU's price from the catalog and have it disappear from the
+  // effective table on the next refresh.
+  // Returns: { accepted, orphansPurged, orphanProductCodes }
+  async ingestProductPriceDefaults(payload) {
+    const records    = Array.isArray(payload?.records) ? payload.records : [];
+    const snapshotId = payload?.snapshotId ? String(payload.snapshotId) : null;
+    const isFinal    = Boolean(payload?.isFinal);
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      if (records.length > 0) {
+        const productCodes = [];
+        const channels     = [];
+        const unitSizes    = [];
+        const priceLevels  = [];
+        const priceAmounts = [];
+        const unitNames    = [];
+        const factors      = [];
+        const snapshotIds  = [];
+        const syncedAts    = [];
+
+        for (const r of records) {
+          productCodes.push(String(r.productCode || ""));
+          channels.push(String(r.channel || "retail"));
+          unitSizes.push(String(r.unitSize || "S"));
+          priceLevels.push(Number(r.priceLevel || 1));
+          priceAmounts.push(Number(r.priceAmount || 0));
+          unitNames.push(r.unitName ?? null);
+          factors.push(r.factor != null ? Number(r.factor) : null);
+          snapshotIds.push(snapshotId);
+          syncedAts.push(r.syncedAt ? new Date(r.syncedAt).toISOString() : new Date().toISOString());
+        }
+
+        await client.query(
+          `INSERT INTO product_price_defaults
+             (product_code, channel, unit_size, price_level, price_amount, unit_name, factor, snapshot_id, synced_at)
+           SELECT
+             unnest($1::text[]),
+             unnest($2::text[]),
+             unnest($3::text[]),
+             unnest($4::smallint[]),
+             unnest($5::numeric[]),
+             unnest($6::text[]),
+             unnest($7::int[]),
+             unnest($8::text[]),
+             unnest($9::timestamptz[])
+           ON CONFLICT (product_code, channel, unit_size, price_level) DO UPDATE SET
+             price_amount = EXCLUDED.price_amount,
+             unit_name    = EXCLUDED.unit_name,
+             factor       = EXCLUDED.factor,
+             snapshot_id  = EXCLUDED.snapshot_id,
+             synced_at    = EXCLUDED.synced_at,
+             updated_at   = NOW()`,
+          [productCodes, channels, unitSizes, priceLevels, priceAmounts, unitNames, factors, snapshotIds, syncedAts],
+        );
+      }
+
+      let orphansPurged      = 0;
+      let orphanProductCodes = [];
+
+      if (isFinal && snapshotId) {
+        const purgeResult = await client.query(
+          `DELETE FROM product_price_defaults
+           WHERE snapshot_id IS DISTINCT FROM $1
+           RETURNING product_code`,
+          [snapshotId],
+        );
+        orphansPurged      = purgeResult.rowCount || 0;
+        orphanProductCodes = [...new Set(purgeResult.rows.map((r) => r.product_code))];
+      }
+
+      await client.query("COMMIT");
+      return { accepted: records.length, orphansPurged, orphanProductCodes };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Upsert branch-level price overrides from TCNTPdtBchPrice.
+  // payload: { branchCode, snapshotId, isFinal, records: [...] }
+  // Snapshot semantics: when isFinal=true, rows for this branch whose
+  // snapshot_id differs from snapshotId are purged (full replace).
+  // Only rows with a non-null priceAmount are stored — a missing field means
+  // "fall back to master", which is expressed by absence of an override row.
+  // Returns: { accepted, branchCode, orphansPurged, orphanProductCodes }
+  // Callers must refresh effective prices for BOTH new codes AND orphanProductCodes
+  // so the effective table reflects the fallback-to-master for purged products.
+  async ingestProductBranchPriceOverrides(payload) {
+    const branchCode = String(payload?.branchCode || "");
+    if (!PRICE_BRANCH_WHITELIST.includes(branchCode)) {
+      throw new Error(`Unknown branchCode for price override sync: ${branchCode}`);
+    }
+
+    const snapshotId = payload?.snapshotId ? String(payload.snapshotId) : null;
+    const isFinal    = Boolean(payload?.isFinal);
+    const records    = Array.isArray(payload?.records) ? payload.records : [];
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      let orphansPurged = 0;
+      let orphanProductCodes = [];
+
+      if (records.length > 0) {
+        const productCodes = [];
+        const channels     = [];
+        const unitSizes    = [];
+        const priceLevels  = [];
+        const priceAmounts = [];
+        const unitNames    = [];
+        const factors      = [];
+        const syncedAts    = [];
+
+        for (const r of records) {
+          if (r.priceAmount == null) continue;
+          productCodes.push(String(r.productCode || ""));
+          channels.push(String(r.channel || "retail"));
+          unitSizes.push(String(r.unitSize || "S"));
+          priceLevels.push(Number(r.priceLevel || 1));
+          priceAmounts.push(Number(r.priceAmount));
+          unitNames.push(r.unitName ?? null);
+          factors.push(r.factor != null ? Number(r.factor) : null);
+          syncedAts.push(r.syncedAt ? new Date(r.syncedAt).toISOString() : new Date().toISOString());
+        }
+
+        if (productCodes.length > 0) {
+          await client.query(
+            `INSERT INTO product_branch_price_overrides
+               (product_code, branch_code, channel, unit_size, price_level,
+                price_amount, unit_name, factor, snapshot_id, synced_at)
+             SELECT
+               unnest($1::text[]),
+               $2,
+               unnest($3::text[]),
+               unnest($4::text[]),
+               unnest($5::smallint[]),
+               unnest($6::numeric[]),
+               unnest($7::text[]),
+               unnest($8::int[]),
+               $9,
+               unnest($10::timestamptz[])
+             ON CONFLICT (product_code, branch_code, channel, unit_size, price_level) DO UPDATE SET
+               price_amount = EXCLUDED.price_amount,
+               unit_name    = EXCLUDED.unit_name,
+               factor       = EXCLUDED.factor,
+               snapshot_id  = EXCLUDED.snapshot_id,
+               synced_at    = EXCLUDED.synced_at,
+               updated_at   = NOW()`,
+            [productCodes, branchCode, channels, unitSizes, priceLevels,
+             priceAmounts, unitNames, factors, snapshotId, syncedAts],
+          );
+        }
+      }
+
+      // Purge orphans from previous snapshots once the final batch arrives.
+      // RETURNING lets us know which products lost their override so the
+      // effective table can be rebuilt to fall back to master for those SKUs.
+      if (isFinal && snapshotId) {
+        const purgeResult = await client.query(
+          `DELETE FROM product_branch_price_overrides
+           WHERE branch_code = $1 AND (snapshot_id IS NULL OR snapshot_id != $2)
+           RETURNING product_code`,
+          [branchCode, snapshotId],
+        );
+        orphansPurged      = purgeResult.rowCount || 0;
+        orphanProductCodes = [...new Set(purgeResult.rows.map((r) => r.product_code))];
+      }
+
+      await client.query("COMMIT");
+      return { accepted: records.length, branchCode, orphansPurged, orphanProductCodes };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Rebuild product_effective_branch_prices for the given scope.
+  // options.branchCode  — if set, refresh only that branch; else all whitelisted branches.
+  // options.productCodes — if set, refresh only those products; else all in defaults.
+  // Rule: override wins over master; null override is never stored so absence ≡ "use master".
+  // Returns: { branchesRefreshed: N }
+  async refreshEffectiveBranchPrices({ branchCode = null, productCodes = null } = {}) {
+    const branches = branchCode ? [branchCode] : PRICE_BRANCH_WHITELIST;
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      for (const branch of branches) {
+        const params = [branch];
+        let productFilter = "";
+        if (productCodes && productCodes.length > 0) {
+          params.push(productCodes);
+          productFilter = `AND d.product_code = ANY($2::text[])`;
+        }
+
+        await client.query(
+          `INSERT INTO product_effective_branch_prices
+             (product_code, branch_code, channel, unit_size, price_level,
+              price_amount, source, unit_name, factor, price_synced_at, refreshed_at)
+           SELECT
+             d.product_code,
+             $1,
+             d.channel,
+             d.unit_size,
+             d.price_level,
+             COALESCE(o.price_amount, d.price_amount),
+             CASE WHEN o.price_amount IS NOT NULL THEN 'override' ELSE 'master' END,
+             COALESCE(o.unit_name, d.unit_name),
+             COALESCE(o.factor, d.factor),
+             COALESCE(o.synced_at, d.synced_at),
+             NOW()
+           FROM product_price_defaults d
+           LEFT JOIN product_branch_price_overrides o
+             ON  o.product_code = d.product_code
+             AND o.branch_code  = $1
+             AND o.channel      = d.channel
+             AND o.unit_size    = d.unit_size
+             AND o.price_level  = d.price_level
+           WHERE TRUE ${productFilter}
+           ON CONFLICT (product_code, branch_code, channel, unit_size, price_level) DO UPDATE SET
+             price_amount    = EXCLUDED.price_amount,
+             source          = EXCLUDED.source,
+             unit_name       = EXCLUDED.unit_name,
+             factor          = EXCLUDED.factor,
+             price_synced_at = EXCLUDED.price_synced_at,
+             refreshed_at    = NOW(),
+             updated_at      = NOW()`,
+          params,
+        );
+      }
+
+      await client.query("COMMIT");
+      return { branchesRefreshed: branches.length };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Read path for PDA barcode scan.
+  // Resolves product by barcode (barcode_1/2/3) or productCode, then fetches
+  // pre-computed effective prices for the caller's branch.
+  // scopes filters channels: 'price:retail' → retail, 'price:wholesale' → wholesale.
+  // Returns null if the product is not found.
+  async getProductPricingForBranch({ branchCode, barcode, productCode, scopes = ["price:retail"] } = {}) {
+    if (!branchCode) throw new Error("branchCode is required");
+    if (!barcode && !productCode) throw new Error("barcode or productCode is required");
+
+    let productRow;
+    if (barcode) {
+      const { rows } = await this.pool.query(
+        `SELECT product_code, product_name, product_name_eng,
+                barcode_1, barcode_2, barcode_3,
+                unit_small, unit_medium, unit_large,
+                factor_small, factor_medium, factor_large
+         FROM products
+         WHERE barcode_1 = $1 OR barcode_2 = $1 OR barcode_3 = $1
+         LIMIT 1`,
+        [barcode],
+      );
+      productRow = rows[0] || null;
+    } else {
+      const { rows } = await this.pool.query(
+        `SELECT product_code, product_name, product_name_eng,
+                barcode_1, barcode_2, barcode_3,
+                unit_small, unit_medium, unit_large,
+                factor_small, factor_medium, factor_large
+         FROM products
+         WHERE product_code = $1
+         LIMIT 1`,
+        [productCode],
+      );
+      productRow = rows[0] || null;
+    }
+
+    if (!productRow) return null;
+
+    const channels = [];
+    if (scopes.includes("price:retail"))    channels.push("retail");
+    if (scopes.includes("price:wholesale")) channels.push("wholesale");
+    if (channels.length === 0) channels.push("retail");
+
+    const { rows: priceRows } = await this.pool.query(
+      `SELECT channel, price_level, unit_size, price_amount, source, unit_name, factor, price_synced_at
+       FROM product_effective_branch_prices
+       WHERE branch_code = $1
+         AND product_code = $2
+         AND channel = ANY($3::text[])
+       ORDER BY channel, price_level, unit_size`,
+      [branchCode, productRow.product_code, channels],
+    );
+
+    const latestSyncMs = priceRows.reduce((max, r) => {
+      const t = r.price_synced_at ? new Date(r.price_synced_at).getTime() : 0;
+      return t > max ? t : max;
+    }, 0);
+
+    const matchedBarcode =
+      barcode
+        ? [productRow.barcode_1, productRow.barcode_2, productRow.barcode_3].find((b) => b === barcode) || barcode
+        : productRow.barcode_1 || productRow.barcode_2 || productRow.barcode_3 || null;
+
+    return {
+      productCode:    productRow.product_code,
+      productName:    productRow.product_name || "",
+      productNameEng: productRow.product_name_eng || null,
+      matchedBarcode,
+      branchCode,
+      prices: priceRows.map((r) => ({
+        channel:    r.channel,
+        priceLevel: Number(r.price_level),
+        unitSize:   r.unit_size,
+        unitName:   r.unit_name || null,
+        factor:     r.factor != null ? Number(r.factor) : null,
+        price:      Number(r.price_amount),
+        source:     r.source,
+      })),
+      priceSyncedAt: latestSyncMs > 0 ? new Date(latestSyncMs).toISOString() : null,
+    };
   }
 
   async close() {

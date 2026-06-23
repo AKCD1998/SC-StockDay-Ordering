@@ -38,4 +38,17 @@ export const config = {
   branchStockSyncToken: env.BRANCH_STOCK_SYNC_TOKEN || "",
   posApiKey: env.POS_API_KEY || env.BRANCH_STOCK_SYNC_TOKEN || "",
   isMockMode: dataMode === "mock",
+  // Per-branch opaque tokens for PDA devices.
+  // Each branch has its own token so a compromised branch-001 token
+  // cannot be used to read branch-005 prices.
+  // Set PDA_TOKEN_000 .. PDA_TOKEN_005 in .env / Render env vars.
+  // Branches with an empty/unset token are always rejected.
+  pdaBranchTokens: {
+    "000": env.PDA_TOKEN_000 || "",
+    "001": env.PDA_TOKEN_001 || "",
+    "002": env.PDA_TOKEN_002 || "",
+    "003": env.PDA_TOKEN_003 || "",
+    "004": env.PDA_TOKEN_004 || "",
+    "005": env.PDA_TOKEN_005 || "",
+  },
 };

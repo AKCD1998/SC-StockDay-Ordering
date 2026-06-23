@@ -347,6 +347,12 @@ function normalizeMemberUpdatePayload(body) {
 // columns in branch_stock_snapshots / BRANCH_STOCK_COLUMNS in the repository.
 const BRANCH_STOCK_SYNC_BRANCHES = ["000", "001", "002", "003", "004", "005"];
 
+// Branches that may sync prices or perform PDA scans.
+const PRICE_SYNC_BRANCHES = ["000", "001", "002", "003", "004", "005"];
+
+const VALID_PRICE_CHANNELS = ["retail", "wholesale"];
+const VALID_PRICE_UNIT_SIZES = ["S", "M", "L"];
+
 // A branch-stock sync request describes exactly ONE branch's stock. The branch
 // must be stated explicitly at the top level so the server knows which single
 // column to update — we never infer it from per-record zeroes (which is what
@@ -413,6 +419,172 @@ export function validateAndNormalizeBranchStockRecords(body) {
   }
 
   return { error: null, branchCode, records };
+}
+
+// Validate + normalize a price defaults sync payload.
+// Accepts optional snapshotId + isFinal for full-catalog replace semantics:
+// when isFinal=true the repository purges any defaults row whose snapshot_id
+// differs from snapshotId, removing stale master prices from the effective table.
+// Exported so tests can call it directly without an HTTP server.
+export function validateAndNormalizePriceDefaultsPayload(body) {
+  if (!body || !Array.isArray(body.records)) {
+    return { error: "Payload must include a records array." };
+  }
+
+  const snapshotId = normalizeOptionalText(body?.snapshotId ?? body?.snapshot_id, 120) || null;
+  const isFinal    = Boolean(body?.isFinal ?? body?.is_final);
+
+  const records = [];
+  for (const [i, r] of body.records.entries()) {
+    const productCode = normalizeOptionalText(r?.productCode ?? r?.product_code, 120);
+    if (!productCode) return { error: `records[${i}].productCode is required.` };
+
+    const channel = String(r?.channel || "").toLowerCase().trim();
+    if (!VALID_PRICE_CHANNELS.includes(channel)) {
+      return { error: `records[${i}].channel must be 'retail' or 'wholesale'.` };
+    }
+
+    const unitSize = String((r?.unitSize ?? r?.unit_size) || "").toUpperCase().trim();
+    if (!VALID_PRICE_UNIT_SIZES.includes(unitSize)) {
+      return { error: `records[${i}].unitSize must be 'S', 'M', or 'L'.` };
+    }
+
+    const priceLevel = Number(r?.priceLevel ?? r?.price_level);
+    if (!Number.isInteger(priceLevel) || priceLevel < 1 || priceLevel > 9) {
+      return { error: `records[${i}].priceLevel must be an integer between 1 and 9.` };
+    }
+
+    const priceAmount = Number(r?.priceAmount ?? r?.price_amount);
+    if (!Number.isFinite(priceAmount) || priceAmount < 0) {
+      return { error: `records[${i}].priceAmount must be a non-negative number.` };
+    }
+
+    records.push({
+      productCode,
+      channel,
+      unitSize,
+      priceLevel,
+      priceAmount,
+      unitName: normalizeOptionalText(r?.unitName ?? r?.unit_name, 80) || null,
+      factor: r?.factor != null ? Math.round(Number(r.factor)) : null,
+      syncedAt: normalizeSyncedAt(r?.syncedAt ?? r?.synced_at),
+    });
+  }
+
+  return { error: null, snapshotId, isFinal, records };
+}
+
+// Validate + normalize a branch price overrides sync payload.
+// Records with null priceAmount are silently dropped (absence means "use master").
+// Exported so tests can call it directly.
+export function validateAndNormalizePriceOverridesPayload(body) {
+  const branchCode = normalizeOptionalText(body?.branchCode ?? body?.branch_code, 3);
+  if (!branchCode) return { error: "Payload must include a top-level branchCode." };
+  if (!PRICE_SYNC_BRANCHES.includes(branchCode)) {
+    return { error: `Unknown branchCode: ${branchCode}.` };
+  }
+
+  if (!body || !Array.isArray(body.records)) {
+    return { error: "Payload must include a records array." };
+  }
+
+  const snapshotId = normalizeOptionalText(body?.snapshotId ?? body?.snapshot_id, 120) || null;
+  const isFinal    = Boolean(body?.isFinal ?? body?.is_final);
+
+  const records = [];
+  for (const [i, r] of body.records.entries()) {
+    const productCode = normalizeOptionalText(r?.productCode ?? r?.product_code, 120);
+    if (!productCode) return { error: `records[${i}].productCode is required.` };
+
+    // A null priceAmount means "no override for this SKU" — drop silently.
+    if (r?.priceAmount == null && r?.price_amount == null) continue;
+
+    const channel = String(r?.channel || "").toLowerCase().trim();
+    if (!VALID_PRICE_CHANNELS.includes(channel)) {
+      return { error: `records[${i}].channel must be 'retail' or 'wholesale'.` };
+    }
+
+    const unitSize = String((r?.unitSize ?? r?.unit_size) || "").toUpperCase().trim();
+    if (!VALID_PRICE_UNIT_SIZES.includes(unitSize)) {
+      return { error: `records[${i}].unitSize must be 'S', 'M', or 'L'.` };
+    }
+
+    const priceLevel = Number(r?.priceLevel ?? r?.price_level);
+    if (!Number.isInteger(priceLevel) || priceLevel < 1 || priceLevel > 9) {
+      return { error: `records[${i}].priceLevel must be an integer between 1 and 9.` };
+    }
+
+    const priceAmount = Number(r?.priceAmount ?? r?.price_amount);
+    if (!Number.isFinite(priceAmount) || priceAmount < 0) {
+      return { error: `records[${i}].priceAmount must be a non-negative number.` };
+    }
+
+    records.push({
+      productCode,
+      channel,
+      unitSize,
+      priceLevel,
+      priceAmount,
+      unitName: normalizeOptionalText(r?.unitName ?? r?.unit_name, 80) || null,
+      factor: r?.factor != null ? Math.round(Number(r.factor)) : null,
+      syncedAt: normalizeSyncedAt(r?.syncedAt ?? r?.synced_at),
+    });
+  }
+
+  return { error: null, branchCode, snapshotId, isFinal, records };
+}
+
+// ── PDA auth scaffold ─────────────────────────────────────────────────────────
+// STUB — replace with real JWT verification once the PDA enrollment backend
+// (SC-StockDay-PDA repo) issues signed branch tokens.
+//
+// Design: the server holds one opaque token per branch (PDA_TOKEN_000 … 005).
+// The client sends its token; the server looks up which branch owns that token.
+// branchCode is NEVER taken from the request — the client cannot forge it.
+// A leak of branch-001's token cannot be used to read branch-005 prices.
+//
+// Upgrade path: replace this function body with JWT.verify(). The rest of the
+// route (requirePdaScope, getProductPricingForBranch) stays unchanged.
+function parsePdaUserFromRequest(req) {
+  const authHeader = req.headers.authorization || "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return { user: null, error: "Authorization Bearer token is required." };
+  }
+
+  const providedToken = authHeader.slice(7).trim();
+  if (!providedToken) {
+    return { user: null, error: "Authorization Bearer token is required." };
+  }
+
+  const tokenMap = config.pdaBranchTokens || {};
+  const branchCode = Object.keys(tokenMap).find(
+    (code) => tokenMap[code] && tokenMap[code] === providedToken,
+  );
+
+  if (!branchCode) {
+    return { user: null, error: "Unauthorized." };
+  }
+
+  return {
+    user: {
+      userId:     `pda-${branchCode}`,
+      role:       "branch_staff",
+      branchCode,
+      scopes:     ["price:retail"],
+    },
+    error: null,
+  };
+}
+
+// Guard: verify the resolved user carries the required scope.
+// Returns an error string on failure, null on success.
+// Enforced server-side — never relies on client-supplied scope claims.
+function requirePdaScope(user, requiredScope) {
+  if (!user) return "Authentication required.";
+  if (!Array.isArray(user.scopes) || !user.scopes.includes(requiredScope)) {
+    return `Scope '${requiredScope}' is not authorized for this user.`;
+  }
+  return null;
 }
 
 export function createRouter(repository) {
@@ -928,6 +1100,78 @@ export function createRouter(repository) {
       if (error.statusCode === 404) return res.status(404).json({ message: error.message });
       throw error;
     }
+  }));
+
+  // ── Price sync: HQ master prices (from TCNMPdt) ───────────────────────────
+  router.post("/api/sync/ada/prices/defaults", asyncHandler(async (req, res) => {
+    const authError = validateBranchStockSyncToken(req);
+    if (authError) return res.status(401).json({ message: authError });
+
+    const validation = validateAndNormalizePriceDefaultsPayload(req.body);
+    if (validation.error) return res.status(400).json({ message: validation.error });
+
+    const ingestResult  = await repository.ingestProductPriceDefaults(validation);
+    const affectedCodes = validation.records.map((r) => r.productCode);
+    // Include purged product codes so the effective table drops entries for
+    // any SKU whose master price was removed from the HQ catalog this snapshot.
+    const allCodes = [...new Set([...affectedCodes, ...(ingestResult.orphanProductCodes || [])])];
+    const refreshResult = await repository.refreshEffectiveBranchPrices({
+      productCodes: allCodes.length > 0 ? allCodes : null,
+    });
+
+    res.json({ ...ingestResult, ...refreshResult });
+  }));
+
+  // ── Price sync: branch overrides (from TCNTPdtBchPrice) ───────────────────
+  router.post("/api/sync/ada/prices/branch-overrides", asyncHandler(async (req, res) => {
+    const authError = validateBranchStockSyncToken(req);
+    if (authError) return res.status(401).json({ message: authError });
+
+    const validation = validateAndNormalizePriceOverridesPayload(req.body);
+    if (validation.error) return res.status(400).json({ message: validation.error });
+
+    const ingestResult  = await repository.ingestProductBranchPriceOverrides(validation);
+    const affectedCodes = validation.records.map((r) => r.productCode);
+    // Include purged product codes so the effective table is rebuilt to
+    // fall back to master for any SKU that lost its override this snapshot.
+    const allCodes = [...new Set([...affectedCodes, ...(ingestResult.orphanProductCodes || [])])];
+    const refreshResult = await repository.refreshEffectiveBranchPrices({
+      branchCode:   validation.branchCode,
+      productCodes: allCodes.length > 0 ? allCodes : null,
+    });
+
+    res.json({ ...ingestResult, ...refreshResult });
+  }));
+
+  // ── PDA scan: read effective price for a barcode ──────────────────────────
+  // Branch code is resolved from the auth token — never from a query param.
+  // Phase-1 scope: returns retail level-1 prices; all levels are stored and
+  // returned so the PDA app can display them; scope 'price:wholesale' is
+  // enforced here if the token carries it.
+  router.get("/api/pda/products/scan", asyncHandler(async (req, res) => {
+    const { user, error: authError } = parsePdaUserFromRequest(req);
+    if (authError) return res.status(401).json({ message: authError });
+
+    const scopeError = requirePdaScope(user, "price:retail");
+    if (scopeError) return res.status(403).json({ message: scopeError });
+
+    const barcodeParam     = String(req.query.barcode     || "").trim();
+    const productCodeParam = String(req.query.productCode || "").trim();
+
+    if (!barcodeParam && !productCodeParam) {
+      return res.status(400).json({ message: "barcode or productCode query param is required." });
+    }
+
+    const result = await repository.getProductPricingForBranch({
+      branchCode:  user.branchCode,
+      barcode:     barcodeParam     || null,
+      productCode: productCodeParam || null,
+      scopes:      user.scopes,
+    });
+
+    if (!result) return res.status(404).json({ message: "Product not found." });
+
+    return res.json(result);
   }));
 
   router.use((error, _req, res, _next) => {
