@@ -526,6 +526,23 @@ function mergeRequestDraftItems(currentItems = [], addedItems = []) {
   );
 }
 
+function normalizeDraftLine(line) {
+  return {
+    lineKey: line.lineKey || "",
+    sourceBranchCode: line.sourceBranchCode || "",
+    requestMode: line.requestMode || "STANDARD",
+    productCode: line.productCode || "",
+    productNameThai: line.productNameThai || "",
+    productNameEng: line.productNameEng || "",
+    barcode: line.barcode || "",
+    unit: line.unit || "",
+    requestedQty: Number(line.requestedQty) || 1,
+    snapshotQty: line.snapshotQty != null ? Number(line.snapshotQty) : null,
+    snapshotSyncedAt: line.snapshotSyncedAt || null,
+    lineNote: line.lineNote || "",
+  };
+}
+
 function generateRequestIdempotencyKey() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return `srq-${crypto.randomUUID()}`;
@@ -7856,7 +7873,15 @@ export default function App() {
   const [incomingRequestBadgeCount, setIncomingRequestBadgeCount] = useState(0);
   const [requestDraftItems, setRequestDraftItems] = useState([]);
   const [requestBatchNote, setRequestBatchNote] = useState("");
+  const [draftPublicId, setDraftPublicId] = useState(null);
+  const [draftVersion, setDraftVersion] = useState(0);
   const requestIdempotencyKeyRef = useRef(generateRequestIdempotencyKey());
+  const draftPublicIdRef = useRef(null);
+  const draftVersionRef = useRef(0);
+  // items: null = not hydrated yet; set after first load so autosave skips hydration re-renders
+  const draftHydrationRef = useRef({ items: null, note: null });
+  const draftSaveTimerRef = useRef(null);
+  const draftHydratedForBranchRef = useRef("");
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "dark";
     const savedTheme = window.localStorage.getItem(adminThemeStorageKey);
@@ -8048,6 +8073,121 @@ export default function App() {
     return () => { active = false; clearInterval(id); };
   }, [branchCode]);
 
+  // Hydrate draft from server whenever branch context changes
+  useEffect(() => {
+    if (!session || !branchCode) {
+      draftHydratedForBranchRef.current = "";
+      draftHydrationRef.current = { items: null, note: null };
+      setDraftPublicId(null);
+      setDraftVersion(0);
+      draftPublicIdRef.current = null;
+      draftVersionRef.current = 0;
+      setRequestDraftItems([]);
+      setRequestBatchNote("");
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+        draftSaveTimerRef.current = null;
+      }
+      return undefined;
+    }
+    if (draftHydratedForBranchRef.current === branchCode) return undefined;
+
+    draftHydratedForBranchRef.current = branchCode;
+    draftHydrationRef.current = { items: null, note: null };
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
+
+    let active = true;
+    async function fetchDraft() {
+      try {
+        const res = await apiFetch("/api/stock-request-draft/me");
+        if (!res.ok || !active) return;
+        const data = await res.json();
+        if (!active) return;
+        const draft = data.draft || {};
+        const hydratedItems = (draft.lines || []).map(normalizeDraftLine);
+        const hydratedNote = draft.note || "";
+        setRequestDraftItems(hydratedItems);
+        setRequestBatchNote(hydratedNote);
+        setDraftPublicId(draft.draftPublicId || null);
+        setDraftVersion(draft.version ?? 0);
+        draftPublicIdRef.current = draft.draftPublicId || null;
+        draftVersionRef.current = draft.version ?? 0;
+        // Mark hydration snapshot so autosave skips this render
+        draftHydrationRef.current = { items: hydratedItems, note: hydratedNote };
+      } catch {
+        // Draft is non-critical; allow autosave to create it fresh
+        draftHydrationRef.current = { items: [], note: "" };
+      }
+    }
+    fetchDraft();
+    return () => { active = false; };
+  }, [session, branchCode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Autosave draft changes with 1.5 s debounce
+  useEffect(() => {
+    const snap = draftHydrationRef.current;
+    // Skip until hydrated and skip the hydration-triggered re-render itself
+    if (snap.items === null) return undefined;
+    if (requestDraftItems === snap.items && requestBatchNote === snap.note) return undefined;
+    if (!branchCode || !session) return undefined;
+
+    const capturedItems = requestDraftItems;
+    const capturedNote = requestBatchNote;
+    const capturedCsrf = session?.csrfToken || "";
+
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = setTimeout(async () => {
+      draftSaveTimerRef.current = null;
+      try {
+        const res = await apiFetch("/api/stock-request-draft/me", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": capturedCsrf },
+          body: JSON.stringify({
+            version: draftVersionRef.current,
+            note: capturedNote,
+            lines: capturedItems.map(normalizeDraftLine),
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const saved = data.draft || {};
+          draftPublicIdRef.current = saved.draftPublicId || null;
+          draftVersionRef.current = saved.version ?? 0;
+          setDraftPublicId(saved.draftPublicId || null);
+          setDraftVersion(saved.version ?? 0);
+        } else if (res.status === 409) {
+          // Re-fetch fresh draft on version conflict
+          const freshRes = await apiFetch("/api/stock-request-draft/me");
+          if (freshRes.ok) {
+            const freshData = await freshRes.json();
+            const fresh = freshData.draft || {};
+            const freshItems = (fresh.lines || []).map(normalizeDraftLine);
+            const freshNote = fresh.note || "";
+            draftHydrationRef.current = { items: freshItems, note: freshNote };
+            setRequestDraftItems(freshItems);
+            setRequestBatchNote(freshNote);
+            setDraftPublicId(fresh.draftPublicId || null);
+            setDraftVersion(fresh.version ?? 0);
+            draftPublicIdRef.current = fresh.draftPublicId || null;
+            draftVersionRef.current = fresh.version ?? 0;
+          }
+        }
+      } catch {
+        // Autosave failures are non-critical
+      }
+    }, 1500);
+
+    return () => {
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+        draftSaveTimerRef.current = null;
+      }
+    };
+  }, [requestDraftItems, requestBatchNote]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function handleLogin(event) {
     event.preventDefault();
     setAuthenticating(true);
@@ -8150,27 +8290,66 @@ export default function App() {
   }
 
   function handleClearDraft() {
-    setRequestDraftItems([]);
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
+    const publicIdToDiscard = draftPublicIdRef.current;
+    if (publicIdToDiscard) {
+      apiFetch("/api/stock-request-draft/me", {
+        method: "DELETE",
+        headers: { "X-CSRF-Token": session?.csrfToken || "" },
+      }).catch(() => {});
+    }
+    const emptyItems = [];
+    setRequestDraftItems(emptyItems);
     setRequestBatchNote("");
+    setDraftPublicId(null);
+    setDraftVersion(0);
+    draftPublicIdRef.current = null;
+    draftVersionRef.current = 0;
+    draftHydrationRef.current = { items: emptyItems, note: "" };
     requestIdempotencyKeyRef.current = generateRequestIdempotencyKey();
   }
 
   async function handleSubmitDraft({ onStart, onSuccess, onError, onFinally } = {}) {
     if (onStart) onStart();
     try {
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+        draftSaveTimerRef.current = null;
+      }
       const payload = buildStockRequestPayload(requestDraftItems, {
         note: requestBatchNote,
         idempotencyKey: requestIdempotencyKeyRef.current,
       });
       if (!payload.groups.length) throw new Error("ยังไม่มีรายการที่พร้อมส่งคำขอ");
+      const submitPayload = {
+        ...payload,
+        ...(draftPublicIdRef.current
+          ? { draftPublicId: draftPublicIdRef.current, draftVersion: draftVersionRef.current }
+          : {}),
+      };
       const response = await apiFetch("/api/stock-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-CSRF-Token": session?.csrfToken || "" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(submitPayload),
       });
       const result = await response.json().catch(() => ({}));
+      if (response.status === 409 && result.code === "DRAFT_VERSION_CONFLICT") {
+        throw new Error("ร่างคำขอถูกแก้ไขจากอุปกรณ์อื่น กรุณารีโหลดหน้าเพื่อดูข้อมูลล่าสุด");
+      }
       if (!response.ok) throw new Error(result.message || result.error || `HTTP ${response.status}`);
-      handleClearDraft();
+      // Draft is now SUBMITTED server-side — clear local state without calling DELETE
+      const emptyItems = [];
+      setRequestDraftItems(emptyItems);
+      setRequestBatchNote("");
+      setDraftPublicId(null);
+      setDraftVersion(0);
+      draftPublicIdRef.current = null;
+      draftVersionRef.current = 0;
+      draftHydrationRef.current = { items: emptyItems, note: "" };
+      requestIdempotencyKeyRef.current = generateRequestIdempotencyKey();
       if (onSuccess) onSuccess(result);
     } catch (err) {
       if (onError) onError(err);
