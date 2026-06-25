@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CipdataNav } from "../components/CipdataShell.jsx";
+import { CipdataNav, ThemeToggleButton } from "../components/CipdataShell.jsx";
 import EncounterDetailModal from "../components/EncounterDetailModal.jsx";
 import KpiCards from "../components/KpiCards.jsx";
 import { api } from "../lib/api.js";
@@ -55,6 +55,7 @@ export default function LookupPage() {
   const [kpiData, setKpiData] = useState(null);
   const [monthlyTarget, setMonthlyTarget] = useState(() => loadNumberPreference("cipdata.lookup.monthly-target", 300));
   const [accumSettings, setAccumSettings] = useState(() => loadAccumPreference());
+  const [theme, setTheme] = useState(() => (typeof document === "undefined" ? "light" : document.documentElement.dataset.theme || getComputedStyle(document.documentElement).colorScheme || "light"));
 
   const maxPage = Math.max(1, Math.ceil(total / pageSize));
 
@@ -193,6 +194,18 @@ export default function LookupPage() {
     <div className="page-stack">
       <section className="lookup-top-grid">
         <header className="hero-card lookup-hero-card">
+          <div className="hero-card__actions">
+            <ThemeToggleButton
+              theme={theme === "dark" ? "dark" : "light"}
+              onToggle={() => {
+                const nextTheme = (document.documentElement.dataset.theme || "light") === "dark" ? "light" : "dark";
+                document.documentElement.dataset.theme = nextTheme;
+                window.localStorage.setItem("cipdata.theme", nextTheme);
+                setTheme(nextTheme);
+              }}
+            />
+          </div>
+
           <div className="hero-copy">
             <span className="eyebrow">CiPData Migration</span>
             <h1>สำหรับกรอกข้อมูล</h1>

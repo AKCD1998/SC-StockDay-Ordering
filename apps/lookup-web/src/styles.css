@@ -229,6 +229,7 @@ label {
 }
 
 .hero-card {
+  position: relative;
   width: 100%;
   border-radius: 28px;
   padding: 28px;
@@ -241,6 +242,14 @@ label {
 .lookup-hero-card {
   height: 100%;
   align-content: space-between;
+}
+
+.hero-card__actions {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .hero-copy h1,
@@ -433,10 +442,6 @@ label {
 }
 
 .theme-toggle {
-  position: fixed;
-  top: 18px;
-  right: 18px;
-  z-index: 40;
   padding: 10px 14px;
   border-radius: 999px;
   border: 1px solid var(--theme-toggle-border);
@@ -830,6 +835,11 @@ label {
   .hero-card,
   .modal-card {
     padding: 18px;
+  }
+
+  .hero-card__actions {
+    top: 14px;
+    right: 14px;
   }
 
   .modal-card {

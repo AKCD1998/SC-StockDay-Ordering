@@ -31,6 +31,20 @@ function getInitialTheme() {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
+export function ThemeToggleButton({ theme, onToggle }) {
+  return (
+    <button
+      type="button"
+      className="theme-toggle"
+      onClick={onToggle}
+      aria-label={theme === "dark" ? "สลับเป็นโหมดสว่าง" : "สลับเป็นโหมดมืด"}
+      title={theme === "dark" ? "สลับเป็นโหมดสว่าง" : "สลับเป็นโหมดมืด"}
+    >
+      {theme === "dark" ? "โหมดสว่าง" : "โหมดมืด"}
+    </button>
+  );
+}
+
 export default function CipdataShell({ children }) {
   const location = useLocation();
   const showHero = location.pathname !== "/lookup";
@@ -43,18 +57,12 @@ export default function CipdataShell({ children }) {
 
   return (
     <div className="app-shell">
-      <button
-        type="button"
-        className="theme-toggle"
-        onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-        aria-label={theme === "dark" ? "สลับเป็นโหมดสว่าง" : "สลับเป็นโหมดมืด"}
-        title={theme === "dark" ? "สลับเป็นโหมดสว่าง" : "สลับเป็นโหมดมืด"}
-      >
-        {theme === "dark" ? "โหมดสว่าง" : "โหมดมืด"}
-      </button>
-
       {showHero ? (
         <header className="hero-card">
+          <div className="hero-card__actions">
+            <ThemeToggleButton theme={theme} onToggle={() => setTheme((current) => (current === "dark" ? "light" : "dark"))} />
+          </div>
+
           <div className="hero-copy">
             <span className="eyebrow">CiPData Migration</span>
             <h1>สำหรับกรอกข้อมูล</h1>

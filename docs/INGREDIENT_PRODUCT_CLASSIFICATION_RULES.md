@@ -95,6 +95,8 @@ Sub-type ละเอียดกว่านั้นให้ใช้ **shelf
 | 19 | **ขมิ้นชัน / Curcumin / Turmeric** | 1 (21 synonyms, 8 Thai) |
 | 20 | **น้ำมันระกำ / Methyl Salicylate** | 1 (9 synonyms, 3 Thai) |
 | 21 | **ว่านหางจระเข้ / Aloe Vera** | 1 (17 synonyms, 6 Thai) |
+| 22 | **ยูเรีย / Urea (Topical)** | 1 (10 synonyms, 4 Thai) |
+| 23 | **มะระขี้นก / Bitter Melon** | 1 (16 synonyms, 6 Thai) |
 
 ---
 
