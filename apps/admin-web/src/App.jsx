@@ -5120,7 +5120,7 @@ const RESPONSE_STATUS_LABELS = {
   REJECTED: "ปฏิเสธ",
 };
 
-function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDraftItems, requestBatchNote, setRequestBatchNote, onSubmitDraft, onClearDraft, draftHydrating = false }) {
+function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDraftItems, requestBatchNote, setRequestBatchNote, onSubmitDraft, onClearDraft, draftHydrating = false, draftSaveStatus = null }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -5355,6 +5355,14 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
 
       {draftHydrating ? (
         <p className="meta-line" style={{ padding: "8px 0", opacity: 0.6 }}>กำลังโหลดร่างคำขอ...</p>
+      ) : null}
+
+      {draftSaveStatus === "saving" ? (
+        <p className="meta-line" style={{ padding: "4px 0", opacity: 0.6, fontSize: "0.8em" }}>กำลังบันทึกร่าง...</p>
+      ) : draftSaveStatus === "saved" ? (
+        <p className="meta-line" style={{ padding: "4px 0", color: "#4caf50", fontSize: "0.8em" }}>บันทึกร่างแล้ว</p>
+      ) : draftSaveStatus?.error ? (
+        <p className="meta-line" style={{ padding: "4px 0", color: "#f44336", fontSize: "0.8em" }}>บันทึกไม่สำเร็จ: {draftSaveStatus.error}</p>
       ) : null}
 
       {!draftHydrating && draftCount > 0 ? (
@@ -5669,6 +5677,7 @@ function StockRequestsPanel({
   onSubmitDraft,
   onClearDraft,
   draftHydrating = false,
+  draftSaveStatus = null,
   incomingNotifCount = 0,
   onIncomingNotificationsChanged,
 }) {
@@ -5706,6 +5715,7 @@ function StockRequestsPanel({
           onSubmitDraft={onSubmitDraft}
           onClearDraft={onClearDraft}
           draftHydrating={draftHydrating}
+          draftSaveStatus={draftSaveStatus}
         />
       ) : (
         <IncomingRequestsTab
@@ -7882,6 +7892,7 @@ export default function App() {
   const [draftPublicId, setDraftPublicId] = useState(null);
   const [draftVersion, setDraftVersion] = useState(0);
   const [draftHydrating, setDraftHydrating] = useState(false);
+  const [draftSaveStatus, setDraftSaveStatus] = useState(null); // null | "saving" | "saved" | { error: string }
   const requestIdempotencyKeyRef = useRef(generateRequestIdempotencyKey());
   const draftPublicIdRef = useRef(null);
   const draftVersionRef = useRef(0);
@@ -8150,8 +8161,10 @@ export default function App() {
     const capturedCsrf = session?.csrfToken || "";
 
     if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    setDraftSaveStatus(null);
     draftSaveTimerRef.current = setTimeout(async () => {
       draftSaveTimerRef.current = null;
+      setDraftSaveStatus("saving");
       try {
         const res = await apiFetch("/api/stock-request-draft/me", {
           method: "PUT",
@@ -8169,6 +8182,8 @@ export default function App() {
           draftVersionRef.current = saved.version ?? 0;
           setDraftPublicId(saved.draftPublicId || null);
           setDraftVersion(saved.version ?? 0);
+          setDraftSaveStatus("saved");
+          setTimeout(() => setDraftSaveStatus(null), 3000);
         } else if (res.status === 409) {
           // Re-fetch fresh draft on version conflict
           const freshRes = await apiFetch("/api/stock-request-draft/me");
@@ -8185,9 +8200,13 @@ export default function App() {
             draftPublicIdRef.current = fresh.draftPublicId || null;
             draftVersionRef.current = fresh.version ?? 0;
           }
+          setDraftSaveStatus({ error: "409 conflict — reloaded" });
+        } else {
+          const errText = await res.text().catch(() => "");
+          setDraftSaveStatus({ error: `${res.status} ${errText.slice(0, 120)}` });
         }
-      } catch {
-        // Autosave failures are non-critical
+      } catch (err) {
+        setDraftSaveStatus({ error: `network: ${err?.message || "unknown"}` });
       }
     }, 1500);
 
@@ -8824,6 +8843,7 @@ export default function App() {
           onSubmitDraft={handleSubmitDraft}
           onClearDraft={handleClearDraft}
           draftHydrating={draftHydrating}
+          draftSaveStatus={draftSaveStatus}
           incomingNotifCount={incomingRequestBadgeCount}
           onIncomingNotificationsChanged={refreshIncomingRequestBadgeCount}
         />
