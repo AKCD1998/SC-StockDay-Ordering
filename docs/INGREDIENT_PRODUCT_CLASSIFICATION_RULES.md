@@ -103,6 +103,7 @@ Sub-type ละเอียดกว่านั้นให้ใช้ **shelf
 | 27 | **กระชายดำ / Black Ginger (Kaempferia parviflora)** | 1 (15 synonyms, 6 Thai) |
 | 28 | **กระเจี๊ยบแดง / Roselle (Hibiscus sabdariffa)** | 1 (18 synonyms, 8 Thai) |
 | 29 | **เสลดพังพอน × 2** (C. nutans / พญายอ + B. lupulina / พิมเสนต้น) | 2 (20 synonyms, 11 Thai) |
+| 30 | **กระชาย / Fingerroot (Boesenbergia rotunda)** | 1 (18 synonyms, 8 Thai) |
 
 ---
 
