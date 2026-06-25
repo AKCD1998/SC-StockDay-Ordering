@@ -6297,6 +6297,7 @@ function IngredientDictionaryPanel({ csrfToken }) {
   const [discoveries, setDiscoveries] = useState([]);
   const [discoveryTotal, setDiscoveryTotal] = useState(0);
   const [loadingDiscoveries, setLoadingDiscoveries] = useState(false);
+  const [discoverySearch, setDiscoverySearch] = useState("");
 
   const MATCHED_PAGE = 50;
 
@@ -6834,6 +6835,18 @@ function IngredientDictionaryPanel({ csrfToken }) {
             คำที่พบบ่อยในชื่อสินค้าที่ยังจับคู่ไม่ได้ — ใช้เป็นตัวช่วยขยายพจนานุกรม
             {discoveryTotal > 0 && <> (จากทั้งหมด {discoveryTotal.toLocaleString()} สินค้า)</>}
           </div>
+          <div className="id-search-row">
+            <input
+              type="text"
+              className="rq-search"
+              placeholder="ค้นหาคำ..."
+              value={discoverySearch}
+              onChange={(e) => setDiscoverySearch(e.target.value)}
+            />
+            {discoverySearch && (
+              <button type="button" className="ghost-button" onClick={() => setDiscoverySearch("")}>ล้าง</button>
+            )}
+          </div>
           <div className="table-wrap">
             <table className="id-table">
               <thead>
@@ -6844,16 +6857,22 @@ function IngredientDictionaryPanel({ csrfToken }) {
                   <tr><td colSpan={4} className="empty-state">กำลังสแกนชื่อสินค้า...</td></tr>
                 ) : discoveries.length === 0 ? (
                   <tr><td colSpan={4} className="empty-state">ไม่มีข้อมูล</td></tr>
-                ) : (
-                  discoveries.map((d, idx) => (
-                    <tr key={d.token}>
-                      <td>{idx + 1}</td>
-                      <td><strong>{d.token}</strong></td>
-                      <td>{d.productCount.toLocaleString()}</td>
-                      <td>{d.coveragePct.toFixed(2)}%</td>
-                    </tr>
-                  ))
-                )}
+                ) : (() => {
+                  const q = discoverySearch.trim().toLowerCase();
+                  const filtered = q ? discoveries.filter((d) => d.token.toLowerCase().includes(q)) : discoveries;
+                  return filtered.length === 0 ? (
+                    <tr><td colSpan={4} className="empty-state">ไม่พบคำที่ค้นหา</td></tr>
+                  ) : (
+                    filtered.map((d, idx) => (
+                      <tr key={d.token}>
+                        <td>{idx + 1}</td>
+                        <td><strong>{d.token}</strong></td>
+                        <td>{d.productCount.toLocaleString()}</td>
+                        <td>{d.coveragePct.toFixed(2)}%</td>
+                      </tr>
+                    ))
+                  );
+                })()}
               </tbody>
             </table>
           </div>

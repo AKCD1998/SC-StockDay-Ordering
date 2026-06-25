@@ -16,21 +16,6 @@ const cardConfig = [
     label: "เป้าหมายต่อเดือน",
     helper: () => "ปรับจาก local preference ได้",
   },
-  {
-    key: "remaining",
-    label: "เหลืออีก",
-    helper: () => "เคสที่ยังต้องทำให้ถึงเป้า",
-  },
-  {
-    key: "perDay",
-    label: "ต้องทำต่อวัน",
-    helper: () => "เฉลี่ยจากวันคงเหลือในเดือน",
-  },
-  {
-    key: "remainingDays",
-    label: "วันคงเหลือ",
-    helper: () => "นับตั้งแต่วันถัดไปจนถึงสิ้นเดือน",
-  },
 ];
 
 export default function KpiCards({ data }) {
