@@ -92,6 +92,7 @@ Sub-type ละเอียดกว่านั้นให้ใช้ **shelf
 | 16 | Iron (7 forms) + Folate + Vitamin B12 (4 forms) | 13 |
 | 17 | **ฟ้าทะลายโจร / Andrographis** | 1 (41 synonyms, 18 Thai) |
 | 18 | **มะขามแขก / Senna** | 1 (22 synonyms, 6 Thai) |
+| 19 | **ขมิ้นชัน / Curcumin / Turmeric** | 1 (21 synonyms, 8 Thai) |
 
 ---
 
@@ -104,7 +105,7 @@ Sub-type ละเอียดกว่านั้นให้ใช้ **shelf
 
 **สมุนไพรไทย**
 - ฟ้าทะลายโจร (done ✓)
-- ขมิ้นชัน (Curcumin/Turmeric)
+- ~~ขมิ้นชัน (Curcumin/Turmeric)~~ (done ✓ batch 19)
 - บัวบก (Centella asiatica / Gotu Kola)
 - ว่านหางจระเข้ (Aloe vera)
 - กระชายดำ (Kaempferia parviflora / Black Ginger)

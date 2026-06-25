@@ -389,7 +389,7 @@ export default function LookupPage() {
           <div className="table-shell">
             <table className="lookup-table lookup-table--legacy">
               <colgroup>
-                <col style={{ width: "108px" }} />
+                <col style={{ width: "28px" }} />
                 <col style={{ width: "56px" }} />
                 <col style={{ width: "140px" }} />
                 <col style={{ width: "130px" }} />
@@ -403,7 +403,7 @@ export default function LookupPage() {
               </colgroup>
               <thead>
                 <tr>
-                  <th>ดู</th>
+                  <th></th>
                   <th>สาขา</th>
                   <th>วันที่รับบริการ</th>
                   <th>เลขประจำตัวประชาชน</th>
@@ -421,8 +421,8 @@ export default function LookupPage() {
                   rows.map((row) => (
                     <tr key={row.encounterId}>
                       <td className="action-column">
-                        <button type="button" className="row-action-button" onClick={() => setActiveRow(row)}>
-                          รายละเอียด
+                        <button type="button" className="row-action-button row-action-button--icon" onClick={() => setActiveRow(row)} aria-label="เปิดรายละเอียด encounter" title="เปิดรายละเอียด encounter">
+                          ⋮
                         </button>
                       </td>
                       <td>{row.branchNo || "-"}</td>

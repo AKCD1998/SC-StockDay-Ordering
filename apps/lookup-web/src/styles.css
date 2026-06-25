@@ -528,12 +528,26 @@ label {
 }
 
 .action-column {
-  width: 108px;
+  width: 28px;
+  text-align: center;
 }
 
 .row-action-button {
   background: #ebf4f7;
   color: #214d64;
+}
+
+.row-action-button--icon {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 18px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .drug-stack {
