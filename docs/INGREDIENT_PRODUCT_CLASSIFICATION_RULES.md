@@ -93,6 +93,8 @@ Sub-type ละเอียดกว่านั้นให้ใช้ **shelf
 | 17 | **ฟ้าทะลายโจร / Andrographis** | 1 (41 synonyms, 18 Thai) |
 | 18 | **มะขามแขก / Senna** | 1 (22 synonyms, 6 Thai) |
 | 19 | **ขมิ้นชัน / Curcumin / Turmeric** | 1 (21 synonyms, 8 Thai) |
+| 20 | **น้ำมันระกำ / Methyl Salicylate** | 1 (9 synonyms, 3 Thai) |
+| 21 | **ว่านหางจระเข้ / Aloe Vera** | 1 (17 synonyms, 6 Thai) |
 
 ---
 
@@ -107,7 +109,7 @@ Sub-type ละเอียดกว่านั้นให้ใช้ **shelf
 - ฟ้าทะลายโจร (done ✓)
 - ~~ขมิ้นชัน (Curcumin/Turmeric)~~ (done ✓ batch 19)
 - บัวบก (Centella asiatica / Gotu Kola)
-- ว่านหางจระเข้ (Aloe vera)
+- ~~ว่านหางจระเข้ (Aloe vera)~~ (done ✓ batch 21)
 - กระชายดำ (Kaempferia parviflora / Black Ginger)
 - กระเจี๊ยบ (Roselle / Hibiscus sabdariffa)
 - ~~มะขามแขก (Senna)~~ (done ✓ batch 18)

@@ -602,10 +602,12 @@ label {
 .modal-card {
   position: relative;
   width: min(1200px, 95vw);
-  max-height: 85vh;
+  height: min(85vh, calc(100vh - 40px));
   overflow: hidden;
   border-radius: 16px;
   padding: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .legacy-modal-head {
@@ -633,7 +635,7 @@ label {
 }
 
 .legacy-modal-body {
-  max-height: calc(85vh - 64px);
+  min-height: 0;
   overflow: auto;
   padding: 18px;
   display: grid;
