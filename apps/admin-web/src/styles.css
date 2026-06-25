@@ -1906,8 +1906,8 @@ button {
 .id-subtab.active { border-color: #3a6cd4; background: rgba(58,108,212,0.08); color: #2a5cb4; }
 
 .id-search-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 86px;
+  display: flex;
+  align-items: center;
   gap: 8px;
   margin-bottom: 10px;
   padding: 12px;
@@ -2151,7 +2151,7 @@ button {
 
 @media (max-width: 1100px) {
   .id-search-row {
-    grid-template-columns: 1fr;
+    flex-wrap: wrap;
   }
 
   .id-search-button {

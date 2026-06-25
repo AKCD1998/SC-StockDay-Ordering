@@ -101,6 +101,13 @@ label {
   width: min(1460px, calc(100vw - 48px));
   margin: 0 auto 0 24px;
   padding: 28px 0 64px;
+  display: grid;
+  gap: 28px;
+  align-content: start;
+}
+
+.app-shell > * {
+  width: 100%;
 }
 
 .page-content,
@@ -119,6 +126,7 @@ label {
 }
 
 .hero-card {
+  width: 100%;
   border-radius: 28px;
   padding: 28px;
   display: grid;
@@ -426,6 +434,7 @@ label {
     width: auto;
     margin: 0;
     padding: 18px 14px 40px;
+    gap: 20px;
   }
 
   .panel,
