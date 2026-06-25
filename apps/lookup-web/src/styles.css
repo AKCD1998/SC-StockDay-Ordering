@@ -228,7 +228,12 @@ label {
 }
 
 .summary-grid {
+  display: grid;
   gap: 14px;
+}
+
+.kpi-grid {
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
 }
 
 .summary-card,
@@ -247,7 +252,7 @@ label {
 
 .summary-card strong {
   display: block;
-  font-size: 30px;
+  font-size: 22px;
   color: #103041;
 }
 

@@ -194,7 +194,6 @@ export default function LookupPage() {
         <div className="panel-header">
           <div>
             <h2>ค้นหา encounter</h2>
-            <p>รองรับ workflow หลักของ lookup เดิม: search, branch/date filter, sort, advanced filter และ close-up modal</p>
           </div>
         </div>
 

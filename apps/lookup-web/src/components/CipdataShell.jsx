@@ -14,10 +14,6 @@ export default function CipdataShell({ children }) {
         <div className="hero-copy">
           <span className="eyebrow">CiPData Migration</span>
           <h1>สำหรับกรอกข้อมูล</h1>
-          <p>
-            React SPA ที่คง workflow เดิมของ GAS ไว้ แต่แยกเป็นหน้าชัดเจนและเตรียมต่อกับ shared backend ผ่าน
-            สัญญา `/api/cipdata/*`
-          </p>
         </div>
 
         <nav className="top-nav" aria-label="CiPData navigation">
