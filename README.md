@@ -24,6 +24,7 @@ It still does not require direct access to the live `AdaAcc` database during dev
 apps/
   admin-web/      React dashboard for boss/admin
   order-web/      React branch ordering page
+  lookup-web/     React migration of CiPData "สำหรับกรอกข้อมูล"
   adapos-sync/    Node sync service for mother PC
 server/           Express API + mock repository + PostgreSQL schema
 docs/             Architecture and deployment notes
@@ -44,6 +45,7 @@ Copy-Item .env.example .env
 Copy-Item server\.env.example server\.env
 Copy-Item apps\admin-web\.env.example apps\admin-web\.env
 Copy-Item apps\order-web\.env.example apps\order-web\.env
+Copy-Item apps\lookup-web\.env.example apps\lookup-web\.env
 Copy-Item apps\adapos-sync\.env.example apps\adapos-sync\.env
 ```
 
@@ -112,7 +114,19 @@ npm run dev:sync
 
 - Order web: [http://localhost:5174](http://localhost:5174)
 - Admin web: [http://localhost:5173](http://localhost:5173)
+- Lookup web: [http://localhost:5175](http://localhost:5175)
 - API server: [http://localhost:4000](http://localhost:4000)
+
+## Lookup-web migration notes
+
+- `apps/lookup-web` is the React rebuild of the old GAS `สำหรับกรอกข้อมูล` workflow.
+- It now contains four routed flows:
+  - `/lookup`
+  - `/summary`
+  - `/followups`
+  - `/reports`
+- The SPA expects a shared-backend contract under `/api/cipdata/*`.
+- Local development can keep `VITE_USE_LOOKUP_MOCK=true` until the shared backend exposes those routes.
 
 ## Current behavior
 
