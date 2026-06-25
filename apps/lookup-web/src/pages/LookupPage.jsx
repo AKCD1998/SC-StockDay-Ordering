@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { CipdataNav } from "../components/CipdataShell.jsx";
 import EncounterDetailModal from "../components/EncounterDetailModal.jsx";
 import KpiCards from "../components/KpiCards.jsx";
 import { api } from "../lib/api.js";
@@ -190,6 +191,80 @@ export default function LookupPage() {
 
   return (
     <div className="page-stack">
+      <section className="lookup-top-grid">
+        <header className="hero-card lookup-hero-card">
+          <div className="hero-copy">
+            <span className="eyebrow">CiPData Migration</span>
+            <h1>สำหรับกรอกข้อมูล</h1>
+          </div>
+
+          <CipdataNav />
+        </header>
+
+        <section className="panel hero-kpi-panel">
+          <div className="panel-header stacked hero-kpi-header">
+            <div>
+              <h2>KPI ภาพรวม</h2>
+            </div>
+            <div className="toolbar kpi-controls">
+              <label>
+                โหมดสะสม
+                <select
+                  value={accumSettings.mode}
+                  onChange={(event) =>
+                    setAccumSettings((current) => ({
+                      ...current,
+                      mode: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="monthStart">ตั้งแต่ต้นเดือนถึงวันนี้</option>
+                  <option value="custom">กำหนดช่วงเอง</option>
+                </select>
+              </label>
+              {accumSettings.mode === "custom" ? (
+                <>
+                  <label>
+                    เริ่ม
+                    <input
+                      type="date"
+                      value={accumSettings.start}
+                      onChange={(event) =>
+                        setAccumSettings((current) => ({
+                          ...current,
+                          start: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    สิ้นสุด
+                    <input
+                      type="date"
+                      value={accumSettings.end}
+                      onChange={(event) =>
+                        setAccumSettings((current) => ({
+                          ...current,
+                          end: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </>
+              ) : null}
+              <label>
+                เป้าหมายต่อเดือน
+                <input type="number" min="1" value={monthlyTarget} onChange={(event) => setMonthlyTarget(Math.max(1, Number(event.target.value) || 1))} />
+              </label>
+            </div>
+          </div>
+
+          {kpiLoading ? <div className="notice">กำลังคำนวณ KPI...</div> : null}
+          {kpiError ? <div className="notice error">{kpiError}</div> : null}
+          <KpiCards data={kpiData} />
+        </section>
+      </section>
+
       <section className="panel">
         <div className="panel-header">
           <div>
@@ -287,70 +362,6 @@ export default function LookupPage() {
             </button>
           </div>
         </form>
-      </section>
-
-      <section className="panel">
-        <div className="panel-header stacked">
-          <div>
-            <h2>KPI ภาพรวม</h2>
-            <p>คำนวณแยกจาก lookup filters เพื่อคง behavior เดิมของหน้า GAS</p>
-          </div>
-          <div className="toolbar kpi-controls">
-            <label>
-              โหมดสะสม
-              <select
-                value={accumSettings.mode}
-                onChange={(event) =>
-                  setAccumSettings((current) => ({
-                    ...current,
-                    mode: event.target.value,
-                  }))
-                }
-              >
-                <option value="monthStart">ตั้งแต่ต้นเดือนถึงวันนี้</option>
-                <option value="custom">กำหนดช่วงเอง</option>
-              </select>
-            </label>
-            {accumSettings.mode === "custom" ? (
-              <>
-                <label>
-                  เริ่ม
-                  <input
-                    type="date"
-                    value={accumSettings.start}
-                    onChange={(event) =>
-                      setAccumSettings((current) => ({
-                        ...current,
-                        start: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  สิ้นสุด
-                  <input
-                    type="date"
-                    value={accumSettings.end}
-                    onChange={(event) =>
-                      setAccumSettings((current) => ({
-                        ...current,
-                        end: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-              </>
-            ) : null}
-            <label>
-              เป้าหมายต่อเดือน
-              <input type="number" min="1" value={monthlyTarget} onChange={(event) => setMonthlyTarget(Math.max(1, Number(event.target.value) || 1))} />
-            </label>
-          </div>
-        </div>
-
-        {kpiLoading ? <div className="notice">กำลังคำนวณ KPI...</div> : null}
-        {kpiError ? <div className="notice error">{kpiError}</div> : null}
-        <KpiCards data={kpiData} />
       </section>
 
       <section className="panel">

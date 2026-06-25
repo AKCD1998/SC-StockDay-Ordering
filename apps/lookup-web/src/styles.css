@@ -116,6 +116,13 @@ label {
   gap: 22px;
 }
 
+.lookup-top-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
 .hero-card,
 .panel,
 .notice,
@@ -135,6 +142,11 @@ label {
     radial-gradient(circle at top right, rgba(78, 193, 164, 0.14), transparent 24%),
     linear-gradient(145deg, rgba(12, 48, 66, 0.98) 0%, rgba(22, 89, 107, 0.96) 100%);
   color: #f4fbff;
+}
+
+.lookup-hero-card {
+  height: 100%;
+  align-content: space-between;
 }
 
 .hero-copy h1,
@@ -191,6 +203,43 @@ label {
 .panel {
   border-radius: 24px;
   padding: 24px;
+}
+
+.hero-kpi-panel {
+  border-radius: 28px;
+  padding: 22px;
+}
+
+.hero-kpi-header {
+  margin-bottom: 14px;
+}
+
+.hero-kpi-panel .panel-header {
+  gap: 14px;
+}
+
+.hero-kpi-panel .kpi-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  width: 100%;
+}
+
+.hero-kpi-panel .kpi-controls label {
+  font-size: 13px;
+}
+
+.hero-kpi-panel .summary-card {
+  padding: 14px 16px;
+}
+
+.hero-kpi-panel .summary-card span {
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.hero-kpi-panel .summary-card strong {
+  font-size: 20px;
 }
 
 .panel-header {
@@ -427,10 +476,15 @@ label {
 }
 
 @media (max-width: 1180px) {
+  .lookup-top-grid,
   .filter-grid,
   .detail-grid,
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hero-kpi-panel .kpi-controls {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -458,6 +512,7 @@ label {
 
   .filter-grid,
   .detail-grid,
+  .lookup-top-grid,
   .summary-grid {
     grid-template-columns: 1fr;
   }
