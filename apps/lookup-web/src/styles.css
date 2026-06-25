@@ -480,13 +480,13 @@ label {
 .page-chip {
   min-width: 112px;
   padding: 10px 14px;
-  background: #edf5f8;
-  color: #35566b;
+  background: color-mix(in srgb, var(--card-bg) 80%, white);
+  color: var(--text-soft);
 }
 
 .table-shell {
   overflow: auto;
-  border: 1px solid #d7e5eb;
+  border: 1px solid var(--card-border);
   border-radius: 20px;
 }
 
@@ -494,7 +494,7 @@ label {
   width: 100%;
   min-width: 1180px;
   border-collapse: collapse;
-  background: #ffffff;
+  background: var(--table-bg);
 }
 
 .lookup-table--legacy {
@@ -509,21 +509,22 @@ label {
 .lookup-table th,
 .lookup-table td {
   padding: 12px 14px;
-  border-bottom: 1px solid #edf3f6;
+  border-bottom: 1px solid var(--table-row-border);
   vertical-align: top;
   text-align: left;
+  color: var(--text-main);
 }
 
 .lookup-table thead th {
-  background: #f2f8fa;
-  color: #285167;
+  background: var(--table-head-bg);
+  color: var(--table-head-text);
   position: sticky;
   top: 0;
   z-index: 1;
 }
 
 .lookup-table tbody tr:hover {
-  background: #fbfeff;
+  background: var(--table-row-hover);
 }
 
 .table-empty-state {
@@ -538,8 +539,8 @@ label {
 }
 
 .row-action-button {
-  background: #ebf4f7;
-  color: #214d64;
+  background: color-mix(in srgb, var(--card-bg) 84%, white);
+  color: var(--text-soft);
 }
 
 .row-action-button--icon {
@@ -568,15 +569,15 @@ label {
 
 .qty-pill {
   padding: 4px 10px;
-  background: #ebf7ef;
-  color: #1f6a42;
+  background: var(--pill-green-bg);
+  color: var(--pill-green-text);
   font-size: 13px;
 }
 
 .warning-badge {
   padding: 8px 10px;
-  background: #fff5e8;
-  color: #8b5414;
+  background: var(--pill-warn-bg);
+  color: var(--pill-warn-text);
   display: inline-block;
   white-space: pre-wrap;
   overflow-wrap: anywhere;

@@ -97,6 +97,7 @@ Sub-type ละเอียดกว่านั้นให้ใช้ **shelf
 | 21 | **ว่านหางจระเข้ / Aloe Vera** | 1 (17 synonyms, 6 Thai) |
 | 22 | **ยูเรีย / Urea (Topical)** | 1 (10 synonyms, 4 Thai) |
 | 23 | **มะระขี้นก / Bitter Melon** | 1 (16 synonyms, 6 Thai) |
+| 24 | **Thai Herbal Bundle** (มะแว้งเครือ, มะแว้งต้น, มะขามป้อม, ชะเอมเทศ, ขิง, กานพลู, ตรีผลา, ยาประสะมะแว้ง) | 8 (68 synonyms, 26 Thai) |
 
 ---
 
