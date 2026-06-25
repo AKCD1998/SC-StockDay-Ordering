@@ -91,6 +91,7 @@ Sub-type ละเอียดกว่านั้นให้ใช้ **shelf
 | 7–15 | ยา generics, วิตามิน, อาหารเสริมต่างๆ | — |
 | 16 | Iron (7 forms) + Folate + Vitamin B12 (4 forms) | 13 |
 | 17 | **ฟ้าทะลายโจร / Andrographis** | 1 (41 synonyms, 18 Thai) |
+| 18 | **มะขามแขก / Senna** | 1 (22 synonyms, 6 Thai) |
 
 ---
 
@@ -108,7 +109,7 @@ Sub-type ละเอียดกว่านั้นให้ใช้ **shelf
 - ว่านหางจระเข้ (Aloe vera)
 - กระชายดำ (Kaempferia parviflora / Black Ginger)
 - กระเจี๊ยบ (Roselle / Hibiscus sabdariffa)
-- มะขามแขก (Senna)
+- ~~มะขามแขก (Senna)~~ (done ✓ batch 18)
 - กานพลู, ขิง, ขมิ้น, ไพล
 - เสลดพังพอน (Clinacanthus nutans)
 
@@ -137,7 +138,7 @@ Sub-type ละเอียดกว่านั้นให้ใช้ **shelf
 
 ### ลำดับที่ 2 — หลังจากนั้น (Phase 2 ก่อนหรือควบคู่)
 
-**Antiseptics & Disinfectants (batch 18 ที่วางแผนไว้)**
+**Antiseptics & Disinfectants (batch 19 ที่วางแผนไว้)**
 - Chlorhexidine
 - Isopropyl alcohol (IPA)
 - Ethanol (disinfectant grade)
