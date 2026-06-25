@@ -5120,7 +5120,7 @@ const RESPONSE_STATUS_LABELS = {
   REJECTED: "ปฏิเสธ",
 };
 
-function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDraftItems, requestBatchNote, setRequestBatchNote, onSubmitDraft, onClearDraft }) {
+function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDraftItems, requestBatchNote, setRequestBatchNote, onSubmitDraft, onClearDraft, draftHydrating = false }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -5668,6 +5668,7 @@ function StockRequestsPanel({
   setRequestBatchNote,
   onSubmitDraft,
   onClearDraft,
+  draftHydrating = false,
   incomingNotifCount = 0,
   onIncomingNotificationsChanged,
 }) {
@@ -5704,6 +5705,7 @@ function StockRequestsPanel({
           setRequestBatchNote={setRequestBatchNote}
           onSubmitDraft={onSubmitDraft}
           onClearDraft={onClearDraft}
+          draftHydrating={draftHydrating}
         />
       ) : (
         <IncomingRequestsTab
@@ -8821,6 +8823,7 @@ export default function App() {
           setRequestBatchNote={setRequestBatchNote}
           onSubmitDraft={handleSubmitDraft}
           onClearDraft={handleClearDraft}
+          draftHydrating={draftHydrating}
           incomingNotifCount={incomingRequestBadgeCount}
           onIncomingNotificationsChanged={refreshIncomingRequestBadgeCount}
         />
