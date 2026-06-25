@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api.js";
-import { formatCurrency, formatPhone, formatThaiDateTime, normalizeDrugItems, stripHtml } from "../lib/format.js";
+import { formatPhone, formatThaiDateTime, normalizeDrugItems, stripHtml, toDateInputValue } from "../lib/format.js";
 
 function DetailRow({ label, value }) {
   return (
-    <div className="detail-row">
-      <span>{label}</span>
-      <strong>{value || "-"}</strong>
+    <div className="legacy-detail-row">
+      <div className="legacy-detail-label">{label}</div>
+      <div className="legacy-detail-value">{value || "-"}</div>
     </div>
   );
 }
@@ -16,6 +16,8 @@ export default function EncounterDetailModal({ row, rows, onSelectRow, onClose }
   const [medications, setMedications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [copyNotice, setCopyNotice] = useState("");
+  const noticeTimerRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,6 +59,9 @@ export default function EncounterDetailModal({ row, rows, onSelectRow, onClose }
     load();
     return () => {
       cancelled = true;
+      if (noticeTimerRef.current) {
+        window.clearTimeout(noticeTimerRef.current);
+      }
     };
   }, [row?.encounterId]);
 
@@ -68,13 +73,52 @@ export default function EncounterDetailModal({ row, rows, onSelectRow, onClose }
   const previousRow = activeIndex > 0 ? rows[activeIndex - 1] : null;
   const nextRow = activeIndex >= 0 && activeIndex < rows.length - 1 ? rows[activeIndex + 1] : null;
   const drugItems = normalizeDrugItems(detail?.medsJson || detail?.medsAmedTh || row?.medsJson || row?.medsAmedTh);
+  const displayDate = detail?.encounterAt || row.encounterAt;
+  const formattedDate = formatThaiDateTime(displayDate);
+  const prescriptionSummary =
+    [...new Set(medications.map((item) => item.aggregateDirections || item.directionsText || "").map((value) => value.trim()).filter(Boolean))].join(" , ") ||
+    detail?.symptomName ||
+    row?.symptomName ||
+    "-";
+  const medicationRows = (medications.length ? medications : drugItems).map((item, index) => {
+    const fallbackDrug = drugItems[index] || {};
+    return {
+      id: `${item.skuId || fallbackDrug.id || index}`,
+      displayName: item.amedShortName || item.amedFullName || fallbackDrug.name || "-",
+      quantityText: [item.quantity || fallbackDrug.qty || 1, fallbackDrug.uom || ""].filter(Boolean).join(" "),
+      amedCopyText: item.amedShortName || item.amedFullName || fallbackDrug.name || "-",
+      directionsText: item.aggregateDirections || item.directionsText || "-",
+    };
+  });
+
+  async function copyText(value) {
+    const text = String(value || "").trim();
+    if (!text || text === "-") return;
+
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+
+    setCopyNotice("คัดลอกแล้ว");
+    if (noticeTimerRef.current) {
+      window.clearTimeout(noticeTimerRef.current);
+    }
+    noticeTimerRef.current = window.setTimeout(() => setCopyNotice(""), 1200);
+  }
 
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
       <section className="modal-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-        <header className="panel-header">
+        <header className="legacy-modal-head">
           <div>
-            <h2>รายละเอียด encounter</h2>
+            <h2>ใบสรุปรายเคส • {formattedDate}</h2>
             <p>{detail?.encounterId || row.encounterId}</p>
           </div>
           <div className="toolbar">
@@ -90,70 +134,85 @@ export default function EncounterDetailModal({ row, rows, onSelectRow, onClose }
           </div>
         </header>
 
-        {loading ? <div className="notice">กำลังโหลดข้อมูลเคส...</div> : null}
-        {error ? <div className="notice error">{error}</div> : null}
+        <div className="legacy-modal-body">
+          {loading ? <div className="notice">กำลังโหลดข้อมูลเคส...</div> : null}
+          {error ? <div className="notice error">{error}</div> : null}
 
-        <div className="detail-grid">
-          <DetailRow label="สาขา" value={detail?.branchNo || row.branchNo} />
-          <DetailRow label="วันที่รับบริการ" value={formatThaiDateTime(detail?.encounterAt || row.encounterAt)} />
-          <DetailRow label="เลขประจำตัวประชาชน" value={detail?.patientPid || row.patientPid} />
-          <DetailRow label="ชื่อ-สกุล" value={detail?.patientName || row.patientName} />
-          <DetailRow label="โทรศัพท์" value={formatPhone(detail?.patientPhone || row.patientPhone)} />
-          <DetailRow label="ติดตามอาการ" value={formatThaiDateTime(detail?.followupCall || row.followupCall)} />
-          <DetailRow label="รหัสอาการ" value={String(detail?.symptomNo || row.symptomNo || "-")} />
-          <DetailRow label="กลุ่มอาการ" value={detail?.symptomName || row.symptomName} />
-        </div>
+          <section className="legacy-date-card">
+            <label>วันที่</label>
+            <input type="date" value={toDateInputValue(displayDate)} readOnly />
+          </section>
 
-        <section className="embedded-panel">
-          <h3>คำอธิบายอาการ</h3>
-          <p className="detail-text">{stripHtml(detail?.answersText || row.answersText) || "-"}</p>
-        </section>
-
-        <section className="embedded-panel">
-          <h3>รายการยาสรุป</h3>
-          <div className="drug-stack">
-            {drugItems.length ? (
-              drugItems.map((item) => (
-                <span key={item.id} className="qty-pill positive">
-                  {item.name} x {item.qty}
-                  {item.uom ? ` ${item.uom}` : ""}
-                </span>
-              ))
-            ) : (
-              <span className="subtle">ไม่พบรายการยา</span>
-            )}
+          <div className="legacy-detail-table">
+            <DetailRow label="สาขา" value={detail?.branchNo || row.branchNo} />
+            <DetailRow label="ชื่อ-สกุล" value={detail?.patientName || row.patientName} />
+            <DetailRow label="เลขประจำตัวประชาชน" value={detail?.patientPid || row.patientPid} />
+            <DetailRow label="เบอร์โทร" value={formatPhone(detail?.patientPhone || row.patientPhone)} />
+            <DetailRow label="วันที่รับบริการ" value={formattedDate} />
+            <DetailRow label="กลุ่มอาการ" value={`${detail?.symptomNo || row.symptomNo || "-"} : ${detail?.symptomName || row.symptomName || "-"}`} />
           </div>
-        </section>
 
-        <section className="embedded-panel">
-          <h3>Medication detail</h3>
-          <div className="table-shell">
-            <table className="lookup-table compact-table">
+          <section className="legacy-section">
+            <div className="legacy-section-title legacy-section-title--problem">อาการที่เป็นปัญหาของผู้รับบริการ</div>
+            <div className="legacy-copy-wrap">
+              <button type="button" className="legacy-copy-icon" onClick={() => copyText(stripHtml(detail?.answersText || row.answersText) || "-")}>
+                คัดลอก
+              </button>
+              <div className="legacy-info-box">
+                <p className="detail-text">{stripHtml(detail?.answersText || row.answersText) || "-"}</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="legacy-section">
+            <div className="legacy-section-title legacy-section-title--prescription">ข้อมูลใบสั่งยา</div>
+            <div className="legacy-copy-wrap">
+              <button type="button" className="legacy-copy-icon" onClick={() => copyText(prescriptionSummary)}>
+                คัดลอก
+              </button>
+              <div className="legacy-info-box">
+                <p className="detail-text">{prescriptionSummary}</p>
+              </div>
+            </div>
+          </section>
+
+          <div className="table-shell legacy-rx-table-shell">
+            <table className="legacy-rx-table">
               <thead>
                 <tr>
-                  <th>ชื่อยา</th>
-                  <th>จำนวน</th>
-                  <th>วิธีใช้</th>
-                  <th>ราคา/หน่วย</th>
-                  <th>รวม</th>
-                  <th>ผู้ตรวจ</th>
+                  <th style={{ width: "38%" }}>รายการที่จ่าย</th>
+                  <th style={{ width: "14%" }}>จำนวน</th>
+                  <th style={{ width: "24%" }}>คัดลอกไป A-med care</th>
+                  <th style={{ width: "24%" }}>วิธีรับประทาน</th>
                 </tr>
               </thead>
               <tbody>
-                {medications.length ? (
-                  medications.map((item) => (
-                    <tr key={`${item.skuId}-${item.barcode}-${item.amedFullName}`}>
-                      <td>{item.amedFullName || item.amedShortName || "-"}</td>
-                      <td>{item.quantity}</td>
-                      <td className="text-cell">{item.aggregateDirections || item.directionsText || "-"}</td>
-                      <td>{formatCurrency(item.unitPrice)}</td>
-                      <td>{formatCurrency(item.lineTotal)}</td>
-                      <td>{item.verifiedBy || "-"}</td>
+                {medicationRows.length ? (
+                  medicationRows.map((item) => (
+                    <tr key={item.id}>
+                      <td>{item.displayName}</td>
+                      <td className="legacy-qty-cell">{item.quantityText}</td>
+                      <td>
+                        <div className="legacy-inline-copy">
+                          <span>{item.amedCopyText}</span>
+                          <button type="button" className="legacy-mini-button" onClick={() => copyText(item.amedCopyText)}>
+                            คัดลอก
+                          </button>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="legacy-inline-copy">
+                          <span>{item.directionsText}</span>
+                          <button type="button" className="legacy-mini-button" onClick={() => copyText(item.directionsText)}>
+                            คัดลอก
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="6" className="table-empty-state">
+                    <td colSpan="4" className="table-empty-state">
                       ไม่พบรายการยารายบรรทัด
                     </td>
                   </tr>
@@ -161,7 +220,9 @@ export default function EncounterDetailModal({ row, rows, onSelectRow, onClose }
               </tbody>
             </table>
           </div>
-        </section>
+        </div>
+
+        {copyNotice ? <div className="legacy-copy-toast">{copyNotice}</div> : null}
       </section>
     </div>
   );

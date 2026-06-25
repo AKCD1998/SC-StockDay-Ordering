@@ -259,7 +259,6 @@ export default function LookupPage() {
             </div>
           </div>
 
-          {kpiLoading ? <div className="notice">กำลังคำนวณ KPI...</div> : null}
           {kpiError ? <div className="notice error">{kpiError}</div> : null}
           <KpiCards data={kpiData} />
         </section>

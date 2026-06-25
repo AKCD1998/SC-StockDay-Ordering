@@ -19,6 +19,20 @@ const cardConfig = [
 ];
 
 export default function KpiCards({ data }) {
+  if (!data) {
+    return (
+      <div className="summary-grid kpi-grid">
+        {cardConfig.map((card) => (
+          <article key={card.key} className="summary-card summary-card--loading" aria-hidden="true">
+            <span>{card.label}</span>
+            <strong className="skeleton-block skeleton-block--value" />
+            <small className="skeleton-block skeleton-block--meta" />
+          </article>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="summary-grid kpi-grid">
       {cardConfig.map((card) => (
