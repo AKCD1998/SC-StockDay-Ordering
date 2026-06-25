@@ -5353,7 +5353,11 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
         </div>
       ) : null}
 
-      {draftCount > 0 ? (
+      {draftHydrating ? (
+        <p className="meta-line" style={{ padding: "8px 0", opacity: 0.6 }}>กำลังโหลดร่างคำขอ...</p>
+      ) : null}
+
+      {!draftHydrating && draftCount > 0 ? (
         <div className="srq-draft-inline">
           <div className="srq-checkout-header">
             <div>
@@ -7875,6 +7879,7 @@ export default function App() {
   const [requestBatchNote, setRequestBatchNote] = useState("");
   const [draftPublicId, setDraftPublicId] = useState(null);
   const [draftVersion, setDraftVersion] = useState(0);
+  const [draftHydrating, setDraftHydrating] = useState(false);
   const requestIdempotencyKeyRef = useRef(generateRequestIdempotencyKey());
   const draftPublicIdRef = useRef(null);
   const draftVersionRef = useRef(0);
@@ -8084,6 +8089,7 @@ export default function App() {
       draftVersionRef.current = 0;
       setRequestDraftItems([]);
       setRequestBatchNote("");
+      setDraftHydrating(false);
       if (draftSaveTimerRef.current) {
         clearTimeout(draftSaveTimerRef.current);
         draftSaveTimerRef.current = null;
@@ -8094,6 +8100,7 @@ export default function App() {
 
     draftHydratedForBranchRef.current = branchCode;
     draftHydrationRef.current = { items: null, note: null };
+    setDraftHydrating(true);
     if (draftSaveTimerRef.current) {
       clearTimeout(draftSaveTimerRef.current);
       draftSaveTimerRef.current = null;
@@ -8103,7 +8110,7 @@ export default function App() {
     async function fetchDraft() {
       try {
         const res = await apiFetch("/api/stock-request-draft/me");
-        if (!res.ok || !active) return;
+        if (!res.ok || !active) { if (active) setDraftHydrating(false); return; }
         const data = await res.json();
         if (!active) return;
         const draft = data.draft || {};
@@ -8120,6 +8127,8 @@ export default function App() {
       } catch {
         // Draft is non-critical; allow autosave to create it fresh
         draftHydrationRef.current = { items: [], note: "" };
+      } finally {
+        if (active) setDraftHydrating(false);
       }
     }
     fetchDraft();
