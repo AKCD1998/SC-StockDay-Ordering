@@ -98,6 +98,9 @@ Sub-type ละเอียดกว่านั้นให้ใช้ **shelf
 | 22 | **ยูเรีย / Urea (Topical)** | 1 (10 synonyms, 4 Thai) |
 | 23 | **มะระขี้นก / Bitter Melon** | 1 (16 synonyms, 6 Thai) |
 | 24 | **Thai Herbal Bundle** (มะแว้งเครือ, มะแว้งต้น, มะขามป้อม, ชะเอมเทศ, ขิง, กานพลู, ตรีผลา, ยาประสะมะแว้ง) | 8 (68 synonyms, 26 Thai) |
+| 25 | **โพรพอลิส / Propolis** | 1 (13 synonyms, 6 Thai) |
+| 26 | **บัวบก / Centella asiatica / Gotu Kola** | 1 (18 synonyms, 6 Thai) |
+| 27 | **กระชายดำ / Black Ginger (Kaempferia parviflora)** | 1 (15 synonyms, 6 Thai) |
 
 ---
 
@@ -111,9 +114,9 @@ Sub-type ละเอียดกว่านั้นให้ใช้ **shelf
 **สมุนไพรไทย**
 - ฟ้าทะลายโจร (done ✓)
 - ~~ขมิ้นชัน (Curcumin/Turmeric)~~ (done ✓ batch 19)
-- บัวบก (Centella asiatica / Gotu Kola)
+- ~~บัวบก (Centella asiatica / Gotu Kola)~~ (done ✓ batch 26)
 - ~~ว่านหางจระเข้ (Aloe vera)~~ (done ✓ batch 21)
-- กระชายดำ (Kaempferia parviflora / Black Ginger)
+- ~~กระชายดำ (Kaempferia parviflora / Black Ginger)~~ (done ✓ batch 27)
 - กระเจี๊ยบ (Roselle / Hibiscus sabdariffa)
 - ~~มะขามแขก (Senna)~~ (done ✓ batch 18)
 - กานพลู, ขิง, ขมิ้น, ไพล

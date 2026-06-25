@@ -601,7 +601,7 @@ label {
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(5, 20, 30, 0.48);
+  background: var(--modal-backdrop);
   backdrop-filter: blur(4px);
 }
 
@@ -625,8 +625,8 @@ label {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  background: #0f4c5c;
-  color: #ffffff;
+  background: var(--legacy-head-bg);
+  color: var(--legacy-head-text);
 }
 
 .legacy-modal-head h2,
@@ -636,7 +636,7 @@ label {
 
 .legacy-modal-head p {
   margin-top: 4px;
-  color: rgba(231, 240, 251, 0.82);
+  color: color-mix(in srgb, var(--legacy-head-text) 82%, transparent);
   font-size: 13px;
 }
 
@@ -646,34 +646,35 @@ label {
   padding: 18px;
   display: grid;
   gap: 14px;
+  background: var(--surface-bg);
 }
 
 .legacy-date-card {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--card-border);
   border-radius: 10px;
   padding: 10px 12px;
-  background: #ffffff;
+  background: var(--card-bg);
 }
 
 .legacy-date-card label {
   display: block;
   font-weight: 700;
-  color: #374151;
+  color: var(--text-main);
   margin-bottom: 6px;
 }
 
 .legacy-date-card input {
   max-width: 260px;
-  background: #16324b;
-  color: #f8fbff;
-  border-color: #16324b;
+  background: var(--legacy-head-bg);
+  color: var(--legacy-head-text);
+  border-color: var(--legacy-head-bg);
 }
 
 .legacy-detail-table {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--card-border);
   border-radius: 10px;
   overflow: hidden;
-  background: #ffffff;
+  background: var(--card-bg);
 }
 
 .legacy-detail-row {
@@ -684,7 +685,7 @@ label {
 .legacy-detail-label,
 .legacy-detail-value {
   padding: 10px 12px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--card-border);
 }
 
 .legacy-detail-row:last-child .legacy-detail-label,
@@ -693,13 +694,13 @@ label {
 }
 
 .legacy-detail-label {
-  background: #f6f7fb;
-  color: #374151;
+  background: var(--legacy-label-bg);
+  color: var(--text-main);
   font-weight: 600;
 }
 
 .legacy-detail-value {
-  color: #111827;
+  color: var(--text-main);
 }
 
 .legacy-section {
@@ -715,11 +716,11 @@ label {
 }
 
 .legacy-section-title--problem {
-  background: #6b21a8;
+  background: var(--legacy-purple);
 }
 
 .legacy-section-title--prescription {
-  background: #0f4c5c;
+  background: var(--legacy-head-bg);
 }
 
 .legacy-copy-wrap {
@@ -732,16 +733,16 @@ label {
   right: 8px;
   padding: 6px 10px;
   border-radius: 8px;
-  background: #ffffff;
-  border: 1px solid #d1d5db;
-  color: #103041;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-main);
 }
 
 .legacy-info-box {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   padding: 12px 48px 12px 12px;
-  background: #fafafa;
+  background: var(--legacy-box-bg);
 }
 
 .legacy-rx-table-shell {
@@ -752,20 +753,20 @@ label {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  background: #ffffff;
+  background: var(--table-bg);
 }
 
 .legacy-rx-table th,
 .legacy-rx-table td {
-  border: 1px solid #cad3df;
+  border: 1px solid var(--legacy-table-border);
   padding: 10px 12px;
   vertical-align: top;
-  color: #111827;
+  color: var(--text-main);
 }
 
 .legacy-rx-table thead th {
-  background: #0f4c5c;
-  color: #ffffff;
+  background: var(--legacy-head-bg);
+  color: var(--legacy-head-text);
   text-align: center;
 }
 
@@ -783,9 +784,9 @@ label {
 .legacy-mini-button {
   padding: 4px 8px;
   border-radius: 6px;
-  border: 1px solid #d1d5db;
-  background: #ffffff;
-  color: #103041;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text-main);
   font-size: 12px;
 }
 
@@ -796,8 +797,8 @@ label {
   transform: translateX(-50%);
   padding: 8px 12px;
   border-radius: 10px;
-  background: #0f4c5c;
-  color: #ffffff;
+  background: var(--legacy-head-bg);
+  color: var(--legacy-head-text);
   font-weight: 600;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
 }
