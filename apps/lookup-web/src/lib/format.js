@@ -55,13 +55,31 @@ export function toDateInputValue(date) {
 export function normalizeDrugItems(input) {
   if (!input) return [];
 
+  function normalizeDrugItem(item, index) {
+    const name =
+      item?.display_name ||
+      item?.name ||
+      item?.amed_full_name ||
+      item?.amedFullName ||
+      item?.amed_short_name ||
+      item?.amedShortName ||
+      item?.amed_copy_name ||
+      item?.amedCopyName ||
+      "";
+    const rawQty = item?.qty ?? item?.quantity ?? 1;
+    const qty = Number(rawQty);
+    const uom = item?.uom_th || item?.uom || item?.unit || "";
+
+    return {
+      id: `${name || "drug"}-${item?.barcode || item?.sku_id || item?.skuId || index}`,
+      name: name || "-",
+      qty: Number.isFinite(qty) && qty > 0 ? qty : 1,
+      uom,
+    };
+  }
+
   if (Array.isArray(input)) {
-    return input.map((item, index) => ({
-      id: `${item.name || item.amedFullName || index}`,
-      name: item.name || item.amedFullName || item.amedShortName || "-",
-      qty: Number(item.qty || item.quantity || 0),
-      uom: item.uom || item.unit || "",
-    }));
+    return input.map((item, index) => normalizeDrugItem(item, index));
   }
 
   if (typeof input === "string") {
@@ -82,6 +100,10 @@ export function normalizeDrugItems(input) {
           uom: "",
         }));
     }
+  }
+
+  if (typeof input === "object") {
+    return [normalizeDrugItem(input, 0)];
   }
 
   return [];

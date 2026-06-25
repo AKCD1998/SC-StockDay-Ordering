@@ -285,6 +285,11 @@ label {
   background: #ffffff;
 }
 
+.lookup-table--legacy {
+  min-width: 1760px;
+  table-layout: fixed;
+}
+
 .lookup-table.compact-table {
   min-width: 840px;
 }
@@ -324,15 +329,15 @@ label {
   color: #214d64;
 }
 
-.symptom-stack,
 .drug-stack {
   display: grid;
   gap: 6px;
 }
 
 .text-cell {
-  min-width: 220px;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .qty-pill {
@@ -346,6 +351,10 @@ label {
   padding: 8px 10px;
   background: #fff5e8;
   color: #8b5414;
+  display: inline-block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .checkbox-row {

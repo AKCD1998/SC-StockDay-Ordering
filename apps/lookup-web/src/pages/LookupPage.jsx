@@ -378,7 +378,20 @@ export default function LookupPage() {
 
         {!loading ? (
           <div className="table-shell">
-            <table className="lookup-table">
+            <table className="lookup-table lookup-table--legacy">
+              <colgroup>
+                <col style={{ width: "108px" }} />
+                <col style={{ width: "56px" }} />
+                <col style={{ width: "140px" }} />
+                <col style={{ width: "130px" }} />
+                <col style={{ width: "150px" }} />
+                <col style={{ width: "120px" }} />
+                <col style={{ width: "56px" }} />
+                <col style={{ width: "160px" }} />
+                <col style={{ width: "320px" }} />
+                <col style={{ width: "260px" }} />
+                <col style={{ width: "260px" }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th>ดู</th>
@@ -386,10 +399,11 @@ export default function LookupPage() {
                   <th>วันที่รับบริการ</th>
                   <th>เลขประจำตัวประชาชน</th>
                   <th>ชื่อ-สกุล</th>
-                  <th>โทรศัพท์</th>
+                  <th>เบอร์โทรศัพท์ติดต่อ</th>
+                  <th>รหัสอาการ</th>
                   <th>กลุ่มอาการ</th>
                   <th>คำอธิบายอาการ</th>
-                  <th>รายการยา</th>
+                  <th>รายการยาที่เภสัชกรจ่าย</th>
                   <th>หมายเหตุ</th>
                 </tr>
               </thead>
@@ -407,11 +421,9 @@ export default function LookupPage() {
                       <td>{row.patientPid || "-"}</td>
                       <td>{row.patientName || "-"}</td>
                       <td>{formatPhone(row.patientPhone)}</td>
+                      <td>{row.symptomNo || "-"}</td>
                       <td>
-                        <div className="symptom-stack">
-                          <strong>{row.symptomName || "-"}</strong>
-                          <small>{row.symptomNo || "-"}</small>
-                        </div>
+                        {row.symptomName || "-"}
                       </td>
                       <td className="text-cell">{stripHtml(row.answersText) || "-"}</td>
                       <td>
@@ -433,7 +445,7 @@ export default function LookupPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="10" className="table-empty-state">
+                    <td colSpan="11" className="table-empty-state">
                       ไม่พบข้อมูลตามเงื่อนไขที่เลือก
                     </td>
                   </tr>
