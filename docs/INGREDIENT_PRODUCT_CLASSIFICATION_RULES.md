@@ -101,6 +101,8 @@ Sub-type ละเอียดกว่านั้นให้ใช้ **shelf
 | 25 | **โพรพอลิส / Propolis** | 1 (13 synonyms, 6 Thai) |
 | 26 | **บัวบก / Centella asiatica / Gotu Kola** | 1 (18 synonyms, 6 Thai) |
 | 27 | **กระชายดำ / Black Ginger (Kaempferia parviflora)** | 1 (15 synonyms, 6 Thai) |
+| 28 | **กระเจี๊ยบแดง / Roselle (Hibiscus sabdariffa)** | 1 (18 synonyms, 8 Thai) |
+| 29 | **เสลดพังพอน × 2** (C. nutans / พญายอ + B. lupulina / พิมเสนต้น) | 2 (20 synonyms, 11 Thai) |
 
 ---
 
@@ -117,10 +119,10 @@ Sub-type ละเอียดกว่านั้นให้ใช้ **shelf
 - ~~บัวบก (Centella asiatica / Gotu Kola)~~ (done ✓ batch 26)
 - ~~ว่านหางจระเข้ (Aloe vera)~~ (done ✓ batch 21)
 - ~~กระชายดำ (Kaempferia parviflora / Black Ginger)~~ (done ✓ batch 27)
-- กระเจี๊ยบ (Roselle / Hibiscus sabdariffa)
+- ~~กระเจี๊ยบ (Roselle / Hibiscus sabdariffa)~~ (done ✓ batch 28)
 - ~~มะขามแขก (Senna)~~ (done ✓ batch 18)
 - กานพลู, ขิง, ขมิ้น, ไพล
-- เสลดพังพอน (Clinacanthus nutans)
+- ~~เสลดพังพอน (Clinacanthus nutans + Barleria lupulina)~~ (done ✓ batch 29)
 
 **เวชสำอางค์ (Cosmeceutical) — active agents**
 - Retinol / Retinoids (Tretinoin, Adapalene)

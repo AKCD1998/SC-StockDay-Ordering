@@ -18,6 +18,8 @@ export default function EncounterDetailModal({ row, rows, onSelectRow, onClose }
   const [error, setError] = useState("");
   const [copyNotice, setCopyNotice] = useState("");
   const noticeTimerRef = useRef(null);
+  const cardRef = useRef(null);
+  const headRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +66,19 @@ export default function EncounterDetailModal({ row, rows, onSelectRow, onClose }
       }
     };
   }, [row?.encounterId]);
+
+  useEffect(() => {
+    function syncHeadHeight() {
+      if (!cardRef.current || !headRef.current) {
+        return;
+      }
+      cardRef.current.style.setProperty("--legacy-head-h", `${headRef.current.offsetHeight}px`);
+    }
+
+    syncHeadHeight();
+    window.addEventListener("resize", syncHeadHeight);
+    return () => window.removeEventListener("resize", syncHeadHeight);
+  }, [row?.encounterId, loading, error, medications.length]);
 
   if (!row) {
     return null;
@@ -115,20 +130,20 @@ export default function EncounterDetailModal({ row, rows, onSelectRow, onClose }
 
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
-      <section className="modal-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-        <header className="legacy-modal-head">
+      <section ref={cardRef} className="modal-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <header ref={headRef} className="legacy-modal-head">
           <div>
-            <h2>ใบสรุปรายเคส • {formattedDate}</h2>
+            <h2 className="legacy-modal-title">ใบสรุปรายเคส • {formattedDate}</h2>
             <p>{detail?.encounterId || row.encounterId}</p>
           </div>
-          <div className="toolbar">
-            <button type="button" className="ghost" onClick={() => previousRow && onSelectRow(previousRow)} disabled={!previousRow}>
+          <div className="legacy-modal-toolbar">
+            <button type="button" className="legacy-modal-button legacy-modal-button--neutral" onClick={() => previousRow && onSelectRow(previousRow)} disabled={!previousRow}>
               ก่อนหน้า
             </button>
-            <button type="button" className="ghost" onClick={() => nextRow && onSelectRow(nextRow)} disabled={!nextRow}>
+            <button type="button" className="legacy-modal-button legacy-modal-button--neutral" onClick={() => nextRow && onSelectRow(nextRow)} disabled={!nextRow}>
               ถัดไป
             </button>
-            <button type="button" onClick={onClose}>
+            <button type="button" className="legacy-modal-button legacy-modal-button--close" onClick={onClose}>
               ปิด
             </button>
           </div>
@@ -180,8 +195,8 @@ export default function EncounterDetailModal({ row, rows, onSelectRow, onClose }
             <table className="legacy-rx-table">
               <thead>
                 <tr>
-                  <th style={{ width: "38%" }}>รายการที่จ่าย</th>
-                  <th style={{ width: "14%" }}>จำนวน</th>
+                  <th style={{ width: "40%" }}>รายการที่จ่าย</th>
+                  <th style={{ width: "12%" }}>จำนวน</th>
                   <th style={{ width: "24%" }}>คัดลอกไป A-med care</th>
                   <th style={{ width: "24%" }}>วิธีรับประทาน</th>
                 </tr>

@@ -48,6 +48,10 @@
   --legacy-label-bg: #f6f7fb;
   --legacy-box-bg: #fafafa;
   --legacy-table-border: #cad3df;
+  --legacy-button-neutral-bg: #173649;
+  --legacy-button-neutral-text: #f4fbff;
+  --legacy-button-close-bg: #18a9c2;
+  --legacy-button-close-text: #ffffff;
   --theme-toggle-bg: rgba(255, 255, 255, 0.88);
   --theme-toggle-border: rgba(182, 206, 217, 0.95);
   --theme-toggle-text: #103041;
@@ -100,6 +104,10 @@
   --legacy-label-bg: #122432;
   --legacy-box-bg: #0d1a24;
   --legacy-table-border: #294152;
+  --legacy-button-neutral-bg: #173649;
+  --legacy-button-neutral-text: #f4fbff;
+  --legacy-button-close-bg: #18a9c2;
+  --legacy-button-close-text: #ffffff;
   --theme-toggle-bg: rgba(13, 28, 39, 0.92);
   --theme-toggle-border: rgba(50, 74, 90, 0.95);
   --theme-toggle-text: #e7f0fb;
@@ -598,35 +606,74 @@ label {
   position: fixed;
   inset: 0;
   z-index: 30;
-  display: grid;
-  place-items: center;
-  padding: 20px;
   background: var(--modal-backdrop);
   backdrop-filter: blur(4px);
 }
 
 .modal-card {
-  position: relative;
+  position: fixed;
+  left: 50%;
+  bottom: 5%;
+  transform: translateX(-50%);
   width: min(1200px, 95vw);
-  height: min(85vh, calc(100vh - 40px));
-  overflow: hidden;
-  border-radius: 16px;
+  height: 85vh;
+  overflow: auto;
+  border-radius: 14px;
   padding: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--card-bg);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
 }
 
 .legacy-modal-head {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 5;
   padding: 12px 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   background: var(--legacy-head-bg);
   color: var(--legacy-head-text);
+}
+
+.legacy-modal-title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.legacy-modal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.legacy-modal-button {
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.legacy-modal-button:hover {
+  opacity: 0.94;
+}
+
+.legacy-modal-button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.legacy-modal-button--neutral {
+  background: var(--legacy-button-neutral-bg);
+  color: var(--legacy-button-neutral-text);
+}
+
+.legacy-modal-button--close {
+  background: var(--legacy-button-close-bg);
+  color: var(--legacy-button-close-text);
 }
 
 .legacy-modal-head h2,
@@ -641,8 +688,6 @@ label {
 }
 
 .legacy-modal-body {
-  min-height: 0;
-  overflow: auto;
   padding: 18px;
   display: grid;
   gap: 14px;
@@ -713,6 +758,7 @@ label {
   border-radius: 8px;
   color: #ffffff;
   font-weight: 700;
+  margin: 14px 0 8px;
 }
 
 .legacy-section-title--problem {
@@ -754,6 +800,12 @@ label {
   border-collapse: collapse;
   table-layout: fixed;
   background: var(--table-bg);
+}
+
+.legacy-rx-table thead th {
+  position: sticky;
+  top: var(--legacy-head-h, 0px);
+  z-index: 1;
 }
 
 .legacy-rx-table th,
@@ -846,6 +898,12 @@ label {
 
   .modal-card {
     padding: 0;
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+    width: auto;
+    height: calc(100vh - 28px);
+    transform: none;
   }
 
   .panel-header,
@@ -869,6 +927,10 @@ label {
 
   .legacy-modal-head {
     align-items: flex-start;
+  }
+
+  .legacy-modal-toolbar {
+    flex-wrap: wrap;
   }
 
   .legacy-date-card input {
