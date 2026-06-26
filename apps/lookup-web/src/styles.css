@@ -373,6 +373,10 @@ label {
 }
 
 .hero-kpi-header {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) minmax(220px, 1fr);
+  align-items: start;
+  gap: 16px;
   margin-bottom: 14px;
 }
 
@@ -380,11 +384,17 @@ label {
   gap: 14px;
 }
 
+.hero-kpi-header h2 {
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
 .hero-kpi-panel .kpi-controls {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px 12px;
-  width: 100%;
+  width: min(100%, 420px);
+  margin-left: auto;
 }
 
 .hero-kpi-panel .kpi-controls label {

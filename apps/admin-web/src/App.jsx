@@ -6305,6 +6305,8 @@ function IngredientDictionaryPanel({ csrfToken }) {
   const [loadingAll, setLoadingAll] = useState(false);
   const [allSearch, setAllSearch] = useState("");
   const [allCatFilter, setAllCatFilter] = useState("");
+  const [allOffset, setAllOffset] = useState(0);
+  const ALL_PAGE = 200;
 
   const MATCHED_PAGE = 50;
 
@@ -6380,15 +6382,16 @@ function IngredientDictionaryPanel({ csrfToken }) {
     }
   }, []);
 
-  const loadAll = useCallback(async () => {
+  const loadAll = useCallback(async (offset = 0) => {
     setLoadingAll(true);
     setError("");
     try {
-      const res = await apiFetch(`${ING_API}/ingredients?limit=500&status=active`);
+      const res = await apiFetch(`${ING_API}/ingredients?limit=200&status=active&offset=${offset}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setAllList(data.records || []);
       setAllTotal(data.total || 0);
+      setAllOffset(offset);
     } catch (e) {
       setError("โหลดรายการสารสำคัญไม่สำเร็จ: " + e.message);
     } finally {
