@@ -108,6 +108,7 @@ Sub-type ละเอียดกว่านั้นให้ใช้ **shelf
 | 32 | **น้ำมันมะพร้าว / Coconut Oil / VCO (Cocos nucifera)** | 1 (12 synonyms, 5 Thai) — เวชสำอางค์ rule attached ✓ |
 | 33 | **น้ำมันมะกอก / Olive Oil / EVOO (Olea europaea)** | 1 (13 synonyms, 5 Thai) — เวชสำอางค์ rule attached ✓ |
 | 34 | **สตาวะ / ชะเพาะ / Shatavari (Asparagus racemosus)** | 1 (16 synonyms, 6 Thai) — 9 bioactives excluded, 2 kept |
+| 35 | **Women's health cluster** — 6 compound formulas (ยาประสะไพล, ยาปลูกไฟธาตุ, ยาไฟประลัยกัลป์, ยาไฟห้ากอง, ยาเลือดงาม, ยาสตรีหลังคลอด) + ไพล (Zingiber montanum), ขมิ้นอ้อย (C. zedoaria), ดีปลี (P. retrofractum), ฝาง (C. sappan), โกฐเชียง/ตังกุย (Angelica sinensis), กวาวเครือขาว (P. mirifica), ไวเท็กซ์ (V. agnus-castus), EPO (Oenothera biennis), เรดโคลเวอร์ (T. pratense) + synonym additions for ชะเอมเทศ + รากสามสิบ | 17 entries (15 new + 2 existing re-add) — 100 synonyms inserted, 12 skipped (already in DB from prior batches). KEY RULES: ยาตำรับ compound formula precedent; ขมิ้นอ้อย≠ขมิ้นชัน; กวาวเครือขาว≠กวาวเครือแดง; piperine excluded from ดีปลี; GLA included for EPO (label claim, audit flag). |
 
 ---
 
