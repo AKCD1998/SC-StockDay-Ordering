@@ -312,6 +312,154 @@ button {
   background: #fff;
 }
 
+.taxonomy-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.taxonomy-header-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.taxonomy-notice {
+  margin: 0;
+}
+
+.taxonomy-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 12px;
+}
+
+.taxonomy-stat-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid #d7dfeb;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.taxonomy-stat-card span {
+  color: #526578;
+}
+
+.taxonomy-stat-card strong {
+  font-size: 1.35rem;
+  color: #16344d;
+}
+
+.taxonomy-tone-drug { background: #eef3ff; }
+.taxonomy-tone-herb { background: #edf8ee; }
+.taxonomy-tone-supplement { background: #fff6e2; }
+.taxonomy-tone-antiseptic { background: #edf8fb; }
+.taxonomy-tone-cosmeceutical { background: #fff0ea; }
+.taxonomy-tone-cosmetic { background: #fff1f7; }
+.taxonomy-tone-device { background: #eff3f8; }
+.taxonomy-tone-service { background: #f5efff; }
+.taxonomy-tone-other { background: #f7f4ee; }
+.taxonomy-tone-unclassified { background: #fff8d9; }
+
+.taxonomy-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+.taxonomy-filters label {
+  display: grid;
+  gap: 8px;
+  color: #38506b;
+}
+
+.taxonomy-filters input,
+.taxonomy-filters select {
+  width: 100%;
+  border: 1px solid #c8d3e2;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #1f2933;
+  background: #fff;
+  font-family: Inter, "Segoe UI", "Noto Sans Thai", Arial, sans-serif;
+  font-size: 0.92rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.taxonomy-filter-span {
+  grid-column: 1 / -1;
+}
+
+.taxonomy-filter-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.taxonomy-table select {
+  width: 100%;
+  min-width: 168px;
+}
+
+.taxonomy-inline-meta {
+  margin-top: 6px;
+  color: #526578;
+  font-size: 0.86rem;
+}
+
+.taxonomy-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.taxonomy-footer-summary {
+  color: #526578;
+}
+
+.taxonomy-footer-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.taxonomy-preview-hint {
+  margin: 0;
+  color: #526578;
+  font-size: 0.9rem;
+}
+
+.taxonomy-confirm-modal {
+  width: min(760px, calc(100vw - 32px));
+  display: grid;
+  gap: 16px;
+}
+
+.taxonomy-confirm-body {
+  display: grid;
+  gap: 8px;
+  max-height: 50vh;
+  overflow: auto;
+}
+
+.taxonomy-confirm-line {
+  padding: 10px 12px;
+  border: 1px solid #d7dfeb;
+  border-radius: 12px;
+  background: #f8fbfe;
+  color: #38506b;
+}
+
+.taxonomy-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 980px) {
   .movement-layout {
     grid-template-columns: 1fr;
@@ -5847,5 +5995,216 @@ select {
 [data-theme="light"] .branch-stock-loading-overlay {
   background: rgba(240, 245, 255, 0.82);
   color: #1f2933;
+}
+
+/* ── Movement & Transactions page ─────────────────────────────────────────── */
+
+.mvt-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(160px, 200px) 160px 160px 1fr;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.mvt-filter-field {
+  display: grid;
+  gap: 6px;
+  color: #38506b;
+  font-weight: 700;
+}
+
+.mvt-filter-field span {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #38506b;
+}
+
+.mvt-filter-field input,
+.mvt-filter-field select {
+  width: 100%;
+  border: 1px solid #c8d3e2;
+  border-radius: 10px;
+  padding: 9px 11px;
+  color: #1f2933;
+  background: #fff;
+  font-family: Inter, "Segoe UI", "Noto Sans Thai", Arial, sans-serif;
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+.mvt-filter-grow {
+  grid-column: span 1;
+}
+
+.mvt-type-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+/* Tab bar */
+.mvt-tab-bar {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #d7dfeb;
+}
+
+.mvt-tab {
+  padding: 10px 24px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: #5a6a85;
+  font: inherit;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-bottom: -2px;
+  white-space: nowrap;
+  transition: color 0.14s, border-color 0.14s;
+}
+
+.mvt-tab:hover { color: #16344d; }
+
+.mvt-tab.active {
+  color: #2a34ff;
+  border-bottom-color: #2a34ff;
+}
+
+/* Ledger table */
+.mvt-ledger-wrap {
+  max-height: 65vh;
+  overflow: auto;
+}
+
+.mvt-ledger th,
+.mvt-ledger td {
+  white-space: nowrap;
+}
+
+.mvt-doc-no {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #16344d;
+  letter-spacing: 0.02em;
+}
+
+/* Pending backend notice */
+.mvt-pending-notice {
+  padding: 28px 24px;
+  text-align: center;
+  color: #6a7a90;
+  border: 1.5px dashed #c8d3e2;
+  border-radius: 16px;
+  background: rgba(248, 250, 253, 0.6);
+  margin-top: 8px;
+}
+
+.mvt-pending-notice strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #38506b;
+  font-size: 1.05rem;
+}
+
+.mvt-pending-notice p {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+}
+
+.mvt-pending-notice code {
+  display: block;
+  text-align: left;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.8rem;
+  color: #7f8fa6;
+  line-height: 1.7;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 12px 14px;
+  border-radius: 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Document list */
+.mvt-doc-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.mvt-doc-card {
+  border: 1px solid #d7dfeb;
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.mvt-doc-card-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.mvt-doc-card-header:hover { background: #f5f8fd; }
+
+.mvt-doc-meta {
+  color: #6a7a90;
+  font-size: 0.88rem;
+  margin-top: 2px;
+}
+
+.mvt-doc-amount {
+  font-weight: 700;
+  color: #1f2933;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.mvt-doc-items {
+  border-top: 1px solid #edf2f7;
+  padding: 12px 16px;
+  background: rgba(238, 244, 251, 0.35);
+}
+
+.mvt-doc-items table th,
+.mvt-doc-items table td {
+  padding: 8px 10px;
+  font-size: 0.9rem;
+}
+
+/* info status variant (for sale_return) */
+.status.info {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+@media (max-width: 900px) {
+  .mvt-filter-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+  .mvt-filter-grow {
+    grid-column: 1 / -1;
+  }
+  .mvt-tab {
+    padding: 9px 14px;
+    font-size: 0.92rem;
+  }
+  .mvt-doc-card-header {
+    grid-template-columns: auto 1fr auto;
+    gap: 8px;
+  }
 }
 
