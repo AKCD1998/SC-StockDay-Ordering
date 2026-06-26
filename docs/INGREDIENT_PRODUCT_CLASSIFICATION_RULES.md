@@ -107,6 +107,7 @@ Sub-type ละเอียดกว่านั้นให้ใช้ **shelf
 | 31 | **งาดำ / งาขาว / Sesame (Sesamum indicum)** | 1 (21 synonyms, 8 Thai) |
 | 32 | **น้ำมันมะพร้าว / Coconut Oil / VCO (Cocos nucifera)** | 1 (12 synonyms, 5 Thai) — เวชสำอางค์ rule attached ✓ |
 | 33 | **น้ำมันมะกอก / Olive Oil / EVOO (Olea europaea)** | 1 (13 synonyms, 5 Thai) — เวชสำอางค์ rule attached ✓ |
+| 34 | **สตาวะ / ชะเพาะ / Shatavari (Asparagus racemosus)** | 1 (16 synonyms, 6 Thai) — 9 bioactives excluded, 2 kept |
 
 ---
 

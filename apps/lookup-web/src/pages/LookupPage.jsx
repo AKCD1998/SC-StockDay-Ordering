@@ -402,7 +402,7 @@ export default function LookupPage() {
           <div className="table-shell">
             <table className="lookup-table lookup-table--legacy">
               <colgroup>
-                <col style={{ width: "28px" }} />
+                <col style={{ width: "56px" }} />
                 <col style={{ width: "56px" }} />
                 <col style={{ width: "140px" }} />
                 <col style={{ width: "130px" }} />
