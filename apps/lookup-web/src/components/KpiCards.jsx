@@ -11,11 +11,6 @@ const cardConfig = [
     label: "จำนวนเคสสะสม",
     helper: (data) => data?.accumLabel || "-",
   },
-  {
-    key: "target",
-    label: "เป้าหมายต่อเดือน",
-    helper: () => "ปรับจาก local preference ได้",
-  },
 ];
 
 export default function KpiCards({ data }) {

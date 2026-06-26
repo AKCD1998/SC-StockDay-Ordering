@@ -284,10 +284,6 @@ export default function LookupPage() {
                   </label>
                 </>
               ) : null}
-              <label>
-                เป้าหมายต่อเดือน
-                <input type="number" min="1" value={monthlyTarget} onChange={(event) => setMonthlyTarget(Math.max(1, Number(event.target.value) || 1))} />
-              </label>
             </div>
           </div>
 
