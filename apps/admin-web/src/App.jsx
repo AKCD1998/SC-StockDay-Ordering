@@ -6402,7 +6402,7 @@ function IngredientDictionaryPanel({ csrfToken }) {
   useEffect(() => { if (subTab === "dictionary") loadList(); }, [subTab, loadList]);
   useEffect(() => { if (subTab === "matched") loadMatched(0); }, [subTab, matchedStatusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (subTab === "discoveries") loadDiscoveries(); }, [subTab, loadDiscoveries]);
-  useEffect(() => { if (subTab === "all") loadAll(); }, [subTab, loadAll]);
+  useEffect(() => { if (subTab === "all") loadAll(0); }, [subTab, loadAll]);
 
   useEffect(() => {
     if (selectedId) loadDetail(selectedId);
@@ -6945,10 +6945,12 @@ function IngredientDictionaryPanel({ csrfToken }) {
                 <option value="">กลุ่มยาทั้งหมด</option>
                 {uniqueCats.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
-              <button type="button" className="ghost-button" onClick={loadAll}>รีเฟรช</button>
+              <button type="button" className="ghost-button" onClick={() => loadAll(allOffset)}>รีเฟรช</button>
             </div>
             <div className="id-list-meta">
-              {loadingAll ? "กำลังโหลด..." : `แสดง ${filtered.length.toLocaleString()} จาก ${allTotal.toLocaleString()} สาร`}
+              {loadingAll
+                ? "กำลังโหลด..."
+                : `แสดง ${(allOffset + 1).toLocaleString()}–${Math.min(allOffset + allList.length, allTotal).toLocaleString()} จาก ${allTotal.toLocaleString()} สาร (หน้า ${Math.floor(allOffset / ALL_PAGE) + 1}/${Math.ceil(allTotal / ALL_PAGE)})`}
             </div>
             <div className="table-wrap">
               <table className="id-table id-all-table">
@@ -6989,7 +6991,30 @@ function IngredientDictionaryPanel({ csrfToken }) {
                 </tbody>
               </table>
             </div>
-            <p className="id-hint">* คลิกแถวใดก็ได้เพื่อเปิดรายละเอียดในแท็บ "พจนานุกรม"</p>
+            {allTotal > ALL_PAGE && (
+              <div className="id-pager">
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={() => loadAll(Math.max(0, allOffset - ALL_PAGE))}
+                  disabled={loadingAll || allOffset === 0}
+                >
+                  ← หน้าก่อน
+                </button>
+                <span>
+                  หน้า {Math.floor(allOffset / ALL_PAGE) + 1} / {Math.ceil(allTotal / ALL_PAGE)}
+                </span>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={() => loadAll(allOffset + ALL_PAGE)}
+                  disabled={loadingAll || allOffset + ALL_PAGE >= allTotal}
+                >
+                  หน้าถัดไป →
+                </button>
+              </div>
+            )}
+            <p className="id-hint">* คลิกแถวใดก็ได้เพื่อเปิดรายละเอียดในแท็บ "พจนานุกรม" · search/filter ทำงานบน 200 รายการที่โหลดอยู่</p>
           </div>
         );
       })()}
