@@ -368,11 +368,11 @@ button {
 }
 
 .taxonomy-workspace-open {
-  grid-template-columns: minmax(0, 1fr) 240px;
+  grid-template-columns: minmax(0, 1fr) 256px;
 }
 
 .taxonomy-workspace-closed {
-  grid-template-columns: minmax(0, 1fr) 76px;
+  grid-template-columns: minmax(0, 1fr) 92px;
 }
 
 .taxonomy-main {
@@ -382,10 +382,16 @@ button {
 }
 
 .taxonomy-shortcuts {
-  position: sticky;
-  top: 96px;
+  position: fixed;
+  top: 132px;
+  right: 28px;
   align-self: start;
-  height: fit-content;
+  width: 240px;
+  z-index: 30;
+}
+
+.taxonomy-shortcuts-closed {
+  width: 76px;
 }
 
 .taxonomy-shortcuts-sticky {
@@ -654,6 +660,10 @@ button {
 
   .taxonomy-shortcuts {
     position: static;
+    top: auto;
+    right: auto;
+    width: auto;
+    z-index: auto;
   }
 
   .taxonomy-shortcuts-closed .taxonomy-shortcut-toggle {
