@@ -361,6 +361,46 @@ button {
 .taxonomy-tone-other { background: #f7f4ee; }
 .taxonomy-tone-unclassified { background: #fff8d9; }
 
+.taxonomy-hotkey-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid #d7dfeb;
+  border-radius: 16px;
+  background: rgba(248, 251, 254, 0.92);
+}
+
+.taxonomy-hotkey-title {
+  color: #16344d;
+  font-weight: 700;
+}
+
+.taxonomy-hotkey-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #d7dfeb;
+  color: #526578;
+  font-size: 0.88rem;
+}
+
+.taxonomy-hotkey-chip kbd {
+  min-width: 22px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  border: 1px solid #c8d3e2;
+  background: #edf4fb;
+  color: #16344d;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
 .taxonomy-filters {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -401,6 +441,14 @@ button {
 .taxonomy-table select {
   width: 100%;
   min-width: 168px;
+}
+
+.taxonomy-row-active td {
+  background: rgba(28, 110, 184, 0.1);
+}
+
+.taxonomy-row-active td:first-child {
+  box-shadow: inset 4px 0 0 #2b6cb0;
 }
 
 .taxonomy-inline-meta {
@@ -526,6 +574,10 @@ button {
 
   .movement-event {
     grid-template-columns: 1fr;
+  }
+
+  .taxonomy-hotkey-bar {
+    align-items: flex-start;
   }
 
   .taxonomy-confirm-summary {
@@ -6372,5 +6424,125 @@ select {
   .mvt-sales-name-col {
     left: 80px !important;
   }
+}
+
+/* ── Movement & Transactions — dark mode overrides ───────────────────────── */
+
+/* Tab bar */
+[data-theme="dark"] .mvt-tab-bar {
+  border-bottom-color: #263547;
+}
+[data-theme="dark"] .mvt-tab {
+  color: #7090aa;
+}
+[data-theme="dark"] .mvt-tab:hover {
+  color: #c8d8ec;
+}
+[data-theme="dark"] .mvt-tab.active {
+  color: #7b8fff;
+  border-bottom-color: #7b8fff;
+}
+
+/* Shared filter bar labels */
+[data-theme="dark"] .mvt-filter-field span {
+  color: #7090aa;
+}
+
+/* Pending notice */
+[data-theme="dark"] .mvt-pending-notice {
+  background: rgba(10, 17, 28, 0.72);
+  border-color: #263547;
+  color: #7090aa;
+}
+[data-theme="dark"] .mvt-pending-notice strong {
+  color: #b8c8db;
+}
+[data-theme="dark"] .mvt-pending-notice code {
+  background: rgba(255, 255, 255, 0.04);
+  color: #5a7490;
+}
+[data-theme="dark"] .mvt-sales-mock-label {
+  color: #4a6075;
+}
+[data-theme="dark"] .mvt-sales-mock-row td {
+  opacity: 0.45;
+}
+
+/* Sales table — sticky columns (override hardcoded #fff) */
+[data-theme="dark"] .mvt-sales-table th,
+[data-theme="dark"] .mvt-sales-table td {
+  border-bottom-color: #1e2d3f;
+}
+[data-theme="dark"] .mvt-sales-sticky {
+  background: #0d1623 !important;
+}
+[data-theme="dark"] .mvt-sales-table th.mvt-sales-sticky {
+  background: #111d2b !important;
+  color: #8aa0bb;
+}
+
+/* Highlighted branch column */
+[data-theme="dark"] .mvt-sales-highlight {
+  background: rgba(100, 120, 255, 0.1) !important;
+  border-left-color: #3040a0;
+  border-right-color: #3040a0;
+}
+[data-theme="dark"] .mvt-sales-table th.mvt-sales-highlight {
+  background: rgba(100, 120, 255, 0.16) !important;
+  color: #8899ff;
+}
+
+/* Total column */
+[data-theme="dark"] .mvt-sales-total-col {
+  background: rgba(11, 19, 30, 0.8);
+  border-left-color: #1e2d3f;
+}
+[data-theme="dark"] .mvt-sales-table th.mvt-sales-total-col {
+  background: #0f1e2e;
+}
+
+/* Row hover */
+[data-theme="dark"] .mvt-sales-table tr:hover td {
+  background: rgba(255, 255, 255, 0.025);
+}
+[data-theme="dark"] .mvt-sales-table tr:hover td.mvt-sales-sticky {
+  background: rgba(20, 32, 48, 0.95) !important;
+}
+[data-theme="dark"] .mvt-sales-table tr:hover td.mvt-sales-highlight {
+  background: rgba(100, 120, 255, 0.14) !important;
+}
+
+/* Zero/empty cells */
+[data-theme="dark"] .mvt-sales-zero-dash {
+  color: #2d3f55;
+}
+
+/* Ledger table */
+[data-theme="dark"] .mvt-ledger-wrap,
+[data-theme="dark"] .mvt-ledger th,
+[data-theme="dark"] .mvt-ledger td {
+  border-color: #1e2d3f;
+}
+
+/* Document cards */
+[data-theme="dark"] .mvt-doc-card {
+  background: rgba(13, 22, 35, 0.92);
+  border-color: #263547;
+}
+[data-theme="dark"] .mvt-doc-card-header:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+[data-theme="dark"] .mvt-doc-no {
+  color: #c8d8ec;
+}
+[data-theme="dark"] .mvt-doc-meta {
+  color: #5a7490;
+}
+[data-theme="dark"] .mvt-doc-amount {
+  color: #d0dcea;
+}
+[data-theme="dark"] .mvt-doc-items {
+  background: rgba(8, 14, 22, 0.5);
+  border-top-color: #1e2d3f;
 }
 

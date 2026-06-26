@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const PAGE_SIZE = 50;
@@ -40,6 +40,23 @@ const PRODUCT_TYPE_LABELS = {
   other: "อื่นๆ",
 };
 
+const HOTKEY_ASSIGNMENTS = [
+  { key: "1", value: "drug", label: "ยา" },
+  { key: "2", value: "herb", label: "สมุนไพร" },
+  { key: "3", value: "supplement", label: "อาหารเสริม" },
+  { key: "4", value: "antiseptic", label: "ฆ่าเชื้อ" },
+  { key: "5", value: "cosmeceutical", label: "เวชสำอาง" },
+  { key: "6", value: "cosmetic", label: "เครื่องสำอาง" },
+  { key: "7", value: "device", label: "อุปกรณ์" },
+  { key: "8", value: "service", label: "บริการ" },
+  { key: "9", value: "other", label: "อื่นๆ" },
+  { key: "0", value: "", label: "ล้างค่า" },
+];
+
+const HOTKEY_ASSIGNMENT_MAP = Object.fromEntries(
+  HOTKEY_ASSIGNMENTS.map((item) => [item.key, item.value]),
+);
+
 const RULE_SUMMARY_COPY = {
   device_product_kind: {
     title: "อุปกรณ์จาก product_kind",
@@ -78,6 +95,13 @@ const RULE_SUMMARY_COPY = {
 function formatNumber(value) {
   if (value == null || value === "") return "-";
   return Number(value).toLocaleString("th-TH");
+}
+
+function isTypingTarget(target) {
+  if (!target || typeof target.closest !== "function") {
+    return false;
+  }
+  return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
 }
 
 async function apiFetch(path, options = {}) {
@@ -208,6 +232,7 @@ export default function ProductTaxonomyPanel({ csrfToken }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [previewSummary, setPreviewSummary] = useState(null);
+  const [activeRowIndex, setActiveRowIndex] = useState(0);
   const [appliedFilters, setAppliedFilters] = useState({
     product_type: "",
     enrichment_status: "",
@@ -218,6 +243,7 @@ export default function ProductTaxonomyPanel({ csrfToken }) {
     enrichment_status: "",
     q: "",
   });
+  const rowRefs = useRef([]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
@@ -282,6 +308,25 @@ export default function ProductTaxonomyPanel({ csrfToken }) {
     };
   }, [appliedFilters, offset]);
 
+  useEffect(() => {
+    if (rows.length === 0) {
+      if (activeRowIndex !== 0) {
+        setActiveRowIndex(0);
+      }
+      return;
+    }
+    if (activeRowIndex >= rows.length) {
+      setActiveRowIndex(rows.length - 1);
+    }
+  }, [activeRowIndex, rows]);
+
+  useEffect(() => {
+    const activeRow = rowRefs.current[activeRowIndex];
+    if (activeRow && typeof activeRow.scrollIntoView === "function") {
+      activeRow.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [activeRowIndex]);
+
   function refreshCurrentPage() {
     setAppliedFilters((current) => ({ ...current }));
   }
@@ -321,10 +366,23 @@ export default function ProductTaxonomyPanel({ csrfToken }) {
       )));
       setNotice(`อัปเดตประเภทสินค้า ${skuCode} แล้ว`);
       refreshCurrentPage();
+      return true;
     } catch (updateError) {
       setError(`อัปเดตประเภทสินค้าไม่สำเร็จ: ${updateError.message}`);
+      return false;
     } finally {
       setSavingSkuCode("");
+    }
+  }
+
+  async function assignRowProductType(rowIndex, nextProductType, options = {}) {
+    const row = rows[rowIndex];
+    if (!row || savingSkuCode) {
+      return;
+    }
+    const ok = await updateProductType(row.sku_code, nextProductType);
+    if (ok && options.advance) {
+      setActiveRowIndex((current) => Math.min(current + 1, Math.max(rows.length - 1, 0)));
     }
   }
 
@@ -375,6 +433,65 @@ export default function ProductTaxonomyPanel({ csrfToken }) {
     }
   }
 
+  useEffect(() => {
+    function onKeyDown(event) {
+      if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+      }
+      if (isTypingTarget(event.target)) {
+        return;
+      }
+      if (confirmOpen || loading || !rows.length) {
+        return;
+      }
+
+      if (event.key === "ArrowDown" || event.key === "j" || event.key === "J") {
+        event.preventDefault();
+        setActiveRowIndex((current) => Math.min(current + 1, rows.length - 1));
+        return;
+      }
+
+      if (event.key === "ArrowUp" || event.key === "k" || event.key === "K") {
+        event.preventDefault();
+        setActiveRowIndex((current) => Math.max(current - 1, 0));
+        return;
+      }
+
+      if (event.key === "PageDown") {
+        if (offset + PAGE_SIZE >= total) {
+          return;
+        }
+        event.preventDefault();
+        setOffset((current) => current + PAGE_SIZE);
+        setActiveRowIndex(0);
+        return;
+      }
+
+      if (event.key === "PageUp") {
+        if (offset <= 0) {
+          return;
+        }
+        event.preventDefault();
+        setOffset((current) => Math.max(0, current - PAGE_SIZE));
+        setActiveRowIndex(0);
+        return;
+      }
+
+      const nextProductType = HOTKEY_ASSIGNMENT_MAP[event.key];
+      if (nextProductType === undefined) {
+        return;
+      }
+
+      event.preventDefault();
+      void assignRowProductType(activeRowIndex, nextProductType, { advance: true });
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [activeRowIndex, confirmOpen, loading, offset, rows, savingSkuCode, total]);
+
   return (
     <section className="panel taxonomy-panel">
       <div className="panel-header stacked">
@@ -398,6 +515,17 @@ export default function ProductTaxonomyPanel({ csrfToken }) {
             <span>{chip.label}</span>
             <strong>{formatNumber(chip.count)}</strong>
           </article>
+        ))}
+      </div>
+
+      <div className="taxonomy-hotkey-bar" aria-label="taxonomy keyboard shortcuts">
+        <span className="taxonomy-hotkey-title">ลัดด้วยคีย์บอร์ด</span>
+        <span className="taxonomy-hotkey-chip"><kbd>↑</kbd><kbd>↓</kbd> หรือ <kbd>J</kbd><kbd>K</kbd> เลื่อนแถว</span>
+        <span className="taxonomy-hotkey-chip"><kbd>PgUp</kbd><kbd>PgDn</kbd> เปลี่ยนหน้า</span>
+        {HOTKEY_ASSIGNMENTS.map((item) => (
+          <span key={item.key} className="taxonomy-hotkey-chip">
+            <kbd>{item.key}</kbd> {item.label}
+          </span>
         ))}
       </div>
 
@@ -471,8 +599,15 @@ export default function ProductTaxonomyPanel({ csrfToken }) {
               <tr>
                 <td colSpan={6} className="empty-state">ไม่พบสินค้าที่ตรงกับตัวกรองปัจจุบัน</td>
               </tr>
-            ) : rows.map((row) => (
-              <tr key={row.sku_code}>
+            ) : rows.map((row, index) => (
+              <tr
+                key={row.sku_code}
+                ref={(element) => {
+                  rowRefs.current[index] = element;
+                }}
+                className={index === activeRowIndex ? "taxonomy-row-active" : ""}
+                onClick={() => setActiveRowIndex(index)}
+              >
                 <td><code>{row.sku_code}</code></td>
                 <td>{row.name || "-"}</td>
                 <td>{row.category_name || "-"}</td>
@@ -480,7 +615,8 @@ export default function ProductTaxonomyPanel({ csrfToken }) {
                 <td>
                   <select
                     value={row.product_type || ""}
-                    onChange={(event) => updateProductType(row.sku_code, event.target.value)}
+                    onChange={(event) => void updateProductType(row.sku_code, event.target.value)}
+                    onFocus={() => setActiveRowIndex(index)}
                     disabled={savingSkuCode === row.sku_code}
                   >
                     <option value="">ยังไม่ระบุ</option>
@@ -499,7 +635,7 @@ export default function ProductTaxonomyPanel({ csrfToken }) {
 
       <div className="taxonomy-footer">
         <div className="taxonomy-footer-summary">
-          หน้า {formatNumber(currentPage)} / {formatNumber(totalPages)} · {formatNumber(total)} รายการ
+          หน้า {formatNumber(currentPage)} / {formatNumber(totalPages)} · {formatNumber(total)} รายการ · แถวที่เลือก {rows[activeRowIndex]?.sku_code || "-"}
         </div>
         <div className="taxonomy-footer-actions">
           <button
