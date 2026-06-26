@@ -104,6 +104,9 @@ Sub-type ละเอียดกว่านั้นให้ใช้ **shelf
 | 28 | **กระเจี๊ยบแดง / Roselle (Hibiscus sabdariffa)** | 1 (18 synonyms, 8 Thai) |
 | 29 | **เสลดพังพอน × 2** (C. nutans / พญายอ + B. lupulina / พิมเสนต้น) | 2 (20 synonyms, 11 Thai) |
 | 30 | **กระชาย / Fingerroot (Boesenbergia rotunda)** | 1 (18 synonyms, 8 Thai) |
+| 31 | **งาดำ / งาขาว / Sesame (Sesamum indicum)** | 1 (21 synonyms, 8 Thai) |
+| 32 | **น้ำมันมะพร้าว / Coconut Oil / VCO (Cocos nucifera)** | 1 (12 synonyms, 5 Thai) — เวชสำอางค์ rule attached ✓ |
+| 33 | **น้ำมันมะกอก / Olive Oil / EVOO (Olea europaea)** | 1 (13 synonyms, 5 Thai) — เวชสำอางค์ rule attached ✓ |
 
 ---
 

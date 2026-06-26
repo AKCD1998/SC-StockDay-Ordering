@@ -792,6 +792,7 @@ label {
 }
 
 .legacy-rx-table-shell {
+  overflow: visible;
   border-radius: 10px;
 }
 
