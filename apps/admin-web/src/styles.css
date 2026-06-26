@@ -2149,6 +2149,18 @@ button {
 .rq-ing-item-rejected { opacity: 0.55; }
 .rq-ing-status-rejected { background: rgba(220,60,60,0.12); color: #c0392b; }
 
+/* ── All-ingredients browse tab ── */
+.id-all-wrap { display: flex; flex-direction: column; gap: 12px; }
+.id-all-table { font-size: 0.93rem; }
+.id-all-table td { padding: 8px 12px; vertical-align: top; }
+.id-all-row { cursor: pointer; transition: background 0.1s; }
+.id-all-row:hover { background: rgba(58,108,212,0.05); }
+.id-all-idx { color: #a0afc0; font-size: 0.82rem; text-align: right; padding-right: 8px; white-space: nowrap; }
+.id-all-canonical { font-family: var(--font-mono, monospace); font-size: 0.84rem; color: #2a5cb4; word-break: break-all; }
+.id-all-meta { font-size: 0.88rem; color: #5a6a80; }
+.id-all-count { text-align: center; font-size: 0.9rem; color: #6a7a90; }
+.id-all-empty { color: #c0cad8; }
+
 @media (max-width: 1100px) {
   .id-search-row {
     flex-wrap: wrap;
