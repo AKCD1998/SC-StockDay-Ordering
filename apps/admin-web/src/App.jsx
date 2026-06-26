@@ -6299,6 +6299,13 @@ function IngredientDictionaryPanel({ csrfToken }) {
   const [loadingDiscoveries, setLoadingDiscoveries] = useState(false);
   const [discoverySearch, setDiscoverySearch] = useState("");
 
+  // all ingredients view
+  const [allList, setAllList] = useState([]);
+  const [allTotal, setAllTotal] = useState(0);
+  const [loadingAll, setLoadingAll] = useState(false);
+  const [allSearch, setAllSearch] = useState("");
+  const [allCatFilter, setAllCatFilter] = useState("");
+
   const MATCHED_PAGE = 50;
 
   // ── loaders ───────────────────────────────────────────────────────────────
@@ -6373,9 +6380,26 @@ function IngredientDictionaryPanel({ csrfToken }) {
     }
   }, []);
 
+  const loadAll = useCallback(async () => {
+    setLoadingAll(true);
+    setError("");
+    try {
+      const res = await apiFetch(`${ING_API}/ingredients?limit=500&status=active`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setAllList(data.records || []);
+      setAllTotal(data.total || 0);
+    } catch (e) {
+      setError("โหลดรายการสารสำคัญไม่สำเร็จ: " + e.message);
+    } finally {
+      setLoadingAll(false);
+    }
+  }, []);
+
   useEffect(() => { if (subTab === "dictionary") loadList(); }, [subTab, loadList]);
   useEffect(() => { if (subTab === "matched") loadMatched(0); }, [subTab, matchedStatusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (subTab === "discoveries") loadDiscoveries(); }, [subTab, loadDiscoveries]);
+  useEffect(() => { if (subTab === "all") loadAll(); }, [subTab, loadAll]);
 
   useEffect(() => {
     if (selectedId) loadDetail(selectedId);
@@ -6519,6 +6543,7 @@ function IngredientDictionaryPanel({ csrfToken }) {
           { key: "dictionary", label: "พจนานุกรม" },
           { key: "matched", label: "สินค้าที่จับคู่แล้ว" },
           { key: "discoveries", label: "คำที่ยังไม่รู้จัก" },
+          { key: "all", label: "📋 ดูทั้งหมด" },
         ].map((t) => (
           <button
             key={t.key}
@@ -6879,6 +6904,92 @@ function IngredientDictionaryPanel({ csrfToken }) {
           <p className="id-hint">* คำเหล่านี้รวมชื่อยี่ห้อ/บรรจุภัณฑ์ด้วย — เภสัชกรควรเลือกเฉพาะที่เป็นสารสำคัญจริงก่อนเพิ่มเข้าพจนานุกรม</p>
         </div>
       )}
+
+      {/* ── ALL INGREDIENTS (read-only browse) ── */}
+      {subTab === "all" && (() => {
+        const q = allSearch.trim().toLowerCase();
+        const catQ = allCatFilter.trim().toLowerCase();
+        const filtered = allList.filter((r) => {
+          if (catQ && !r.drugClassNames.toLowerCase().includes(catQ)) return false;
+          if (!q) return true;
+          return (
+            r.displayName.toLowerCase().includes(q) ||
+            r.canonicalName.toLowerCase().includes(q) ||
+            r.drugClassNames.toLowerCase().includes(q) ||
+            r.indicationNames.toLowerCase().includes(q)
+          );
+        });
+
+        const uniqueCats = [...new Set(
+          allList.flatMap((r) => r.drugClassNames ? r.drugClassNames.split(", ").map((s) => s.trim()) : [])
+        )].sort();
+
+        return (
+          <div className="id-all-wrap">
+            <div className="id-search-row">
+              <input
+                type="text"
+                className="rq-search"
+                placeholder="ค้นหา: ชื่อสาร / canonical / กลุ่มยา / ข้อบ่งใช้"
+                value={allSearch}
+                onChange={(e) => setAllSearch(e.target.value)}
+              />
+              <select
+                className="id-select"
+                value={allCatFilter}
+                onChange={(e) => setAllCatFilter(e.target.value)}
+              >
+                <option value="">กลุ่มยาทั้งหมด</option>
+                {uniqueCats.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <button type="button" className="ghost-button" onClick={loadAll}>รีเฟรช</button>
+            </div>
+            <div className="id-list-meta">
+              {loadingAll ? "กำลังโหลด..." : `แสดง ${filtered.length.toLocaleString()} จาก ${allTotal.toLocaleString()} สาร`}
+            </div>
+            <div className="table-wrap">
+              <table className="id-table id-all-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: "2rem" }}>#</th>
+                    <th>ชื่อแสดง</th>
+                    <th>Canonical name</th>
+                    <th>กลุ่มยา</th>
+                    <th>ข้อบ่งใช้</th>
+                    <th style={{ width: "4rem", textAlign: "center" }}>คำพ้อง</th>
+                    <th style={{ width: "4rem", textAlign: "center" }}>กฎหมวด</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingAll ? (
+                    <tr><td colSpan={7} className="empty-state">กำลังโหลด...</td></tr>
+                  ) : filtered.length === 0 ? (
+                    <tr><td colSpan={7} className="empty-state">ไม่พบสารสำคัญ</td></tr>
+                  ) : (
+                    filtered.map((r, idx) => (
+                      <tr
+                        key={r.ingredientId}
+                        className="id-all-row"
+                        onClick={() => { setSubTab("dictionary"); setSelectedId(r.ingredientId); }}
+                        title="คลิกเพื่อดูรายละเอียด"
+                      >
+                        <td className="id-all-idx">{idx + 1}</td>
+                        <td><strong>{r.displayName}</strong></td>
+                        <td className="id-all-canonical">{r.canonicalName}</td>
+                        <td className="id-all-meta">{r.drugClassNames || <span className="id-all-empty">—</span>}</td>
+                        <td className="id-all-meta">{r.indicationNames || <span className="id-all-empty">—</span>}</td>
+                        <td className="id-all-count">{r.synonymCount}</td>
+                        <td className="id-all-count">{r.categoryRuleCount}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p className="id-hint">* คลิกแถวใดก็ได้เพื่อเปิดรายละเอียดในแท็บ "พจนานุกรม"</p>
+          </div>
+        );
+      })()}
     </section>
   );
 }
