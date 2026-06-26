@@ -361,12 +361,73 @@ button {
 .taxonomy-tone-other { background: #f7f4ee; }
 .taxonomy-tone-unclassified { background: #fff8d9; }
 
-.taxonomy-hotkey-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.taxonomy-workspace {
+  display: grid;
+  gap: 18px;
+  align-items: start;
+}
+
+.taxonomy-workspace-open {
+  grid-template-columns: minmax(0, 1fr) 240px;
+}
+
+.taxonomy-workspace-closed {
+  grid-template-columns: minmax(0, 1fr) 76px;
+}
+
+.taxonomy-main {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.taxonomy-shortcuts-sticky {
+  position: sticky;
+  top: 96px;
+  display: grid;
+  gap: 12px;
+}
+
+.taxonomy-shortcut-toggle {
+  display: inline-flex;
   align-items: center;
-  padding: 12px 14px;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d7dfeb;
+  border-radius: 14px;
+  background: #edf4fb;
+  color: #16344d;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.taxonomy-shortcut-toggle kbd,
+.taxonomy-hotkey-subtitle kbd {
+  min-width: 24px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  border: 1px solid #c8d3e2;
+  background: #fff;
+  color: #16344d;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.taxonomy-shortcuts-closed .taxonomy-shortcut-toggle {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  justify-content: flex-start;
+  min-height: 156px;
+}
+
+.taxonomy-hotkey-bar {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
   border: 1px solid #d7dfeb;
   border-radius: 16px;
   background: rgba(248, 251, 254, 0.92);
@@ -375,6 +436,11 @@ button {
 .taxonomy-hotkey-title {
   color: #16344d;
   font-weight: 700;
+}
+
+.taxonomy-hotkey-subtitle {
+  color: #526578;
+  font-size: 0.88rem;
 }
 
 .taxonomy-hotkey-chip {
@@ -576,8 +642,19 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .taxonomy-hotkey-bar {
-    align-items: flex-start;
+  .taxonomy-workspace-open,
+  .taxonomy-workspace-closed {
+    grid-template-columns: 1fr;
+  }
+
+  .taxonomy-shortcuts-sticky {
+    position: static;
+  }
+
+  .taxonomy-shortcuts-closed .taxonomy-shortcut-toggle {
+    writing-mode: initial;
+    text-orientation: initial;
+    min-height: auto;
   }
 
   .taxonomy-confirm-summary {
@@ -6308,20 +6385,27 @@ select {
 .mvt-sales-table {
   border-collapse: collapse;
   min-width: 100%;
+  /* Lock to sans-serif so Thai serif root font doesn't bleed in */
+  font-family: Inter, "Segoe UI", "Noto Sans Thai", Arial, sans-serif;
+  font-size: 0.95rem;
+  color: #1f2933;
 }
 
 .mvt-sales-table th,
 .mvt-sales-table td {
-  padding: 11px 12px;
+  padding: 11px 14px;
   border-bottom: 1px solid #e4e9f2;
   white-space: nowrap;
   font-size: 0.95rem;
+  font-family: inherit;
+  line-height: 1.4;
 }
 
 .mvt-sales-table th {
   background: #f5f8fd;
   color: #38506b;
-  font-size: 0.88rem;
+  font-size: 0.92rem;
+  font-weight: 700;
   position: sticky;
   top: 0;
   z-index: 2;
@@ -6468,17 +6552,41 @@ select {
   opacity: 0.45;
 }
 
-/* Sales table — sticky columns (override hardcoded #fff) */
-[data-theme="dark"] .mvt-sales-table th,
-[data-theme="dark"] .mvt-sales-table td {
+/* Sales table — base text + borders */
+[data-theme="dark"] .mvt-sales-table {
+  color: #d4e0ef;
+}
+[data-theme="dark"] .mvt-sales-table th {
+  color: #c0d0e4;
+  background: #111d2b;
   border-bottom-color: #1e2d3f;
 }
+[data-theme="dark"] .mvt-sales-table td {
+  color: #d4e0ef;
+  border-bottom-color: #1e2d3f;
+}
+[data-theme="dark"] .mvt-sales-table strong {
+  color: #e8f0fb;
+}
+[data-theme="dark"] .mvt-sales-table .meta {
+  color: #6a8aaa;
+}
+
+/* Sticky columns */
 [data-theme="dark"] .mvt-sales-sticky {
   background: #0d1623 !important;
 }
 [data-theme="dark"] .mvt-sales-table th.mvt-sales-sticky {
   background: #111d2b !important;
-  color: #8aa0bb;
+  color: #c0d0e4;
+}
+
+/* Qty cells */
+[data-theme="dark"] .mvt-sales-qty-cell {
+  color: #d0e0f0;
+}
+[data-theme="dark"] .mvt-sales-total-col strong {
+  color: #ffffff;
 }
 
 /* Highlighted branch column */
@@ -6518,10 +6626,24 @@ select {
 }
 
 /* Ledger table */
-[data-theme="dark"] .mvt-ledger-wrap,
 [data-theme="dark"] .mvt-ledger th,
 [data-theme="dark"] .mvt-ledger td {
   border-color: #1e2d3f;
+  color: #d4e0ef;
+}
+[data-theme="dark"] .mvt-ledger th {
+  color: #c0d0e4;
+}
+[data-theme="dark"] .mvt-ledger strong {
+  color: #e8f0fb;
+}
+[data-theme="dark"] .mvt-ledger .meta {
+  color: #6a8aaa;
+}
+
+/* Doc number mono text in dark mode */
+[data-theme="dark"] .mvt-doc-no {
+  color: #d4e0ef;
 }
 
 /* Document cards */

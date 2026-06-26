@@ -233,6 +233,7 @@ export default function ProductTaxonomyPanel({ csrfToken }) {
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [previewSummary, setPreviewSummary] = useState(null);
   const [activeRowIndex, setActiveRowIndex] = useState(0);
+  const [shortcutsVisible, setShortcutsVisible] = useState(true);
   const [appliedFilters, setAppliedFilters] = useState({
     product_type: "",
     enrichment_status: "",
@@ -335,6 +336,10 @@ export default function ProductTaxonomyPanel({ csrfToken }) {
     event.preventDefault();
     setOffset(0);
     setAppliedFilters({ ...draftFilters });
+  }
+
+  function toggleShortcuts() {
+    setShortcutsVisible((current) => !current);
   }
 
   async function updateProductType(skuCode, nextProductType) {
@@ -441,6 +446,13 @@ export default function ProductTaxonomyPanel({ csrfToken }) {
       if (isTypingTarget(event.target)) {
         return;
       }
+
+      if (event.key === "h" || event.key === "H") {
+        event.preventDefault();
+        toggleShortcuts();
+        return;
+      }
+
       if (confirmOpen || loading || !rows.length) {
         return;
       }
@@ -518,143 +530,165 @@ export default function ProductTaxonomyPanel({ csrfToken }) {
         ))}
       </div>
 
-      <div className="taxonomy-hotkey-bar" aria-label="taxonomy keyboard shortcuts">
-        <span className="taxonomy-hotkey-title">ลัดด้วยคีย์บอร์ด</span>
-        <span className="taxonomy-hotkey-chip"><kbd>↑</kbd><kbd>↓</kbd> หรือ <kbd>J</kbd><kbd>K</kbd> เลื่อนแถว</span>
-        <span className="taxonomy-hotkey-chip"><kbd>PgUp</kbd><kbd>PgDn</kbd> เปลี่ยนหน้า</span>
-        {HOTKEY_ASSIGNMENTS.map((item) => (
-          <span key={item.key} className="taxonomy-hotkey-chip">
-            <kbd>{item.key}</kbd> {item.label}
-          </span>
-        ))}
-      </div>
-
-      <form className="taxonomy-filters" onSubmit={applyFilters}>
-        <label>
-          ประเภทสินค้า
-          <select
-            value={draftFilters.product_type}
-            onChange={(event) => setDraftFilters((current) => ({ ...current, product_type: event.target.value }))}
-          >
-            {PRODUCT_TYPE_OPTIONS.map((option) => (
-              <option key={option.value || "all"} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          enrichment_status
-          <select
-            value={draftFilters.enrichment_status}
-            onChange={(event) => setDraftFilters((current) => ({ ...current, enrichment_status: event.target.value }))}
-          >
-            {ENRICHMENT_STATUS_OPTIONS.map((option) => (
-              <option key={option.value || "all"} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </label>
-        <label className="taxonomy-filter-span">
-          ค้นหา
-          <input
-            type="text"
-            value={draftFilters.q}
-            onChange={(event) => setDraftFilters((current) => ({ ...current, q: event.target.value }))}
-            placeholder="ชื่อสินค้า หรือรหัสสินค้า"
-          />
-        </label>
-        <div className="taxonomy-filter-actions">
-          <button type="submit" className="primary-button">กรองข้อมูล</button>
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={() => {
-              const empty = { product_type: "", enrichment_status: "", q: "" };
-              setDraftFilters(empty);
-              setAppliedFilters(empty);
-              setOffset(0);
-            }}
-          >
-            ล้างตัวกรอง
-          </button>
-        </div>
-      </form>
-
-      <div className="table-wrap">
-        <table className="taxonomy-table">
-          <thead>
-            <tr>
-              <th>รหัส</th>
-              <th>ชื่อสินค้า</th>
-              <th>หมวด AdaPos</th>
-              <th>product_kind</th>
-              <th>ประเภท</th>
-              <th>enrichment_status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={6} className="empty-state">กำลังโหลดข้อมูล taxonomy...</td>
-              </tr>
-            ) : rows.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="empty-state">ไม่พบสินค้าที่ตรงกับตัวกรองปัจจุบัน</td>
-              </tr>
-            ) : rows.map((row, index) => (
-              <tr
-                key={row.sku_code}
-                ref={(element) => {
-                  rowRefs.current[index] = element;
-                }}
-                className={index === activeRowIndex ? "taxonomy-row-active" : ""}
-                onClick={() => setActiveRowIndex(index)}
+      <div className={`taxonomy-workspace ${shortcutsVisible ? "taxonomy-workspace-open" : "taxonomy-workspace-closed"}`}>
+        <div className="taxonomy-main">
+          <form className="taxonomy-filters" onSubmit={applyFilters}>
+            <label>
+              ประเภทสินค้า
+              <select
+                value={draftFilters.product_type}
+                onChange={(event) => setDraftFilters((current) => ({ ...current, product_type: event.target.value }))}
               >
-                <td><code>{row.sku_code}</code></td>
-                <td>{row.name || "-"}</td>
-                <td>{row.category_name || "-"}</td>
-                <td>{row.product_kind || "-"}</td>
-                <td>
-                  <select
-                    value={row.product_type || ""}
-                    onChange={(event) => void updateProductType(row.sku_code, event.target.value)}
-                    onFocus={() => setActiveRowIndex(index)}
-                    disabled={savingSkuCode === row.sku_code}
-                  >
-                    <option value="">ยังไม่ระบุ</option>
-                    {EDIT_PRODUCT_TYPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  <div className="taxonomy-inline-meta">{PRODUCT_TYPE_LABELS[row.product_type] || "ยังไม่ระบุ"}</div>
-                </td>
-                <td>{row.enrichment_status || "-"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                {PRODUCT_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value || "all"} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              enrichment_status
+              <select
+                value={draftFilters.enrichment_status}
+                onChange={(event) => setDraftFilters((current) => ({ ...current, enrichment_status: event.target.value }))}
+              >
+                {ENRICHMENT_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value || "all"} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="taxonomy-filter-span">
+              ค้นหา
+              <input
+                type="text"
+                value={draftFilters.q}
+                onChange={(event) => setDraftFilters((current) => ({ ...current, q: event.target.value }))}
+                placeholder="ชื่อสินค้า หรือรหัสสินค้า"
+              />
+            </label>
+            <div className="taxonomy-filter-actions">
+              <button type="submit" className="primary-button">กรองข้อมูล</button>
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => {
+                  const empty = { product_type: "", enrichment_status: "", q: "" };
+                  setDraftFilters(empty);
+                  setAppliedFilters(empty);
+                  setOffset(0);
+                }}
+              >
+                ล้างตัวกรอง
+              </button>
+            </div>
+          </form>
 
-      <div className="taxonomy-footer">
-        <div className="taxonomy-footer-summary">
-          หน้า {formatNumber(currentPage)} / {formatNumber(totalPages)} · {formatNumber(total)} รายการ · แถวที่เลือก {rows[activeRowIndex]?.sku_code || "-"}
+          <div className="table-wrap">
+            <table className="taxonomy-table">
+              <thead>
+                <tr>
+                  <th>รหัส</th>
+                  <th>ชื่อสินค้า</th>
+                  <th>หมวด AdaPos</th>
+                  <th>product_kind</th>
+                  <th>ประเภท</th>
+                  <th>enrichment_status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="empty-state">กำลังโหลดข้อมูล taxonomy...</td>
+                  </tr>
+                ) : rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="empty-state">ไม่พบสินค้าที่ตรงกับตัวกรองปัจจุบัน</td>
+                  </tr>
+                ) : rows.map((row, index) => (
+                  <tr
+                    key={row.sku_code}
+                    ref={(element) => {
+                      rowRefs.current[index] = element;
+                    }}
+                    className={index === activeRowIndex ? "taxonomy-row-active" : ""}
+                    onClick={() => setActiveRowIndex(index)}
+                  >
+                    <td><code>{row.sku_code}</code></td>
+                    <td>{row.name || "-"}</td>
+                    <td>{row.category_name || "-"}</td>
+                    <td>{row.product_kind || "-"}</td>
+                    <td>
+                      <select
+                        value={row.product_type || ""}
+                        onChange={(event) => void updateProductType(row.sku_code, event.target.value)}
+                        onFocus={() => setActiveRowIndex(index)}
+                        disabled={savingSkuCode === row.sku_code}
+                      >
+                        <option value="">ยังไม่ระบุ</option>
+                        {EDIT_PRODUCT_TYPE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                      <div className="taxonomy-inline-meta">{PRODUCT_TYPE_LABELS[row.product_type] || "ยังไม่ระบุ"}</div>
+                    </td>
+                    <td>{row.enrichment_status || "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="taxonomy-footer">
+            <div className="taxonomy-footer-summary">
+              หน้า {formatNumber(currentPage)} / {formatNumber(totalPages)} · {formatNumber(total)} รายการ · แถวที่เลือก {rows[activeRowIndex]?.sku_code || "-"}
+            </div>
+            <div className="taxonomy-footer-actions">
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => setOffset((current) => Math.max(0, current - PAGE_SIZE))}
+                disabled={offset <= 0 || loading}
+              >
+                ก่อนหน้า
+              </button>
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => setOffset((current) => current + PAGE_SIZE)}
+                disabled={offset + PAGE_SIZE >= total || loading}
+              >
+                ถัดไป
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="taxonomy-footer-actions">
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={() => setOffset((current) => Math.max(0, current - PAGE_SIZE))}
-            disabled={offset <= 0 || loading}
-          >
-            ก่อนหน้า
-          </button>
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={() => setOffset((current) => current + PAGE_SIZE)}
-            disabled={offset + PAGE_SIZE >= total || loading}
-          >
-            ถัดไป
-          </button>
-        </div>
+
+        <aside className={`taxonomy-shortcuts ${shortcutsVisible ? "taxonomy-shortcuts-open" : "taxonomy-shortcuts-closed"}`} aria-label="taxonomy keyboard shortcuts">
+          <div className="taxonomy-shortcuts-sticky">
+            <button
+              type="button"
+              className="taxonomy-shortcut-toggle"
+              onClick={toggleShortcuts}
+              aria-expanded={shortcutsVisible}
+              aria-controls="taxonomy-hotkey-panel"
+            >
+              <span>{shortcutsVisible ? "ซ่อนคีย์ลัด" : "แสดงคีย์ลัด"}</span>
+              <kbd>H</kbd>
+            </button>
+
+            {shortcutsVisible ? (
+              <div id="taxonomy-hotkey-panel" className="taxonomy-hotkey-bar">
+                <span className="taxonomy-hotkey-title">ลัดด้วยคีย์บอร์ด</span>
+                <span className="taxonomy-hotkey-subtitle">กด <kbd>H</kbd> เพื่อซ่อนหรือแสดงแผงนี้</span>
+                <span className="taxonomy-hotkey-chip"><kbd>↑</kbd><kbd>↓</kbd> หรือ <kbd>J</kbd><kbd>K</kbd> เลื่อนแถว</span>
+                <span className="taxonomy-hotkey-chip"><kbd>PgUp</kbd><kbd>PgDn</kbd> เปลี่ยนหน้า</span>
+                {HOTKEY_ASSIGNMENTS.map((item) => (
+                  <span key={item.key} className="taxonomy-hotkey-chip">
+                    <kbd>{item.key}</kbd> {item.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </aside>
       </div>
 
       <ProductTaxonomyConfirmModal
