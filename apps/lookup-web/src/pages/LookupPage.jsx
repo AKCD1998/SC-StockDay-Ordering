@@ -41,6 +41,7 @@ function loadAccumPreference() {
 
 export default function LookupPage() {
   const [branches, setBranches] = useState([]);
+  const [branchesLoading, setBranchesLoading] = useState(false);
   const [draftFilters, setDraftFilters] = useState(defaultFilters);
   const [filters, setFilters] = useState(defaultFilters);
   const [rows, setRows] = useState([]);
@@ -58,9 +59,12 @@ export default function LookupPage() {
   const [theme, setTheme] = useState(() => (typeof document === "undefined" ? "light" : document.documentElement.dataset.theme || getComputedStyle(document.documentElement).colorScheme || "light"));
 
   const maxPage = Math.max(1, Math.ceil(total / pageSize));
+  const showLookupOverlay = branchesLoading || loading || kpiLoading;
+  const overlayLabel = loading ? "กำลังโหลดข้อมูล CiPData..." : kpiLoading ? "กำลังคำนวณ KPI..." : "กำลังเตรียมหน้าค้นหา...";
 
   useEffect(() => {
     let cancelled = false;
+    setBranchesLoading(true);
     api
       .getBranches()
       .then((payload) => {
@@ -71,6 +75,11 @@ export default function LookupPage() {
       .catch(() => {
         if (!cancelled) {
           setBranches([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBranchesLoading(false);
         }
       });
     return () => {
@@ -191,7 +200,17 @@ export default function LookupPage() {
   const todayText = toDateInputValue(new Date());
 
   return (
-    <div className="page-stack">
+    <div className={`page-stack ${showLookupOverlay ? "page-stack--loading" : ""}`} aria-busy={showLookupOverlay}>
+      {showLookupOverlay ? (
+        <div className="page-loading-overlay" role="status" aria-live="polite">
+          <div className="page-loading-overlay__panel">
+            <div className="page-loading-overlay__spinner" aria-hidden="true" />
+            <strong>{overlayLabel}</strong>
+            <p>รอสักครู่ ระบบกำลังจัดเตรียมข้อมูลและปรับ layout ให้พร้อมใช้งาน</p>
+          </div>
+        </div>
+      ) : null}
+
       <section className="lookup-top-grid">
         <header className="hero-card lookup-hero-card">
           <div className="hero-card__actions">
@@ -395,87 +414,82 @@ export default function LookupPage() {
           </div>
         </div>
 
-        {loading ? <div className="notice">กำลังโหลดข้อมูล CiPData...</div> : null}
         {error ? <div className="notice error">{error}</div> : null}
 
-        {!loading ? (
-          <div className="table-shell">
-            <table className="lookup-table lookup-table--legacy">
-              <colgroup>
-                <col style={{ width: "56px" }} />
-                <col style={{ width: "56px" }} />
-                <col style={{ width: "140px" }} />
-                <col style={{ width: "130px" }} />
-                <col style={{ width: "150px" }} />
-                <col style={{ width: "120px" }} />
-                <col style={{ width: "56px" }} />
-                <col style={{ width: "160px" }} />
-                <col style={{ width: "320px" }} />
-                <col style={{ width: "260px" }} />
-                <col style={{ width: "260px" }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th></th>
-                  <th>สาขา</th>
-                  <th>วันที่รับบริการ</th>
-                  <th>เลขประจำตัวประชาชน</th>
-                  <th>ชื่อ-สกุล</th>
-                  <th>เบอร์โทรศัพท์ติดต่อ</th>
-                  <th>รหัสอาการ</th>
-                  <th>กลุ่มอาการ</th>
-                  <th>คำอธิบายอาการ</th>
-                  <th>รายการยาที่เภสัชกรจ่าย</th>
-                  <th>หมายเหตุ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length ? (
-                  rows.map((row) => (
-                    <tr key={row.encounterId}>
-                      <td className="action-column">
-                        <button type="button" className="row-action-button row-action-button--icon" onClick={() => setActiveRow(row)} aria-label="เปิดรายละเอียด encounter" title="เปิดรายละเอียด encounter">
-                          ⋮
-                        </button>
-                      </td>
-                      <td>{row.branchNo || "-"}</td>
-                      <td>{formatThaiDateTime(row.encounterAt)}</td>
-                      <td>{row.patientPid || "-"}</td>
-                      <td>{row.patientName || "-"}</td>
-                      <td>{formatPhone(row.patientPhone)}</td>
-                      <td>{row.symptomNo || "-"}</td>
-                      <td>
-                        {row.symptomName || "-"}
-                      </td>
-                      <td className="text-cell">{stripHtml(row.answersText) || "-"}</td>
-                      <td>
-                        <div className="drug-stack">
-                          {normalizeDrugItems(row.medsJson || row.medsAmedTh).length ? (
-                            normalizeDrugItems(row.medsJson || row.medsAmedTh).map((item) => (
-                              <span key={item.id} className="qty-pill positive">
-                                {item.name} x {item.qty}
-                                {item.uom ? ` ${item.uom}` : ""}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="subtle">-</span>
-                          )}
-                        </div>
-                      </td>
-                      <td>{row.warningNote ? <span className="warning-badge">{row.warningNote}</span> : "-"}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="11" className="table-empty-state">
-                      ไม่พบข้อมูลตามเงื่อนไขที่เลือก
+        <div className="table-shell">
+          <table className="lookup-table lookup-table--legacy">
+            <colgroup>
+              <col style={{ width: "56px" }} />
+              <col style={{ width: "56px" }} />
+              <col style={{ width: "140px" }} />
+              <col style={{ width: "130px" }} />
+              <col style={{ width: "150px" }} />
+              <col style={{ width: "120px" }} />
+              <col style={{ width: "56px" }} />
+              <col style={{ width: "160px" }} />
+              <col style={{ width: "320px" }} />
+              <col style={{ width: "260px" }} />
+              <col style={{ width: "260px" }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th></th>
+                <th>สาขา</th>
+                <th>วันที่รับบริการ</th>
+                <th>เลขประจำตัวประชาชน</th>
+                <th>ชื่อ-สกุล</th>
+                <th>เบอร์โทรศัพท์ติดต่อ</th>
+                <th>รหัสอาการ</th>
+                <th>กลุ่มอาการ</th>
+                <th>คำอธิบายอาการ</th>
+                <th>รายการยาที่เภสัชกรจ่าย</th>
+                <th>หมายเหตุ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length ? (
+                rows.map((row) => (
+                  <tr key={row.encounterId}>
+                    <td className="action-column">
+                      <button type="button" className="row-action-button row-action-button--icon" onClick={() => setActiveRow(row)} aria-label="เปิดรายละเอียด encounter" title="เปิดรายละเอียด encounter">
+                        ⋮
+                      </button>
                     </td>
+                    <td>{row.branchNo || "-"}</td>
+                    <td>{formatThaiDateTime(row.encounterAt)}</td>
+                    <td>{row.patientPid || "-"}</td>
+                    <td>{row.patientName || "-"}</td>
+                    <td>{formatPhone(row.patientPhone)}</td>
+                    <td>{row.symptomNo || "-"}</td>
+                    <td>{row.symptomName || "-"}</td>
+                    <td className="text-cell">{stripHtml(row.answersText) || "-"}</td>
+                    <td>
+                      <div className="drug-stack">
+                        {normalizeDrugItems(row.medsJson || row.medsAmedTh).length ? (
+                          normalizeDrugItems(row.medsJson || row.medsAmedTh).map((item) => (
+                            <span key={item.id} className="qty-pill positive">
+                              {item.name} x {item.qty}
+                              {item.uom ? ` ${item.uom}` : ""}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="subtle">-</span>
+                        )}
+                      </div>
+                    </td>
+                    <td>{row.warningNote ? <span className="warning-badge">{row.warningNote}</span> : "-"}</td>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="11" className="table-empty-state">
+                    ไม่พบข้อมูลตามเงื่อนไขที่เลือก
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <EncounterDetailModal row={activeRow} rows={rows} onSelectRow={setActiveRow} onClose={() => setActiveRow(null)} />
