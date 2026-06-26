@@ -4,7 +4,6 @@ import { NavLink, useLocation } from "react-router-dom";
 const navItems = [
   { to: "/lookup", label: "ค้นหาข้อมูล" },
   { to: "/summary", label: "สรุปข้อมูล" },
-  { to: "/followups", label: "ติดตามอาการ" },
   { to: "/reports", label: "รายงาน" },
 ];
 

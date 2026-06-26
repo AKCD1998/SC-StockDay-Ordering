@@ -1889,13 +1889,15 @@ button {
 
 /* ── Ingredient Dictionary Admin (Phase 5A) ── */
 .id-panel .panel-header { margin-bottom: 14px; }
-.id-subtabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.id-subtabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
 .id-subtab {
   padding: 10px 18px;
   border: 1.5px solid #d6deea;
   border-radius: 10px;
   background: none;
   color: #5a6a85;
+  white-space: nowrap;
+  flex-shrink: 0;
   font-size: 0.98rem;
   font-weight: 600;
   line-height: 1.3;
@@ -2148,6 +2150,42 @@ button {
 .rq-ing-actions { display: inline-flex; gap: 4px; margin-left: auto; }
 .rq-ing-item-rejected { opacity: 0.55; }
 .rq-ing-status-rejected { background: rgba(220,60,60,0.12); color: #c0392b; }
+
+/* ── Synonym checker tab ── */
+.id-check-wrap { display: flex; flex-direction: column; gap: 20px; }
+.id-check-top { display: flex; gap: 20px; align-items: flex-start; }
+.id-check-input-col { display: flex; flex-direction: column; gap: 10px; flex: 0 0 320px; }
+.id-check-label { font-size: 0.9rem; font-weight: 600; color: #38506b; }
+.id-check-textarea {
+  width: 100%; font-size: 0.9rem; font-family: var(--font-mono, monospace);
+  border: 1.5px solid #d6deea; border-radius: 10px; padding: 10px 12px;
+  resize: vertical; background: #f8fafd; color: #1a2a40; line-height: 1.6;
+}
+.id-check-textarea:focus { outline: none; border-color: #3a6cd4; background: #fff; }
+.id-check-result-col { flex: 1; min-width: 0; }
+.id-check-summary { font-size: 0.9rem; color: #5a6a80; margin-bottom: 10px; }
+.id-check-new-count { color: #e07a00; font-weight: 600; }
+.id-check-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 5px; max-height: 380px; overflow-y: auto; }
+.id-check-item { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; border-radius: 8px; font-size: 0.92rem; }
+.id-check-item.found { background: rgba(47,177,90,0.08); }
+.id-check-item.missing { background: rgba(220,100,40,0.07); }
+.id-check-icon { font-size: 1rem; flex-shrink: 0; }
+.id-check-item.found .id-check-icon { color: #1a8a50; }
+.id-check-item.missing .id-check-icon { color: #c05010; }
+.id-check-word { font-family: var(--font-mono, monospace); font-size: 0.88rem; word-break: break-all; }
+.id-check-meta { font-size: 0.84rem; color: #5a7090; margin-left: 4px; }
+.id-check-new-block { border: 1.5px solid #f0c060; border-radius: 12px; padding: 14px 16px; background: #fffbf0; }
+.id-check-new-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.9rem; font-weight: 600; color: #7a5000; margin-bottom: 10px; }
+.id-check-new-textarea {
+  width: 100%; font-size: 0.88rem; font-family: var(--font-mono, monospace);
+  border: 1px solid #e0d0a0; border-radius: 8px; padding: 8px 10px;
+  background: #fff; color: #1a2a40; resize: vertical; line-height: 1.6;
+}
+.id-check-all-found { color: #1a8a50; font-weight: 600; font-size: 0.95rem; padding: 12px 0; }
+@media (max-width: 800px) {
+  .id-check-top { flex-direction: column; }
+  .id-check-input-col { flex: unset; width: 100%; }
+}
 
 /* ── All-ingredients browse tab ── */
 .id-all-wrap { display: flex; flex-direction: column; gap: 12px; }

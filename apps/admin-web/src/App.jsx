@@ -6308,6 +6308,11 @@ function IngredientDictionaryPanel({ csrfToken }) {
   const [allOffset, setAllOffset] = useState(0);
   const ALL_PAGE = 200;
 
+  // synonym checker
+  const [checkInput, setCheckInput] = useState("");
+  const [checkResults, setCheckResults] = useState(null); // null = not yet run
+  const [checkLoading, setCheckLoading] = useState(false);
+
   const MATCHED_PAGE = 50;
 
   // ── loaders ───────────────────────────────────────────────────────────────
@@ -6547,6 +6552,7 @@ function IngredientDictionaryPanel({ csrfToken }) {
           { key: "matched", label: "สินค้าที่จับคู่แล้ว" },
           { key: "discoveries", label: "คำที่ยังไม่รู้จัก" },
           { key: "all", label: "📋 ดูทั้งหมด" },
+          { key: "check", label: "🔍 ตรวจคำพ้อง" },
         ].map((t) => (
           <button
             key={t.key}
@@ -7015,6 +7021,105 @@ function IngredientDictionaryPanel({ csrfToken }) {
               </div>
             )}
             <p className="id-hint">* คลิกแถวใดก็ได้เพื่อเปิดรายละเอียดในแท็บ "พจนานุกรม" · search/filter ทำงานบน 200 รายการที่โหลดอยู่</p>
+          </div>
+        );
+      })()}
+
+      {/* ── SYNONYM CHECKER ── */}
+      {subTab === "check" && (() => {
+        const newOnes = checkResults ? checkResults.filter((r) => !r.exists).map((r) => r.synonymText) : [];
+
+        async function runCheck() {
+          const lines = checkInput.split("\n").map((l) => l.trim()).filter(Boolean);
+          if (!lines.length) return;
+          setCheckLoading(true);
+          setError("");
+          try {
+            const res = await apiFetch(`${ING_API}/synonyms/check-bulk`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ synonyms: lines }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            setCheckResults(data.results || []);
+          } catch (e) {
+            setError("ตรวจไม่สำเร็จ: " + e.message);
+          } finally {
+            setCheckLoading(false);
+          }
+        }
+
+        return (
+          <div className="id-check-wrap">
+            <div className="id-check-top">
+              <div className="id-check-input-col">
+                <label className="id-check-label">วางคำที่ต้องการตรวจ (ทีละบรรทัด)</label>
+                <textarea
+                  className="id-check-textarea"
+                  rows={14}
+                  placeholder={"ไซเลียมฮัสก์\npsyllium husk\nispaghula husk\n..."}
+                  value={checkInput}
+                  onChange={(e) => { setCheckInput(e.target.value); setCheckResults(null); }}
+                  spellCheck={false}
+                />
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={runCheck}
+                  disabled={checkLoading || !checkInput.trim()}
+                >
+                  {checkLoading ? "กำลังตรวจ..." : "ตรวจสอบ"}
+                </button>
+              </div>
+
+              {checkResults && (
+                <div className="id-check-result-col">
+                  <div className="id-check-summary">
+                    ตรวจ {checkResults.length} คำ · มีแล้ว {checkResults.filter((r) => r.exists).length} · <span className="id-check-new-count">ยังไม่มี {newOnes.length} คำ</span>
+                  </div>
+                  <ul className="id-check-list">
+                    {checkResults.map((r, i) => (
+                      <li key={i} className={`id-check-item ${r.exists ? "found" : "missing"}`}>
+                        <span className="id-check-icon">{r.exists ? "✓" : "✗"}</span>
+                        <span className="id-check-word">{r.synonymText}</span>
+                        {r.exists && (
+                          <span className="id-check-meta">
+                            → {r.ingredientDisplay}
+                            {r.status !== "active" && <span className="id-badge muted">{ingStatusLabel(r.status)}</span>}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {checkResults && newOnes.length > 0 && (
+              <div className="id-check-new-block">
+                <div className="id-check-new-head">
+                  <span>คำที่ยังไม่มีในระบบ ({newOnes.length} คำ) — copy ไปส่ง Claude seed ต่อได้เลย</span>
+                  <button
+                    type="button"
+                    className="ghost-button id-mini"
+                    onClick={() => navigator.clipboard.writeText(newOnes.join("\n")).then(() => setNotice("คัดลอกแล้ว")).catch(() => {})}
+                  >
+                    คัดลอก
+                  </button>
+                </div>
+                <textarea
+                  className="id-check-new-textarea"
+                  readOnly
+                  rows={Math.min(newOnes.length + 1, 10)}
+                  value={newOnes.join("\n")}
+                />
+              </div>
+            )}
+
+            {checkResults && newOnes.length === 0 && (
+              <p className="id-check-all-found">ทุกคำมีอยู่ในพจนานุกรมแล้ว</p>
+            )}
           </div>
         );
       })()}
