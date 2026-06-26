@@ -505,33 +505,32 @@ export default function ProductTaxonomyPanel({ csrfToken }) {
   }, [activeRowIndex, confirmOpen, loading, offset, rows, savingSkuCode, total]);
 
   return (
-    <section className="panel taxonomy-panel">
-      <div className="panel-header stacked">
-        <div>
-          <h2>Product Taxonomy</h2>
-          <p>กำหนดประเภทสินค้า, ตรวจสอบ enrichment applicability และใช้ตัวช่วยจัดประเภทอัตโนมัติ</p>
+    <div className={`taxonomy-workspace ${shortcutsVisible ? "taxonomy-workspace-open" : "taxonomy-workspace-closed"}`}>
+      <section className="panel taxonomy-panel taxonomy-main">
+        <div className="panel-header stacked">
+          <div>
+            <h2>Product Taxonomy</h2>
+            <p>กำหนดประเภทสินค้า, ตรวจสอบ enrichment applicability และใช้ตัวช่วยจัดประเภทอัตโนมัติ</p>
+          </div>
+          <div className="taxonomy-header-actions">
+            <button type="button" className="primary-button" onClick={previewAutoClassify} disabled={!csrfToken || loading}>
+              Auto-classify
+            </button>
+          </div>
         </div>
-        <div className="taxonomy-header-actions">
-          <button type="button" className="primary-button" onClick={previewAutoClassify} disabled={!csrfToken || loading}>
-            Auto-classify
-          </button>
+
+        {notice ? <div className="notice taxonomy-notice">{notice}</div> : null}
+        {error ? <div className="notice error taxonomy-notice">{error}</div> : null}
+
+        <div className="taxonomy-stats-grid">
+          {statChips.map((chip) => (
+            <article key={chip.key} className={`taxonomy-stat-card taxonomy-tone-${chip.tone}`}>
+              <span>{chip.label}</span>
+              <strong>{formatNumber(chip.count)}</strong>
+            </article>
+          ))}
         </div>
-      </div>
 
-      {notice ? <div className="notice taxonomy-notice">{notice}</div> : null}
-      {error ? <div className="notice error taxonomy-notice">{error}</div> : null}
-
-      <div className="taxonomy-stats-grid">
-        {statChips.map((chip) => (
-          <article key={chip.key} className={`taxonomy-stat-card taxonomy-tone-${chip.tone}`}>
-            <span>{chip.label}</span>
-            <strong>{formatNumber(chip.count)}</strong>
-          </article>
-        ))}
-      </div>
-
-      <div className={`taxonomy-workspace ${shortcutsVisible ? "taxonomy-workspace-open" : "taxonomy-workspace-closed"}`}>
-        <div className="taxonomy-main">
           <form className="taxonomy-filters" onSubmit={applyFilters}>
             <label>
               ประเภทสินค้า
@@ -659,37 +658,40 @@ export default function ProductTaxonomyPanel({ csrfToken }) {
               </button>
             </div>
           </div>
+
+        {previewSummary && !confirmOpen ? (
+          <p className="taxonomy-preview-hint">{buildPreviewText(previewSummary)}</p>
+        ) : null}
+      </section>
+
+      <aside className={`taxonomy-shortcuts ${shortcutsVisible ? "taxonomy-shortcuts-open" : "taxonomy-shortcuts-closed"}`} aria-label="taxonomy keyboard shortcuts">
+        <div className="taxonomy-shortcuts-sticky">
+          <button
+            type="button"
+            className="taxonomy-shortcut-toggle"
+            onClick={toggleShortcuts}
+            aria-expanded={shortcutsVisible}
+            aria-controls="taxonomy-hotkey-panel"
+          >
+            <span>{shortcutsVisible ? "ซ่อนคีย์ลัด" : "แสดงคีย์ลัด"}</span>
+            <kbd>H</kbd>
+          </button>
+
+          {shortcutsVisible ? (
+            <div id="taxonomy-hotkey-panel" className="taxonomy-hotkey-bar">
+              <span className="taxonomy-hotkey-title">ลัดด้วยคีย์บอร์ด</span>
+              <span className="taxonomy-hotkey-subtitle">กด <kbd>H</kbd> เพื่อซ่อนหรือแสดงแผงนี้</span>
+              <span className="taxonomy-hotkey-chip"><kbd>↑</kbd><kbd>↓</kbd> หรือ <kbd>J</kbd><kbd>K</kbd> เลื่อนแถว</span>
+              <span className="taxonomy-hotkey-chip"><kbd>PgUp</kbd><kbd>PgDn</kbd> เปลี่ยนหน้า</span>
+              {HOTKEY_ASSIGNMENTS.map((item) => (
+                <span key={item.key} className="taxonomy-hotkey-chip">
+                  <kbd>{item.key}</kbd> {item.label}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
-
-        <aside className={`taxonomy-shortcuts ${shortcutsVisible ? "taxonomy-shortcuts-open" : "taxonomy-shortcuts-closed"}`} aria-label="taxonomy keyboard shortcuts">
-          <div className="taxonomy-shortcuts-sticky">
-            <button
-              type="button"
-              className="taxonomy-shortcut-toggle"
-              onClick={toggleShortcuts}
-              aria-expanded={shortcutsVisible}
-              aria-controls="taxonomy-hotkey-panel"
-            >
-              <span>{shortcutsVisible ? "ซ่อนคีย์ลัด" : "แสดงคีย์ลัด"}</span>
-              <kbd>H</kbd>
-            </button>
-
-            {shortcutsVisible ? (
-              <div id="taxonomy-hotkey-panel" className="taxonomy-hotkey-bar">
-                <span className="taxonomy-hotkey-title">ลัดด้วยคีย์บอร์ด</span>
-                <span className="taxonomy-hotkey-subtitle">กด <kbd>H</kbd> เพื่อซ่อนหรือแสดงแผงนี้</span>
-                <span className="taxonomy-hotkey-chip"><kbd>↑</kbd><kbd>↓</kbd> หรือ <kbd>J</kbd><kbd>K</kbd> เลื่อนแถว</span>
-                <span className="taxonomy-hotkey-chip"><kbd>PgUp</kbd><kbd>PgDn</kbd> เปลี่ยนหน้า</span>
-                {HOTKEY_ASSIGNMENTS.map((item) => (
-                  <span key={item.key} className="taxonomy-hotkey-chip">
-                    <kbd>{item.key}</kbd> {item.label}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </aside>
-      </div>
+      </aside>
 
       <ProductTaxonomyConfirmModal
         open={confirmOpen}
@@ -700,10 +702,6 @@ export default function ProductTaxonomyPanel({ csrfToken }) {
         }}
         onConfirm={confirmAutoClassify}
       />
-
-      {previewSummary && !confirmOpen ? (
-        <p className="taxonomy-preview-hint">{buildPreviewText(previewSummary)}</p>
-      ) : null}
-    </section>
+    </div>
   );
 }
