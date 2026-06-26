@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 const navItems = [
-  { to: "/lookup", label: "Lookup" },
-  { to: "/summary", label: "Summary" },
-  { to: "/followups", label: "Follow-up" },
-  { to: "/reports", label: "Reports" },
+  { to: "/lookup", label: "ค้นหาข้อมูล" },
+  { to: "/summary", label: "สรุปข้อมูล" },
+  { to: "/followups", label: "ติดตามอาการ" },
+  { to: "/reports", label: "รายงาน" },
 ];
 
 export function CipdataNav() {
