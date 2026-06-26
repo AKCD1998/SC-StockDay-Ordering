@@ -40,6 +40,41 @@ const PRODUCT_TYPE_LABELS = {
   other: "อื่นๆ",
 };
 
+const RULE_SUMMARY_COPY = {
+  device_product_kind: {
+    title: "อุปกรณ์จาก product_kind",
+    description: "ใช้เมื่อ product_kind เป็น device_or_general_goods",
+  },
+  service_company_code: {
+    title: "บริการจากรหัสสินค้า",
+    description: "ใช้เมื่อรหัสขึ้นต้นด้วย IS-",
+  },
+  ingredient_categories: {
+    title: "จับจาก ingredient ที่ยืนยันแล้ว",
+    description: "อิง knowledge.product_ingredients ที่สถานะ confirmed",
+  },
+  category_name_herb: {
+    title: "สมุนไพรจากหมวด AdaPOS",
+    description: "จับจากข้อความใน category_name",
+  },
+  category_name_antiseptic: {
+    title: "ฆ่าเชื้อจากหมวด AdaPOS",
+    description: "จับจากข้อความใน category_name",
+  },
+  category_name_supplement: {
+    title: "อาหารเสริมจากหมวด AdaPOS",
+    description: "จับจากข้อความใน category_name",
+  },
+  category_name_drug: {
+    title: "ยาจากหมวด AdaPOS",
+    description: "จับจากข้อความใน category_name",
+  },
+  category_name_cosmetic: {
+    title: "เครื่องสำอางจากหมวด AdaPOS",
+    description: "จับจากข้อความใน category_name",
+  },
+};
+
 function formatNumber(value) {
   if (value == null || value === "") return "-";
   return Number(value).toLocaleString("th-TH");
@@ -56,14 +91,52 @@ async function apiFetch(path, options = {}) {
 }
 
 function buildPreviewText(summary) {
-  return (summary?.lines || [])
-    .filter((line) => !line.startsWith("[") && !line.startsWith("Run with"))
-    .map((line) => line.replace(/\s+/g, " ").trim())
-    .join(" | ");
+  if (!summary) {
+    return "";
+  }
+  const classified = Number(summary.classified || 0);
+  const unclassified = Number(summary.unclassified || 0);
+  return `พรีวิวล่าสุด: จัดประเภทได้ ${formatNumber(classified)} รายการ และยังไม่เข้าเงื่อนไข ${formatNumber(unclassified)} รายการ`;
+}
+
+function buildRuleBreakdown(summary) {
+  const orderedKeys = [
+    "device_product_kind",
+    "service_company_code",
+    "ingredient_categories",
+    "category_name_herb",
+    "category_name_antiseptic",
+    "category_name_supplement",
+    "category_name_drug",
+    "category_name_cosmetic",
+  ];
+
+  return orderedKeys
+    .map((ruleKey) => {
+      const entry = summary?.countsByRule?.[ruleKey];
+      if (!entry?.count) {
+        return null;
+      }
+
+      const copy = RULE_SUMMARY_COPY[ruleKey] || {};
+      return {
+        ruleKey,
+        count: entry.count,
+        productType: entry.productType,
+        title: copy.title || `${PRODUCT_TYPE_LABELS[entry.productType] || entry.productType}`,
+        description: copy.description || entry.reasonLabel || "",
+      };
+    })
+    .filter(Boolean);
 }
 
 function ProductTaxonomyConfirmModal({ open, summary, busy, onClose, onConfirm }) {
   if (!open) return null;
+
+  const evaluated = Number(summary?.evaluated || 0);
+  const classified = Number(summary?.classified || 0);
+  const unclassified = Number(summary?.unclassified || 0);
+  const breakdown = buildRuleBreakdown(summary);
 
   return createPortal(
     <div className="dialog-overlay" onClick={busy ? undefined : onClose} role="dialog" aria-modal="true" aria-label="ยืนยัน Auto-classify">
@@ -71,13 +144,45 @@ function ProductTaxonomyConfirmModal({ open, summary, busy, onClose, onConfirm }
         <div className="panel-header stacked">
           <div>
             <h3>ยืนยัน Auto-classify</h3>
-            <p>ตรวจสอบสรุปก่อนเขียนผลลัพธ์ลงฐานข้อมูลจริง</p>
+            <p>นี่คือพรีวิวเท่านั้น ยังไม่ได้เขียนข้อมูลลงฐานข้อมูลจริง</p>
           </div>
         </div>
         <div className="taxonomy-confirm-body">
-          {(summary?.lines || []).map((line, index) => (
-            <div key={`${line}-${index}`} className="taxonomy-confirm-line">{line}</div>
-          ))}
+          <div className="taxonomy-confirm-summary">
+            <article className="taxonomy-confirm-stat">
+              <span>ตรวจทั้งหมด</span>
+              <strong>{formatNumber(evaluated)}</strong>
+              <small>SKU ที่ product_type ยังว่าง</small>
+            </article>
+            <article className="taxonomy-confirm-stat">
+              <span>จะจัดประเภทให้</span>
+              <strong>{formatNumber(classified)}</strong>
+              <small>ถ้ากดยืนยัน ระบบจะเขียนค่าจริง</small>
+            </article>
+            <article className="taxonomy-confirm-stat">
+              <span>ยังไม่เข้าเงื่อนไข</span>
+              <strong>{formatNumber(unclassified)}</strong>
+              <small>ต้องจัดเองหรือเพิ่มกฎใหม่</small>
+            </article>
+          </div>
+
+          {breakdown.length > 0 ? (
+            <div className="taxonomy-confirm-rule-list">
+              {breakdown.map((item) => (
+                <div key={item.ruleKey} className="taxonomy-confirm-line">
+                  <div className="taxonomy-confirm-line-head">
+                    <strong>{item.title}</strong>
+                    <span>{formatNumber(item.count)} รายการ</span>
+                  </div>
+                  <small>{item.description}</small>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="taxonomy-confirm-note">
+            การกดยืนยันจะเขียนค่าไปที่ <code>public.skus.product_type</code> เฉพาะแถวที่ยังไม่เคยถูกจัดประเภท
+          </div>
         </div>
         <div className="taxonomy-confirm-actions">
           <button type="button" className="ghost-button" onClick={onClose} disabled={busy}>ยกเลิก</button>

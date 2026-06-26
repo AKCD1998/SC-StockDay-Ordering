@@ -153,6 +153,33 @@ function toggleArrayValue(setter, value) {
 const SUMMARY_MOVEMENT_TYPES = ["transfer_in", "transfer_out", "supplier_receipt", "sales_summary"];
 const LEDGER_MOVEMENT_TYPES = ["transfer_in", "transfer_out", "supplier_receipt", "sale_receipt", "sale_return"];
 
+// ── Sales by Branch data contract ─────────────────────────────────────────────
+// BACKEND PENDING: GET /api/admin/branch-sales-summary
+// Query params:
+//   date_from     — "YYYY-MM-DD"
+//   date_to       — "YYYY-MM-DD"
+//   product_search — optional: filter by product name / code / barcode
+//   sort_by        — "total_sold_qty" (default) | "product_name" | "product_code"
+//   sort_dir       — "desc" (default) | "asc"
+//   limit          — default 100
+//   offset         — default 0
+// Response:
+// {
+//   branches: [{ branch_code: string, branch_name: string }],  // ordered by branch_code
+//   products: [{
+//     product_code: string,
+//     product_name: string,
+//     category: string | null,
+//     brand: string | null,
+//     sales_by_branch: { "001": number, "002": number, ... },  // 0 if not sold
+//     total_sold_qty: number
+//   }],
+//   date_from: string,
+//   date_to: string,
+//   total: number   // total products matched (for pagination)
+// }
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) {
@@ -162,6 +189,7 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
   const [dateTo, setDateTo] = useState(todayIsoDate());
   const [movementTypes, setMovementTypes] = useState([...SUMMARY_MOVEMENT_TYPES]);
   const [docSearch, setDocSearch] = useState("");
+  const [salesSearch, setSalesSearch] = useState("");
 
   const [activeTab, setActiveTab] = useState("summary");
   const [options, setOptions] = useState({ categories: [], brands: [], branches: [] });
@@ -179,10 +207,16 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
   function switchTab(tab) {
     setActiveTab(tab);
     if (tab === "summary") setMovementTypes([...SUMMARY_MOVEMENT_TYPES]);
+    else if (tab === "sales") setMovementTypes([]);
     else setMovementTypes([...LEDGER_MOVEMENT_TYPES]);
   }
 
-  const activeTypes = activeTab === "summary" ? SUMMARY_MOVEMENT_TYPES : LEDGER_MOVEMENT_TYPES;
+  // Empty array on "sales" tab hides the movement-type checkbox row entirely
+  const activeTypes = activeTab === "summary"
+    ? SUMMARY_MOVEMENT_TYPES
+    : activeTab === "sales"
+      ? []
+      : LEDGER_MOVEMENT_TYPES;
 
   return (
     <section className="panel movement-panel">
@@ -190,7 +224,7 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
         <div>
           <p className="eyebrow">Movement &amp; Transactions</p>
           <h2>การเคลื่อนไหวสินค้า</h2>
-          <p>สรุปยอดรวม · ตรวจ transaction รายบิล · เปิดเอกสาร</p>
+          <p>สรุปยอดรวม · ยอดขายแยกสาขา · transaction รายบิล · เอกสาร</p>
         </div>
       </div>
 
@@ -213,13 +247,23 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
           <span>ถึงวันที่</span>
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         </label>
-        {activeTab !== "summary" && (
+        {(activeTab === "transactions" || activeTab === "documents") && (
           <label className="mvt-filter-field mvt-filter-grow">
             <span>ค้นหาสินค้า / เลขเอกสาร</span>
             <input
               value={docSearch}
               onChange={(e) => setDocSearch(e.target.value)}
               placeholder="ชื่อสินค้า รหัส IC- หรือเลขเอกสาร"
+            />
+          </label>
+        )}
+        {activeTab === "sales" && (
+          <label className="mvt-filter-field mvt-filter-grow">
+            <span>ค้นหาสินค้า</span>
+            <input
+              value={salesSearch}
+              onChange={(e) => setSalesSearch(e.target.value)}
+              placeholder="ชื่อสินค้า รหัส IC- หรือ barcode"
             />
           </label>
         )}
@@ -243,6 +287,7 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
       <div className="mvt-tab-bar" role="tablist">
         {[
           { key: "summary", label: "Summary — ยอดรวม" },
+          { key: "sales", label: "Sales — ยอดขายสาขา" },
           { key: "transactions", label: "Transactions — รายการ" },
           { key: "documents", label: "Documents — เอกสาร" },
         ].map(({ key, label }) => (
@@ -268,6 +313,15 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
           dateTo={dateTo}
           movementTypes={movementTypes}
           csrfToken={csrfToken}
+        />
+      )}
+      {activeTab === "sales" && (
+        <SalesTab
+          branches={options.branches}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          productSearch={salesSearch}
+          highlightBranch={selectedBranch}
         />
       )}
       {activeTab === "transactions" && (
@@ -971,6 +1025,219 @@ Returns: { items: [{ product_code, product_name, qty, unit, unit_price, amount }
 
       {!searched && (
         <p className="empty-state">ตั้งค่าตัวกรองด้านบน แล้วกด "ค้นหาเอกสาร"</p>
+      )}
+    </div>
+  );
+}
+
+// ── Sales Tab ─────────────────────────────────────────────────────────────────
+// Cross-branch pivot table: rows = products, columns = branches, values = sold qty.
+// Mirrors the layout of the branch-stock page but shows sales instead of on-hand stock.
+// BACKEND PENDING: GET /api/admin/branch-sales-summary (see data contract above)
+
+const MOCK_BRANCHES = ["001", "002", "003", "004", "005"];
+const MOCK_PRODUCTS = [
+  { product_code: "IC-002833", product_name: "Paracetamol 500mg (GSK)", category: "ยาแก้ปวด", sales_by_branch: { "001": 120, "002": 88, "003": 145, "004": 32, "005": 210 }, total_sold_qty: 595 },
+  { product_code: "IC-000193", product_name: "Amoxicillin 500mg", category: "ยาปฏิชีวนะ", sales_by_branch: { "001": 44, "002": 67, "003": 29, "004": 18, "005": 91 }, total_sold_qty: 249 },
+  { product_code: "IC-003501", product_name: "Loratadine 10mg", category: "ยาแก้แพ้", sales_by_branch: { "001": 0, "002": 15, "003": 33, "004": 8, "005": 54 }, total_sold_qty: 110 },
+];
+
+function SalesTab({ branches, dateFrom, dateTo, productSearch, highlightBranch }) {
+  const [rows, setRows] = useState([]);
+  const [displayBranches, setDisplayBranches] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+  const [sortBy, setSortBy] = useState("total_sold_qty");
+  const [sortDir, setSortDir] = useState("desc");
+
+  // Auto-load on mount and when dates change
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo]);
+
+  async function load(overrideSearch) {
+    setLoading(true);
+    setError("");
+    setPending(false);
+    try {
+      const params = new URLSearchParams({
+        date_from: dateFrom,
+        date_to: dateTo,
+        sort_by: sortBy,
+        sort_dir: sortDir,
+        limit: "150",
+        offset: "0",
+      });
+      const q = overrideSearch !== undefined ? overrideSearch : productSearch;
+      if (q.trim()) params.set("product_search", q.trim());
+
+      const res = await apiFetch(`/api/admin/branch-sales-summary?${params}`);
+      if (res.status === 404) {
+        setPending(true);
+        setRows([]);
+        setDisplayBranches([]);
+        return;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setRows(data.products || []);
+      setDisplayBranches(data.branches || []);
+      setTotal(data.total || 0);
+    } catch (err) {
+      setError(err.message || "โหลดข้อมูลยอดขายไม่สำเร็จ");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleSort(col) {
+    if (col === sortBy) {
+      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    } else {
+      setSortBy(col);
+      setSortDir("desc");
+    }
+  }
+
+  // Client-side sort (applied to whatever rows we have)
+  const sortedRows = useMemo(() => {
+    if (!rows.length) return rows;
+    return [...rows].sort((a, b) => {
+      let va = sortBy === "total_sold_qty" ? Number(a.total_sold_qty) : String(a[sortBy] || "");
+      let vb = sortBy === "total_sold_qty" ? Number(b.total_sold_qty) : String(b[sortBy] || "");
+      if (typeof va === "number") return sortDir === "desc" ? vb - va : va - vb;
+      return sortDir === "desc" ? vb.localeCompare(va) : va.localeCompare(vb);
+    });
+  }, [rows, sortBy, sortDir]);
+
+  function SortIcon({ col }) {
+    if (sortBy !== col) return <span className="mvt-sort-icon">↕</span>;
+    return <span className="mvt-sort-icon active">{sortDir === "desc" ? "↓" : "↑"}</span>;
+  }
+
+  const branchCols = displayBranches.length > 0 ? displayBranches : [];
+
+  return (
+    <div className="movement-main">
+      <div className="movement-actions">
+        <button type="button" className="primary-button" disabled={loading} onClick={() => load()}>
+          {loading ? "กำลังโหลด..." : "โหลดยอดขาย"}
+        </button>
+        {!loading && !pending && rows.length > 0 && (
+          <span className="meta-line">
+            {total} สินค้า · {dateFrom} ถึง {dateTo}
+          </span>
+        )}
+      </div>
+
+      {error ? <div className="notice error compact">{error}</div> : null}
+
+      {pending && (
+        <div className="mvt-pending-notice">
+          <strong>Sales by Branch endpoint ยังไม่พร้อม</strong>
+          <p>ตัวอย่าง layout ที่จะได้รับเมื่อ backend พร้อม:</p>
+          <code>{`GET /api/admin/branch-sales-summary
+Params: date_from, date_to, product_search, sort_by, sort_dir, limit, offset
+Returns: { branches: [...], products: [{ product_code, product_name,
+  sales_by_branch: { "001": qty, "002": qty, ... },
+  total_sold_qty }], total }`}</code>
+
+          {/* ── Mock preview table ─────────────────────────────────── */}
+          <div className="mvt-sales-mock-label">ตัวอย่าง layout (ข้อมูลสมมติ)</div>
+          <div className="table-wrap mvt-sales-table-wrap">
+            <table className="mvt-sales-table">
+              <thead>
+                <tr>
+                  <th className="mvt-sales-sticky">รหัสสินค้า</th>
+                  <th className="mvt-sales-sticky mvt-sales-name-col">ชื่อสินค้า</th>
+                  <th className="mvt-sales-sticky-right">หมวด</th>
+                  {MOCK_BRANCHES.map((bc) => (
+                    <th key={bc} className={`mvt-sales-branch-col${bc === highlightBranch ? " mvt-sales-highlight" : ""}`}>
+                      สาขา {bc}
+                    </th>
+                  ))}
+                  <th className="mvt-sales-total-col">รวม</th>
+                </tr>
+              </thead>
+              <tbody>
+                {MOCK_PRODUCTS.map((p) => (
+                  <tr key={p.product_code} className="mvt-sales-mock-row">
+                    <td className="mvt-sales-sticky"><span className="meta">{p.product_code}</span></td>
+                    <td className="mvt-sales-sticky mvt-sales-name-col">{p.product_name}</td>
+                    <td className="mvt-sales-sticky-right"><span className="meta">{p.category}</span></td>
+                    {MOCK_BRANCHES.map((bc) => {
+                      const qty = p.sales_by_branch[bc] || 0;
+                      return (
+                        <td key={bc} className={`mvt-sales-qty-cell${bc === highlightBranch ? " mvt-sales-highlight" : ""}${qty === 0 ? " mvt-sales-zero" : ""}`}>
+                          {qty > 0 ? formatNumber(qty) : <span className="mvt-sales-zero-dash">—</span>}
+                        </td>
+                      );
+                    })}
+                    <td className="mvt-sales-qty-cell mvt-sales-total-col">
+                      <strong>{formatNumber(p.total_sold_qty)}</strong>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {!pending && rows.length > 0 && (
+        <div className="table-wrap mvt-sales-table-wrap">
+          <table className="mvt-sales-table">
+            <thead>
+              <tr>
+                <th className="mvt-sales-sticky" onClick={() => handleSort("product_code")} style={{ cursor: "pointer" }}>
+                  รหัสสินค้า <SortIcon col="product_code" />
+                </th>
+                <th className="mvt-sales-sticky mvt-sales-name-col" onClick={() => handleSort("product_name")} style={{ cursor: "pointer" }}>
+                  ชื่อสินค้า <SortIcon col="product_name" />
+                </th>
+                <th>หมวด</th>
+                {branchCols.map((b) => (
+                  <th key={b.branch_code} className={`mvt-sales-branch-col${b.branch_code === highlightBranch ? " mvt-sales-highlight" : ""}`}>
+                    {b.branch_name ? `${b.branch_code} ${b.branch_name}` : `สาขา ${b.branch_code}`}
+                  </th>
+                ))}
+                <th className="mvt-sales-total-col" onClick={() => handleSort("total_sold_qty")} style={{ cursor: "pointer" }}>
+                  รวม <SortIcon col="total_sold_qty" />
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedRows.map((p) => (
+                <tr key={p.product_code}>
+                  <td className="mvt-sales-sticky"><span className="meta">{p.product_code}</span></td>
+                  <td className="mvt-sales-sticky mvt-sales-name-col">
+                    <strong>{p.product_name}</strong>
+                    {p.brand ? <div className="meta">{p.brand}</div> : null}
+                  </td>
+                  <td><span className="meta">{p.category || "-"}</span></td>
+                  {branchCols.map((b) => {
+                    const qty = Number(p.sales_by_branch?.[b.branch_code] || 0);
+                    return (
+                      <td key={b.branch_code} className={`mvt-sales-qty-cell${b.branch_code === highlightBranch ? " mvt-sales-highlight" : ""}${qty === 0 ? " mvt-sales-zero" : ""}`}>
+                        {qty > 0 ? formatNumber(qty) : <span className="mvt-sales-zero-dash">—</span>}
+                      </td>
+                    );
+                  })}
+                  <td className="mvt-sales-qty-cell mvt-sales-total-col">
+                    <strong>{formatNumber(p.total_sold_qty)}</strong>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {!pending && !loading && rows.length === 0 && !error && (
+        <p className="empty-state">ไม่พบสินค้าตามเงื่อนไขที่เลือก</p>
       )}
     </div>
   );

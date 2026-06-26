@@ -440,16 +440,66 @@ button {
 
 .taxonomy-confirm-body {
   display: grid;
-  gap: 8px;
+  gap: 12px;
   max-height: 50vh;
   overflow: auto;
 }
 
+.taxonomy-confirm-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.taxonomy-confirm-stat {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid #d7dfeb;
+  border-radius: 14px;
+  background: #f8fbfe;
+}
+
+.taxonomy-confirm-stat span,
+.taxonomy-confirm-stat small {
+  color: #526578;
+}
+
+.taxonomy-confirm-stat strong {
+  font-size: 1.4rem;
+  color: #16344d;
+}
+
+.taxonomy-confirm-rule-list {
+  display: grid;
+  gap: 8px;
+}
+
 .taxonomy-confirm-line {
-  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
   border: 1px solid #d7dfeb;
   border-radius: 12px;
   background: #f8fbfe;
+  color: #38506b;
+}
+
+.taxonomy-confirm-line-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.taxonomy-confirm-line small {
+  color: #526578;
+}
+
+.taxonomy-confirm-note {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(223, 237, 252, 0.7);
   color: #38506b;
 }
 
@@ -475,6 +525,10 @@ button {
   }
 
   .movement-event {
+    grid-template-columns: 1fr;
+  }
+
+  .taxonomy-confirm-summary {
     grid-template-columns: 1fr;
   }
 }
@@ -6191,6 +6245,115 @@ select {
   color: #5b21b6;
 }
 
+/* ── Sales by Branch table ────────────────────────────────────────────────── */
+
+.mvt-sales-table-wrap {
+  overflow: auto;
+  max-height: 70vh;
+  margin-top: 8px;
+}
+
+.mvt-sales-table {
+  border-collapse: collapse;
+  min-width: 100%;
+}
+
+.mvt-sales-table th,
+.mvt-sales-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid #e4e9f2;
+  white-space: nowrap;
+  font-size: 0.95rem;
+}
+
+.mvt-sales-table th {
+  background: #f5f8fd;
+  color: #38506b;
+  font-size: 0.88rem;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.mvt-sales-sticky {
+  position: sticky !important;
+  left: 0;
+  z-index: 3;
+  background: #fff;
+}
+
+.mvt-sales-table th.mvt-sales-sticky {
+  background: #f5f8fd;
+  z-index: 4;
+}
+
+.mvt-sales-name-col {
+  left: 90px !important;
+  min-width: 200px;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mvt-sales-branch-col {
+  text-align: right;
+  min-width: 80px;
+}
+
+.mvt-sales-qty-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+.mvt-sales-zero { opacity: 0.35; }
+.mvt-sales-zero-dash { color: #b0bac8; }
+
+.mvt-sales-highlight {
+  background: rgba(42, 52, 255, 0.05) !important;
+  border-left: 2px solid #c0c8ff;
+  border-right: 2px solid #c0c8ff;
+}
+
+.mvt-sales-table th.mvt-sales-highlight {
+  background: rgba(42, 52, 255, 0.09) !important;
+  color: #2a34ff;
+}
+
+.mvt-sales-total-col {
+  text-align: right;
+  border-left: 2px solid #e4e9f2;
+  background: rgba(248, 250, 253, 0.8);
+  min-width: 80px;
+}
+
+.mvt-sales-table th.mvt-sales-total-col {
+  background: #eef3fb;
+}
+
+.mvt-sales-table tr:hover td { background: #f8fbff; }
+.mvt-sales-table tr:hover td.mvt-sales-sticky { background: #f8fbff; }
+.mvt-sales-table tr:hover td.mvt-sales-highlight { background: rgba(42, 52, 255, 0.08) !important; }
+
+.mvt-sort-icon {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 0.78rem;
+  opacity: 0.4;
+}
+.mvt-sort-icon.active { opacity: 1; color: #2a34ff; }
+
+.mvt-sales-mock-label {
+  font-size: 0.82rem;
+  color: #8090a8;
+  margin: 16px 0 8px;
+  text-align: left;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.mvt-sales-mock-row td { opacity: 0.7; }
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .mvt-filter-bar {
     grid-template-columns: 1fr 1fr;
@@ -6205,6 +6368,9 @@ select {
   .mvt-doc-card-header {
     grid-template-columns: auto 1fr auto;
     gap: 8px;
+  }
+  .mvt-sales-name-col {
+    left: 80px !important;
   }
 }
 
