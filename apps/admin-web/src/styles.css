@@ -381,9 +381,14 @@ button {
   min-width: 0;
 }
 
-.taxonomy-shortcuts-sticky {
+.taxonomy-shortcuts {
   position: sticky;
   top: 96px;
+  align-self: start;
+  height: fit-content;
+}
+
+.taxonomy-shortcuts-sticky {
   display: grid;
   gap: 12px;
 }
@@ -647,7 +652,7 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .taxonomy-shortcuts-sticky {
+  .taxonomy-shortcuts {
     position: static;
   }
 
@@ -6554,22 +6559,22 @@ select {
 
 /* Sales table — base text + borders */
 [data-theme="dark"] .mvt-sales-table {
-  color: #d4e0ef;
+  color: #f0f4ff;
 }
 [data-theme="dark"] .mvt-sales-table th {
-  color: #c0d0e4;
+  color: #ffffff;
   background: #111d2b;
   border-bottom-color: #1e2d3f;
 }
 [data-theme="dark"] .mvt-sales-table td {
-  color: #d4e0ef;
+  color: #f0f4ff;
   border-bottom-color: #1e2d3f;
 }
 [data-theme="dark"] .mvt-sales-table strong {
-  color: #e8f0fb;
+  color: #ffffff;
 }
 [data-theme="dark"] .mvt-sales-table .meta {
-  color: #6a8aaa;
+  color: #8ab0cc;
 }
 
 /* Sticky columns */
@@ -6578,12 +6583,12 @@ select {
 }
 [data-theme="dark"] .mvt-sales-table th.mvt-sales-sticky {
   background: #111d2b !important;
-  color: #c0d0e4;
+  color: #ffffff;
 }
 
 /* Qty cells */
 [data-theme="dark"] .mvt-sales-qty-cell {
-  color: #d0e0f0;
+  color: #ffffff;
 }
 [data-theme="dark"] .mvt-sales-total-col strong {
   color: #ffffff;
@@ -6629,16 +6634,16 @@ select {
 [data-theme="dark"] .mvt-ledger th,
 [data-theme="dark"] .mvt-ledger td {
   border-color: #1e2d3f;
-  color: #d4e0ef;
+  color: #f0f4ff;
 }
 [data-theme="dark"] .mvt-ledger th {
-  color: #c0d0e4;
+  color: #ffffff;
 }
 [data-theme="dark"] .mvt-ledger strong {
-  color: #e8f0fb;
+  color: #ffffff;
 }
 [data-theme="dark"] .mvt-ledger .meta {
-  color: #6a8aaa;
+  color: #8ab0cc;
 }
 
 /* Doc number mono text in dark mode */
