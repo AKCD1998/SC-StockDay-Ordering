@@ -1,16 +1,15 @@
 # register-task.ps1
-# Registers a Windows Scheduled Task that fires sync-and-shutdown.ps1 every
-# night at 22:00 for this branch laptop.
+# Registers a Windows Scheduled Task that fires RUN-ADAPOS-SYNC.bat at 08:20
+# and 19:20 daily for this machine.
 #
-# Run this ONCE per laptop, as Administrator:
-#   powershell -ExecutionPolicy Bypass -File register-task.ps1 -Branch 005
+# Run this ONCE per machine, as Administrator:
+#   powershell -ExecutionPolicy Bypass -File register-task.ps1 -Branch 000
 #
 # To remove the task later:
-#   Unregister-ScheduledTask -TaskName "AdaPOS Nightly Sync (Branch 005)" -Confirm:$false
+#   Unregister-ScheduledTask -TaskName "AdaPOS Sync (Branch 000)" -Confirm:$false
 
 param(
-  [string]$Branch   = "005",
-  [string]$RunTime  = "22:00",
+  [string]$Branch   = "000",
   [string]$TaskName = ""
 )
 
@@ -21,14 +20,14 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 }
 
 if (-not $TaskName) {
-  $TaskName = "AdaPOS Nightly Sync (Branch $Branch)"
+  $TaskName = "AdaPOS Sync (Branch $Branch)"
 }
 
 $ScriptDir  = $PSScriptRoot
-$SyncScript = Join-Path $ScriptDir "sync-and-shutdown.ps1"
+$BatScript  = Join-Path $ScriptDir "RUN-ADAPOS-SYNC.bat"
 
-if (-not (Test-Path $SyncScript)) {
-  Write-Error "Could not find sync-and-shutdown.ps1 at: $SyncScript"
+if (-not (Test-Path $BatScript)) {
+  Write-Error "Could not find RUN-ADAPOS-SYNC.bat at: $BatScript"
   exit 1
 }
 
@@ -40,18 +39,21 @@ if ($existing) {
 }
 
 # --- Build the task ---------------------------------------------------------
-# Action: launch powershell.exe with the wrapper script.
-# Quoting the path with backticked double-quotes so spaces / Thai chars are preserved.
+# Action: cmd.exe calls the .bat with "nopause" so the window doesn't hang
+# waiting for a keypress when run unattended by Task Scheduler.
 $Action = New-ScheduledTaskAction `
-  -Execute "powershell.exe" `
-  -Argument "-ExecutionPolicy Bypass -NoProfile -File `"$SyncScript`" -Branch $Branch"
+  -Execute   "cmd.exe" `
+  -Argument  "/c `"$BatScript`" nopause" `
+  -WorkingDirectory $ScriptDir
 
-# Trigger: daily at $RunTime.
-$Trigger = New-ScheduledTaskTrigger -Daily -At $RunTime
+# Triggers: daily at 08:20 and 19:20.
+$Triggers = @(
+  (New-ScheduledTaskTrigger -Daily -At "08:20"),
+  (New-ScheduledTaskTrigger -Daily -At "19:20")
+)
 
 # Settings:
-#   - AllowStartIfOnBatteries / DontStopIfGoingOnBatteries: laptop on battery still runs
-#   - StartWhenAvailable: if 22:00 was missed (PC was off), run as soon as PC comes back on
+#   - StartWhenAvailable: if the trigger was missed (PC was off), run as soon as PC comes back on
 #   - ExecutionTimeLimit: kill the task if it hangs past 1h (sync should finish in ~5 min)
 $Settings = New-ScheduledTaskSettingsSet `
   -AllowStartIfOnBatteries `
@@ -62,7 +64,6 @@ $Settings = New-ScheduledTaskSettingsSet `
 # Principal: run as SYSTEM with highest privileges.
 #   - No password to manage / expire
 #   - Works whether anyone is logged in or not
-#   - SYSTEM has rights to shutdown.exe /s /f
 $Principal = New-ScheduledTaskPrincipal `
   -UserId "SYSTEM" `
   -LogonType ServiceAccount `
@@ -72,10 +73,10 @@ $Principal = New-ScheduledTaskPrincipal `
 Register-ScheduledTask `
   -TaskName    $TaskName `
   -Action      $Action `
-  -Trigger     $Trigger `
+  -Trigger     $Triggers `
   -Settings    $Settings `
   -Principal   $Principal `
-  -Description "Runs sync-and-shutdown.ps1 at $RunTime nightly for branch $Branch, then shuts the PC down." | Out-Null
+  -Description "Runs RUN-ADAPOS-SYNC.bat at 08:20 and 19:20 daily for branch $Branch." | Out-Null
 
 Write-Output ""
 Write-Output "Task registered:"
@@ -85,5 +86,5 @@ Get-ScheduledTask -TaskName $TaskName |
     @{N='Command';   E={ $_.Actions[0].Execute + ' ' + $_.Actions[0].Arguments }}
 
 Write-Output ""
-Write-Output "Done. The task will fire at $RunTime every day."
+Write-Output "Done. The task will fire at 08:20 and 19:20 every day."
 Write-Output "To remove it later:  Unregister-ScheduledTask -TaskName `"$TaskName`" -Confirm:`$false"

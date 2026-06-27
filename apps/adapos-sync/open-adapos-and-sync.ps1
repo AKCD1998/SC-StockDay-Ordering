@@ -38,6 +38,9 @@ function Invoke-LoggedProcess {
     [string[]]$ArgumentList
   )
 
+  # "Continue" lets node's stderr flow through the 2>&1 pipe as ErrorRecords
+  # rather than terminating the pipeline (which "Stop" would do, silencing the error).
+  $local:ErrorActionPreference = "Continue"
   & $FilePath @ArgumentList 2>&1 | ForEach-Object {
     $line = if ($_ -is [System.Management.Automation.ErrorRecord]) {
       if ($null -ne $_.TargetObject) { "$($_.TargetObject)" } else { $_.Exception.Message }
