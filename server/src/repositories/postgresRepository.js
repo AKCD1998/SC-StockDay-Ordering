@@ -3129,13 +3129,13 @@ export class PostgresRepository {
   async getMovementOptions() {
     const [branchRes, catRes, brandRes] = await Promise.all([
       this.pool.query("SELECT branch_code, branch_name FROM branches ORDER BY branch_code ASC"),
-      this.pool.query("SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND category <> '' ORDER BY category ASC"),
-      this.pool.query("SELECT DISTINCT brand FROM products WHERE brand IS NOT NULL AND brand <> '' ORDER BY brand ASC"),
+      this.pool.query("SELECT category, COUNT(*) AS product_count FROM products WHERE category IS NOT NULL AND category <> '' GROUP BY category ORDER BY category ASC"),
+      this.pool.query("SELECT brand, COUNT(*) AS product_count FROM products WHERE brand IS NOT NULL AND brand <> '' GROUP BY brand ORDER BY brand ASC"),
     ]);
     return {
       branches:   branchRes.rows.map((r) => ({ branchCode: r.branch_code, branchName: r.branch_name })),
-      categories: catRes.rows.map((r) => r.category),
-      brands:     brandRes.rows.map((r) => r.brand),
+      categories: catRes.rows.map((r) => ({ name: r.category, productCount: Number(r.product_count) })),
+      brands:     brandRes.rows.map((r) => ({ name: r.brand, productCount: Number(r.product_count) })),
     };
   }
 
@@ -3229,22 +3229,19 @@ export class PostgresRepository {
     const total = rows.length > 0 ? Number(rows[0].total_count) : 0;
     return {
       transactions: rows.map((r) => ({
-        eventId:       r.event_id,
-        eventDate:     r.event_date,
-        eventType:     r.event_type,
-        documentNo:    r.document_no,
-        sourceTable:   r.source_table,
-        branchFrom:    r.branch_frm,
-        branchTo:      r.branch_to,
-        warehouseCode: r.warehouse_code,
-        productCode:   r.product_code,
-        productName:   r.product_name,
-        qty:           Number(r.qty || 0),
-        unit:          r.unit,
-        unitPrice:     r.unit_price != null ? Number(r.unit_price) : null,
-        amount:        r.amount != null ? Number(r.amount) : null,
-        posCode:       r.pos_code,
-        notes:         r.notes,
+        event_id:     r.event_id,
+        event_date:   r.event_date,
+        event_type:   r.event_type,
+        document_no:  r.document_no,
+        branch_from:  r.branch_frm,
+        branch_to:    r.branch_to,
+        product_code: r.product_code,
+        product_name: r.product_name,
+        qty:          Number(r.qty || 0),
+        unit:         r.unit,
+        unit_price:   r.unit_price != null ? Number(r.unit_price) : null,
+        amount:       r.amount != null ? Number(r.amount) : null,
+        pos_code:     r.pos_code,
       })),
       total,
       offset: Number(offset),
@@ -3321,15 +3318,15 @@ export class PostgresRepository {
     const total = rows.length > 0 ? Number(rows[0].total_count) : 0;
     return {
       documents: rows.map((r) => ({
-        documentNo:   r.document_no,
-        documentType: r.document_type,
-        documentDate: r.document_date,
-        branchCode:   r.branch_code,
-        posCode:      r.pos_code,
-        itemCount:    r.item_count,
-        totalAmount:  r.total_amount != null ? Number(r.total_amount) : null,
-        status:       r.status,
-        items:        null,
+        document_no:   r.document_no,
+        document_type: r.document_type,
+        document_date: r.document_date,
+        branch_code:   r.branch_code,
+        pos_code:      r.pos_code,
+        item_count:    r.item_count,
+        total_amount:  r.total_amount != null ? Number(r.total_amount) : null,
+        status:        r.status,
+        items:         null,
       })),
       total,
       offset: Number(offset),
@@ -3358,13 +3355,12 @@ export class PostgresRepository {
     );
     if (trfRows.length > 0) {
       return { items: trfRows.map((r) => ({
-        seqNo:       r.seq_no,
-        productCode: r.product_code,
-        productName: r.product_name,
-        qty:         Number(r.qty || 0),
-        unit:        r.unit,
-        unitPrice:   r.unit_price != null ? Number(r.unit_price) : null,
-        amount:      r.amount != null ? Number(r.amount) : null,
+        product_code: r.product_code,
+        product_name: r.product_name,
+        qty:          Number(r.qty || 0),
+        unit:         r.unit,
+        unit_price:   r.unit_price != null ? Number(r.unit_price) : null,
+        amount:       r.amount != null ? Number(r.amount) : null,
       })) };
     }
 
@@ -3387,13 +3383,12 @@ export class PostgresRepository {
       [docNo],
     );
     return { items: rcvRows.map((r) => ({
-      seqNo:       r.seq_no,
-      productCode: r.product_code,
-      productName: r.product_name,
-      qty:         Number(r.qty || 0),
-      unit:        r.unit,
-      unitPrice:   r.unit_price != null ? Number(r.unit_price) : null,
-      amount:      r.amount != null ? Number(r.amount) : null,
+      product_code: r.product_code,
+      product_name: r.product_name,
+      qty:          Number(r.qty || 0),
+      unit:         r.unit,
+      unit_price:   r.unit_price != null ? Number(r.unit_price) : null,
+      amount:       r.amount != null ? Number(r.amount) : null,
     })) };
   }
 
@@ -3445,14 +3440,14 @@ export class PostgresRepository {
 
     const total = rows.length > 0 ? Number(rows[0].total_count) : 0;
     return {
-      branches: branchCodes.map((code) => ({ branchCode: code })),
+      branches: branchCodes,
       products: rows.map((r) => ({
-        productCode:    r.product_code,
-        productName:    r.product_name,
-        category:       r.category,
-        brand:          r.brand,
-        salesByBranch:  r.sales_by_branch || {},
-        totalSoldQty:   Number(r.total_sold_qty || 0),
+        product_code:    r.product_code,
+        product_name:    r.product_name,
+        category:        r.category,
+        brand:           r.brand,
+        sales_by_branch: r.sales_by_branch || {},
+        total_sold_qty:  Number(r.total_sold_qty || 0),
       })),
       dateFrom,
       dateTo,
@@ -3497,7 +3492,8 @@ export class PostgresRepository {
     const { rows } = await this.pool.query(
       `
       WITH target_products AS (
-        SELECT p.product_code, p.product_name, p.category, p.brand, p.unit_small
+        SELECT p.product_code, p.product_name, p.category, p.brand, p.unit_small,
+               COALESCE(p.barcode_1, p.barcode_2) AS barcode
         FROM products p
         ${productWhere}
       ),
@@ -3543,6 +3539,7 @@ export class PostgresRepository {
         tp.category,
         tp.brand,
         tp.unit_small,
+        tp.barcode,
         COALESCE(ti.qty, 0)                                                AS transfer_in_qty,
         COALESCE(to2.qty, 0)                                               AS transfer_out_qty,
         COALESCE(rcv.qty, 0)                                               AS supplier_receipt_qty,
@@ -3561,11 +3558,15 @@ export class PostgresRepository {
 
     return {
       products: rows.map((r) => ({
-        productCode: r.product_code,
-        productName: r.product_name,
-        category:    r.category,
-        brand:       r.brand,
-        unit:        r.unit_small,
+        product_code:       r.product_code,
+        product_name:       r.product_name,
+        category:           r.category,
+        brand:              r.brand,
+        unit:               r.unit_small,
+        barcode:            r.barcode || null,
+        last_movement_date: null,
+        movements:          [],
+        sales_summary:      [],
         summary: {
           transfer_in_qty:      Number(r.transfer_in_qty || 0),
           transfer_out_qty:     Number(r.transfer_out_qty || 0),
