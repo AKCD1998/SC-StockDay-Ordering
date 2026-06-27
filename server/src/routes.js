@@ -1174,6 +1174,106 @@ export function createRouter(repository) {
     return res.json(result);
   }));
 
+  // ── Movement & Transactions ──────────────────────────────────────────────────
+
+  router.get("/api/admin/product-movement-options", asyncHandler(async (_req, res) => {
+    res.json(await repository.getMovementOptions());
+  }));
+
+  router.get("/api/admin/movement-transactions", asyncHandler(async (req, res) => {
+    const branchCode = String(req.query.branch_code || "").trim();
+    const dateFrom   = String(req.query.date_from || "").trim();
+    const dateTo     = String(req.query.date_to   || "").trim();
+    const types      = req.query.types ? String(req.query.types).split(",").map((t) => t.trim()).filter(Boolean) : [];
+    const docSearch  = String(req.query.doc_search  || req.query.product_code || "").trim();
+    const limit      = parsePageParam(req.query.limit, 200);
+    const offset     = parseOffsetParam(req.query.offset, 0);
+
+    if (!dateFrom || !dateTo) return res.status(400).json({ message: "date_from and date_to are required." });
+
+    res.json(await repository.getMovementTransactions({ branchCode, dateFrom, dateTo, types, docSearch, limit, offset }));
+  }));
+
+  router.get("/api/admin/movement-documents", asyncHandler(async (req, res) => {
+    const branchCode = String(req.query.branch_code || "").trim();
+    const dateFrom   = String(req.query.date_from || "").trim();
+    const dateTo     = String(req.query.date_to   || "").trim();
+    const types      = req.query.types ? String(req.query.types).split(",").map((t) => t.trim()).filter(Boolean) : [];
+    const docSearch  = String(req.query.doc_search || "").trim();
+    const limit      = parsePageParam(req.query.limit, 100);
+    const offset     = parseOffsetParam(req.query.offset, 0);
+
+    if (!dateFrom || !dateTo) return res.status(400).json({ message: "date_from and date_to are required." });
+
+    res.json(await repository.getMovementDocuments({ branchCode, dateFrom, dateTo, types, docSearch, limit, offset }));
+  }));
+
+  router.get("/api/admin/movement-documents/:docNo/items", asyncHandler(async (req, res) => {
+    const docNo = String(req.params.docNo || "").trim();
+    if (!docNo) return res.status(400).json({ message: "docNo is required." });
+    res.json(await repository.getMovementDocumentItems(docNo));
+  }));
+
+  router.get("/api/admin/branch-sales-summary", asyncHandler(async (req, res) => {
+    const dateFrom      = String(req.query.date_from      || "").trim();
+    const dateTo        = String(req.query.date_to        || "").trim();
+    const productSearch = String(req.query.product_search || "").trim();
+    const sortBy        = String(req.query.sort_by        || "total_sold_qty").trim();
+    const sortDir       = String(req.query.sort_dir       || "desc").trim();
+    const limit         = parsePageParam(req.query.limit, 100);
+    const offset        = parseOffsetParam(req.query.offset, 0);
+
+    if (!dateFrom || !dateTo) return res.status(400).json({ message: "date_from and date_to are required." });
+
+    res.json(await repository.getBranchSalesSummary({ dateFrom, dateTo, productSearch, sortBy, sortDir, limit, offset }));
+  }));
+
+  router.post("/api/admin/product-movement-trace", asyncHandler(async (req, res) => {
+    const {
+      product_codes   = [],
+      saved_group_ids = [],
+      category_names  = [],
+      brand_names     = [],
+      branch_code     = "",
+      date_from,
+      date_to,
+      movement_types  = [],
+    } = req.body || {};
+
+    if (!date_from || !date_to) return res.status(400).json({ message: "date_from and date_to are required." });
+
+    res.json(await repository.runProductMovementTrace({
+      productCodes:  product_codes,
+      savedGroupIds: saved_group_ids,
+      categoryNames: category_names,
+      brandNames:    brand_names,
+      branchCode:    branch_code,
+      dateFrom:      date_from,
+      dateTo:        date_to,
+      movementTypes: movement_types,
+    }));
+  }));
+
+  router.get("/api/admin/product-movement-groups", asyncHandler(async (_req, res) => {
+    res.json(await repository.getProductMovementGroups());
+  }));
+
+  router.post("/api/admin/product-movement-groups", asyncHandler(async (req, res) => {
+    const { name, description, product_codes } = req.body || {};
+    if (!name) return res.status(400).json({ message: "name is required." });
+    res.json(await repository.createProductMovementGroup({ name, description, productCodes: product_codes || [] }));
+  }));
+
+  router.put("/api/admin/product-movement-groups/:id", asyncHandler(async (req, res) => {
+    const { name, description, product_codes } = req.body || {};
+    if (!name) return res.status(400).json({ message: "name is required." });
+    res.json(await repository.updateProductMovementGroup(req.params.id, { name, description, productCodes: product_codes || [] }));
+  }));
+
+  router.delete("/api/admin/product-movement-groups/:id", asyncHandler(async (req, res) => {
+    res.json(await repository.deleteProductMovementGroup(req.params.id));
+  }));
+
   router.use((error, _req, res, _next) => {
     console.error(error);
     res.status(500).json({ message: error.message || "Internal server error." });
