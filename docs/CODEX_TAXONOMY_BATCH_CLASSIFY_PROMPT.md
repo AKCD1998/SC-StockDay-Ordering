@@ -12,13 +12,19 @@
 
 ---
 
+## สถานะปัจจุบัน (อัปเดต 2026-06-28)
+
+- **Batches 1–11 เสร็จแล้ว** (เขียนไว้ใน `PaaSRTSM-project/scripts/batch1_taxonomy_classify.sql` ถึง `batch11_...sql`)
+- **batch ถัดไปคือ batch 12** — เริ่มต้น query `ORDER BY display_name` แล้วจะได้รายการที่ขึ้นต้น "บ..." ถึง "ป..." เป็นกลุ่มแรก
+- ยังเหลือประมาณ **5,450 รายการ** ที่ยังไม่ classify
+
 ## Read first — ห้ามข้าม
 
 1. อ่าน `SC-StockDay-Ordering/docs/INGREDIENT_PRODUCT_CLASSIFICATION_RULES.md` ทั้งไฟล์
    → source of truth สำหรับ 9 product_type values และ enrichment_status rules
 
-2. อ่าน `PaaSRTSM-project/scripts/batch1_taxonomy_classify.sql`
-   → ดูรูปแบบ SQL และ taxonomy_note ที่เคยเขียนไว้แล้ว เพื่อให้สไตล์สอดคล้องกัน
+2. อ่าน `PaaSRTSM-project/scripts/batch11_taxonomy_classify.sql`
+   → ดูรูปแบบ SQL และ taxonomy_note ล่าสุด เพื่อให้สไตล์สอดคล้องกัน
 
 ---
 
@@ -157,7 +163,7 @@ ORDER BY cnt DESC
 LIMIT 30;
 ```
 
-จากนั้น query batch แรก (100 รายการ) โดยเรียงตาม `company_code`:
+จากนั้น query batch ถัดไป (100 รายการ) โดยเรียงตาม `display_name`:
 
 ```sql
 SELECT company_code, display_name, category_name, product_kind,
@@ -165,11 +171,11 @@ SELECT company_code, display_name, category_name, product_kind,
 FROM public.skus
 WHERE product_type IS NULL
   AND status = 'active'
-ORDER BY company_code
+ORDER BY display_name
 LIMIT 100;
 ```
 
-บันทึก offset ไว้ใช้ใน batch ถัดไป (`OFFSET 100`, `OFFSET 200`, ...)
+**หมายเหตุ:** ใช้ `ORDER BY display_name` เสมอ ห้ามใช้ `company_code` — เพราะ batches 1–11 จัดลำดับตาม display_name มาแล้ว (ถึงตัว "บ" ของตัวอักษรไทย)
 
 ---
 
