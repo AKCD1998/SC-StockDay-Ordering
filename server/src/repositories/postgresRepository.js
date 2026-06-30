@@ -3124,6 +3124,494 @@ export class PostgresRepository {
     };
   }
 
+  // ── Movement & Transactions feature ──────────────────────────────────────────
+
+  async getMovementOptions() {
+    const [branchRes, catRes, brandRes] = await Promise.all([
+      this.pool.query("SELECT branch_code, branch_name FROM branches ORDER BY branch_code ASC"),
+      this.pool.query("SELECT category, COUNT(*) AS product_count FROM products WHERE category IS NOT NULL AND category <> '' GROUP BY category ORDER BY category ASC"),
+      this.pool.query("SELECT brand, COUNT(*) AS product_count FROM products WHERE brand IS NOT NULL AND brand <> '' GROUP BY brand ORDER BY brand ASC"),
+    ]);
+    return {
+      branches:   branchRes.rows.map((r) => ({ branchCode: r.branch_code, branchName: r.branch_name })),
+      categories: catRes.rows.map((r) => ({ name: r.category, productCount: Number(r.product_count) })),
+      brands:     brandRes.rows.map((r) => ({ name: r.brand, productCount: Number(r.product_count) })),
+    };
+  }
+
+  async getMovementTransactions({ branchCode = "", dateFrom, dateTo, types = [], docSearch = "", limit = 100, offset = 0 }) {
+    const params = [];
+    const p = (v) => { params.push(v); return `$${params.length}`; };
+
+    const pFrom   = p(dateFrom);
+    const pTo     = p(dateTo);
+    const pTypes  = p(types);
+    const pLike   = docSearch ? p(`%${docSearch.toLowerCase()}%`) : null;
+    const pLimit  = p(limit);
+    const pOffset = p(offset);
+
+    const branchTrfCond = branchCode ? `(h.branch_frm = ${p(branchCode)} OR h.branch_to = ${p(branchCode)})` : "TRUE";
+    const branchRcvCond = branchCode ? `h.branch_code = ${p(branchCode)}` : "TRUE";
+    // event_type for transfers: branch_to match → in, otherwise out
+    const typeExpr = branchCode
+      ? `CASE WHEN h.branch_to = $${params.indexOf(branchCode) + 1} THEN 'transfer_in' ELSE 'transfer_out' END`
+      : `'transfer_out'::text`;
+
+    const searchTrf = pLike
+      ? `AND (LOWER(l.doc_no) LIKE ${pLike} OR LOWER(COALESCE(p.product_name,'')) LIKE ${pLike} OR LOWER(l.product_code) LIKE ${pLike})`
+      : "";
+    const searchRcv = pLike
+      ? `AND (LOWER(l.doc_no) LIKE ${pLike} OR LOWER(COALESCE(p.product_name, l.product_name,'')) LIKE ${pLike} OR LOWER(l.product_code) LIKE ${pLike})`
+      : "";
+
+    const { rows } = await this.pool.query(
+      `
+      WITH combined AS (
+        SELECT
+          'TRF_' || l.doc_no || '_' || l.seq_no::text           AS event_id,
+          h.doc_date                                              AS event_date,
+          ${typeExpr}                                             AS event_type,
+          l.doc_no                                                AS document_no,
+          'transfer_headers'                                      AS source_table,
+          h.branch_frm,
+          h.branch_to,
+          h.wh_to                                                 AS warehouse_code,
+          l.product_code,
+          COALESCE(p.product_name, l.product_code)               AS product_name,
+          l.qty_base                                              AS qty,
+          l.unit_code                                             AS unit,
+          l.cost_in                                               AS unit_price,
+          l.net                                                   AS amount,
+          NULL::text                                              AS pos_code,
+          h.usr_code                                              AS notes
+        FROM transfer_lines l
+        JOIN transfer_headers h ON h.doc_no = l.doc_no
+        LEFT JOIN products p ON p.product_code = l.product_code
+        WHERE ${branchTrfCond}
+          AND h.doc_date BETWEEN ${pFrom} AND ${pTo}
+          ${searchTrf}
+
+        UNION ALL
+
+        SELECT
+          'RCV_' || l.doc_no || '_' || l.seq_no::text                    AS event_id,
+          h.doc_date                                                       AS event_date,
+          'supplier_receipt'                                               AS event_type,
+          l.doc_no                                                         AS document_no,
+          'ada_approved_receipt_headers'                                   AS source_table,
+          NULL::text                                                       AS branch_frm,
+          h.branch_code                                                    AS branch_to,
+          h.warehouse_code,
+          l.product_code,
+          COALESCE(p.product_name, l.product_name, l.product_code)        AS product_name,
+          l.qty_base                                                       AS qty,
+          l.unit_code                                                      AS unit,
+          l.set_price                                                      AS unit_price,
+          l.net                                                            AS amount,
+          NULL::text                                                       AS pos_code,
+          h.supplier_name                                                  AS notes
+        FROM ada_approved_receipt_lines l
+        JOIN ada_approved_receipt_headers h ON h.doc_no = l.doc_no
+        LEFT JOIN products p ON p.product_code = l.product_code
+        WHERE ${branchRcvCond}
+          AND h.doc_date BETWEEN ${pFrom} AND ${pTo}
+          ${searchRcv}
+      )
+      SELECT *, COUNT(*) OVER () AS total_count
+      FROM combined
+      WHERE (${pTypes}::text[] = '{}'::text[] OR event_type = ANY(${pTypes}::text[]))
+      ORDER BY event_date DESC, document_no DESC
+      LIMIT ${pLimit} OFFSET ${pOffset}
+      `,
+      params,
+    );
+
+    const total = rows.length > 0 ? Number(rows[0].total_count) : 0;
+    return {
+      transactions: rows.map((r) => ({
+        event_id:     r.event_id,
+        event_date:   r.event_date,
+        event_type:   r.event_type,
+        document_no:  r.document_no,
+        branch_from:  r.branch_frm,
+        branch_to:    r.branch_to,
+        product_code: r.product_code,
+        product_name: r.product_name,
+        qty:          Number(r.qty || 0),
+        unit:         r.unit,
+        unit_price:   r.unit_price != null ? Number(r.unit_price) : null,
+        amount:       r.amount != null ? Number(r.amount) : null,
+        pos_code:     r.pos_code,
+      })),
+      total,
+      offset: Number(offset),
+      limit:  Number(limit),
+    };
+  }
+
+  async getMovementDocuments({ branchCode = "", dateFrom, dateTo, types = [], docSearch = "", limit = 100, offset = 0 }) {
+    const params = [];
+    const p = (v) => { params.push(v); return `$${params.length}`; };
+
+    const pFrom   = p(dateFrom);
+    const pTo     = p(dateTo);
+    const pTypes  = p(types);
+    const pLike   = docSearch ? p(`%${docSearch.toLowerCase()}%`) : null;
+    const pLimit  = p(limit);
+    const pOffset = p(offset);
+
+    const branchTrfCond = branchCode ? `(h.branch_frm = ${p(branchCode)} OR h.branch_to = ${p(branchCode)})` : "TRUE";
+    const branchRcvCond = branchCode ? `h.branch_code = ${p(branchCode)}` : "TRUE";
+    const typeExpr      = branchCode
+      ? `CASE WHEN h.branch_to = $${params.indexOf(branchCode) + 1} THEN 'transfer_in' ELSE 'transfer_out' END`
+      : `'transfer_out'::text`;
+
+    const searchTrf = pLike ? `AND (LOWER(h.doc_no) LIKE ${pLike})` : "";
+    const searchRcv = pLike ? `AND (LOWER(h.doc_no) LIKE ${pLike} OR LOWER(COALESCE(h.supplier_name,'')) LIKE ${pLike})` : "";
+
+    const { rows } = await this.pool.query(
+      `
+      WITH combined AS (
+        SELECT
+          h.doc_no                         AS document_no,
+          ${typeExpr}                      AS document_type,
+          h.doc_date                       AS document_date,
+          COALESCE(h.branch_frm, '')       AS branch_code,
+          NULL::text                       AS pos_code,
+          COUNT(l.seq_no)::int             AS item_count,
+          SUM(l.net)                       AS total_amount,
+          'completed'                      AS status
+        FROM transfer_headers h
+        LEFT JOIN transfer_lines l ON l.doc_no = h.doc_no
+        WHERE ${branchTrfCond}
+          AND h.doc_date BETWEEN ${pFrom} AND ${pTo}
+          ${searchTrf}
+        GROUP BY h.doc_no, h.doc_date, h.branch_frm, h.branch_to
+
+        UNION ALL
+
+        SELECT
+          h.doc_no                                    AS document_no,
+          'supplier_receipt'                          AS document_type,
+          h.doc_date                                  AS document_date,
+          COALESCE(h.branch_code, '')                AS branch_code,
+          NULL::text                                  AS pos_code,
+          COUNT(l.seq_no)::int                        AS item_count,
+          h.grand                                     AS total_amount,
+          'completed'                                 AS status
+        FROM ada_approved_receipt_headers h
+        LEFT JOIN ada_approved_receipt_lines l ON l.doc_no = h.doc_no
+        WHERE ${branchRcvCond}
+          AND h.doc_date BETWEEN ${pFrom} AND ${pTo}
+          ${searchRcv}
+        GROUP BY h.doc_no, h.doc_date, h.branch_code, h.grand
+      )
+      SELECT *, COUNT(*) OVER () AS total_count
+      FROM combined
+      WHERE (${pTypes}::text[] = '{}'::text[] OR document_type = ANY(${pTypes}::text[]))
+      ORDER BY document_date DESC, document_no DESC
+      LIMIT ${pLimit} OFFSET ${pOffset}
+      `,
+      params,
+    );
+
+    const total = rows.length > 0 ? Number(rows[0].total_count) : 0;
+    return {
+      documents: rows.map((r) => ({
+        document_no:   r.document_no,
+        document_type: r.document_type,
+        document_date: r.document_date,
+        branch_code:   r.branch_code,
+        pos_code:      r.pos_code,
+        item_count:    r.item_count,
+        total_amount:  r.total_amount != null ? Number(r.total_amount) : null,
+        status:        r.status,
+        items:         null,
+      })),
+      total,
+      offset: Number(offset),
+      limit:  Number(limit),
+    };
+  }
+
+  async getMovementDocumentItems(docNo) {
+    // Try transfer lines first
+    const { rows: trfRows } = await this.pool.query(
+      `
+      SELECT
+        l.seq_no,
+        l.product_code,
+        COALESCE(p.product_name, l.product_code) AS product_name,
+        l.qty_base AS qty,
+        l.unit_code AS unit,
+        l.cost_in AS unit_price,
+        l.net AS amount
+      FROM transfer_lines l
+      LEFT JOIN products p ON p.product_code = l.product_code
+      WHERE l.doc_no = $1
+      ORDER BY l.seq_no ASC
+      `,
+      [docNo],
+    );
+    if (trfRows.length > 0) {
+      return { items: trfRows.map((r) => ({
+        product_code: r.product_code,
+        product_name: r.product_name,
+        qty:          Number(r.qty || 0),
+        unit:         r.unit,
+        unit_price:   r.unit_price != null ? Number(r.unit_price) : null,
+        amount:       r.amount != null ? Number(r.amount) : null,
+      })) };
+    }
+
+    // Try receipt lines
+    const { rows: rcvRows } = await this.pool.query(
+      `
+      SELECT
+        l.seq_no,
+        l.product_code,
+        COALESCE(p.product_name, l.product_name, l.product_code) AS product_name,
+        l.qty_base AS qty,
+        l.unit_code AS unit,
+        l.set_price AS unit_price,
+        l.net AS amount
+      FROM ada_approved_receipt_lines l
+      LEFT JOIN products p ON p.product_code = l.product_code
+      WHERE l.doc_no = $1
+      ORDER BY l.seq_no ASC
+      `,
+      [docNo],
+    );
+    return { items: rcvRows.map((r) => ({
+      product_code: r.product_code,
+      product_name: r.product_name,
+      qty:          Number(r.qty || 0),
+      unit:         r.unit,
+      unit_price:   r.unit_price != null ? Number(r.unit_price) : null,
+      amount:       r.amount != null ? Number(r.amount) : null,
+    })) };
+  }
+
+  async getBranchSalesSummary({ dateFrom, dateTo, productSearch = "", sortBy = "total_sold_qty", sortDir = "desc", limit = 100, offset = 0 }) {
+    const validSorts = { total_sold_qty: "total_sold_qty", product_name: "p.product_name", product_code: "p.product_code" };
+    const orderCol = validSorts[sortBy] || "total_sold_qty";
+    const orderDir = sortDir === "asc" ? "ASC" : "DESC";
+
+    const params = [];
+    const p = (v) => { params.push(v); return `$${params.length}`; };
+
+    const pFrom   = p(dateFrom);
+    const pTo     = p(dateTo);
+    const pLike   = productSearch ? p(`%${productSearch.toLowerCase()}%`) : null;
+    const pLimit  = p(limit);
+    const pOffset = p(offset);
+
+    const searchCond = pLike
+      ? `AND (LOWER(p.product_code) LIKE ${pLike} OR LOWER(COALESCE(p.product_name,'')) LIKE ${pLike} OR LOWER(COALESCE(p.barcode_1,'')) LIKE ${pLike})`
+      : "";
+
+    // Get all branches first for the column list
+    const { rows: branchRows } = await this.pool.query(
+      "SELECT branch_code FROM branches ORDER BY branch_code ASC",
+    );
+    const branchCodes = branchRows.map((r) => r.branch_code);
+
+    const { rows } = await this.pool.query(
+      `
+      SELECT
+        p.product_code,
+        p.product_name,
+        p.category,
+        p.brand,
+        jsonb_object_agg(s.branch_code, COALESCE(s.sold_qty_base, 0)) AS sales_by_branch,
+        COALESCE(SUM(s.sold_qty_base), 0)                              AS total_sold_qty,
+        COUNT(*) OVER ()                                               AS total_count
+      FROM products p
+      JOIN product_sales_summary s ON s.product_code = p.product_code
+      WHERE s.period_start <= ${pTo}::date
+        AND s.period_end   >= ${pFrom}::date
+        ${searchCond}
+      GROUP BY p.product_code, p.product_name, p.category, p.brand
+      ORDER BY ${orderCol} ${orderDir}
+      LIMIT ${pLimit} OFFSET ${pOffset}
+      `,
+      params,
+    );
+
+    const total = rows.length > 0 ? Number(rows[0].total_count) : 0;
+    return {
+      branches: branchCodes,
+      products: rows.map((r) => ({
+        product_code:    r.product_code,
+        product_name:    r.product_name,
+        category:        r.category,
+        brand:           r.brand,
+        sales_by_branch: r.sales_by_branch || {},
+        total_sold_qty:  Number(r.total_sold_qty || 0),
+      })),
+      dateFrom,
+      dateTo,
+      total,
+      offset: Number(offset),
+      limit:  Number(limit),
+    };
+  }
+
+  async runProductMovementTrace({ productCodes = [], savedGroupIds = [], categoryNames = [], brandNames = [], branchCode = "", dateFrom, dateTo, movementTypes = [] }) {
+    // Resolve product codes from groups + categories + brands
+    const extraCodes = [];
+
+    if (savedGroupIds.length) {
+      const { rows } = await this.pool.query(
+        "SELECT product_codes FROM product_movement_groups WHERE id = ANY($1::text[])",
+        [savedGroupIds],
+      );
+      rows.forEach((r) => extraCodes.push(...(r.product_codes || [])));
+    }
+
+    const allCodes = [...new Set([...productCodes, ...extraCodes])];
+
+    const params = [];
+    const p = (v) => { params.push(v); return `$${params.length}`; };
+
+    const pFrom  = p(dateFrom);
+    const pTo    = p(dateTo);
+
+    // Product filter
+    const productFilters = [];
+    if (allCodes.length)        productFilters.push(`p.product_code = ANY(${p(allCodes)}::text[])`);
+    if (categoryNames.length)   productFilters.push(`p.category = ANY(${p(categoryNames)}::text[])`);
+    if (brandNames.length)      productFilters.push(`p.brand = ANY(${p(brandNames)}::text[])`);
+    const productWhere = productFilters.length ? `WHERE ${productFilters.join(" OR ")}` : "";
+
+    const branchTrfInCond  = branchCode ? `AND h.branch_to  = ${p(branchCode)}` : "";
+    const branchTrfOutCond = branchCode ? `AND h.branch_frm = ${p(branchCode)}` : "";
+    const branchRcvCond    = branchCode ? `AND h.branch_code = ${p(branchCode)}` : "";
+    const branchSalCond    = branchCode ? `AND s.branch_code = ${p(branchCode)}` : "";
+
+    const { rows } = await this.pool.query(
+      `
+      WITH target_products AS (
+        SELECT p.product_code, p.product_name, p.category, p.brand, p.unit_small,
+               COALESCE(p.barcode_1, p.barcode_2) AS barcode
+        FROM products p
+        ${productWhere}
+      ),
+      trf_in AS (
+        SELECT l.product_code, COALESCE(SUM(l.qty_base), 0) AS qty
+        FROM transfer_lines l
+        JOIN transfer_headers h ON h.doc_no = l.doc_no
+        WHERE l.product_code = ANY(SELECT product_code FROM target_products)
+          AND h.doc_date BETWEEN ${pFrom} AND ${pTo}
+          ${branchTrfInCond}
+        GROUP BY l.product_code
+      ),
+      trf_out AS (
+        SELECT l.product_code, COALESCE(SUM(l.qty_base), 0) AS qty
+        FROM transfer_lines l
+        JOIN transfer_headers h ON h.doc_no = l.doc_no
+        WHERE l.product_code = ANY(SELECT product_code FROM target_products)
+          AND h.doc_date BETWEEN ${pFrom} AND ${pTo}
+          ${branchTrfOutCond}
+        GROUP BY l.product_code
+      ),
+      rcv AS (
+        SELECT l.product_code, COALESCE(SUM(l.qty_base), 0) AS qty
+        FROM ada_approved_receipt_lines l
+        JOIN ada_approved_receipt_headers h ON h.doc_no = l.doc_no
+        WHERE l.product_code = ANY(SELECT product_code FROM target_products)
+          AND h.doc_date BETWEEN ${pFrom} AND ${pTo}
+          ${branchRcvCond}
+        GROUP BY l.product_code
+      ),
+      sal AS (
+        SELECT s.product_code, COALESCE(SUM(s.sold_qty_base), 0) AS qty
+        FROM product_sales_summary s
+        WHERE s.product_code = ANY(SELECT product_code FROM target_products)
+          AND s.period_start <= ${pTo}::date
+          AND s.period_end   >= ${pFrom}::date
+          ${branchSalCond}
+        GROUP BY s.product_code
+      )
+      SELECT
+        tp.product_code,
+        tp.product_name,
+        tp.category,
+        tp.brand,
+        tp.unit_small,
+        tp.barcode,
+        COALESCE(ti.qty, 0)                                                AS transfer_in_qty,
+        COALESCE(to2.qty, 0)                                               AS transfer_out_qty,
+        COALESCE(rcv.qty, 0)                                               AS supplier_receipt_qty,
+        COALESCE(sal.qty, 0)                                               AS sold_qty_base,
+        COALESCE(ti.qty, 0) + COALESCE(rcv.qty, 0)
+          - COALESCE(to2.qty, 0) - COALESCE(sal.qty, 0)                   AS net_movement_qty
+      FROM target_products tp
+      LEFT JOIN trf_in ti   ON ti.product_code  = tp.product_code
+      LEFT JOIN trf_out to2 ON to2.product_code = tp.product_code
+      LEFT JOIN rcv         ON rcv.product_code = tp.product_code
+      LEFT JOIN sal         ON sal.product_code = tp.product_code
+      ORDER BY tp.product_code ASC
+      `,
+      params,
+    );
+
+    return {
+      products: rows.map((r) => ({
+        product_code:       r.product_code,
+        product_name:       r.product_name,
+        category:           r.category,
+        brand:              r.brand,
+        unit:               r.unit_small,
+        barcode:            r.barcode || null,
+        last_movement_date: null,
+        movements:          [],
+        sales_summary:      [],
+        summary: {
+          transfer_in_qty:      Number(r.transfer_in_qty || 0),
+          transfer_out_qty:     Number(r.transfer_out_qty || 0),
+          supplier_receipt_qty: Number(r.supplier_receipt_qty || 0),
+          sold_qty_base:        Number(r.sold_qty_base || 0),
+          net_movement_qty:     Number(r.net_movement_qty || 0),
+        },
+      })),
+      dateFrom,
+      dateTo,
+      branchCode,
+    };
+  }
+
+  async getProductMovementGroups() {
+    const { rows } = await this.pool.query(
+      "SELECT id, name, description, product_codes, created_at, updated_at FROM product_movement_groups ORDER BY name ASC",
+    );
+    return { groups: rows.map((r) => ({ id: r.id, name: r.name, description: r.description, productCodes: r.product_codes, createdAt: r.created_at })) };
+  }
+
+  async createProductMovementGroup({ name, description, productCodes }) {
+    const id = `pmg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const { rows } = await this.pool.query(
+      "INSERT INTO product_movement_groups (id, name, description, product_codes) VALUES ($1,$2,$3,$4) RETURNING id, name, description, product_codes",
+      [id, name, description || null, productCodes || []],
+    );
+    return { ok: true, group: { id: rows[0].id, name: rows[0].name, description: rows[0].description, productCodes: rows[0].product_codes } };
+  }
+
+  async updateProductMovementGroup(id, { name, description, productCodes }) {
+    const { rowCount } = await this.pool.query(
+      "UPDATE product_movement_groups SET name=$2, description=$3, product_codes=$4, updated_at=NOW() WHERE id=$1",
+      [id, name, description || null, productCodes || []],
+    );
+    if (!rowCount) throw Object.assign(new Error("Group not found."), { status: 404 });
+    return { ok: true };
+  }
+
+  async deleteProductMovementGroup(id) {
+    const { rowCount } = await this.pool.query("DELETE FROM product_movement_groups WHERE id=$1", [id]);
+    if (!rowCount) throw Object.assign(new Error("Group not found."), { status: 404 });
+    return { ok: true };
+  }
+
   async close() {
     await closePool();
   }
