@@ -3,6 +3,8 @@ import { syncConfig } from "./config.js";
 import {
   getProductMasterRows,
   getSalesSummaryRows,
+  getSalesDetailHeaderRows,
+  getSalesDetailLineRows,
   getPurchaseSummaryRows,
   discoverTransferSchema,
   discoverPurchaseSchema,
@@ -18,7 +20,7 @@ import {
   getBranchPriceOverrideRows,
 } from "./queries.js";
 import { postJson } from "./client.js";
-import { toProductRecords, toSalesRecords, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
+import { toProductRecords, toSalesRecords, toSalesDetailPayload, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
 
 const PERIOD_DAYS = 30;
 
@@ -47,6 +49,7 @@ const sqlServerConfig = {
 async function fetchDatasets(pool) {
   const data = {};
   const { datasets, branchCode, dateCutoff } = syncConfig;
+  const wantsSalesDetail = datasets.includes("sales_detail") || datasets.includes("sales");
 
   if (datasets.includes("schema_discovery")) {
     data.schema_discovery = await discoverTransferSchema(pool);
@@ -62,6 +65,16 @@ async function fetchDatasets(pool) {
   }
   if (datasets.includes("sales")) {
     data.sales = await getSalesSummaryRows(pool, branchCode, PERIOD_DAYS, dateCutoff);
+  }
+  if (wantsSalesDetail) {
+    const salesDateOpts = {
+      periodDays: PERIOD_DAYS,
+      dateCutoff,
+      fromDate: syncConfig.dateFrom,
+      toDate: syncConfig.dateTo,
+    };
+    data.sales_detail_headers = await getSalesDetailHeaderRows(pool, branchCode, salesDateOpts);
+    data.sales_detail_lines = await getSalesDetailLineRows(pool, branchCode, salesDateOpts);
   }
   if (datasets.includes("purchases")) {
     data.purchases = await getPurchaseSummaryRows(pool, branchCode, PERIOD_DAYS);
@@ -132,6 +145,13 @@ async function runOnce() {
       console.log(`Backfill:      approved_receipts ${syncConfig.dateFrom} → ${syncConfig.dateTo ?? "today"}`);
     } else {
       console.log(`Approved lookback: last ${syncConfig.approvedReceiptsLookbackDays} days`);
+    }
+  }
+  if (syncConfig.datasets.includes("sales") || syncConfig.datasets.includes("sales_detail")) {
+    if (syncConfig.dateFrom) {
+      console.log(`Sales detail:  ${syncConfig.dateFrom} → ${syncConfig.dateTo ?? syncConfig.dateFrom}`);
+    } else {
+      console.log(`Sales detail:  last ${PERIOD_DAYS} days ending ${syncConfig.dateCutoff}`);
     }
   }
   console.log("");
@@ -229,6 +249,20 @@ async function runOnce() {
         );
         console.log(`  sales: ${sent} sent`);
         totalSent += sent;
+      }
+
+      if (data.sales_detail_headers?.length || data.sales_detail_lines?.length) {
+        const hCount = data.sales_detail_headers?.length ?? 0;
+        const lCount = data.sales_detail_lines?.length ?? 0;
+        console.log(`Posting ${hCount} detailed sales headers, ${lCount} lines...`);
+        const result = await postJson(
+          `${syncConfig.apiBaseUrl}/api/sync/ada/sales`,
+          toSalesDetailPayload(data.sales_detail_headers ?? [], data.sales_detail_lines ?? []),
+        );
+        const hAccepted = result.acceptedHeaders ?? 0;
+        const lAccepted = result.acceptedLines ?? 0;
+        console.log(`  sales_detail: ${hAccepted} headers, ${lAccepted} lines accepted`);
+        totalSent += hAccepted + lAccepted;
       }
 
       if (data.transfers?.length || data.transfer_lines?.length) {

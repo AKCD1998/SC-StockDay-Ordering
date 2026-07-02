@@ -214,6 +214,52 @@ export function toBranchStockRecords(rows, branchCode) {
   return [...snapshots.values()];
 }
 
+export function toSalesDetailPayload(headerRows, lineRows) {
+  const syncedAt = new Date().toISOString();
+  return {
+    sourceSystem: "AdaAcc",
+    sourceSyncedAt: syncedAt,
+    headers: headerRows.map((r) => ({
+      branchCode: String(r.FTBchCode || "").trim(),
+      docNo: r.FTShdDocNo || null,
+      docDate: toBangkokDateString(r.FDShdDocDate),
+      docTime: r.FTShdDocTime || null,
+      customerCode: r.FTCstCode || null,
+      paidStatus: r.FTShdStaPaid || null,
+      grandAmount: Number(r.FCShdGrand ?? 0),
+      netAmount: Number(r.FCShdAftDisChg ?? 0),
+      vatAmount: Number(r.FCShdVat ?? 0),
+      cashierCode: r.FTUsrCode || null,
+      terminalCode: r.FTPosCode || null,
+      referenceDocNo: r.FTShdPosCN || null,
+      sourceTable: "TPSTSalHD",
+      // Extra source fields preserved in raw_payload for future reporting.
+      FTShdDocType: r.FTShdDocType || null,
+      FTShdStaRefund: r.FTShdStaRefund || null,
+    })),
+    lines: lineRows.map((r) => ({
+      branchCode: String(r.FTBchCode || "").trim(),
+      docNo: r.FTShdDocNo || null,
+      lineNo: Number(r.FNSdtSeqNo ?? 0),
+      productCode: r.FTPdtCode || null,
+      barcode: r.FTSdtBarCode || null,
+      qty: Number(r.FCSdtQty ?? 0),
+      unitPrice: Number(r.FCSdtSetPrice ?? 0),
+      discountAmount: Number(r.FCSdtDis ?? 0),
+      lineAmount: Number(r.FCSdtNet ?? 0),
+      stockFactor: Number(r.FCSdtStkFac ?? 1),
+      qtyBase: Number(r.FCSdtQtyAll ?? ((r.FCSdtQty ?? 0) * (r.FCSdtStkFac ?? 1))),
+      lotNo: r.FTSdtLotNo || null,
+      expiryDate: toBangkokDateString(r.FDSdtExpired),
+      sourceTable: "TPSTSalDT",
+      // Extra source fields preserved in raw_payload for future reporting.
+      productNameThai: r.FTPdtName || null,
+      unitCode: r.FTPunCode || null,
+      unitName: r.FTSdtUnitName || null,
+    })),
+  };
+}
+
 export function toSalesRecords(rows, branchCode, periodDays) {
   return rows.map((r) => ({
     productCode:   r.FTPdtCode,

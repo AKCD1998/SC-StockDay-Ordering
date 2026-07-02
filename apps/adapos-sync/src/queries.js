@@ -56,6 +56,101 @@ export async function getSalesSummaryRows(pool, branchCode, periodDays, dateCuto
   return result.recordset;
 }
 
+function applySalesDateWindow(req, { periodDays, dateCutoff, fromDate = null, toDate = null } = {}, columnExpr = "h.FDShdDocDate") {
+  if (fromDate) {
+    req.input("fromDate", sql.VarChar(10), fromDate);
+    req.input("toDate", sql.VarChar(10), toDate || fromDate);
+    return `
+      AND CAST(${columnExpr} AS DATE) >= @fromDate
+      AND CAST(${columnExpr} AS DATE) <= @toDate
+    `;
+  }
+
+  req.input("periodDays", sql.Int, periodDays);
+  req.input("dateCutoff", sql.VarChar(10), dateCutoff);
+  return `
+    AND CAST(${columnExpr} AS DATE) >= DATEADD(day, -(@periodDays - 1), CAST(@dateCutoff AS DATE))
+    AND CAST(${columnExpr} AS DATE) <= CAST(@dateCutoff AS DATE)
+  `;
+}
+
+// ── Sales detail (raw historical sales for reporting / drilldown) ────────────
+// This is additive to sales summary. It preserves source bill/date/time/POS so
+// the backend can build per-branch, per-POS, per-bill reporting without losing
+// the existing 30-day summary sync.
+export async function getSalesDetailHeaderRows(
+  pool,
+  branchCode,
+  { periodDays = 30, dateCutoff = null, fromDate = null, toDate = null } = {},
+) {
+  const req = pool.request();
+  req.input("branchCode", sql.VarChar(3), branchCode);
+  const dateFilter = applySalesDateWindow(req, { periodDays, dateCutoff, fromDate, toDate });
+  const result = await req.query(`
+    SELECT
+      h.FTBchCode,
+      h.FTShdDocNo,
+      h.FTShdDocType,
+      h.FDShdDocDate,
+      h.FTShdDocTime,
+      h.FTCstCode,
+      h.FTShdStaPaid,
+      h.FTShdStaRefund,
+      h.FTUsrCode,
+      h.FTPosCode,
+      h.FTShdPosCN,
+      h.FCShdAftDisChg,
+      h.FCShdVat,
+      h.FCShdGrand
+    FROM TPSTSalHD h
+    WHERE h.FTBchCode = @branchCode
+      AND h.FTShdDocType = '1'
+      AND h.FTShdStaPaid = '3'
+      ${dateFilter}
+    ORDER BY h.FDShdDocDate ASC, h.FTShdDocTime ASC, h.FTShdDocNo ASC
+  `);
+  return result.recordset;
+}
+
+export async function getSalesDetailLineRows(
+  pool,
+  branchCode,
+  { periodDays = 30, dateCutoff = null, fromDate = null, toDate = null } = {},
+) {
+  const req = pool.request();
+  req.input("branchCode", sql.VarChar(3), branchCode);
+  const dateFilter = applySalesDateWindow(req, { periodDays, dateCutoff, fromDate, toDate });
+  const result = await req.query(`
+    SELECT
+      d.FTBchCode,
+      d.FTShdDocNo,
+      d.FNSdtSeqNo,
+      d.FTPdtCode,
+      d.FTPdtName,
+      d.FTSdtBarCode,
+      d.FTPunCode,
+      d.FTSdtUnitName,
+      d.FCSdtQty,
+      d.FCSdtStkFac,
+      d.FCSdtQtyAll,
+      d.FCSdtSetPrice,
+      d.FCSdtDis,
+      d.FCSdtNet,
+      d.FTSdtLotNo,
+      d.FDSdtExpired
+    FROM TPSTSalDT d
+    INNER JOIN TPSTSalHD h
+      ON h.FTBchCode = d.FTBchCode
+     AND h.FTShdDocNo = d.FTShdDocNo
+    WHERE h.FTBchCode = @branchCode
+      AND h.FTShdDocType = '1'
+      AND h.FTShdStaPaid = '3'
+      ${dateFilter}
+    ORDER BY h.FDShdDocDate ASC, h.FTShdDocTime ASC, d.FTShdDocNo ASC, d.FNSdtSeqNo ASC
+  `);
+  return result.recordset;
+}
+
 // ── Purchase summary ───────────────────────────────────────────────────────────
 export async function getPurchaseSummaryRows(pool, branchCode, periodDays) {
   const req = pool.request();

@@ -20,6 +20,11 @@ function formatNumber(value, digits = 0) {
   });
 }
 
+function formatQty(value) {
+  const number = Number(value || 0);
+  return formatNumber(number, Number.isInteger(number) ? 0 : 2);
+}
+
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -87,6 +92,12 @@ function toggleArrayValue(setter, value) {
   setter((current) =>
     current.includes(value) ? current.filter((item) => item !== value) : [...current, value]
   );
+}
+
+function formatPosLabel(posCode) {
+  const code = String(posCode == null ? "" : posCode).trim();
+  if (!code || code.toLowerCase() === "unknown") return "POS ไม่ทราบ";
+  return /^pos/i.test(code) ? code.toUpperCase() : `POS ${code}`;
 }
 
 // ── Data contracts (pending backend implementation) ───────────────────────────
@@ -207,14 +218,14 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
   function switchTab(tab) {
     setActiveTab(tab);
     if (tab === "summary") setMovementTypes([...SUMMARY_MOVEMENT_TYPES]);
-    else if (tab === "sales") setMovementTypes([]);
+    else if (tab === "sales" || tab === "sold-qty") setMovementTypes([]);
     else setMovementTypes([...LEDGER_MOVEMENT_TYPES]);
   }
 
-  // Empty array on "sales" tab hides the movement-type checkbox row entirely
+  // Empty array on sales-report tabs hides the movement-type checkbox row entirely
   const activeTypes = activeTab === "summary"
     ? SUMMARY_MOVEMENT_TYPES
-    : activeTab === "sales"
+    : (activeTab === "sales" || activeTab === "sold-qty")
       ? []
       : LEDGER_MOVEMENT_TYPES;
 
@@ -224,7 +235,7 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
         <div>
           <p className="eyebrow">Movement &amp; Transactions</p>
           <h2>การเคลื่อนไหวสินค้า</h2>
-          <p>สรุปยอดรวม · ยอดขายแยกสาขา · transaction รายบิล · เอกสาร</p>
+          <p>สรุปยอดรวม · ยอดขายแยกสาขา · รายงานสินค้าแยก POS · transaction รายบิล · เอกสาร</p>
         </div>
       </div>
 
@@ -257,7 +268,7 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
             />
           </label>
         )}
-        {activeTab === "sales" && (
+        {(activeTab === "sales" || activeTab === "sold-qty") && (
           <label className="mvt-filter-field mvt-filter-grow">
             <span>ค้นหาสินค้า</span>
             <input
@@ -288,6 +299,7 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
         {[
           { key: "summary", label: "Summary — ยอดรวม" },
           { key: "sales", label: "Sales — ยอดขายสาขา" },
+          { key: "sold-qty", label: "Sold Qty — รายงานสินค้า" },
           { key: "transactions", label: "Transactions — รายการ" },
           { key: "documents", label: "Documents — เอกสาร" },
         ].map(({ key, label }) => (
@@ -331,6 +343,14 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
           dateTo={dateTo}
           movementTypes={movementTypes}
           docSearch={docSearch}
+        />
+      )}
+      {activeTab === "sold-qty" && (
+        <SoldQuantityTab
+          selectedBranch={selectedBranch}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          productSearch={salesSearch}
         />
       )}
       {activeTab === "documents" && (
@@ -1238,6 +1258,319 @@ Returns: { branches: [...], products: [{ product_code, product_name,
 
       {!pending && !loading && rows.length === 0 && !error && (
         <p className="empty-state">ไม่พบสินค้าตามเงื่อนไขที่เลือก</p>
+      )}
+    </div>
+  );
+}
+
+function SoldQuantityTab({ selectedBranch, dateFrom, dateTo, productSearch }) {
+  const [rows, setRows] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [posCodes, setPosCodes] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [sortBy, setSortBy] = useState("qty_total");
+  const [sortDir, setSortDir] = useState("desc");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [expandedProducts, setExpandedProducts] = useState({});
+  const [billRowsByProduct, setBillRowsByProduct] = useState({});
+  const [loadingBills, setLoadingBills] = useState({});
+  const [billErrors, setBillErrors] = useState({});
+
+  useEffect(() => {
+    if (!selectedBranch) {
+      setRows([]);
+      setSummary(null);
+      setPosCodes([]);
+      setTotal(0);
+      return undefined;
+    }
+
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const params = new URLSearchParams({
+          branch_code: selectedBranch,
+          date_from: dateFrom,
+          date_to: dateTo,
+          sort_by: sortBy,
+          sort_dir: sortDir,
+          limit: "10000",
+          offset: "0",
+        });
+        if (productSearch.trim()) params.set("product_search", productSearch.trim());
+
+        const res = await apiFetch(`/api/admin/branch-product-sales?${params}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!active) return;
+        setRows(data.products || []);
+        setSummary(data.summary || null);
+        setPosCodes(Array.isArray(data.pos_codes) ? data.pos_codes : []);
+        setTotal(Number(data.total || 0));
+      } catch (err) {
+        if (active) {
+          setRows([]);
+          setSummary(null);
+          setPosCodes([]);
+          setTotal(0);
+          setError(err.message || "โหลดรายงานสินค้าที่ขายไม่สำเร็จ");
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    }, productSearch.trim() ? 250 : 0);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [selectedBranch, dateFrom, dateTo, productSearch, sortBy, sortDir, refreshKey]);
+
+  function handleSort(column) {
+    if (column === sortBy) {
+      setSortDir((current) => (current === "desc" ? "asc" : "desc"));
+      return;
+    }
+    setSortBy(column);
+    setSortDir(column === "product_code" || column === "product_name" ? "asc" : "desc");
+  }
+
+  async function toggleProductBills(productCode) {
+    if (expandedProducts[productCode]) {
+      setExpandedProducts((current) => ({ ...current, [productCode]: false }));
+      return;
+    }
+
+    setExpandedProducts((current) => ({ ...current, [productCode]: true }));
+    if (billRowsByProduct[productCode] || loadingBills[productCode]) return;
+
+    setLoadingBills((current) => ({ ...current, [productCode]: true }));
+    setBillErrors((current) => ({ ...current, [productCode]: "" }));
+    try {
+      const params = new URLSearchParams({
+        branch_code: selectedBranch,
+        date_from: dateFrom,
+        date_to: dateTo,
+      });
+      const res = await apiFetch(`/api/admin/branch-product-sales/${encodeURIComponent(productCode)}/bills?${params}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setBillRowsByProduct((current) => ({ ...current, [productCode]: data.bills || [] }));
+    } catch (err) {
+      setBillErrors((current) => ({ ...current, [productCode]: err.message || "โหลดรายบิลไม่สำเร็จ" }));
+    } finally {
+      setLoadingBills((current) => ({ ...current, [productCode]: false }));
+    }
+  }
+
+  function SortIcon({ col }) {
+    if (sortBy !== col) return <span className="mvt-sort-icon">↕</span>;
+    return <span className="mvt-sort-icon active">{sortDir === "desc" ? "↓" : "↑"}</span>;
+  }
+
+  if (!selectedBranch) {
+    return (
+      <div className="movement-main">
+        <div className="notice movement-warning">
+          เลือกสาขาก่อนจึงจะดูรายงานสินค้า sold quantity แบบแยก POS และรายบิลได้
+        </div>
+      </div>
+    );
+  }
+
+  const detailColSpan = 10 + posCodes.length;
+
+  return (
+    <div className="movement-main">
+      <div className="notice movement-warning">
+        แท็บนี้อ่านจาก raw sales headers/lines ที่ sync มาจาก AdaPos เพื่อให้แยก POS, เวลา, และเลขบิลได้ตรงตามเอกสารขายจริง
+      </div>
+
+      <div className="movement-actions">
+        <button type="button" className="primary-button" disabled={loading} onClick={() => setRefreshKey((current) => current + 1)}>
+          {loading ? "กำลังโหลด..." : "รีเฟรชรายงานสินค้า"}
+        </button>
+        {!loading && summary && (
+          <span className="meta-line">
+            สาขา {selectedBranch} · {total} สินค้า · {dateFrom} ถึง {dateTo}
+          </span>
+        )}
+      </div>
+
+      {error ? <div className="notice error compact">{error}</div> : null}
+
+      {summary && (
+        <>
+          <section className="kpis movement-kpis">
+            <article className="kpi"><span>สินค้าทั้งหมด</span><strong>{formatNumber(summary.product_count)}</strong></article>
+            <article className="kpi"><span>มีการขาย</span><strong>{formatNumber(summary.products_with_sales)}</strong></article>
+            <article className="kpi"><span>ไม่มียอดขาย</span><strong>{formatNumber(summary.products_without_sales)}</strong></article>
+            <article className="kpi"><span>จำนวนขายรวม</span><strong>{formatQty(summary.qty_total)}</strong></article>
+            <article className="kpi"><span>จำนวนบิล</span><strong>{formatNumber(summary.bill_count_total)}</strong></article>
+            <article className="kpi"><span>มูลค่าขายรวม</span><strong>{formatNumber(summary.net_amount_total, 2)}</strong></article>
+          </section>
+
+          {posCodes.length > 0 && (
+            <div className="mvt-branch-sales-pos-grid">
+              {posCodes.map((posCode) => {
+                const totals = summary.totals_by_pos?.[posCode] || {};
+                return (
+                  <article key={posCode} className="mvt-branch-sales-pos-card">
+                    <strong>{formatPosLabel(posCode)}</strong>
+                    <span>จำนวนขาย {formatQty(totals.qty_total)}</span>
+                    <span>จำนวนบิล {formatNumber(totals.bill_count_total)}</span>
+                    <span>มูลค่า {formatNumber(totals.net_amount_total, 2)}</span>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {!loading && !error && rows.length === 0 && (
+        <p className="empty-state">ไม่พบข้อมูลสินค้าตามเงื่อนไขที่เลือก</p>
+      )}
+
+      {rows.length > 0 && (
+        <div className="table-wrap mvt-sales-table-wrap">
+          <table className="mvt-sales-table">
+            <thead>
+              <tr>
+                <th className="mvt-sales-sticky" onClick={() => handleSort("product_code")} style={{ cursor: "pointer" }}>
+                  รหัสสินค้า <SortIcon col="product_code" />
+                </th>
+                <th className="mvt-sales-sticky mvt-sales-name-col" onClick={() => handleSort("product_name")} style={{ cursor: "pointer" }}>
+                  ชื่อสินค้า <SortIcon col="product_name" />
+                </th>
+                <th>barcode / หน่วย</th>
+                <th>หมวด</th>
+                {posCodes.map((posCode) => (
+                  <th key={posCode} className="mvt-sales-branch-col">{formatPosLabel(posCode)}</th>
+                ))}
+                <th className="mvt-sales-total-col" onClick={() => handleSort("qty_total")} style={{ cursor: "pointer" }}>
+                  ขายรวม <SortIcon col="qty_total" />
+                </th>
+                <th onClick={() => handleSort("bill_count_total")} style={{ cursor: "pointer" }}>
+                  จำนวนบิล <SortIcon col="bill_count_total" />
+                </th>
+                <th style={{ textAlign: "right" }}>มูลค่า</th>
+                <th onClick={() => handleSort("first_sale_date")} style={{ cursor: "pointer" }}>
+                  ขายครั้งแรก <SortIcon col="first_sale_date" />
+                </th>
+                <th onClick={() => handleSort("last_sale_date")} style={{ cursor: "pointer" }}>
+                  ขายครั้งล่าสุด <SortIcon col="last_sale_date" />
+                </th>
+                <th>รายละเอียด</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((product) => {
+                const bills = billRowsByProduct[product.product_code] || [];
+                const rowError = billErrors[product.product_code];
+                const isExpanded = !!expandedProducts[product.product_code];
+                return (
+                  <Fragment key={product.product_code}>
+                    <tr>
+                      <td className="mvt-sales-sticky"><span className="meta">{product.product_code}</span></td>
+                      <td className="mvt-sales-sticky mvt-sales-name-col">
+                        <strong>{product.product_name}</strong>
+                        {product.product_name_eng ? <div className="meta">{product.product_name_eng}</div> : null}
+                      </td>
+                      <td>
+                        <div className="meta">{product.barcode || "-"}</div>
+                        <div>{product.unit || "-"}</div>
+                      </td>
+                      <td><span className="meta">{product.category || "-"}</span></td>
+                      {posCodes.map((posCode) => {
+                        const qty = Number(product.sales_by_pos?.[posCode]?.qty_total || 0);
+                        return (
+                          <td key={posCode} className="mvt-sales-qty-cell">
+                            {formatQty(qty)}
+                          </td>
+                        );
+                      })}
+                      <td className="mvt-sales-qty-cell mvt-sales-total-col">
+                        <strong>{formatQty(product.qty_total)}</strong>
+                      </td>
+                      <td className="mvt-sales-qty-cell">{formatNumber(product.bill_count_total)}</td>
+                      <td className="mvt-sales-qty-cell">{formatNumber(product.net_amount_total, 2)}</td>
+                      <td>{product.first_sale_date || "-"}</td>
+                      <td>{product.last_sale_date || "-"}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="ghost-button movement-expand-button"
+                          onClick={() => toggleProductBills(product.product_code)}
+                        >
+                          {isExpanded ? "ซ่อนบิล" : "ดูบิล"}
+                        </button>
+                      </td>
+                    </tr>
+
+                    {isExpanded && (
+                      <tr className="mvt-branch-sales-detail-row">
+                        <td colSpan={detailColSpan}>
+                          <div className="mvt-branch-sales-detail">
+                            <div className="mvt-branch-sales-detail-header">
+                              <strong>{product.product_code}</strong>
+                              <span>{product.product_name}</span>
+                            </div>
+
+                            {loadingBills[product.product_code] ? (
+                              <p className="meta-line">กำลังโหลดรายบิล...</p>
+                            ) : rowError ? (
+                              <div className="notice error compact">{rowError}</div>
+                            ) : bills.length === 0 ? (
+                              <p className="empty-state">ไม่มีบิลขายสำหรับสินค้านี้ในช่วงวันที่ที่เลือก</p>
+                            ) : (
+                              <div className="table-wrap">
+                                <table className="mvt-sales-table mvt-branch-sales-bills">
+                                  <thead>
+                                    <tr>
+                                      <th>วันที่</th>
+                                      <th>เวลา</th>
+                                      <th>เลขบิล</th>
+                                      <th>POS</th>
+                                      <th style={{ textAlign: "right" }}>จำนวน</th>
+                                      <th style={{ textAlign: "right" }}>มูลค่า</th>
+                                      <th>หน่วย</th>
+                                      <th>Cashier</th>
+                                      <th>Customer</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {bills.map((bill) => (
+                                      <tr key={`${bill.bill_no}-${bill.sale_date}-${bill.sale_time || ""}`}>
+                                        <td>{bill.sale_date || "-"}</td>
+                                        <td>{bill.sale_time || "-"}</td>
+                                        <td><span className="mvt-doc-no">{bill.bill_no}</span></td>
+                                        <td>{formatPosLabel(bill.pos_code)}</td>
+                                        <td className="mvt-sales-qty-cell">{formatQty(bill.qty_total)}</td>
+                                        <td className="mvt-sales-qty-cell">{formatNumber(bill.net_amount_total, 2)}</td>
+                                        <td>{bill.unit_name || "-"}</td>
+                                        <td>{bill.cashier_code || "-"}</td>
+                                        <td>{bill.customer_code || "-"}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
