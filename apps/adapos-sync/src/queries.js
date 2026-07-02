@@ -68,8 +68,13 @@ function applySalesDateWindow(req, { periodDays, dateCutoff, fromDate = null, to
 
   req.input("periodDays", sql.Int, periodDays);
   req.input("dateCutoff", sql.VarChar(10), dateCutoff);
+  // Lookback anchors to today (GETDATE()), matching getSalesSummaryRows. dateCutoff
+  // is only a permissive upper-bound safety cap (e.g. against a bad system clock),
+  // not a substitute for "today" — anchoring the window to it instead of GETDATE()
+  // was the bug that made this query see zero rows when dateCutoff was set far in
+  // the future.
   return `
-    AND CAST(${columnExpr} AS DATE) >= DATEADD(day, -(@periodDays - 1), CAST(@dateCutoff AS DATE))
+    AND CAST(${columnExpr} AS DATE) >= DATEADD(day, -(@periodDays - 1), CAST(GETDATE() AS DATE))
     AND CAST(${columnExpr} AS DATE) <= CAST(@dateCutoff AS DATE)
   `;
 }
