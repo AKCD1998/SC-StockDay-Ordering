@@ -69,15 +69,37 @@ first, not just the dev clone, before assuming the deployed code matches GitHub.
 
 1. Fixed the `unit_name` raw_payload key bug in `PaaSRTSM-project`.
 2. Committed + pushed `PaaSRTSM-project` (`movement-analytics.js` — the two new
-   `branch-product-sales` report endpoints, now live on `origin/main`).
+   `branch-product-sales` report endpoints, now live on `origin/main` at `58077eb`).
 3. Committed + pushed `SC-StockDay-Ordering` (adapos-sync detailed-sales extraction +
-   posting, admin-web `Sold Qty` tab, docs).
-4. Brought `X:\SCstockDay` (real branch-005 laptop) to the same `origin/main` tip via
-   `git fetch && git reset --hard origin/main`, so the next real
-   `RUN-ADAPOS-SYNC.bat` run on that machine will include `sales_detail` posting.
+   posting, admin-web `Sold Qty` tab, docs — now live on `origin/main` at `b6f4bf0`).
+4. **Attempted** to bring `X:\SCstockDay` (real branch-005 laptop) to the same
+   `origin/main` tip via `git fetch && git reset --hard origin/main` — **this failed**.
+   `X:\SCstockDay` is a mapped drive (`\\100.106.107.80\D`) that is **read-only for this
+   session at the SMB share level** (NTFS ACLs on `.git` show `Authenticated Users:
+   Modify`, but writes still fail with Access Denied — the share-level permission is
+   more restrictive than the NTFS ACL and wins). Confirmed with a plain file write test
+   in PowerShell, not just git. This is consistent with Codex's original handoff note
+   ("X drive write behavior... do not assume the code was edited directly under
+   `X:\SCstockDay`") — that boundary is a real, session-level constraint, not just a
+   convention.
+
+   **`X:\SCstockDay` is therefore still on the stale local commit `02af7e0`
+   (2026-06-17) and will NOT pick up `sales_detail` sync until someone with write
+   access to that machine runs, on the branch-005 laptop itself (RDP/physical
+   access, not this mapped drive):**
+   ```
+   cd D:\SCstockDay
+   git fetch origin
+   git reset --hard origin/main
+   ```
+   (Working tree was confirmed clean before this session touched anything, and the
+   laptop's one local-only commit was verified content-identical to what's already
+   upstream, so a hard reset is safe — nothing unique is lost.)
 
 ## Still outstanding (see main handoff doc for the original acceptance criteria)
 
+- **Blocking:** update the branch-005 laptop's local git checkout to `origin/main`
+  (see command above) — this cannot be done from this session's mapped `X:` drive.
 - `PaaSRTSM-project`'s Render backend needs a **Manual Deploy** click (GitHub push alone
   does not deploy admin-api — see `docs/ARCHITECTURE.md` §10).
 - No end-to-end live branch sync has been run yet against the new code. Recommended
