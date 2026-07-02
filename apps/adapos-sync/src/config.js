@@ -55,6 +55,15 @@ export const syncConfig = {
   // Approved receipts window — default 14 days so missed-day syncs self-heal.
   // Override with --lookback-days=N or env APPROVED_RECEIPTS_LOOKBACK_DAYS.
   approvedReceiptsLookbackDays: Number(cliLookback || process.env.APPROVED_RECEIPTS_LOOKBACK_DAYS || 14),
+  // sales_detail routine window — deliberately small. This dataset runs every
+  // ADAPOS_SYNC_INTERVAL_MINUTES (default every 10 min), so re-scanning a full
+  // 30-day window (like the sales-summary dataset does) on every run would
+  // re-post the same historical bills over and over for no reason. 7 days is
+  // enough to self-heal a missed run (e.g. laptop off over a weekend) without
+  // the routine cost of a full month. Historical backfill for older ranges
+  // (e.g. a specific past month) uses --date-from/--date-to instead, as a
+  // one-off run — not this rolling window.
+  salesDetailLookbackDays: Number(process.env.SALES_DETAIL_LOOKBACK_DAYS || 7),
   // Explicit backfill date range (overrides lookback when both are set).
   // Pass --date-from=YYYY-MM-DD --date-to=YYYY-MM-DD to backfill a specific window.
   dateFrom: cliDateFrom || process.env.SYNC_DATE_FROM || null,

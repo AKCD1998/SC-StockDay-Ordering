@@ -68,7 +68,11 @@ async function fetchDatasets(pool) {
   }
   if (wantsSalesDetail) {
     const salesDateOpts = {
-      periodDays: PERIOD_DAYS,
+      // Routine runs use a short self-healing window (default 7 days), not the
+      // 30-day PERIOD_DAYS used by the sales-summary dataset — see
+      // syncConfig.salesDetailLookbackDays. An explicit --date-from/--date-to
+      // backfill still overrides this entirely (see applySalesDateWindow).
+      periodDays: syncConfig.salesDetailLookbackDays,
       dateCutoff,
       fromDate: syncConfig.dateFrom,
       toDate: syncConfig.dateTo,
@@ -151,7 +155,7 @@ async function runOnce() {
     if (syncConfig.dateFrom) {
       console.log(`Sales detail:  ${syncConfig.dateFrom} → ${syncConfig.dateTo ?? syncConfig.dateFrom}`);
     } else {
-      console.log(`Sales detail:  last ${PERIOD_DAYS} days ending ${syncConfig.dateCutoff}`);
+      console.log(`Sales detail:  last ${syncConfig.salesDetailLookbackDays} days (self-healing window, capped at ${syncConfig.dateCutoff})`);
     }
   }
   console.log("");
