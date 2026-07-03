@@ -1,6 +1,6 @@
 # Architecture
 
-> Last revised: 2026-06-25
+> Last revised: 2026-07-03
 
 ---
 
@@ -22,16 +22,17 @@ The system has grown well beyond the original V1 scope. This document reflects t
 
 ## 1. Workspace map
 
-Four repos live under `Desktop/Webapp training project/` and form one logical system.
+Five repos live under `Desktop/Webapp training project/` and form one logical system.
 
 | Repo | Role | Stack | Entry point |
 |---|---|---|---|
-| **PaaSRTSM-project** | **Live backend API + drug-DB admin.** Ordering, stock, ingredient ML, analytics, CRM mirror, mobile enrollment. | Node CJS, Express 4, `pg`, pgvector, `mssql`, `xlsx`, bcryptjs, JWT cookie sessions | `apps/admin-api/src/server.js` |
+| **PaaSRTSM-project** | **Live backend API + drug-DB admin.** Ordering, stock, ingredient ML, analytics, CRM mirror, mobile enrollment, AI video content studio. | Node CJS, Express 4, `pg`, pgvector, `mssql`, `xlsx`, bcryptjs, JWT cookie sessions | `apps/admin-api/src/server.js` |
 | **SC-StockDay-Ordering** | Branch ordering SPA, admin SPA, legacy server, AdaPOS sync agent, Python OCR worker, E2E harness | npm workspaces: `apps/order-web` + `apps/admin-web` (React/Vite), `server/` (Express ESM, legacy), `apps/adapos-sync` (Node), `apps/ocr-worker` (Python) | `apps/*/main.jsx` |
 | **SC-StockDay-Ordering-BranchSender** | Per-branch Windows agent that pulls stock from local AdaPOS SQL Server and pushes it to admin-api | C# .NET, Windows Task Scheduler | `src/BranchSender/Program.cs` |
 | **SCCRMonPOS** | C# POS loyalty integration — CRM claims from POS terminals | C# .NET | `SCCRMonPOS/` |
+| **SCAiGenVid** | AI Video Content Studio frontend — staff generate/review AI promotional video clips. Deliberately separate from `admin-web` (unrelated domain; may be published publicly). Talks to the same PaaSRTSM admin-api, same cookie-session auth. | React + Vite SPA | `src/main.jsx` |
 
-A fifth project (`currentSC-official-website-project`) — public marketing site + CRM/loyalty backend — is in the workspace but **not part of the ordering/stock system.** Admin-api mirrors member data into it via an internal token.
+A sixth project (`currentSC-official-website-project`) — public marketing site + CRM/loyalty backend — is in the workspace but **not part of the ordering/stock system.** Admin-api mirrors member data into it via an internal token.
 
 ---
 
@@ -204,6 +205,7 @@ Code39 barcode renderer built inline (used for packing documents).
 | `supplier-logos.js` | `/api/supplier-logos` | Supplier logo metadata |
 | `health.js` | `/api/health` | Health check |
 | `auth.js (admin)` | `/api/auth` | — |
+| `video-content.js` | `/api/content` | AI Video Content Studio — job CRUD/submit/retry/cancel/approve/reject, asset upload, signed download proxy. Gated by `FEATURE_VIDEO_STUDIO`. See `docs/AI_VIDEO_CONTENT_STUDIO.md`. |
 
 ### Services
 
@@ -211,6 +213,11 @@ Code39 barcode renderer built inline (used for packing documents).
 |---|---|
 | `stockRequests.js` | Inter-branch request business logic |
 | `stockRequestDrafts.js` | Server-side draft cart persistence |
+| `videoJobsService.js` | AI video job CRUD, submit/retry/cancel/approve/reject, role-based visibility |
+| `videoAssetsService.js` | AI video asset upload finalize + download authorization |
+| `videoJobRunner.js` | In-process `setTimeout`-chain poller for AI video render jobs (no separate worker) |
+| `video-providers/*` | AI video provider adapter layer — `mockVideoProvider.js`, `openaiVideoProvider.js` (Sora), `providerRegistry.js` |
+| `storage/*` | AI video storage adapter layer — `localDiskStorageProvider.js` (Phase 1), `storageRegistry.js` |
 | `ada-derivation.js` | Refresh analytics / reconciliation from `ada.*` |
 | `embedding-sync-jobs.js` | Vector embedding job queue |
 | `sku-embedding-indexer.js` | pgvector upsert |
@@ -252,7 +259,7 @@ Runs on each branch PC via Windows Task Scheduler.
 
 ## 7. Database schemas (PaaSRTSM Postgres)
 
-Migrations run via `npm run db:migrate` from `PaaSRTSM-project/`. 40 migrations as of 2026-06-25.
+Migrations run via `npm run db:migrate` from `PaaSRTSM-project/`. 43 migrations as of 2026-07-03.
 
 | Schema | Tables / purpose |
 |---|---|
@@ -264,6 +271,7 @@ Migrations run via `npm run db:migrate` from `PaaSRTSM-project/`. 40 migrations 
 | `reconciliation` | Source-derived: `transfer_documents/lines`, `transfer_match_candidates`, `transfer_cases/lines`. App-owned: `transfer_reconciliations/lines/events` |
 | `ingest` | `sync_runs`, `sync_errors` |
 | `admin` | Admin-facing audit / log tables |
+| `content` | AI Video Content Studio (migration 043): `video_jobs`, `video_assets`, `video_job_events`. See `docs/AI_VIDEO_CONTENT_STUDIO.md`. |
 
 **Pricing (migration 039):** `ada.branch_prices` stores per-branch retail/cost prices synced from AdaPOS. Canonical selling price is `public.sku_unit_prices.retail_price` (per sku + unit + is_active). `public.prices` is written in parallel but `sku_unit_prices` is authoritative.
 
@@ -343,8 +351,9 @@ Vitest unit tests co-located: `lib/requestCart.test.js`, `lib/requestSubmission.
 | `sc-stockday-ordering` (admin-web static) | SC-StockDay-Ordering | Render static | **Yes** (`autoDeploy: true`) |
 | `sc-stockday-ordering` (SC legacy server) | SC-StockDay-Ordering | Render web | **Yes** (`autoDeploy: true`) ← zombie |
 | `paasrtsm-project` (admin-api) | PaaSRTSM-project | Render web | **Manual only** (no render.yaml) |
+| `sc-ai-gen-vid` (static, planned) | SCAiGenVid | Render static | New service — not yet deployed. `render.yaml` in the repo, `VITE_API_BASE_URL` → `paasrtsm-project.onrender.com`. |
 
-**Critical:** After every push to PaaSRTSM-project, a **Manual Deploy must be triggered** from the Render dashboard. GitHub push alone does not deploy.
+**Critical:** After every push to PaaSRTSM-project, a **Manual Deploy must be triggered** from the Render dashboard. GitHub push alone does not deploy. This applies to the new `content.*` video-studio backend code too — merging it does not activate it; `FEATURE_VIDEO_STUDIO=true` must also be set as a Render env var, and a Manual Deploy triggered.
 
 ---
 
