@@ -42,6 +42,14 @@ same StorageProvider interface.
 - **`content.video_assets`** — metadata only, never binary bytes in Postgres. `asset_type` ∈ `input_image, input_video, generated_video, thumbnail, export`. `storage_provider`/`storage_key` are the pointer into object storage.
 - **`content.video_job_events`** — append-only audit trail per job (`job_created`, `submitted_to_provider`, `provider_status_updated`, `output_downloaded`, `output_stored`, `job_completed`, `job_failed`, `approved`, `rejected`, `retry_requested`, `job_cancelled`, `provider_cancel_attempted`/`_failed`).
 
+## Usage & cost tracking
+
+`estimated_cost` on `openai` jobs is computed at submit time from OpenAI's **published** per-second Sora pricing (`OPENAI_PRICE_PER_SECOND_USD` in `videoStudioConstants.js`, keyed by model + resolution) — it is an estimate, not a real billed figure, because the Sora Videos API does not return usage/cost data anywhere in its responses. `actual_cost` therefore stays `NULL` for every provider today; it exists in the schema for whenever a provider does report real billing. The `mock` provider never sets a cost (it's free/simulated).
+
+Duration allow-lists are **per model**, not just per provider — `sora-2` supports 4/8/12s, `sora-2-pro` supports 10/15/25s (confirmed against OpenAI's docs as of 2026-07; reconfirm before relying on this, since these have changed across doc revisions).
+
+`GET /api/content/usage-summary` (admin-only, `content.video.admin`) returns all-time and this-month totals, plus breakdowns by provider/model and by user — both in USD and in THB. THB is a **display-only conversion**, not a live exchange rate: `USD_TO_THB_RATE` env var (default 36.5), applied at read time, update it manually when it drifts. Surfaced in `SCAiGenVid` as a new "Usage & Cost" nav item, visible only to `admin`.
+
 ## Routes (`/api/content`, mounted in `server.js`, gated by `FEATURE_VIDEO_STUDIO`)
 
 | Method/Path | Guard |
@@ -57,6 +65,7 @@ same StorageProvider interface.
 | `POST /video-jobs/:id/reject` | auth, csrf, `content.video.reject` (admin only, `reason` required) |
 | `GET /video-jobs/:id/events` | auth, `content.video.view` |
 | `GET /video-jobs/:id/download` | auth, `content.video.download` → returns `{ url }`, a short-lived signed URL |
+| `GET /usage-summary` | auth, `content.video.admin` (admin only) → cost/usage totals in USD + THB |
 | `POST /assets/upload-init` | auth, csrf, `content.video.create` |
 | `POST /assets/upload-complete` | auth, csrf, `content.video.create`, multipart (`multer`) |
 | `GET /assets/binary` | HMAC token in query string (no session needed — the token *is* the auth) |
