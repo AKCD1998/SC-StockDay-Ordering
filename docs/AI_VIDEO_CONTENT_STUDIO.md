@@ -135,13 +135,15 @@ Update `VIDEO_PROVIDER_API_KEY` (or `OPENAI_API_KEY`) in the Render environment 
 
 ## How to clean up stale drafts/assets
 
-Not automated in Phase 1. A `draft` job that's never submitted, or an uploaded `input_image` asset never attached to a submitted job, will sit indefinitely in `content.video_jobs`/`content.video_assets` and on local disk. Recommended follow-up (not built yet): a scheduled cleanup job (cron or an admin-triggered endpoint) that deletes `draft` jobs and orphaned assets older than N days, calling `storageProvider.deleteAsset` before removing the DB row.
+**Automated for local-disk video/image files** (`apps/admin-api/src/services/videoAssetCleanup.js`): a periodic sweep runs inside the running server process (started in `startServer()`, never inside `createApp()` so tests never trigger it) every `VIDEO_ASSET_CLEANUP_INTERVAL_MS` (default 6h). It deletes on-disk bytes for any `content.video_assets` row where `storage_provider='local'` and `created_at` is older than `VIDEO_LOCAL_ASSET_RETENTION_DAYS` (default 3 days) — **unless** that asset is still referenced (`input_asset_id`/`output_asset_id`) by a job in `draft`/`queued`/`processing`, so an in-flight retry never has its input image swept out from under it. The DB row is kept (`storage_key` is cleared, not the row itself) so job history stays intact; a `asset_purged` event is recorded on any job that referenced it. Requesting a download of a purged asset returns `410 Gone` with a clear message instead of a confusing 404/500. Set `VIDEO_ASSET_CLEANUP_INTERVAL_MS=0` to disable the automatic sweep entirely.
+
+This intentionally does **not** clean up never-submitted `draft` jobs themselves (only their local files, once past retention) — the job/asset DB rows are cheap to keep and useful for audit history.
 
 ## Known limitations
 
 - **Sora 2 Videos API deprecation** — shuts down 2026-09-24 per OpenAI's own docs; re-verify `openaiVideoProvider.js` before then.
 - **No native cancel on the OpenAI side** — `cancelGenerationJob` is a documented no-op for `openai` (no cancel endpoint exists in the API as of writing); cancelling a job stops the app from polling it and marks it `cancelled` locally, but the render may continue (and be billed) upstream.
-- **Local disk storage is not durable in production** — see deployment step 5. Swap in an R2/S3 adapter (behind the same `StorageProvider` interface) before relying on this for real deliverables.
+- **Local disk storage is not durable across redeploys/restarts, and files are auto-deleted after `VIDEO_LOCAL_ASSET_RETENTION_DAYS`** — by design, per the user's explicit call not to build R2 yet. Staff must download anything they want to keep promptly after a job completes; don't treat the in-app video preview as permanent storage. Swap in an R2/S3 adapter (behind the same `StorageProvider` interface) if/when persistent storage is actually needed.
 - **Runner polling, not webhooks** — `VIDEO_PROVIDER_WEBHOOK_SECRET` is reserved but unused; Phase 2 could move to provider webhooks without changing the job state-machine logic in `videoJobRunner.js`.
 - **No automated stale-asset cleanup** — see above.
 - **No upload progress bar** in the `SCAiGenVid` frontend (plain `fetch`, not `XMLHttpRequest`) — acceptable for MVP file sizes, revisit if upload UX complaints come in.
