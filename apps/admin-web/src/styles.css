@@ -6297,7 +6297,7 @@ input[type="radio"] {
 .mvt-filter-bar {
   display: grid;
   grid-template-columns: minmax(160px, 200px) 160px 160px 1fr;
-  gap: 12px;
+  gap: 24px;
   align-items: end;
   margin-bottom: 12px;
 }
