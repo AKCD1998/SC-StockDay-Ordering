@@ -3034,7 +3034,7 @@ th {
   justify-content: flex-end;
 }
 
-input:not([type="checkbox"]):not([type="radio"]),
+input,
 select {
   width: 100%;
   border: 1px solid #c8d3e2;
@@ -3049,7 +3049,13 @@ select {
    squeezing their label text into a narrow wrapped column. Reset to
    sensible native checkbox sizing everywhere at once, instead of the
    per-component overrides this had before (see e.g. .category-review-grid
-   input[type="checkbox"], which is now redundant but harmless). */
+   input[type="checkbox"], which is now redundant but harmless).
+   IMPORTANT: this relies on `input[type="checkbox"]` (element+attribute)
+   naturally outranking the plain `input` above via specificity + source
+   order — do NOT "fix" the rule above with `:not([type="checkbox"])`
+   instead. That raises its specificity past single-class selectors like
+   .srq-search-input/.srq-date-filter-input/.srq-branch-filter, which rely
+   on losing to a plain-element `input` rule to set their own width. */
 input[type="checkbox"],
 input[type="radio"] {
   width: 16px;
