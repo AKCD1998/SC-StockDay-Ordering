@@ -6983,6 +6983,30 @@ input[type="radio"] {
   flex-wrap: wrap;
 }
 
+.taxonomy-confirm-btn {
+  background: #22a65a;
+  border-color: #22a65a;
+  color: #fff;
+  min-width: 80px;
+}
+
+.taxonomy-confirm-btn:hover:not(:disabled) {
+  background: #1a8f4a;
+  border-color: #1a8f4a;
+}
+
+.taxonomy-flag-btn {
+  background: #f5c400;
+  border-color: #f5c400;
+  color: #1a1a1a;
+  min-width: 80px;
+}
+
+.taxonomy-flag-btn:hover:not(:disabled) {
+  background: #ddb000;
+  border-color: #ddb000;
+}
+
 .taxonomy-review-pagination {
   display: flex;
   gap: 12px;

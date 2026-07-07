@@ -379,7 +379,7 @@ export default function TaxonomyReviewPanel({ csrfToken }) {
                     <div className="taxonomy-review-actions">
                       <button
                         type="button"
-                        className="ghost-button"
+                        className="ghost-button taxonomy-confirm-btn"
                         onClick={() => void handleRowStatus(row.company_code, "confirmed")}
                         disabled={isBusy || !csrfToken}
                       >
@@ -387,7 +387,7 @@ export default function TaxonomyReviewPanel({ csrfToken }) {
                       </button>
                       <button
                         type="button"
-                        className="ghost-button"
+                        className="ghost-button taxonomy-flag-btn"
                         onClick={() => void handleRowStatus(row.company_code, "needs_review")}
                         disabled={isBusy || !csrfToken}
                       >
