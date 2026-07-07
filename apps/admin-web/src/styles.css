@@ -5316,6 +5316,29 @@ input[type="radio"] {
   padding: 8px 14px;
   font-size: 0.82rem;
 }
+.srq-page-size-select {
+  width: 140px;
+}
+.srq-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 16px 0 4px;
+}
+.srq-pagination-nav {
+  padding: 8px 16px;
+  font-size: 0.85rem;
+}
+.srq-pagination-nav:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.srq-pagination-label {
+  font-size: 0.85rem;
+  color: #526578;
+}
+[data-theme="dark"] .srq-pagination-label { color: #9fb0c3; }
 .srq-search-loading-overlay {
   position: absolute;
   inset: 0;

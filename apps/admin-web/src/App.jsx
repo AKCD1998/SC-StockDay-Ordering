@@ -4363,6 +4363,8 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
   const [appliedSearch, setAppliedSearch] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchDetailCache, setSearchDetailCache] = useState({});
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const canLoad = isAdmin || Boolean(branchCode);
 
@@ -4446,6 +4448,19 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
   const hasActiveRequestingBranchFilter = selectedRequestingBranches.length !== STOCK_REQUEST_BRANCH_FILTER_CODES.length;
   const hasActiveSearch = Boolean(normalizedAppliedSearch);
 
+  // Pagination is purely a display window over filteredRecords — search and
+  // filters above already run against every loaded record, not just the
+  // current page, so a match on page 999 is still found. Reset to page 1
+  // whenever the underlying filtered set changes, so users don't land on a
+  // now-empty page (e.g. filtering down to 3 records while on page 5).
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterBranch, selectedRequestingBranches, dateFilterMode, filterSingleDate, filterDateFrom, filterDateTo, normalizedAppliedSearch, pageSize, refreshKey]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedRecords = filteredRecords.slice((safePage - 1) * pageSize, safePage * pageSize);
+
   useEffect(() => {
     let active = true;
     if (!normalizedAppliedSearch) return undefined;
@@ -4489,6 +4504,16 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
       ) : null}
       <div className="srq-tab-toolbar">
         <span className="srq-total-label">{filteredRecords.length} รายการ{adminAlertCount > 0 ? <span className="srq-alert-count"> · 🔴 {adminAlertCount} แจ้งจัดซื้อรอดำเนินการ</span> : null}</span>
+        <select
+          className="srq-branch-filter srq-page-size-select"
+          value={pageSize}
+          onChange={(e) => { setPageSize(Number(e.target.value)); setExpandedId(null); }}
+          aria-label="จำนวนรายการต่อหน้า"
+        >
+          <option value={10}>10 รายการ/หน้า</option>
+          <option value={50}>50 รายการ/หน้า</option>
+          <option value={100}>100 รายการ/หน้า</option>
+        </select>
         {isAdmin ? (
           <select
             className="srq-branch-filter"
@@ -4614,7 +4639,7 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
                 ? "ไม่พบคำขอสินค้าที่ตรงกับตัวกรองที่เลือก"
                 : "ยังไม่มีคำขอสินค้าเข้ามา"}
         </p>
-      ) : filteredRecords.map((req) => {
+      ) : pagedRecords.map((req) => {
         const isPureAlert = req.isAdminAlert && !req.isMixedMode && req.status === "SUBMITTED" && !req.responseResult;
         const isMixedIncoming = req.isAdminAlert && req.isMixedMode && req.status === "SUBMITTED" && !req.responseResult;
         const inCardExtra = isPureAlert ? " srq-batch-card-admin-alert" : isMixedIncoming ? " srq-batch-card-mixed" : "";
@@ -4651,6 +4676,27 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
         </article>
         );
       })}
+      {filteredRecords.length > 0 ? (
+        <div className="srq-pagination">
+          <button
+            type="button"
+            className="ghost-button srq-pagination-nav"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={safePage <= 1}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="srq-pagination-label">หน้า {safePage} จาก {totalPages}</span>
+          <button
+            type="button"
+            className="ghost-button srq-pagination-nav"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={safePage >= totalPages}
+          >
+            ถัดไป
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
