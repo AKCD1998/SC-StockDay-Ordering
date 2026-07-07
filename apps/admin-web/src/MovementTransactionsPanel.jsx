@@ -94,12 +94,6 @@ function toggleArrayValue(setter, value) {
   );
 }
 
-function formatPosLabel(posCode) {
-  const code = String(posCode == null ? "" : posCode).trim();
-  if (!code || code.toLowerCase() === "unknown") return "POS ไม่ทราบ";
-  return /^pos/i.test(code) ? code.toUpperCase() : `POS ${code}`;
-}
-
 // ── Data contracts (pending backend implementation) ───────────────────────────
 //
 // TRANSACTIONS ENDPOINT — PENDING BACKEND:
@@ -235,7 +229,7 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
         <div>
           <p className="eyebrow">Movement &amp; Transactions</p>
           <h2>การเคลื่อนไหวสินค้า</h2>
-          <p>สรุปยอดรวม · ยอดขายแยกสาขา · รายงานสินค้าแยก POS · transaction รายบิล · เอกสาร</p>
+          <p>สรุปยอดรวม · ยอดขายแยกสาขา · รายงานสินค้าที่ขายแยกสาขา · transaction รายบิล · เอกสาร</p>
         </div>
       </div>
 
@@ -347,7 +341,6 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
       )}
       {activeTab === "sold-qty" && (
         <SoldQuantityTab
-          selectedBranch={selectedBranch}
           dateFrom={dateFrom}
           dateTo={dateTo}
           productSearch={salesSearch}
@@ -1263,10 +1256,18 @@ Returns: { branches: [...], products: [{ product_code, product_name,
   );
 }
 
-function SoldQuantityTab({ selectedBranch, dateFrom, dateTo, productSearch }) {
+// Branch columns match the "สต็อกสาขา" page exactly, so the two reports are
+// directly comparable at a glance.
+const SOLD_QTY_BRANCH_COLUMNS = [
+  { code: "000", label: "สาขา 000 (HQ)" },
+  { code: "001", label: "สาขา 001" },
+  { code: "003", label: "สาขา 003" },
+  { code: "004", label: "สาขา 004" },
+  { code: "005", label: "สาขา 005" },
+];
+
+function SoldQuantityTab({ dateFrom, dateTo, productSearch }) {
   const [rows, setRows] = useState([]);
-  const [summary, setSummary] = useState(null);
-  const [posCodes, setPosCodes] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -1279,21 +1280,12 @@ function SoldQuantityTab({ selectedBranch, dateFrom, dateTo, productSearch }) {
   const [billErrors, setBillErrors] = useState({});
 
   useEffect(() => {
-    if (!selectedBranch) {
-      setRows([]);
-      setSummary(null);
-      setPosCodes([]);
-      setTotal(0);
-      return undefined;
-    }
-
     let active = true;
     const timer = window.setTimeout(async () => {
       setLoading(true);
       setError("");
       try {
         const params = new URLSearchParams({
-          branch_code: selectedBranch,
           date_from: dateFrom,
           date_to: dateTo,
           sort_by: sortBy,
@@ -1308,14 +1300,10 @@ function SoldQuantityTab({ selectedBranch, dateFrom, dateTo, productSearch }) {
         const data = await res.json();
         if (!active) return;
         setRows(data.products || []);
-        setSummary(data.summary || null);
-        setPosCodes(Array.isArray(data.pos_codes) ? data.pos_codes : []);
         setTotal(Number(data.total || 0));
       } catch (err) {
         if (active) {
           setRows([]);
-          setSummary(null);
-          setPosCodes([]);
           setTotal(0);
           setError(err.message || "โหลดรายงานสินค้าที่ขายไม่สำเร็จ");
         }
@@ -1328,7 +1316,7 @@ function SoldQuantityTab({ selectedBranch, dateFrom, dateTo, productSearch }) {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [selectedBranch, dateFrom, dateTo, productSearch, sortBy, sortDir, refreshKey]);
+  }, [dateFrom, dateTo, productSearch, sortBy, sortDir, refreshKey]);
 
   function handleSort(column) {
     if (column === sortBy) {
@@ -1351,11 +1339,7 @@ function SoldQuantityTab({ selectedBranch, dateFrom, dateTo, productSearch }) {
     setLoadingBills((current) => ({ ...current, [productCode]: true }));
     setBillErrors((current) => ({ ...current, [productCode]: "" }));
     try {
-      const params = new URLSearchParams({
-        branch_code: selectedBranch,
-        date_from: dateFrom,
-        date_to: dateTo,
-      });
+      const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
       const res = await apiFetch(`/api/admin/branch-product-sales/${encodeURIComponent(productCode)}/bills?${params}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -1372,65 +1356,20 @@ function SoldQuantityTab({ selectedBranch, dateFrom, dateTo, productSearch }) {
     return <span className="mvt-sort-icon active">{sortDir === "desc" ? "↓" : "↑"}</span>;
   }
 
-  if (!selectedBranch) {
-    return (
-      <div className="movement-main">
-        <div className="notice movement-warning">
-          เลือกสาขาก่อนจึงจะดูรายงานสินค้า sold quantity แบบแยก POS และรายบิลได้
-        </div>
-      </div>
-    );
-  }
-
-  const detailColSpan = 10 + posCodes.length;
+  const detailColSpan = 3 + SOLD_QTY_BRANCH_COLUMNS.length;
 
   return (
     <div className="movement-main">
-      <div className="notice movement-warning">
-        แท็บนี้อ่านจาก raw sales headers/lines ที่ sync มาจาก AdaPos เพื่อให้แยก POS, เวลา, และเลขบิลได้ตรงตามเอกสารขายจริง
-      </div>
-
       <div className="movement-actions">
         <button type="button" className="primary-button" disabled={loading} onClick={() => setRefreshKey((current) => current + 1)}>
           {loading ? "กำลังโหลด..." : "รีเฟรชรายงานสินค้า"}
         </button>
-        {!loading && summary && (
-          <span className="meta-line">
-            สาขา {selectedBranch} · {total} สินค้า · {dateFrom} ถึง {dateTo}
-          </span>
+        {!loading && !error && (
+          <span className="meta-line">{total} สินค้า · {dateFrom} ถึง {dateTo}</span>
         )}
       </div>
 
       {error ? <div className="notice error compact">{error}</div> : null}
-
-      {summary && (
-        <>
-          <section className="kpis movement-kpis">
-            <article className="kpi"><span>สินค้าทั้งหมด</span><strong>{formatNumber(summary.product_count)}</strong></article>
-            <article className="kpi"><span>มีการขาย</span><strong>{formatNumber(summary.products_with_sales)}</strong></article>
-            <article className="kpi"><span>ไม่มียอดขาย</span><strong>{formatNumber(summary.products_without_sales)}</strong></article>
-            <article className="kpi"><span>จำนวนขายรวม</span><strong>{formatQty(summary.qty_total)}</strong></article>
-            <article className="kpi"><span>จำนวนบิล</span><strong>{formatNumber(summary.bill_count_total)}</strong></article>
-            <article className="kpi"><span>มูลค่าขายรวม</span><strong>{formatNumber(summary.net_amount_total, 2)}</strong></article>
-          </section>
-
-          {posCodes.length > 0 && (
-            <div className="mvt-branch-sales-pos-grid">
-              {posCodes.map((posCode) => {
-                const totals = summary.totals_by_pos?.[posCode] || {};
-                return (
-                  <article key={posCode} className="mvt-branch-sales-pos-card">
-                    <strong>{formatPosLabel(posCode)}</strong>
-                    <span>จำนวนขาย {formatQty(totals.qty_total)}</span>
-                    <span>จำนวนบิล {formatNumber(totals.bill_count_total)}</span>
-                    <span>มูลค่า {formatNumber(totals.net_amount_total, 2)}</span>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </>
-      )}
 
       {!loading && !error && rows.length === 0 && (
         <p className="empty-state">ไม่พบข้อมูลสินค้าตามเงื่อนไขที่เลือก</p>
@@ -1447,23 +1386,11 @@ function SoldQuantityTab({ selectedBranch, dateFrom, dateTo, productSearch }) {
                 <th className="mvt-sales-sticky mvt-sales-name-col" onClick={() => handleSort("product_name")} style={{ cursor: "pointer" }}>
                   ชื่อสินค้า <SortIcon col="product_name" />
                 </th>
-                <th>barcode / หน่วย</th>
-                <th>หมวด</th>
-                {posCodes.map((posCode) => (
-                  <th key={posCode} className="mvt-sales-branch-col">{formatPosLabel(posCode)}</th>
+                {SOLD_QTY_BRANCH_COLUMNS.map((col) => (
+                  <th key={col.code} className="mvt-sales-branch-col">{col.label}</th>
                 ))}
                 <th className="mvt-sales-total-col" onClick={() => handleSort("qty_total")} style={{ cursor: "pointer" }}>
-                  ขายรวม <SortIcon col="qty_total" />
-                </th>
-                <th onClick={() => handleSort("bill_count_total")} style={{ cursor: "pointer" }}>
-                  จำนวนบิล <SortIcon col="bill_count_total" />
-                </th>
-                <th style={{ textAlign: "right" }}>มูลค่า</th>
-                <th onClick={() => handleSort("first_sale_date")} style={{ cursor: "pointer" }}>
-                  ขายครั้งแรก <SortIcon col="first_sale_date" />
-                </th>
-                <th onClick={() => handleSort("last_sale_date")} style={{ cursor: "pointer" }}>
-                  ขายครั้งล่าสุด <SortIcon col="last_sale_date" />
+                  รวมทุกสาขา <SortIcon col="qty_total" />
                 </th>
                 <th>รายละเอียด</th>
               </tr>
@@ -1481,26 +1408,14 @@ function SoldQuantityTab({ selectedBranch, dateFrom, dateTo, productSearch }) {
                         <strong>{product.product_name}</strong>
                         {product.product_name_eng ? <div className="meta">{product.product_name_eng}</div> : null}
                       </td>
-                      <td>
-                        <div className="meta">{product.barcode || "-"}</div>
-                        <div>{product.unit || "-"}</div>
-                      </td>
-                      <td><span className="meta">{product.category || "-"}</span></td>
-                      {posCodes.map((posCode) => {
-                        const qty = Number(product.sales_by_pos?.[posCode]?.qty_total || 0);
-                        return (
-                          <td key={posCode} className="mvt-sales-qty-cell">
-                            {formatQty(qty)}
-                          </td>
-                        );
-                      })}
+                      {SOLD_QTY_BRANCH_COLUMNS.map((col) => (
+                        <td key={col.code} className="mvt-sales-qty-cell">
+                          {formatQty(Number(product[`qty_branch_${col.code}`] || 0))}
+                        </td>
+                      ))}
                       <td className="mvt-sales-qty-cell mvt-sales-total-col">
                         <strong>{formatQty(product.qty_total)}</strong>
                       </td>
-                      <td className="mvt-sales-qty-cell">{formatNumber(product.bill_count_total)}</td>
-                      <td className="mvt-sales-qty-cell">{formatNumber(product.net_amount_total, 2)}</td>
-                      <td>{product.first_sale_date || "-"}</td>
-                      <td>{product.last_sale_date || "-"}</td>
                       <td>
                         <button
                           type="button"
@@ -1535,7 +1450,7 @@ function SoldQuantityTab({ selectedBranch, dateFrom, dateTo, productSearch }) {
                                       <th>วันที่</th>
                                       <th>เวลา</th>
                                       <th>เลขบิล</th>
-                                      <th>POS</th>
+                                      <th>สาขา</th>
                                       <th style={{ textAlign: "right" }}>จำนวน</th>
                                       <th style={{ textAlign: "right" }}>มูลค่า</th>
                                       <th>หน่วย</th>
@@ -1549,7 +1464,7 @@ function SoldQuantityTab({ selectedBranch, dateFrom, dateTo, productSearch }) {
                                         <td>{bill.sale_date || "-"}</td>
                                         <td>{bill.sale_time || "-"}</td>
                                         <td><span className="mvt-doc-no">{bill.bill_no}</span></td>
-                                        <td>{formatPosLabel(bill.pos_code)}</td>
+                                        <td>{bill.branch_code ? `สาขา ${bill.branch_code}` : "-"}</td>
                                         <td className="mvt-sales-qty-cell">{formatQty(bill.qty_total)}</td>
                                         <td className="mvt-sales-qty-cell">{formatNumber(bill.net_amount_total, 2)}</td>
                                         <td>{bill.unit_name || "-"}</td>
