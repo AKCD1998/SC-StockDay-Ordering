@@ -19,7 +19,7 @@ import {
   getProductPriceDefaultRows,
   getBranchPriceOverrideRows,
 } from "./queries.js";
-import { postJson } from "./client.js";
+import { postJson, getJson } from "./client.js";
 import { toProductRecords, toSalesRecords, toSalesDetailPayload, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toStockSnapshotRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
 
 const PERIOD_DAYS = 30;
@@ -159,6 +159,25 @@ async function runOnce() {
     }
   }
   console.log("");
+
+  if (syncConfig.skipIfSyncedToday) {
+    try {
+      const status = await getJson(
+        `${syncConfig.apiBaseUrl}/api/sync/today-status?branchCode=${encodeURIComponent(syncConfig.branchCode)}&datasetTag=branch_stock_history`,
+      );
+      if (status.hasSuccessToday) {
+        console.log("branch_stock_history already synced successfully today — sending heartbeat only, skipping full run.");
+        await postJson(`${syncConfig.apiBaseUrl}/api/sync/heartbeat`, {
+          branchCode: syncConfig.branchCode,
+          event: "evening-check-skip",
+        });
+        return;
+      }
+      console.log("No successful branch_stock_history run yet today — proceeding with full sync.");
+    } catch (checkErr) {
+      console.warn(`WARN: today-status check failed (${checkErr.message}); proceeding with full sync as a safe fallback.`);
+    }
+  }
 
   let pool;
   try {
@@ -430,7 +449,7 @@ async function runOnce() {
         status: "success",
         recordsRead: totalRead,
         recordsSent: totalSent,
-        message: `products+sales+transfers posted for branch ${syncConfig.branchCode}.`,
+        message: `datasets=${syncConfig.datasets.join(",")} posted for branch ${syncConfig.branchCode}.`,
       });
 
       console.log(`\nDone. ${totalSent} records sent to API.`);

@@ -22,6 +22,7 @@ const cliDatasets   = (args.find((a) => a.startsWith("--datasets="))      ?? "")
 const cliDateFrom   = (args.find((a) => a.startsWith("--date-from="))     ?? "").replace("--date-from=",     "") || null;
 const cliDateTo     = (args.find((a) => a.startsWith("--date-to="))       ?? "").replace("--date-to=",       "") || null;
 const cliLookback   = (args.find((a) => a.startsWith("--lookback-days=")) ?? "").replace("--lookback-days=", "") || null;
+const cliSkipIfSyncedToday = args.includes("--skip-if-synced-today");
 
 const { server, instanceName } = parseHost(process.env.ADAPOS_SQLSERVER_HOST ?? "");
 
@@ -68,6 +69,15 @@ export const syncConfig = {
   // Pass --date-from=YYYY-MM-DD --date-to=YYYY-MM-DD to backfill a specific window.
   dateFrom: cliDateFrom || process.env.SYNC_DATE_FROM || null,
   dateTo:   cliDateTo   || process.env.SYNC_DATE_TO   || null,
+  // Evening health-check mode: pass --skip-if-synced-today (or env
+  // ADAPOS_SYNC_SKIP_IF_SYNCED_TODAY=true) on the 19:20 Task Scheduler entry only,
+  // not the 08:20 one. Before touching AdaAcc, the agent asks the backend whether
+  // a branch_stock_history run already succeeded today; if so it sends a
+  // heartbeat and exits without a full resync (today's stock numbers won't have
+  // changed anyway — see docs on why AdaPos only recomputes them once/morning).
+  // If the check fails or says "not yet", it falls through to a normal full run,
+  // which self-heals a missed morning sync.
+  skipIfSyncedToday: cliSkipIfSyncedToday || String(process.env.ADAPOS_SYNC_SKIP_IF_SYNCED_TODAY ?? "false") === "true",
 };
 
 // ── Safety guards ─────────────────────────────────────────────────────────────
