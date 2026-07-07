@@ -1490,8 +1490,8 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch }) {
                                         <th>เวลา</th>
                                         <th>เลขบิล</th>
                                         <th>สาขา</th>
-                                        <th style={{ textAlign: "right" }}>จำนวน</th>
-                                        <th style={{ textAlign: "right" }}>มูลค่า</th>
+                                        <th>จำนวน</th>
+                                        <th>มูลค่า</th>
                                         <th>หน่วย</th>
                                         <th>Cashier</th>
                                         <th>Customer</th>

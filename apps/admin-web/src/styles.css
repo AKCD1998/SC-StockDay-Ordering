@@ -6656,6 +6656,11 @@ input[type="radio"] {
   min-width: 920px;
 }
 
+.mvt-branch-sales-bills th,
+.mvt-branch-sales-bills td {
+  text-align: center;
+}
+
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .mvt-filter-bar {
