@@ -20,7 +20,7 @@ import {
   getBranchPriceOverrideRows,
 } from "./queries.js";
 import { postJson } from "./client.js";
-import { toProductRecords, toSalesRecords, toSalesDetailPayload, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
+import { toProductRecords, toSalesRecords, toSalesDetailPayload, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toStockSnapshotRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
 
 const PERIOD_DAYS = 30;
 
@@ -106,7 +106,7 @@ async function fetchDatasets(pool) {
     data.approved_receipt_headers = await getApprovedReceiptHeaderRows(pool, branchCode, dateOpts);
     data.approved_receipt_lines   = await getApprovedReceiptLineRows(pool, branchCode, dateOpts);
   }
-  if (datasets.includes("branch_stock")) {
+  if (datasets.includes("branch_stock") || datasets.includes("branch_stock_history")) {
     data.branch_stock = await getBranchStockRows(pool, branchCode);
   }
   // Price datasets are all-branch and read from the consolidated HQ/mother DB.
@@ -310,6 +310,23 @@ async function runOnce() {
           { branchCode: syncConfig.branchCode },
         );
         console.log(`  branch_stock: ${sent} snapshots sent`);
+        totalSent += sent;
+      }
+
+      // Accumulate-mode history — additive to branch_stock above, which stays the
+      // overwrite-mode "current" sync untouched. Only runs when explicitly enabled
+      // via ADAPOS_SYNC_DATASETS, since it writes a NEW row every run instead of
+      // updating one row per product (unbounded growth if run every 10 minutes —
+      // intended for the twice-daily 08:20/19:20 schedule, not the routine loop).
+      if (syncConfig.datasets.includes("branch_stock_history") && data.branch_stock?.length) {
+        console.log(`Posting ${data.branch_stock.length} stock-history snapshot rows...`);
+        const sent = await postBatches(
+          `${syncConfig.apiBaseUrl}/api/sync/ada/stock-snapshots`,
+          toStockSnapshotRecords(data.branch_stock, syncConfig.branchCode),
+          500,
+          { sourceSyncedAt: startedAt },
+        );
+        console.log(`  branch_stock_history: ${sent} snapshot rows sent`);
         totalSent += sent;
       }
 

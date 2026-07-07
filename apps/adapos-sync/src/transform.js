@@ -214,6 +214,33 @@ export function toBranchStockRecords(rows, branchCode) {
   return [...snapshots.values()];
 }
 
+// Accumulate-mode stock history. Reuses the same rows as toBranchStockRecords
+// (current overwrite-mode sync) but posts to /api/sync/ada/stock-snapshots
+// instead of /api/branch-stock/sync — that endpoint is insert-only (unique key
+// includes snapshotAt), so each call adds a new row rather than overwriting the
+// previous one. snapshotAt should be the actual moment this scheduled run fired
+// (e.g. the 08:20 or 19:20 run), not the underlying AdaAcc data's own timestamp,
+// since TCNMPdt.FCPdtQtyRet itself has no per-row timestamp to reuse.
+export function toStockSnapshotRecords(rows, branchCode, snapshotAt = new Date().toISOString()) {
+  const normalizedBranch = String(branchCode || "").padStart(3, "0");
+  if (!BRANCH_STOCK_SYNC_BRANCHES.has(normalizedBranch)) {
+    throw new Error(`Refusing to build stock-snapshot records for unknown branch code: ${branchCode}`);
+  }
+
+  return rows
+    .filter((row) => row.product_code)
+    .map((row) => ({
+      productCode: row.product_code,
+      branchCode: normalizedBranch,
+      snapshotAt,
+      qtyOnHand: Number(row.qty || 0),
+      unitCode: row.unit || null,
+      barcode: row.barcode || null,
+      productNameThai: row.product_name_thai || null,
+      sourceTable: "TCNMPdt",
+    }));
+}
+
 export function toSalesDetailPayload(headerRows, lineRows) {
   const syncedAt = new Date().toISOString();
   return {
