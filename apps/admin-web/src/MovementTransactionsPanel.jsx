@@ -35,6 +35,19 @@ function daysAgoIsoDate(days) {
   return date.toISOString().slice(0, 10);
 }
 
+// bill.sale_date comes over the wire as a DATE column serialized to
+// "YYYY-MM-DDT00:00:00.000Z" — there's no real time component, so slicing the
+// YYYY-MM-DD prefix directly avoids any timezone re-interpretation risk that
+// `new Date(value)` + toLocaleDateString would introduce.
+function formatSaleDate(value) {
+  if (!value) return "-";
+  const isoDate = String(value).slice(0, 10);
+  const parts = isoDate.split("-");
+  if (parts.length !== 3) return isoDate;
+  const [year, month, day] = parts;
+  return `${day}/${month}/${year}`;
+}
+
 function formatBranchOptionLabel(branch) {
   const code = String(branch?.branchCode || "").trim();
   const name = String(branch?.branchName || "").trim();
@@ -1487,7 +1500,7 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch }) {
                                     <tbody>
                                       {billRows.map((bill) => (
                                         <tr key={`${bill.bill_no}-${bill.sale_date}-${bill.sale_time || ""}`}>
-                                          <td>{bill.sale_date || "-"}</td>
+                                          <td>{formatSaleDate(bill.sale_date)}</td>
                                           <td>{bill.sale_time || "-"}</td>
                                           <td><span className="mvt-doc-no">{bill.bill_no}</span></td>
                                           <td>{bill.branch_code ? `สาขา ${bill.branch_code}` : "-"}</td>
