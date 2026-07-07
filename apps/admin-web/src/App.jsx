@@ -3779,7 +3779,7 @@ function PackingPreviewModal({ detail, onClose }) {
                       <td>{index + 1}</td>
                       <td className="mono">{line.productCode || "-"}</td>
                       <td>{line.productNameThai || line.productNameEng || "-"}</td>
-                      <td>{line.snapshotQty != null ? `${formatNumber(line.snapshotQty, 0)} ${line.unit || ""}`.trim() : "-"}</td>
+                      <td>{line.currentQty != null ? `${formatNumber(line.currentQty, 0)} ${line.unit || ""}`.trim() : "-"}</td>
                       <td>{`${formatNumber(line.requestedQty, 0)} ${line.unit || ""}`.trim()}</td>
                       <td className="srq-preview-note-cell">&nbsp;</td>
                     </tr>
@@ -4213,7 +4213,7 @@ function IncomingRequestActionModal({ detail, csrfToken, onClose, onCompleted })
   );
 }
 
-function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
+function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted, isAdmin = false }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -4302,6 +4302,12 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted }) {
             <div className="srq-line-info">
               <strong>{line.productNameThai || line.productNameEng || line.productCode}</strong>
               <span className="meta-line">{line.productCode}</span>
+              {isAdmin && line.snapshotQty != null ? (
+                <span className="meta-line srq-snapshot-audit">
+                  ตอนขอมีสต็อก {formatNumber(line.snapshotQty, 0)} {line.unit}
+                  {line.snapshotSyncedAt ? ` (${formatDateTime(line.snapshotSyncedAt)})` : ""}
+                </span>
+              ) : null}
             </div>
             <div className="srq-line-preview-metrics">
               <span>ขอ {formatNumber(line.requestedQty, 0)} {line.unit}</span>
@@ -4635,6 +4641,7 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
             <IncomingRequestDetail
               publicId={req.requestPublicId}
               csrfToken={csrfToken}
+              isAdmin={isAdmin}
               onResponseSubmitted={() => {
                 setRefreshKey((k) => k + 1);
                 onIncomingNotificationsChanged?.();
