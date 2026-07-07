@@ -3034,7 +3034,7 @@ th {
   justify-content: flex-end;
 }
 
-input,
+input:not([type="checkbox"]):not([type="radio"]),
 select {
   width: 100%;
   border: 1px solid #c8d3e2;
@@ -3042,6 +3042,20 @@ select {
   padding: 11px 12px;
   background: #fff;
   font-size: 1rem;
+}
+
+/* Checkboxes/radios must not inherit the text-input sizing above (width:
+   100%, heavy padding) — that inflated them into giant rounded boxes,
+   squeezing their label text into a narrow wrapped column. Reset to
+   sensible native checkbox sizing everywhere at once, instead of the
+   per-component overrides this had before (see e.g. .category-review-grid
+   input[type="checkbox"], which is now redundant but harmless). */
+input[type="checkbox"],
+input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
 }
 
 @media (max-width: 1100px) {
