@@ -1,7 +1,9 @@
 ﻿import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import MovementAndTransactionsPanel from "./MovementTransactionsPanel";
+import BranchStockHistoryPanel from "./BranchStockHistoryPanel";
 import ProductTaxonomyPanel from "./ProductTaxonomyPanel";
+import TaxonomyReviewPanel from "./TaxonomyReviewPanel";
 import dkshLogoUrl from "./assets/dksh.svg";
 import hansaLogoUrl from "./assets/hansa-logo.png";
 import tnpHealthcareLogoUrl from "./assets/tnp-healthcare-logo.svg";
@@ -40,17 +42,20 @@ const HQ_BRANCH_CODE = "000";
 const defaultAdminView = "receipts";
 const stockCostAuditView = "stock-cost-audit";
 const taxonomyView = "product-taxonomy";
-const adminOnlyViews = [stockCostAuditView, "category-review", "ingredient-dictionary", taxonomyView, "sync-log"];
-const adminViewKeys = [defaultAdminView, "branch-stock", "movement-trace", "stock-requests", ...adminOnlyViews];
+const taxonomyReviewView = "taxonomy-review";
+const adminOnlyViews = [stockCostAuditView, "category-review", "ingredient-dictionary", taxonomyView, taxonomyReviewView, "sync-log"];
+const adminViewKeys = [defaultAdminView, "branch-stock", "branch-stock-history", "movement-trace", "stock-requests", ...adminOnlyViews];
 const ADMIN_VIEW_ROUTE_SEGMENTS = {
   receipts: "receipts",
   "branch-stock": "branch-stock",
+  "branch-stock-history": "branch-stock-history",
   "movement-trace": "movement-trace",
   "stock-requests": "stock-requests",
   [stockCostAuditView]: "stock-cost-audit",
   "category-review": "category-review",
   "ingredient-dictionary": "ingredient-dictionary",
   [taxonomyView]: "taxonomy",
+  [taxonomyReviewView]: "taxonomy-review",
   "sync-log": "sync-log",
 };
 const ADMIN_VIEW_BY_SEGMENT = Object.fromEntries(
@@ -121,6 +126,7 @@ function getNavigationGroups(isAdminUser) {
       items: [
         { label: "ใบรับสินค้า", view: "receipts", description: "ตรวจใบรับสินค้าและโลโก้ Supplier" },
         { label: "สต็อกสาขา", view: "branch-stock", description: "สถานะสต็อกแยกตามสาขา" },
+        { label: "สต๊อกดูย้อนหลัง", view: "branch-stock-history", description: "ประวัติสต๊อกสะสมตามรอบเวลา sync" },
         { label: "คำขอสินค้า", view: "stock-requests", description: "ส่งและติดตามคำขอสินค้าระหว่างสาขา" },
         { label: "Movement & Transactions", view: "movement-trace", description: "ยอดรวม · รายการ transaction · เอกสาร" },
         ...(isAdminUser ? [{
@@ -139,6 +145,7 @@ function getNavigationGroups(isAdminUser) {
         { label: "ตรวจหมวดสินค้า", view: "category-review", description: "review queue สำหรับยืนยันหมวดสินค้า" },
         { label: "พจนานุกรมสารสำคัญ", view: "ingredient-dictionary", description: "ดูแลฐานความรู้สารสำคัญ" },
         { label: "Product Taxonomy", view: taxonomyView, description: "กำหนดประเภทสินค้าและจัดประเภทอัตโนมัติ" },
+        { label: "Taxonomy Review", view: taxonomyReviewView, description: "ยืนยันผล AI classification และจัดคิวตรวจทาน" },
         { label: "ประวัติ Sync", view: "sync-log", description: "สถานะและประวัติการ sync ข้อมูล" },
         { label: "Ingredient Mapping", description: "supervision workflow ระยะถัดไป", disabled: true },
         { label: "Product Master", description: "ทะเบียนสินค้ากลาง", disabled: true },
@@ -8650,6 +8657,8 @@ export default function App() {
           setRequestDraftItems={setRequestDraftItems}
           onClearDraft={handleClearDraft}
         />
+      ) : view === "branch-stock-history" ? (
+        <BranchStockHistoryPanel />
       ) : view === "stock-requests" ? (
         <StockRequestsPanel
           branchCode={branchCode}
@@ -8676,6 +8685,8 @@ export default function App() {
         <IngredientDictionaryPanel csrfToken={session.csrfToken} />
       ) : view === taxonomyView && isAdminUser ? (
         <ProductTaxonomyPanel csrfToken={session.csrfToken} />
+      ) : view === taxonomyReviewView && isAdminUser ? (
+        <TaxonomyReviewPanel csrfToken={session.csrfToken} />
       ) : view === "sync-log" && isAdminUser ? (
         <SyncLogPanel onUnauthorized={handleSyncUnauthorized} />
       ) : (

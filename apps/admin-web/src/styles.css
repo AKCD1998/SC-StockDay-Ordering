@@ -1001,6 +1001,32 @@ button {
   min-width: 220px;
 }
 
+.stock-history-toolbar {
+  flex-wrap: wrap;
+}
+
+.stock-history-toolbar input,
+.stock-history-toolbar select {
+  min-width: 140px;
+}
+
+.stock-history-date-sep {
+  opacity: 0.7;
+}
+
+.stock-history-pending {
+  opacity: 0.85;
+}
+
+.stock-history-table {
+  margin-top: 12px;
+}
+
+.stock-history-qty {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .branch-stock-toolbar {
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -6758,5 +6784,189 @@ select {
 [data-theme="dark"] .mvt-doc-items {
   background: rgba(8, 14, 22, 0.5);
   border-top-color: #1e2d3f;
+}
+
+.taxonomy-review-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.taxonomy-review-notice {
+  margin: 0;
+}
+
+.taxonomy-review-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.taxonomy-review-stat {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: #f8fafc;
+  display: grid;
+  gap: 6px;
+}
+
+.taxonomy-review-stat span {
+  font-size: 0.84rem;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.taxonomy-review-stat strong {
+  font-size: 1.45rem;
+  color: #0f172a;
+}
+
+.taxonomy-review-stat-auto {
+  background: #fff7e8;
+}
+
+.taxonomy-review-stat-confirmed {
+  background: #edfdf3;
+}
+
+.taxonomy-review-stat-needs_review {
+  background: #fff0f0;
+}
+
+.taxonomy-review-toolbar {
+  display: flex;
+  gap: 16px;
+  align-items: end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.taxonomy-review-filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.taxonomy-review-filters label {
+  display: grid;
+  gap: 6px;
+  min-width: 180px;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.taxonomy-review-filters select {
+  min-height: 42px;
+}
+
+.taxonomy-review-bulk-bar {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+.taxonomy-review-bulk-hint {
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.taxonomy-review-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.taxonomy-review-table th,
+.taxonomy-review-table td {
+  padding: 12px 14px;
+  vertical-align: top;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  text-align: left;
+}
+
+.taxonomy-review-table th {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.taxonomy-review-table select {
+  min-width: 150px;
+}
+
+.taxonomy-review-note-cell {
+  min-width: 320px;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.taxonomy-review-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.taxonomy-review-pagination {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  color: #475569;
+}
+
+.taxonomy-review-pagination-actions {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 960px) {
+  .taxonomy-review-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .taxonomy-review-bulk-bar {
+    justify-items: start;
+  }
+
+  .taxonomy-review-note-cell {
+    min-width: 240px;
+  }
+}
+
+[data-theme="dark"] .taxonomy-review-stat {
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(15, 23, 42, 0.78);
+}
+
+[data-theme="dark"] .taxonomy-review-stat-auto {
+  background: rgba(120, 53, 15, 0.32);
+}
+
+[data-theme="dark"] .taxonomy-review-stat-confirmed {
+  background: rgba(20, 83, 45, 0.3);
+}
+
+[data-theme="dark"] .taxonomy-review-stat-needs_review {
+  background: rgba(127, 29, 29, 0.28);
+}
+
+[data-theme="dark"] .taxonomy-review-stat span,
+[data-theme="dark"] .taxonomy-review-bulk-hint,
+[data-theme="dark"] .taxonomy-review-pagination {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .taxonomy-review-stat strong {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .taxonomy-review-table th {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .taxonomy-review-table td {
+  border-bottom-color: rgba(148, 163, 184, 0.16);
 }
 
