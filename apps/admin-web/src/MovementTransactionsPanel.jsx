@@ -1274,10 +1274,23 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch }) {
   const [sortBy, setSortBy] = useState("qty_total");
   const [sortDir, setSortDir] = useState("desc");
   const [refreshKey, setRefreshKey] = useState(0);
-  const [expandedProducts, setExpandedProducts] = useState({});
-  const [billRowsByProduct, setBillRowsByProduct] = useState({});
-  const [loadingBills, setLoadingBills] = useState({});
-  const [billErrors, setBillErrors] = useState({});
+  const [pageSize, setPageSize] = useState(50);
+  const [currentPage, setCurrentPage] = useState(1);
+  // Only one product's bill drilldown open at a time — this table can hold
+  // thousands of products (every synced item, zero-sale rows included), so
+  // letting every row accumulate its own nested bill table would keep
+  // growing the DOM with every click and never shrink back down.
+  const [expandedProductCode, setExpandedProductCode] = useState(null);
+  const [billRows, setBillRows] = useState([]);
+  const [billTruncated, setBillTruncated] = useState(false);
+  const [loadingBills, setLoadingBills] = useState(false);
+  const [billError, setBillError] = useState("");
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [dateFrom, dateTo, productSearch, sortBy, sortDir, pageSize, refreshKey]);
 
   useEffect(() => {
     let active = true;
@@ -1290,8 +1303,8 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch }) {
           date_to: dateTo,
           sort_by: sortBy,
           sort_dir: sortDir,
-          limit: "10000",
-          offset: "0",
+          limit: String(pageSize),
+          offset: String((currentPage - 1) * pageSize),
         });
         if (productSearch.trim()) params.set("product_search", productSearch.trim());
 
@@ -1316,7 +1329,7 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch }) {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [dateFrom, dateTo, productSearch, sortBy, sortDir, refreshKey]);
+  }, [dateFrom, dateTo, productSearch, sortBy, sortDir, pageSize, currentPage, refreshKey]);
 
   function handleSort(column) {
     if (column === sortBy) {
@@ -1328,26 +1341,27 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch }) {
   }
 
   async function toggleProductBills(productCode) {
-    if (expandedProducts[productCode]) {
-      setExpandedProducts((current) => ({ ...current, [productCode]: false }));
+    if (expandedProductCode === productCode) {
+      setExpandedProductCode(null);
       return;
     }
 
-    setExpandedProducts((current) => ({ ...current, [productCode]: true }));
-    if (billRowsByProduct[productCode] || loadingBills[productCode]) return;
-
-    setLoadingBills((current) => ({ ...current, [productCode]: true }));
-    setBillErrors((current) => ({ ...current, [productCode]: "" }));
+    setExpandedProductCode(productCode);
+    setBillRows([]);
+    setBillTruncated(false);
+    setBillError("");
+    setLoadingBills(true);
     try {
       const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
       const res = await apiFetch(`/api/admin/branch-product-sales/${encodeURIComponent(productCode)}/bills?${params}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setBillRowsByProduct((current) => ({ ...current, [productCode]: data.bills || [] }));
+      setBillRows(data.bills || []);
+      setBillTruncated(Boolean(data.truncated));
     } catch (err) {
-      setBillErrors((current) => ({ ...current, [productCode]: err.message || "โหลดรายบิลไม่สำเร็จ" }));
+      setBillError(err.message || "โหลดรายบิลไม่สำเร็จ");
     } finally {
-      setLoadingBills((current) => ({ ...current, [productCode]: false }));
+      setLoadingBills(false);
     }
   }
 
@@ -1364,6 +1378,16 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch }) {
         <button type="button" className="primary-button" disabled={loading} onClick={() => setRefreshKey((current) => current + 1)}>
           {loading ? "กำลังโหลด..." : "รีเฟรชรายงานสินค้า"}
         </button>
+        <select
+          className="srq-branch-filter"
+          value={pageSize}
+          onChange={(e) => setPageSize(Number(e.target.value))}
+          aria-label="จำนวนรายการต่อหน้า"
+        >
+          <option value={10}>10 รายการ/หน้า</option>
+          <option value={50}>50 รายการ/หน้า</option>
+          <option value={100}>100 รายการ/หน้า</option>
+        </select>
         {!loading && !error && (
           <span className="meta-line">{total} สินค้า · {dateFrom} ถึง {dateTo}</span>
         )}
@@ -1397,9 +1421,7 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch }) {
             </thead>
             <tbody>
               {rows.map((product) => {
-                const bills = billRowsByProduct[product.product_code] || [];
-                const rowError = billErrors[product.product_code];
-                const isExpanded = !!expandedProducts[product.product_code];
+                const isExpanded = expandedProductCode === product.product_code;
                 return (
                   <Fragment key={product.product_code}>
                     <tr>
@@ -1436,45 +1458,50 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch }) {
                               <span>{product.product_name}</span>
                             </div>
 
-                            {loadingBills[product.product_code] ? (
+                            {loadingBills ? (
                               <p className="meta-line">กำลังโหลดรายบิล...</p>
-                            ) : rowError ? (
-                              <div className="notice error compact">{rowError}</div>
-                            ) : bills.length === 0 ? (
+                            ) : billError ? (
+                              <div className="notice error compact">{billError}</div>
+                            ) : billRows.length === 0 ? (
                               <p className="empty-state">ไม่มีบิลขายสำหรับสินค้านี้ในช่วงวันที่ที่เลือก</p>
                             ) : (
-                              <div className="table-wrap">
-                                <table className="mvt-sales-table mvt-branch-sales-bills">
-                                  <thead>
-                                    <tr>
-                                      <th>วันที่</th>
-                                      <th>เวลา</th>
-                                      <th>เลขบิล</th>
-                                      <th>สาขา</th>
-                                      <th style={{ textAlign: "right" }}>จำนวน</th>
-                                      <th style={{ textAlign: "right" }}>มูลค่า</th>
-                                      <th>หน่วย</th>
-                                      <th>Cashier</th>
-                                      <th>Customer</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {bills.map((bill) => (
-                                      <tr key={`${bill.bill_no}-${bill.sale_date}-${bill.sale_time || ""}`}>
-                                        <td>{bill.sale_date || "-"}</td>
-                                        <td>{bill.sale_time || "-"}</td>
-                                        <td><span className="mvt-doc-no">{bill.bill_no}</span></td>
-                                        <td>{bill.branch_code ? `สาขา ${bill.branch_code}` : "-"}</td>
-                                        <td className="mvt-sales-qty-cell">{formatQty(bill.qty_total)}</td>
-                                        <td className="mvt-sales-qty-cell">{formatNumber(bill.net_amount_total, 2)}</td>
-                                        <td>{bill.unit_name || "-"}</td>
-                                        <td>{bill.cashier_code || "-"}</td>
-                                        <td>{bill.customer_code || "-"}</td>
+                              <>
+                                {billTruncated ? (
+                                  <p className="notice compact">แสดงเฉพาะ 500 บิลล่าสุด — เลือกช่วงวันที่ให้แคบลงเพื่อดูครบทุกบิล</p>
+                                ) : null}
+                                <div className="table-wrap">
+                                  <table className="mvt-sales-table mvt-branch-sales-bills">
+                                    <thead>
+                                      <tr>
+                                        <th>วันที่</th>
+                                        <th>เวลา</th>
+                                        <th>เลขบิล</th>
+                                        <th>สาขา</th>
+                                        <th style={{ textAlign: "right" }}>จำนวน</th>
+                                        <th style={{ textAlign: "right" }}>มูลค่า</th>
+                                        <th>หน่วย</th>
+                                        <th>Cashier</th>
+                                        <th>Customer</th>
                                       </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
+                                    </thead>
+                                    <tbody>
+                                      {billRows.map((bill) => (
+                                        <tr key={`${bill.bill_no}-${bill.sale_date}-${bill.sale_time || ""}`}>
+                                          <td>{bill.sale_date || "-"}</td>
+                                          <td>{bill.sale_time || "-"}</td>
+                                          <td><span className="mvt-doc-no">{bill.bill_no}</span></td>
+                                          <td>{bill.branch_code ? `สาขา ${bill.branch_code}` : "-"}</td>
+                                          <td className="mvt-sales-qty-cell">{formatQty(bill.qty_total)}</td>
+                                          <td className="mvt-sales-qty-cell">{formatNumber(bill.net_amount_total, 2)}</td>
+                                          <td>{bill.unit_name || "-"}</td>
+                                          <td>{bill.cashier_code || "-"}</td>
+                                          <td>{bill.customer_code || "-"}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </>
                             )}
                           </div>
                         </td>
@@ -1487,6 +1514,28 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch }) {
           </table>
         </div>
       )}
+
+      {total > 0 ? (
+        <div className="srq-pagination">
+          <button
+            type="button"
+            className="ghost-button srq-pagination-nav"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage <= 1}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="srq-pagination-label">หน้า {currentPage} จาก {totalPages}</span>
+          <button
+            type="button"
+            className="ghost-button srq-pagination-nav"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage >= totalPages}
+          >
+            ถัดไป
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
