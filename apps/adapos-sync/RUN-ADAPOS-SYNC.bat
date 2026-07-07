@@ -10,7 +10,13 @@ echo Make sure AdaPOS Back Office is already open and logged in.
 echo This will run the branch sync now.
 echo.
 
-powershell -ExecutionPolicy Bypass -NoProfile -File "%~dp0open-adapos-and-sync.ps1"
+REM Task Scheduler passes args in either order, e.g. "nopause" or
+REM "nopause eveningcheck" (evening trigger only - see register-task.ps1).
+set "SKIP_ARG="
+if /i "%~1"=="eveningcheck" set "SKIP_ARG=-SkipIfSyncedToday"
+if /i "%~2"=="eveningcheck" set "SKIP_ARG=-SkipIfSyncedToday"
+
+powershell -ExecutionPolicy Bypass -NoProfile -File "%~dp0open-adapos-and-sync.ps1" %SKIP_ARG%
 set "EXIT_CODE=%ERRORLEVEL%"
 
 REM Thai status message lives in show-result.ps1 (UTF-8). Keeping it out of this
@@ -20,4 +26,4 @@ powershell -ExecutionPolicy Bypass -NoProfile -File "%~dp0show-result.ps1" -Exit
 
 REM Skip the interactive pause when launched non-interactively (e.g. Task
 REM Scheduler passes "nopause"); otherwise the scheduled run hangs here forever.
-if /i not "%~1"=="nopause" pause >nul
+if /i not "%~1"=="nopause" if /i not "%~2"=="nopause" pause >nul

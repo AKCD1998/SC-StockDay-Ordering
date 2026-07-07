@@ -1,12 +1,18 @@
 # register-task.ps1
-# Registers a Windows Scheduled Task that fires RUN-ADAPOS-SYNC.bat at 08:20
-# and 19:20 daily for this machine.
+# Registers TWO Windows Scheduled Tasks for this machine:
+#   - 08:20 daily: normal full sync
+#   - 19:20 daily: same sync, but passes "eveningcheck" to RUN-ADAPOS-SYNC.bat,
+#     which adds --skip-if-synced-today so it only re-sends stock if the
+#     morning run didn't already succeed (AdaPOS itself only recomputes
+#     current stock once a day, so an unconditional evening resend would
+#     just repost identical numbers).
 #
 # Run this ONCE per machine, as Administrator:
 #   powershell -ExecutionPolicy Bypass -File register-task.ps1 -Branch 000
 #
-# To remove the task later:
-#   Unregister-ScheduledTask -TaskName "AdaPOS Sync (Branch 000)" -Confirm:$false
+# To remove the tasks later:
+#   Unregister-ScheduledTask -TaskName "AdaPOS Sync (Branch 000) - Morning" -Confirm:$false
+#   Unregister-ScheduledTask -TaskName "AdaPOS Sync (Branch 000) - Evening" -Confirm:$false
 
 param(
   [string]$Branch   = "000",
@@ -31,26 +37,31 @@ if (-not (Test-Path $BatScript)) {
   exit 1
 }
 
-# --- Remove existing task with the same name (idempotent) -------------------
-$existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-if ($existing) {
-  Write-Output "Existing task '$TaskName' found - replacing it."
-  Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+$MorningTaskName = "$TaskName - Morning"
+$EveningTaskName = "$TaskName - Evening"
+
+# --- Remove existing tasks with the same names (idempotent) ------------------
+foreach ($name in @($MorningTaskName, $EveningTaskName)) {
+  $existing = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
+  if ($existing) {
+    Write-Output "Existing task '$name' found - replacing it."
+    Unregister-ScheduledTask -TaskName $name -Confirm:$false
+  }
 }
 
-# --- Build the task ---------------------------------------------------------
-# Action: cmd.exe calls the .bat with "nopause" so the window doesn't hang
-# waiting for a keypress when run unattended by Task Scheduler.
-$Action = New-ScheduledTaskAction `
+# --- Build the actions --------------------------------------------------------
+# "nopause" so the window doesn't hang waiting for a keypress when run
+# unattended. "eveningcheck" (evening only) makes the .bat add
+# -SkipIfSyncedToday when it calls open-adapos-and-sync.ps1.
+$MorningAction = New-ScheduledTaskAction `
   -Execute   "cmd.exe" `
   -Argument  "/c `"$BatScript`" nopause" `
   -WorkingDirectory $ScriptDir
 
-# Triggers: daily at 08:20 and 19:20.
-$Triggers = @(
-  (New-ScheduledTaskTrigger -Daily -At "08:20"),
-  (New-ScheduledTaskTrigger -Daily -At "19:20")
-)
+$EveningAction = New-ScheduledTaskAction `
+  -Execute   "cmd.exe" `
+  -Argument  "/c `"$BatScript`" nopause eveningcheck" `
+  -WorkingDirectory $ScriptDir
 
 # Settings:
 #   - StartWhenAvailable: if the trigger was missed (PC was off), run as soon as PC comes back on
@@ -69,22 +80,32 @@ $Principal = New-ScheduledTaskPrincipal `
   -LogonType ServiceAccount `
   -RunLevel Highest
 
-# --- Register ---------------------------------------------------------------
+# --- Register both tasks ------------------------------------------------------
 Register-ScheduledTask `
-  -TaskName    $TaskName `
-  -Action      $Action `
-  -Trigger     $Triggers `
+  -TaskName    $MorningTaskName `
+  -Action      $MorningAction `
+  -Trigger     (New-ScheduledTaskTrigger -Daily -At "08:20") `
   -Settings    $Settings `
   -Principal   $Principal `
-  -Description "Runs RUN-ADAPOS-SYNC.bat at 08:20 and 19:20 daily for branch $Branch." | Out-Null
+  -Description "Runs RUN-ADAPOS-SYNC.bat at 08:20 daily for branch $Branch (normal full sync)." | Out-Null
+
+Register-ScheduledTask `
+  -TaskName    $EveningTaskName `
+  -Action      $EveningAction `
+  -Trigger     (New-ScheduledTaskTrigger -Daily -At "19:20") `
+  -Settings    $Settings `
+  -Principal   $Principal `
+  -Description "Runs RUN-ADAPOS-SYNC.bat at 19:20 daily for branch $Branch (skips resync if 08:20 already succeeded)." | Out-Null
 
 Write-Output ""
-Write-Output "Task registered:"
-Get-ScheduledTask -TaskName $TaskName |
+Write-Output "Tasks registered:"
+Get-ScheduledTask -TaskName $MorningTaskName, $EveningTaskName |
   Format-List TaskName, State,
     @{N='NextRun';   E={(Get-ScheduledTaskInfo $_).NextRunTime}},
     @{N='Command';   E={ $_.Actions[0].Execute + ' ' + $_.Actions[0].Arguments }}
 
 Write-Output ""
-Write-Output "Done. The task will fire at 08:20 and 19:20 every day."
-Write-Output "To remove it later:  Unregister-ScheduledTask -TaskName `"$TaskName`" -Confirm:`$false"
+Write-Output "Done. Morning task fires at 08:20 (full sync); evening task fires at 19:20 (skips if morning already succeeded)."
+Write-Output "To remove them later:"
+Write-Output "  Unregister-ScheduledTask -TaskName `"$MorningTaskName`" -Confirm:`$false"
+Write-Output "  Unregister-ScheduledTask -TaskName `"$EveningTaskName`" -Confirm:`$false"

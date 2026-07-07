@@ -6,7 +6,11 @@
 
 param(
   [string]$Branch = "",
-  [string]$NodeExe = "C:\Program Files\nodejs\node.exe"
+  [string]$NodeExe = "C:\Program Files\nodejs\node.exe",
+  # Pass this on the 19:20 evening trigger only. It makes the sync agent check
+  # whether the 08:20 run already succeeded today and, if so, send a heartbeat
+  # and skip the full resync instead of re-sending unchanged stock numbers.
+  [switch]$SkipIfSyncedToday
 )
 
 $ErrorActionPreference = "Stop"
@@ -68,12 +72,13 @@ if (-not $Branch) {
   throw "Branch is required. Pass -Branch 005 or set ADAPOS_SYNC_BRANCH_CODE in apps\adapos-sync\.env."
 }
 
-Write-Log "Starting sync for branch $Branch."
-$exitCode = Invoke-LoggedProcess -FilePath $NodeExe -ArgumentList @(
-  "src/index.js",
-  "--execute",
-  "--branch=$Branch"
-)
+$SyncArgs = @("src/index.js", "--execute", "--branch=$Branch")
+if ($SkipIfSyncedToday) {
+  $SyncArgs += "--skip-if-synced-today"
+}
+
+Write-Log "Starting sync for branch $Branch.$(if ($SkipIfSyncedToday) { ' (evening skip-if-synced-today check)' })"
+$exitCode = Invoke-LoggedProcess -FilePath $NodeExe -ArgumentList $SyncArgs
 $global:LASTEXITCODE = $exitCode
 
 if ($LASTEXITCODE -ne 0) {
