@@ -2,19 +2,12 @@ import { useEffect, useState } from "react";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
-// Only branch 005 has a live AdaAcc connection reachable over Tailscale right
-// now, so it is the only branch that can actually have rows in
-// ada.stock_snapshots yet. The other branches are wired up on the UI (so the
-// selector doesn't need to change again once they come online) but show a
-// "pending sync" placeholder instead of calling the API, since calling it
-// would just return an empty result that looks indistinguishable from "no
-// stock movement," which is misleading.
-const BRANCH_OPTIONS = [
-  { branchCode: "000", label: "สาขา 000 (HQ)", synced: false },
-  { branchCode: "001", label: "สาขา 001", synced: false },
-  { branchCode: "003", label: "สาขา 003", synced: false },
-  { branchCode: "004", label: "สาขา 004", synced: false },
-  { branchCode: "005", label: "สาขา 005", synced: true },
+const BRANCH_COLUMNS = [
+  { code: "000", label: "สาขา 000 (HQ)" },
+  { code: "001", label: "สาขา 001" },
+  { code: "003", label: "สาขา 003" },
+  { code: "004", label: "สาขา 004" },
+  { code: "005", label: "สาขา 005" },
 ];
 
 function formatNumber(value) {
@@ -22,20 +15,12 @@ function formatNumber(value) {
   return Number(value).toLocaleString("th-TH", { maximumFractionDigits: 2 });
 }
 
-function formatDateTime(value) {
-  if (!value) return "-";
-  return new Date(value).toLocaleString("th-TH");
-}
-
-function todayInputValue() {
-  const now = new Date();
-  return now.toISOString().slice(0, 10);
-}
-
-function daysAgoInputValue(days) {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date.toISOString().slice(0, 10);
+// datetime-local inputs give "YYYY-MM-DDTHH:mm" in the browser's local time —
+// interpret it as such and convert to an ISO instant for the API.
+function toIsoOrNull(datetimeLocalValue) {
+  if (!datetimeLocalValue) return null;
+  const parsed = new Date(datetimeLocalValue);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
 async function apiFetch(path) {
@@ -43,37 +28,31 @@ async function apiFetch(path) {
 }
 
 export default function BranchStockHistoryPanel() {
-  const [branchCode, setBranchCode] = useState("005");
   const [productCode, setProductCode] = useState("");
-  const [dateFrom, setDateFrom] = useState(daysAgoInputValue(7));
-  const [dateTo, setDateTo] = useState(todayInputValue());
+  const [atFromInput, setAtFromInput] = useState("");
+  const [atToInput, setAtToInput] = useState("");
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
 
-  const selectedBranch = BRANCH_OPTIONS.find((b) => b.branchCode === branchCode) || BRANCH_OPTIONS[0];
-
-  async function handleSearch(event) {
-    event.preventDefault();
-    if (!selectedBranch.synced) {
-      // Nothing to fetch — the placeholder below already explains why.
-      setRecords([]);
-      setError("");
-      setHasSearched(true);
-      return;
-    }
+  // Accepts overrides so callers that just changed state (e.g. the clear
+  // buttons) can search with the new values immediately, without waiting a
+  // render for setState to land in atFromInput/atToInput.
+  async function runSearch({ productCode: productCodeOverride, atFromInput: atFromOverride, atToInput: atToOverride } = {}) {
     setLoading(true);
     setError("");
     try {
-      const params = new URLSearchParams({
-        branch_code: branchCode,
-        date_from: dateFrom,
-        date_to: dateTo,
-      });
-      if (productCode.trim()) {
-        params.set("product_code", productCode.trim());
+      const params = new URLSearchParams();
+      const effectiveProductCode = (productCodeOverride ?? productCode).trim();
+      if (effectiveProductCode) {
+        params.set("product_code", effectiveProductCode);
       }
+      const atFrom = toIsoOrNull(atFromOverride ?? atFromInput);
+      const atTo = toIsoOrNull(atToOverride ?? atToInput);
+      if (atFrom) params.set("at_from", atFrom);
+      if (atTo) params.set("at_to", atTo);
+
       const response = await apiFetch(`/api/branch-stock/history?${params.toString()}`);
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
@@ -90,13 +69,28 @@ export default function BranchStockHistoryPanel() {
     }
   }
 
+  function handleSearch(event) {
+    event?.preventDefault?.();
+    return runSearch();
+  }
+
+  function clearAtFrom() {
+    setAtFromInput("");
+    runSearch({ atFromInput: "" });
+  }
+
+  function clearAtTo() {
+    setAtToInput("");
+    runSearch({ atToInput: "" });
+  }
+
   useEffect(() => {
-    // Re-run the search automatically when switching branch, so the "pending
-    // sync" placeholder (or a fresh table) shows immediately without the user
-    // needing to press search again.
-    handleSearch({ preventDefault: () => {} });
+    // Show the latest snapshot on first load, same as clearing both dates.
+    runSearch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [branchCode]);
+  }, []);
+
+  const hasTimeFilter = Boolean(atFromInput || atToInput);
 
   return (
     <section className="panel stock-history-panel">
@@ -109,55 +103,87 @@ export default function BranchStockHistoryPanel() {
       </div>
 
       <form className="toolbar stock-history-toolbar" onSubmit={handleSearch}>
-        <select value={branchCode} onChange={(event) => setBranchCode(event.target.value)}>
-          {BRANCH_OPTIONS.map((option) => (
-            <option key={option.branchCode} value={option.branchCode}>
-              {option.label}
-            </option>
-          ))}
-        </select>
         <input
           type="text"
           placeholder="รหัสสินค้า (ไม่บังคับ)"
           value={productCode}
           onChange={(event) => setProductCode(event.target.value)}
         />
-        <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+        <div className="stock-history-datetime-field">
+          <input
+            type="datetime-local"
+            aria-label="จากวันเวลา"
+            value={atFromInput}
+            onChange={(event) => setAtFromInput(event.target.value)}
+          />
+          {atFromInput ? (
+            <button
+              type="button"
+              className="stock-history-datetime-clear"
+              aria-label="ล้างจากวันเวลา"
+              onClick={clearAtFrom}
+            >
+              ×
+            </button>
+          ) : null}
+        </div>
         <span className="stock-history-date-sep">ถึง</span>
-        <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
-        <button type="submit" className="ghost-button" disabled={loading || !selectedBranch.synced}>
+        <div className="stock-history-datetime-field">
+          <input
+            type="datetime-local"
+            aria-label="ถึงวันเวลา"
+            value={atToInput}
+            onChange={(event) => setAtToInput(event.target.value)}
+          />
+          {atToInput ? (
+            <button
+              type="button"
+              className="stock-history-datetime-clear"
+              aria-label="ล้างถึงวันเวลา"
+              onClick={clearAtTo}
+            >
+              ×
+            </button>
+          ) : null}
+        </div>
+        <button type="submit" className="ghost-button" disabled={loading}>
           {loading ? "กำลังค้นหา..." : "ค้นหา"}
         </button>
       </form>
 
+      <p className="meta-line stock-history-hint">
+        {hasTimeFilter
+          ? "แสดง snapshot ที่ใกล้เคียงที่สุดหลังจากเวลาที่ตั้ง (หรือก่อนหน้า ถ้าตั้งแค่ \"ถึง\")"
+          : "ยังไม่ได้ตั้งช่วงเวลา — แสดงยอดล่าสุดของแต่ละสาขา"}
+      </p>
+
       {error && <div className="notice error">{error}</div>}
 
-      {!selectedBranch.synced ? (
-        <div className="notice stock-history-pending">
-          {selectedBranch.label}: ยังไม่มีข้อมูล sync ย้อนหลัง — ตอนนี้เชื่อมต่อได้เฉพาะสาขา 005 ผ่าน
-          Tailscale เท่านั้น สาขาอื่นจะแสดงข้อมูลได้เมื่อเริ่ม sync จริง
-        </div>
-      ) : hasSearched && !loading && !error && records.length === 0 ? (
-        <div className="notice">ไม่พบข้อมูลในช่วงวันที่ที่เลือก</div>
+      {hasSearched && !loading && !error && records.length === 0 ? (
+        <div className="notice">ไม่พบข้อมูลในช่วงเวลาที่เลือก</div>
       ) : records.length > 0 ? (
         <table className="stock-history-table">
           <thead>
             <tr>
-              <th>วันที่/เวลา sync</th>
               <th>รหัสสินค้า</th>
               <th>ชื่อสินค้า</th>
-              <th>จำนวน</th>
-              <th>หน่วย</th>
+              {BRANCH_COLUMNS.map((col) => (
+                <th key={col.code}>{col.label}</th>
+              ))}
+              <th>รวมทุกสาขา</th>
             </tr>
           </thead>
           <tbody>
-            {records.map((row, index) => (
-              <tr key={`${row.productCode}-${row.snapshotAt}-${index}`}>
-                <td>{formatDateTime(row.snapshotAt)}</td>
+            {records.map((row) => (
+              <tr key={row.productCode}>
                 <td>{row.productCode}</td>
                 <td>{row.productNameThai || "-"}</td>
-                <td className="stock-history-qty">{formatNumber(row.qty)}</td>
-                <td>{row.unit || "-"}</td>
+                {BRANCH_COLUMNS.map((col) => (
+                  <td key={col.code} className="stock-history-qty">
+                    {formatNumber(row[`qtyBranch${col.code}`])}
+                  </td>
+                ))}
+                <td className="stock-history-qty">{formatNumber(row.qtyTotalAllBranches)}</td>
               </tr>
             ))}
           </tbody>
