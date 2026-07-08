@@ -1416,6 +1416,11 @@ button {
   font-size: 0.9rem;
 }
 
+.mvt-sales-coverage-line {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+}
+
 .table-wrap {
   overflow: auto;
 }

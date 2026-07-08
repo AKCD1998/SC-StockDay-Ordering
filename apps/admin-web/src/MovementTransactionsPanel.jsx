@@ -1298,6 +1298,7 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch }) {
   const [billTruncated, setBillTruncated] = useState(false);
   const [loadingBills, setLoadingBills] = useState(false);
   const [billError, setBillError] = useState("");
+  const [dataCoverage, setDataCoverage] = useState([]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -1327,10 +1328,12 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch }) {
         if (!active) return;
         setRows(data.products || []);
         setTotal(Number(data.total || 0));
+        setDataCoverage(Array.isArray(data.data_coverage_by_branch) ? data.data_coverage_by_branch : []);
       } catch (err) {
         if (active) {
           setRows([]);
           setTotal(0);
+          setDataCoverage([]);
           setError(err.message || "โหลดรายงานสินค้าที่ขายไม่สำเร็จ");
         }
       } finally {
@@ -1405,6 +1408,18 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch }) {
           <span className="meta-line">{total} สินค้า · {dateFrom} ถึง {dateTo}</span>
         )}
       </div>
+
+      {!loading && !error && dataCoverage.length > 0 ? (
+        <p className="meta-line mvt-sales-coverage-line">
+          ข้อมูล sync จริง:{" "}
+          {dataCoverage.map((c, i) => (
+            <span key={c.branch_code}>
+              {i > 0 ? " · " : ""}
+              สาขา {c.branch_code}: {formatSaleDate(c.earliest_date)}–{formatSaleDate(c.latest_date)} ({formatNumber(c.bill_count)} บิล)
+            </span>
+          ))}
+        </p>
+      ) : null}
 
       {error ? <div className="notice error compact">{error}</div> : null}
 
