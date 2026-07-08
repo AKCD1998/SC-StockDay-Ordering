@@ -211,6 +211,7 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
 
   const [activeTab, setActiveTab] = useState("summary");
   const [options, setOptions] = useState({ categories: [], brands: [], branches: [] });
+  const [dataCoverage, setDataCoverage] = useState([]);
 
   useEffect(() => {
     let active = true;
@@ -221,6 +222,57 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
     }).catch(() => {});
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    apiFetch("/api/admin/sales-sync-coverage").then(async (res) => {
+      if (!res.ok || !active) return;
+      const data = await res.json();
+      if (active) setDataCoverage(Array.isArray(data.data_coverage_by_branch) ? data.data_coverage_by_branch : []);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  // Only meaningful on the sales-report tabs — Summary/Transactions/Documents
+  // can show transfer/receipt data outside the sales-sync window, so clamping
+  // the shared date filter there would hide real data on those tabs.
+  const isSalesReportTab = activeTab === "sales" || activeTab === "sold-qty";
+  const coverageBounds = (() => {
+    if (dataCoverage.length === 0) return null;
+    const relevant = selectedBranch
+      ? dataCoverage.filter((c) => c.branch_code === selectedBranch)
+      : dataCoverage;
+    if (relevant.length === 0) return null;
+    const toDateOnly = (v) => String(v).slice(0, 10);
+    const earliest = relevant.map((c) => toDateOnly(c.earliest_date)).sort()[0];
+    const latest = relevant.map((c) => toDateOnly(c.latest_date)).sort().slice(-1)[0];
+    return { min: earliest, max: latest };
+  })();
+
+  // The default filter range (today, minus 30 days) can easily fall outside
+  // the sales-sync coverage window (e.g. sync stops at 2026-07-07 but "today"
+  // is later) — clamp instead of leaving the date input sitting in the
+  // browser's native "invalid" state indefinitely while quietly still
+  // fetching an out-of-range window.
+  useEffect(() => {
+    if (!isSalesReportTab || !coverageBounds) return;
+    const clamp = (value) => {
+      if (value < coverageBounds.min) return coverageBounds.min;
+      if (value > coverageBounds.max) return coverageBounds.max;
+      return value;
+    };
+    const clampedFrom = clamp(dateFrom);
+    const clampedTo = clamp(dateTo);
+    if (clampedFrom !== dateFrom) setDateFrom(clampedFrom);
+    if (clampedTo !== dateTo) setDateTo(clampedTo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSalesReportTab, coverageBounds?.min, coverageBounds?.max]);
+
+  function handleViewAllSyncedDates() {
+    if (!coverageBounds) return;
+    setDateFrom(coverageBounds.min);
+    setDateTo(coverageBounds.max);
+  }
 
   function switchTab(tab) {
     setActiveTab(tab);
@@ -259,12 +311,34 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
         </label>
         <label className="mvt-filter-field">
           <span>จากวันที่</span>
-          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            min={isSalesReportTab ? coverageBounds?.min : undefined}
+            max={isSalesReportTab ? coverageBounds?.max : undefined}
+          />
         </label>
         <label className="mvt-filter-field">
           <span>ถึงวันที่</span>
-          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            min={isSalesReportTab ? coverageBounds?.min : undefined}
+            max={isSalesReportTab ? coverageBounds?.max : undefined}
+          />
         </label>
+        {isSalesReportTab && coverageBounds ? (
+          <button
+            type="button"
+            className="ghost-button mvt-view-all-dates"
+            onClick={handleViewAllSyncedDates}
+            title={`ดูตั้งแต่ ${coverageBounds.min} ถึง ${coverageBounds.max}`}
+          >
+            ดูทั้งหมด
+          </button>
+        ) : null}
         {(activeTab === "transactions" || activeTab === "documents") && (
           <label className="mvt-filter-field mvt-filter-grow">
             <span>ค้นหาสินค้า / เลขเอกสาร</span>
@@ -357,6 +431,7 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
           dateFrom={dateFrom}
           dateTo={dateTo}
           productSearch={salesSearch}
+          dataCoverage={dataCoverage}
         />
       )}
       {activeTab === "documents" && (
@@ -1279,7 +1354,7 @@ const SOLD_QTY_BRANCH_COLUMNS = [
   { code: "005", label: "สาขา 005" },
 ];
 
-function SoldQuantityTab({ dateFrom, dateTo, productSearch }) {
+function SoldQuantityTab({ dateFrom, dateTo, productSearch, dataCoverage }) {
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -1298,7 +1373,6 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch }) {
   const [billTruncated, setBillTruncated] = useState(false);
   const [loadingBills, setLoadingBills] = useState(false);
   const [billError, setBillError] = useState("");
-  const [dataCoverage, setDataCoverage] = useState([]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -1328,12 +1402,10 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch }) {
         if (!active) return;
         setRows(data.products || []);
         setTotal(Number(data.total || 0));
-        setDataCoverage(Array.isArray(data.data_coverage_by_branch) ? data.data_coverage_by_branch : []);
       } catch (err) {
         if (active) {
           setRows([]);
           setTotal(0);
-          setDataCoverage([]);
           setError(err.message || "โหลดรายงานสินค้าที่ขายไม่สำเร็จ");
         }
       } finally {
