@@ -2,11 +2,11 @@
 #
 # Chunked historical backfill runner. Loops --date-from/--date-to over a list
 # of date ranges (newest -> oldest), running only the sales_detail dataset
-# (bill + line level sales — the one dataset that actually honors an explicit
+# (bill + line level sales - the one dataset that actually honors an explicit
 # date range; products/branch_stock/transfers are "current state" snapshots
 # and would just waste time re-sending today's data on every chunk).
 #
-# Stops immediately on the first failing chunk — never skips ahead — so a
+# Stops immediately on the first failing chunk - never skips ahead - so a
 # partial backfill is always resumable: fix the cause, then re-run with
 # -StartAtIndex pointing at the failed chunk. Already-posted chunks are safe
 # to re-run (unique key on branch+doc_no in the backend), so re-running from
@@ -38,10 +38,10 @@ $AgentDir  = Split-Path $ScriptDir -Parent   # apps/adapos-sync
 $LogDir    = Join-Path $AgentDir "logs\backfill-branch$Branch"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
-# ── Branch 004 chunk plan ────────────────────────────────────────────────────
+# --- Branch 004 chunk plan ---------------------------------------------------
 # Derived from the AdaAcc survey (TPSTSalHD, 2024-04-01 .. 2026-07-07):
 # normal months (<8,000 bills) run as one chunk; months with an unusual sales
-# spike (>=8,000 bills — Nov 2024 through Jun 2025, plus Dec 2025) are split
+# spike (>=8,000 bills - Nov 2024 through Jun 2025, plus Dec 2025) are split
 # into three ~10-day chunks so no single request is larger than what's already
 # been proven safe (branch 005's full backfill was ~5,000 bills in one shot).
 # Newest -> oldest: today's data is useful immediately, and if this list has
@@ -125,7 +125,7 @@ for ($i = $StartAtIndex; $i -le $total; $i++) {
 
   if ($psi.ExitCode -ne 0) {
     Write-Output ""
-    Write-Output "STOPPED at chunk $i ($from -> $to) — exit code $($psi.ExitCode)."
+    Write-Output "STOPPED at chunk $i ($from -> $to) - exit code $($psi.ExitCode)."
     Write-Output "Log:       $logFile"
     Write-Output "Error log: $logFile.err"
     Write-Output ""
@@ -134,7 +134,7 @@ for ($i = $StartAtIndex; $i -le $total; $i++) {
     exit 1
   }
 
-  Write-Output "  OK — log: $logFile"
+  Write-Output "  OK - log: $logFile"
   if ($i -lt $total) {
     Start-Sleep -Seconds $PauseSeconds
   }
