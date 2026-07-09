@@ -117,6 +117,10 @@ function RequestDetail({ publicId }) {
                     {line.requestedQty.toLocaleString("th-TH")} {line.unit || ""}
                   </strong>
                   <span className="subtle">
+                    สต๊อกปัจจุบันฝั่งสาขา: {line.currentQty == null ? "-" : line.currentQty.toLocaleString("th-TH")}{" "}
+                    {line.unit || ""}
+                  </span>
+                  <span className="subtle">
                     {line.response
                       ? `ตอบกลับ: ${statusLabel(line.response.status)} (${Number(
                           line.response.approvedQty || 0,

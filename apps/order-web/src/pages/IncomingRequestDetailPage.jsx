@@ -5,6 +5,7 @@ import FulfillmentForm from "../components/FulfillmentForm";
 import FulfillmentReport from "../components/FulfillmentReport";
 import RequestStatusPill from "../components/RequestStatusPill";
 import { ApiError, api } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 import { formatBranchLabel } from "../lib/requestCart";
 import { statusLabel } from "../lib/requestStatus";
 import {
@@ -24,7 +25,7 @@ const STATUS_OPTIONS = [
   { value: "REJECTED", label: "ปฏิเสธ" },
 ];
 
-function LineResponseEditor({ line, draftLine, error, onChange }) {
+function LineResponseEditor({ line, draftLine, error, onChange, isAdmin }) {
   return (
     <article className="basket-row response-line-row">
       <div className="basket-main">
@@ -33,10 +34,16 @@ function LineResponseEditor({ line, draftLine, error, onChange }) {
           {line.productCode} · ขอ {line.requestedQty.toLocaleString("th-TH")} {line.unit || ""}
         </span>
         <span className="subtle">
-          snapshot: {line.snapshotQty == null ? "-" : line.snapshotQty.toLocaleString("th-TH")}{" "}
+          สต๊อกปัจจุบัน: {line.currentQty == null ? "-" : line.currentQty.toLocaleString("th-TH")}{" "}
           {line.unit || ""}
-          {isSnapshotStale(line.snapshotSyncedAt) ? " (เก่ากว่า 24 ชม.)" : ""}
         </span>
+        {isAdmin ? (
+          <span className="subtle">
+            (ตอนขอ: {line.snapshotQty == null ? "-" : line.snapshotQty.toLocaleString("th-TH")}{" "}
+            {line.unit || ""}
+            {isSnapshotStale(line.snapshotSyncedAt) ? " · เก่ากว่า 24 ชม." : ""})
+          </span>
+        ) : null}
       </div>
 
       <div className="response-controls">
@@ -104,6 +111,8 @@ function ReadOnlyLine({ line }) {
 
 export default function IncomingRequestDetailPage() {
   const { publicId } = useParams();
+  const { session } = useAuth();
+  const isAdmin = session?.role === "admin";
   const [state, setState] = useState({ status: "loading", request: null, error: "" });
   const [draft, setDraft] = useState({});
   const [draftErrors, setDraftErrors] = useState({});
@@ -278,6 +287,7 @@ export default function IncomingRequestDetailPage() {
                     draftLine={draft[line.lineId] || { responseStatus: "APPROVED_FULL" }}
                     error={draftErrors[line.lineId]}
                     onChange={handleLineChange}
+                    isAdmin={isAdmin}
                   />
                 ))}
               </div>
