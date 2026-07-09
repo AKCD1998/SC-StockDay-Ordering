@@ -4551,6 +4551,16 @@ input[type="radio"] {
   color: #dbe5f3;
 }
 
+[data-theme="dark"] .mvt-view-all-dates {
+  background: #facc15;
+  border-color: #facc15;
+  color: #1a1a1a;
+}
+[data-theme="dark"] .mvt-view-all-dates:hover {
+  background: #eab308;
+  border-color: #eab308;
+}
+
 [data-theme="dark"] .branch-context-card {
   border-color: #314255;
   background: linear-gradient(180deg, #122032 0%, #16263b 100%);
@@ -6331,6 +6341,21 @@ input[type="radio"] {
 [data-theme="light"] .mvt-loading-overlay {
   background: rgba(240, 245, 255, 0.82);
   color: #1f2933;
+}
+
+.mvt-view-all-dates {
+  justify-self: start;
+  width: auto;
+  min-width: 0;
+  max-width: 220px;
+  background: #facc15;
+  border-color: #facc15;
+  color: #1a1a1a;
+  font-weight: 600;
+}
+.mvt-view-all-dates:hover {
+  background: #eab308;
+  border-color: #eab308;
 }
 
 .mvt-filter-bar {
