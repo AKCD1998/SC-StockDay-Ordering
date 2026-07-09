@@ -233,10 +233,6 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
     return () => { active = false; };
   }, []);
 
-  // Only meaningful on the sales-report tabs — Summary/Transactions/Documents
-  // can show transfer/receipt data outside the sales-sync window, so clamping
-  // the shared date filter there would hide real data on those tabs.
-  const isSalesReportTab = activeTab === "sales" || activeTab === "sold-qty";
   const coverageBounds = (() => {
     if (dataCoverage.length === 0) return null;
     const relevant = selectedBranch
@@ -255,7 +251,7 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
   // browser's native "invalid" state indefinitely while quietly still
   // fetching an out-of-range window.
   useEffect(() => {
-    if (!isSalesReportTab || !coverageBounds) return;
+    if (!coverageBounds) return;
     const clamp = (value) => {
       if (value < coverageBounds.min) return coverageBounds.min;
       if (value > coverageBounds.max) return coverageBounds.max;
@@ -266,7 +262,7 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
     if (clampedFrom !== dateFrom) setDateFrom(clampedFrom);
     if (clampedTo !== dateTo) setDateTo(clampedTo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSalesReportTab, coverageBounds?.min, coverageBounds?.max]);
+  }, [coverageBounds?.min, coverageBounds?.max]);
 
   function handleViewAllSyncedDates() {
     if (!coverageBounds) return;
@@ -315,8 +311,8 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            min={isSalesReportTab ? coverageBounds?.min : undefined}
-            max={isSalesReportTab ? coverageBounds?.max : undefined}
+            min={coverageBounds?.min}
+            max={coverageBounds?.max}
           />
         </label>
         <label className="mvt-filter-field">
@@ -325,11 +321,11 @@ export default function MovementAndTransactionsPanel({ branchCode, csrfToken }) 
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            min={isSalesReportTab ? coverageBounds?.min : undefined}
-            max={isSalesReportTab ? coverageBounds?.max : undefined}
+            min={coverageBounds?.min}
+            max={coverageBounds?.max}
           />
         </label>
-        {isSalesReportTab && coverageBounds ? (
+        {coverageBounds ? (
           <button
             type="button"
             className="ghost-button mvt-view-all-dates"
