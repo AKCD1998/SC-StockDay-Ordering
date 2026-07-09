@@ -1369,6 +1369,14 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch, dataCoverage }) {
   const [billTruncated, setBillTruncated] = useState(false);
   const [loadingBills, setLoadingBills] = useState(false);
   const [billError, setBillError] = useState("");
+  const [billSortBy, setBillSortBy] = useState("sale_date");
+  const [billSortDir, setBillSortDir] = useState("desc");
+  const [billFilters, setBillFilters] = useState({
+    sale_date: "",
+    sale_time: "",
+    branch_code: "",
+    qty_total: "",
+  });
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -1434,6 +1442,7 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch, dataCoverage }) {
     setBillRows([]);
     setBillTruncated(false);
     setBillError("");
+    setBillFilters({ sale_date: "", sale_time: "", branch_code: "", qty_total: "" });
     setLoadingBills(true);
     try {
       const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
@@ -1453,6 +1462,72 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch, dataCoverage }) {
     if (sortBy !== col) return <span className="mvt-sort-icon">↕</span>;
     return <span className="mvt-sort-icon active">{sortDir === "desc" ? "↓" : "↑"}</span>;
   }
+
+  function handleBillSort(column) {
+    if (column === billSortBy) {
+      setBillSortDir((current) => (current === "desc" ? "asc" : "desc"));
+      return;
+    }
+    setBillSortBy(column);
+    setBillSortDir(column === "qty_total" ? "desc" : "asc");
+  }
+
+  function handleBillFilterChange(column, value) {
+    setBillFilters((current) => ({ ...current, [column]: value }));
+  }
+
+  function BillSortIcon({ col }) {
+    if (billSortBy !== col) return <span className="mvt-sort-icon">↕</span>;
+    return <span className="mvt-sort-icon active">{billSortDir === "desc" ? "↓" : "↑"}</span>;
+  }
+
+  // Sale date/time/branch/qty are the columns staff actually scan through
+  // bill-by-bill, so those get Excel-style type-to-filter + click-to-sort;
+  // client-side is fine since the endpoint already caps this at 500 rows
+  // (see billTruncated).
+  const filteredSortedBillRows = useMemo(() => {
+    const dateNeedle = billFilters.sale_date.trim().toLowerCase();
+    const timeNeedle = billFilters.sale_time.trim().toLowerCase();
+    const branchNeedle = billFilters.branch_code.trim().toLowerCase();
+    const qtyNeedle = billFilters.qty_total.trim().toLowerCase();
+
+    const filtered = billRows.filter((bill) => {
+      if (dateNeedle && !formatSaleDate(bill.sale_date).toLowerCase().includes(dateNeedle)) return false;
+      if (timeNeedle && !String(bill.sale_time || "").toLowerCase().includes(timeNeedle)) return false;
+      if (branchNeedle) {
+        const branchLabel = bill.branch_code ? `สาขา ${bill.branch_code}` : "";
+        if (
+          !branchLabel.toLowerCase().includes(branchNeedle) &&
+          !String(bill.branch_code || "").toLowerCase().includes(branchNeedle)
+        ) {
+          return false;
+        }
+      }
+      if (qtyNeedle && !formatQty(bill.qty_total).toLowerCase().includes(qtyNeedle)) return false;
+      return true;
+    });
+
+    return [...filtered].sort((a, b) => {
+      let va;
+      let vb;
+      if (billSortBy === "sale_time") {
+        va = a.sale_time || "";
+        vb = b.sale_time || "";
+      } else if (billSortBy === "branch_code") {
+        va = a.branch_code || "";
+        vb = b.branch_code || "";
+      } else if (billSortBy === "qty_total") {
+        va = Number(a.qty_total || 0);
+        vb = Number(b.qty_total || 0);
+      } else {
+        // sale_date — tie-break on time so same-day bills stay in a sane order
+        va = `${a.sale_date || ""}T${a.sale_time || ""}`;
+        vb = `${b.sale_date || ""}T${b.sale_time || ""}`;
+      }
+      if (typeof va === "number") return billSortDir === "asc" ? va - vb : vb - va;
+      return billSortDir === "asc" ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+    });
+  }, [billRows, billFilters, billSortBy, billSortDir]);
 
   const detailColSpan = 3 + SOLD_QTY_BRANCH_COLUMNS.length;
 
@@ -1575,19 +1650,66 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch, dataCoverage }) {
                                   <table className="mvt-sales-table mvt-branch-sales-bills">
                                     <thead>
                                       <tr>
-                                        <th>วันที่</th>
-                                        <th>เวลา</th>
+                                        <th onClick={() => handleBillSort("sale_date")} style={{ cursor: "pointer" }}>
+                                          วันที่ <BillSortIcon col="sale_date" />
+                                        </th>
+                                        <th onClick={() => handleBillSort("sale_time")} style={{ cursor: "pointer" }}>
+                                          เวลา <BillSortIcon col="sale_time" />
+                                        </th>
                                         <th>เลขบิล</th>
-                                        <th>สาขา</th>
-                                        <th>จำนวน</th>
+                                        <th onClick={() => handleBillSort("branch_code")} style={{ cursor: "pointer" }}>
+                                          สาขา <BillSortIcon col="branch_code" />
+                                        </th>
+                                        <th onClick={() => handleBillSort("qty_total")} style={{ cursor: "pointer" }}>
+                                          จำนวน <BillSortIcon col="qty_total" />
+                                        </th>
                                         <th>มูลค่า</th>
                                         <th>หน่วย</th>
                                         <th>Cashier</th>
                                         <th>Customer</th>
                                       </tr>
+                                      <tr className="mvt-bill-filter-row">
+                                        <th>
+                                          <input
+                                            value={billFilters.sale_date}
+                                            onChange={(e) => handleBillFilterChange("sale_date", e.target.value)}
+                                            placeholder="พิมพ์หา..."
+                                            aria-label="กรองตามวันที่"
+                                          />
+                                        </th>
+                                        <th>
+                                          <input
+                                            value={billFilters.sale_time}
+                                            onChange={(e) => handleBillFilterChange("sale_time", e.target.value)}
+                                            placeholder="พิมพ์หา..."
+                                            aria-label="กรองตามเวลา"
+                                          />
+                                        </th>
+                                        <th></th>
+                                        <th>
+                                          <input
+                                            value={billFilters.branch_code}
+                                            onChange={(e) => handleBillFilterChange("branch_code", e.target.value)}
+                                            placeholder="พิมพ์หา..."
+                                            aria-label="กรองตามสาขา"
+                                          />
+                                        </th>
+                                        <th>
+                                          <input
+                                            value={billFilters.qty_total}
+                                            onChange={(e) => handleBillFilterChange("qty_total", e.target.value)}
+                                            placeholder="พิมพ์หา..."
+                                            aria-label="กรองตามจำนวน"
+                                          />
+                                        </th>
+                                        <th></th>
+                                        <th></th>
+                                        <th></th>
+                                        <th></th>
+                                      </tr>
                                     </thead>
                                     <tbody>
-                                      {billRows.map((bill) => (
+                                      {filteredSortedBillRows.map((bill) => (
                                         <tr key={`${bill.bill_no}-${bill.sale_date}-${bill.sale_time || ""}`}>
                                           <td>{formatSaleDate(bill.sale_date)}</td>
                                           <td>{bill.sale_time || "-"}</td>
@@ -1600,6 +1722,13 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch, dataCoverage }) {
                                           <td>{bill.customer_code || "-"}</td>
                                         </tr>
                                       ))}
+                                      {filteredSortedBillRows.length === 0 ? (
+                                        <tr>
+                                          <td colSpan={9} className="empty-state">
+                                            ไม่พบบิลที่ตรงกับตัวกรอง
+                                          </td>
+                                        </tr>
+                                      ) : null}
                                     </tbody>
                                   </table>
                                 </div>

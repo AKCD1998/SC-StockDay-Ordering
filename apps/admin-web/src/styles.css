@@ -6655,6 +6655,26 @@ input[type="radio"] {
 }
 .mvt-sort-icon.active { opacity: 1; color: #2a34ff; }
 
+.mvt-bill-filter-row th {
+  padding: 4px 8px;
+  background: #fff;
+}
+.mvt-bill-filter-row input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 3px 6px;
+  font-size: 0.78rem;
+  font-weight: 400;
+  border: 1px solid #d8dee8;
+  border-radius: 4px;
+}
+[data-theme="dark"] .mvt-bill-filter-row th { background: #1b2333; }
+[data-theme="dark"] .mvt-bill-filter-row input {
+  background: #10151f;
+  border-color: #33405a;
+  color: #e7ecf5;
+}
+
 .mvt-sales-mock-label {
   font-size: 0.82rem;
   color: #8090a8;
