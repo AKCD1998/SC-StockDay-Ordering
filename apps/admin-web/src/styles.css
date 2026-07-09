@@ -6299,6 +6299,40 @@ input[type="radio"] {
 
 /* ── Movement & Transactions page ─────────────────────────────────────────── */
 
+.mvt-loading-wrap {
+  position: relative;
+  min-height: 160px;
+}
+.mvt-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 21, 32, 0.72);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  z-index: 10;
+  border-radius: 8px;
+  color: #c8d3e2;
+  font-size: 0.92rem;
+  backdrop-filter: blur(2px);
+}
+.mvt-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.12);
+  border-top-color: #f97316;
+  border-radius: 50%;
+  animation: mvtSpinAnim 0.75s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes mvtSpinAnim { to { transform: rotate(360deg); } }
+[data-theme="light"] .mvt-loading-overlay {
+  background: rgba(240, 245, 255, 0.82);
+  color: #1f2933;
+}
+
 .mvt-filter-bar {
   display: grid;
   grid-template-columns: minmax(160px, 200px) 160px 160px 1fr;

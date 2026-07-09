@@ -1457,7 +1457,13 @@ function SoldQuantityTab({ dateFrom, dateTo, productSearch, dataCoverage }) {
   const detailColSpan = 3 + SOLD_QTY_BRANCH_COLUMNS.length;
 
   return (
-    <div className="movement-main">
+    <div className="movement-main mvt-loading-wrap">
+      {loading && (
+        <div className="mvt-loading-overlay">
+          <div className="mvt-spinner" />
+          <span>กำลังโหลดรายงานสินค้า...</span>
+        </div>
+      )}
       <div className="movement-actions">
         <button type="button" className="primary-button" disabled={loading} onClick={() => setRefreshKey((current) => current + 1)}>
           {loading ? "กำลังโหลด..." : "รีเฟรชรายงานสินค้า"}
