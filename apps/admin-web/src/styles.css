@@ -7724,6 +7724,17 @@ input[type="radio"] {
 
 .fp-table-modal .fp-table { font-size: 0.95rem; }
 
+/* The base .mvt-sales-table forces white-space: nowrap on every cell, which
+   is fine in its native scrollable panel but defeats the purpose of a
+   fullscreen modal — long Thai product names would still force a horizontal
+   scrollbar regardless of modal width. Scoped to the modal only so the
+   Movement/Transactions table elsewhere is unaffected. */
+.fp-table-modal .mvt-sales-table-wrap { overflow: visible; max-height: none; }
+.fp-table-modal .fp-table { width: 100%; table-layout: fixed; }
+.fp-table-modal .fp-table th,
+.fp-table-modal .fp-table td { white-space: normal; word-break: break-word; }
+.fp-table-modal .fp-table .fp-col-wide { width: 24%; }
+
 .fp-table-modal-close {
   position: sticky;
   top: 0;

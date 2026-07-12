@@ -330,7 +330,7 @@ function SalespersonFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
             <th>เป้ารายคน</th>
             <th>รหัสสินค้า</th>
             <th>จำนวน(เป้า)</th>
-            <th>สินค้าโฟกัส</th>
+            <th className="fp-col-wide">สินค้าโฟกัส</th>
             {branchCodes.map((code) => (
               <th key={code}>ยอดสาขา {code}</th>
             ))}
@@ -346,7 +346,7 @@ function SalespersonFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
               <td>{row.assignedPersonName || "-"}</td>
               <td>{row.productCode}</td>
               <td>{formatNumber(row.targetQty)}</td>
-              <td>{row.productName || "-"}</td>
+              <td className="fp-col-wide">{row.productName || "-"}</td>
               {branchCodes.map((code) => (
                 <td key={code}>{formatNumber(row.soldByBranch?.[code] || 0)}</td>
               ))}
@@ -408,7 +408,7 @@ function GenericFocusTable({ typeRows, isAdminUser, onEdit, onDelete }) {
         <thead>
           <tr>
             <th>รหัสสินค้า</th>
-            <th>ชื่อสินค้า</th>
+            <th className="fp-col-wide">ชื่อสินค้า</th>
             <th>ช่วงเวลา</th>
             <th>เป้าหมาย</th>
             <th>ยอดขายแต่ละสาขา</th>
@@ -421,7 +421,7 @@ function GenericFocusTable({ typeRows, isAdminUser, onEdit, onDelete }) {
           {typeRows.map((row) => (
             <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
               <td>{row.productCode}</td>
-              <td>{row.productName || "-"}</td>
+              <td className="fp-col-wide">{row.productName || "-"}</td>
               <td>
                 {toIsoDateOnly(row.dateFrom)} – {toIsoDateOnly(row.dateTo)}
               </td>
