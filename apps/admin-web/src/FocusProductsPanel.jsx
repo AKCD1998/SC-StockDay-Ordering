@@ -304,6 +304,89 @@ function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, 
   );
 }
 
+// Mirrors the source Excel's "สินค้าโฟกัส เดือน ..." layout: one column per
+// branch instead of a combined chip cell, person name and target up front.
+function SalespersonFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
+  const branchCodes = useMemo(() => {
+    const codes = new Set();
+    for (const row of rows) {
+      for (const code of row.branchCodes || []) codes.add(code);
+    }
+    return [...codes].sort();
+  }, [rows]);
+
+  return (
+    <div className="mvt-sales-table-wrap">
+      <table className="mvt-sales-table fp-table fp-excel-table">
+        <thead>
+          <tr className="fp-excel-banner-row">
+            <th colSpan={5 + branchCodes.length + 1 + 1 + (isAdminUser ? 1 : 0)} className="fp-excel-banner">
+              สินค้าโฟกัส เดือน {THAI_MONTH_NAMES[Number(toIsoDateOnly(rows[0]?.dateFrom).slice(5, 7)) - 1]}{" "}
+              {toIsoDateOnly(rows[0]?.dateFrom).slice(0, 4)}
+            </th>
+          </tr>
+          <tr>
+            <th>ลำดับ</th>
+            <th>เป้ารายคน</th>
+            <th>รหัสสินค้า</th>
+            <th>จำนวน(เป้า)</th>
+            <th>สินค้าโฟกัส</th>
+            {branchCodes.map((code) => (
+              <th key={code}>ยอดสาขา {code}</th>
+            ))}
+            <th>รวม {branchCodes.length} สาขา</th>
+            <th>สถานะ</th>
+            {isAdminUser && <th>จัดการ</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
+              <td>{index + 1}</td>
+              <td>{row.assignedPersonName || "-"}</td>
+              <td>{row.productCode}</td>
+              <td>{formatNumber(row.targetQty)}</td>
+              <td>{row.productName || "-"}</td>
+              {branchCodes.map((code) => (
+                <td key={code}>{formatNumber(row.soldByBranch?.[code] || 0)}</td>
+              ))}
+              <td>
+                <strong>{formatNumber(row.totalSold)}</strong>
+              </td>
+              <td>
+                <StatusBadge achieved={row.achieved} />
+                {row.isFrozen && (
+                  <span className="fp-frozen-badge" title="ยอดขายถูกล็อกแล้วเมื่อสิ้นสุดช่วงเวลา">
+                    🔒 ปิดยอด
+                  </span>
+                )}
+              </td>
+              {isAdminUser && (
+                <td className="fp-actions-cell">
+                  <button type="button" className="fp-btn-link" onClick={() => onEdit(row)}>
+                    แก้ไข
+                  </button>
+                  <button type="button" className="fp-btn-link danger" onClick={() => onDelete(row)}>
+                    ลบ
+                  </button>
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="fp-excel-note-row">
+            <td className="fp-excel-note-label">หมายเหตุ</td>
+            <td colSpan={4 + branchCodes.length + 2 + (isAdminUser ? 1 : 0)}>
+              เป้ายอดรวม {branchCodes.length} สาขา
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
 function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete }) {
   const grouped = useMemo(() => {
     const map = new Map(FOCUS_TYPE_ORDER.map((type) => [type, []]));
@@ -322,58 +405,60 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete }) {
         return (
           <section key={type} className="fp-section">
             <h3 className="fp-section-title">{FOCUS_TYPE_LABELS[type]}</h3>
-            <div className="mvt-sales-table-wrap">
-              <table className="mvt-sales-table fp-table">
-                <thead>
-                  <tr>
-                    {type === "salesperson" && <th>ผู้รับผิดชอบ</th>}
-                    <th>รหัสสินค้า</th>
-                    <th>ชื่อสินค้า</th>
-                    <th>ช่วงเวลา</th>
-                    <th>เป้าหมาย</th>
-                    <th>ยอดขายแต่ละสาขา</th>
-                    <th>รวม</th>
-                    <th>สถานะ</th>
-                    {isAdminUser && <th>จัดการ</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {typeRows.map((row) => (
-                    <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
-                      {type === "salesperson" && <td>{row.assignedPersonName || "-"}</td>}
-                      <td>{row.productCode}</td>
-                      <td>{row.productName || "-"}</td>
-                      <td>
-                        {toIsoDateOnly(row.dateFrom)} – {toIsoDateOnly(row.dateTo)}
-                      </td>
-                      <td>{formatNumber(row.targetQty)}</td>
-                      <td>
-                        <BranchBreakdown row={row} />
-                      </td>
-                      <td>{formatNumber(row.totalSold)}</td>
-                      <td>
-                        <StatusBadge achieved={row.achieved} />
-                        {row.isFrozen && (
-                          <span className="fp-frozen-badge" title="ยอดขายถูกล็อกแล้วเมื่อสิ้นสุดช่วงเวลา">
-                            🔒 ปิดยอด
-                          </span>
-                        )}
-                      </td>
-                      {isAdminUser && (
-                        <td className="fp-actions-cell">
-                          <button type="button" className="fp-btn-link" onClick={() => onEdit(row)}>
-                            แก้ไข
-                          </button>
-                          <button type="button" className="fp-btn-link danger" onClick={() => onDelete(row)}>
-                            ลบ
-                          </button>
-                        </td>
-                      )}
+            {type === "salesperson" ? (
+              <SalespersonFocusTable rows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />
+            ) : (
+              <div className="mvt-sales-table-wrap">
+                <table className="mvt-sales-table fp-table">
+                  <thead>
+                    <tr>
+                      <th>รหัสสินค้า</th>
+                      <th>ชื่อสินค้า</th>
+                      <th>ช่วงเวลา</th>
+                      <th>เป้าหมาย</th>
+                      <th>ยอดขายแต่ละสาขา</th>
+                      <th>รวม</th>
+                      <th>สถานะ</th>
+                      {isAdminUser && <th>จัดการ</th>}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {typeRows.map((row) => (
+                      <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
+                        <td>{row.productCode}</td>
+                        <td>{row.productName || "-"}</td>
+                        <td>
+                          {toIsoDateOnly(row.dateFrom)} – {toIsoDateOnly(row.dateTo)}
+                        </td>
+                        <td>{formatNumber(row.targetQty)}</td>
+                        <td>
+                          <BranchBreakdown row={row} />
+                        </td>
+                        <td>{formatNumber(row.totalSold)}</td>
+                        <td>
+                          <StatusBadge achieved={row.achieved} />
+                          {row.isFrozen && (
+                            <span className="fp-frozen-badge" title="ยอดขายถูกล็อกแล้วเมื่อสิ้นสุดช่วงเวลา">
+                              🔒 ปิดยอด
+                            </span>
+                          )}
+                        </td>
+                        {isAdminUser && (
+                          <td className="fp-actions-cell">
+                            <button type="button" className="fp-btn-link" onClick={() => onEdit(row)}>
+                              แก้ไข
+                            </button>
+                            <button type="button" className="fp-btn-link danger" onClick={() => onDelete(row)}>
+                              ลบ
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
         );
       })}

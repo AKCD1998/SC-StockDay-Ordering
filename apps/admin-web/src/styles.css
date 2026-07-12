@@ -7670,6 +7670,25 @@ input[type="radio"] {
   white-space: nowrap;
 }
 
+.fp-excel-banner {
+  background: #6d28d9;
+  color: #fff;
+  text-align: center;
+  font-weight: 700;
+  padding: 8px;
+}
+
+.fp-excel-note-row td {
+  background: #6d28d9;
+  color: #fff;
+  font-weight: 600;
+}
+
+.fp-excel-note-label { text-align: center; }
+
+[data-theme="dark"] .fp-excel-banner { background: #4c1d95; }
+[data-theme="dark"] .fp-excel-note-row td { background: #4c1d95; }
+
 .fp-dash { color: #94a3b8; }
 
 .fp-actions-cell { white-space: nowrap; }
