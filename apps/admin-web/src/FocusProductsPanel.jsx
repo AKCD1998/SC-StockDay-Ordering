@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
@@ -202,7 +202,7 @@ function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, 
         </label>
 
         <label className="fp-field">
-          <span>{form.focusType === "group_manager" ? "เป้าหมายหลัก (ใช้กับสาขาที่ไม่ได้ตั้งเป้าแยก)" : "เป้าหมาย (ชิ้น)"}</span>
+          <span>{form.focusType === "salesperson" ? "เป้าหมาย (ชิ้น)" : "เป้าหมายหลัก (ใช้กับสาขาที่ไม่ได้ตั้งเป้าแยก)"}</span>
           <input
             type="number"
             min="1"
@@ -212,16 +212,16 @@ function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, 
           />
         </label>
 
-        {form.focusType === "group_manager" && (
+        {(form.focusType === "group_manager" || form.focusType === "pharmacist" || form.focusType === "store_manager") && (
           <label className="fp-field">
-            <span>เป้าหมายแยกตามสาขา (แต่ละสาขากำหนดไม่เท่ากันได้ — เว้นว่างเพื่อใช้เป้าหมายหลัก)</span>
+            <span>เป้าหมายแยกตามสาขา (แต่ละสาขากำหนดไม่เท่ากันได้ — ใส่ 0 ถ้ายังไม่รู้เป้า, เว้นว่างเพื่อใช้เป้าหมายหลัก)</span>
             <div className="fp-branch-target-grid">
               {BRANCH_CHOICES.map((code) => (
                 <label key={code} className="fp-branch-target-field">
                   <span>{code}</span>
                   <input
                     type="number"
-                    min="1"
+                    min="0"
                     step="1"
                     value={form.branchTargets[code] ?? ""}
                     onChange={(e) => {
@@ -470,12 +470,110 @@ function GenericFocusTable({ typeRows, isAdminUser, onEdit, onDelete }) {
   );
 }
 
-function FocusSectionTable({ type, typeRows, isAdminUser, onEdit, onDelete }) {
-  return type === "salesperson" ? (
-    <SalespersonFocusTable rows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />
-  ) : (
-    <GenericFocusTable typeRows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />
+// pharmacist / store_manager: each branch can have its own target for the
+// same product (branchTargets override), judged independently — no combined
+// verdict. One pair of columns (เป้า/ขาย) per branch instead of a squished
+// chip cell, matching the source Excel's per-branch layout.
+function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
+  const branchCodes = useMemo(() => {
+    const codes = new Set();
+    for (const row of rows) {
+      for (const code of row.branchCodes || []) codes.add(code);
+    }
+    return [...codes].sort();
+  }, [rows]);
+
+  return (
+    <div className="mvt-sales-table-wrap">
+      <table className="mvt-sales-table fp-table">
+        <thead>
+          <tr>
+            <th rowSpan={2}>รหัสสินค้า</th>
+            <th className="fp-col-wide" rowSpan={2}>
+              สินค้า
+            </th>
+            {branchCodes.map((code) => (
+              <th key={code} colSpan={2}>
+                สาขา {code}
+              </th>
+            ))}
+            <th rowSpan={2}>สถานะ</th>
+            {isAdminUser && <th rowSpan={2}>จัดการ</th>}
+          </tr>
+          <tr>
+            {branchCodes.map((code) => (
+              <Fragment key={code}>
+                <th>เป้า</th>
+                <th>ขาย</th>
+              </Fragment>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
+              <td>{row.productCode}</td>
+              <td className="fp-col-wide">{row.productName || "-"}</td>
+              {branchCodes.map((code) => {
+                const target = row.branchTargetsEffective?.[code];
+                const sold = row.soldByBranch?.[code] || 0;
+                const pass = row.branchAchieved ? row.branchAchieved[code] : null;
+                const cls = pass === null || pass === undefined ? "" : pass ? "fp-cell-ok" : "fp-cell-fail";
+                return (
+                  <Fragment key={code}>
+                    <td>{target != null ? formatNumber(target) : "-"}</td>
+                    <td className={cls}>{formatNumber(sold)}</td>
+                  </Fragment>
+                );
+              })}
+              <td>
+                <StatusBadge achieved={row.achieved} />
+                {row.isFrozen && (
+                  <span className="fp-frozen-badge" title="ยอดขายถูกล็อกแล้วเมื่อสิ้นสุดช่วงเวลา">
+                    🔒 ปิดยอด
+                  </span>
+                )}
+              </td>
+              {isAdminUser && (
+                <td className="fp-actions-cell">
+                  <button
+                    type="button"
+                    className="fp-btn-link"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(row);
+                    }}
+                  >
+                    แก้ไข
+                  </button>
+                  <button
+                    type="button"
+                    className="fp-btn-link danger"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(row);
+                    }}
+                  >
+                    ลบ
+                  </button>
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
+}
+
+function FocusSectionTable({ type, typeRows, isAdminUser, onEdit, onDelete }) {
+  if (type === "salesperson") {
+    return <SalespersonFocusTable rows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />;
+  }
+  if (type === "pharmacist" || type === "store_manager") {
+    return <BranchTargetFocusTable rows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />;
+  }
+  return <GenericFocusTable typeRows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />;
 }
 
 function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete }) {
@@ -730,7 +828,7 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser }) {
       dateFrom: form.dateFrom,
       dateTo: form.dateTo,
       branchCodes: form.branchCodes.length > 0 ? form.branchCodes : null,
-      branchTargets: form.focusType === "group_manager" && Object.keys(form.branchTargets).length > 0
+      branchTargets: form.focusType !== "salesperson" && Object.keys(form.branchTargets).length > 0
         ? Object.fromEntries(Object.entries(form.branchTargets).map(([code, qty]) => [code, Number(qty)]))
         : null,
       assignedPersonName: form.focusType === "salesperson" ? (form.assignedPersonName || "").trim() || null : null,

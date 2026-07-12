@@ -7719,6 +7719,12 @@ input[type="radio"] {
 .fp-status-badge.ok { background: rgba(34, 197, 94, 0.15); color: #15803d; }
 .fp-status-badge.pending { background: rgba(249, 115, 22, 0.15); color: #c2410c; }
 
+.fp-cell-ok { color: #15803d; font-weight: 600; }
+.fp-cell-fail { color: #b91c1c; }
+
+[data-theme="dark"] .fp-cell-ok { color: #4ade80; }
+[data-theme="dark"] .fp-cell-fail { color: #f87171; }
+
 .fp-frozen-badge {
   display: inline-block;
   margin-left: 6px;
