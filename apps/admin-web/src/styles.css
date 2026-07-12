@@ -184,6 +184,15 @@ button {
   gap: 10px;
 }
 
+.stock-recommendations-loading-wrap {
+  position: relative;
+  min-height: 160px;
+}
+
+.stock-recommendations-loading-overlay {
+  border-radius: 22px;
+}
+
 .stock-recommendations-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(340px, 0.95fr);
@@ -336,6 +345,17 @@ button {
 
 .stock-recommendation-donor-item {
   color: #526578;
+}
+
+.stock-recommendation-pagination {
+  margin-top: 0;
+}
+
+.stock-recommendation-page-indicator {
+  display: inline-flex;
+  align-items: center;
+  color: #526578;
+  min-height: 42px;
 }
 
 .movement-panel {
@@ -4964,6 +4984,10 @@ input[type="radio"] {
 [data-theme="dark"] .stock-recommendation-empty {
   border-color: #263547;
   background: rgba(13, 22, 35, 0.9);
+}
+
+[data-theme="dark"] .stock-recommendation-page-indicator {
+  color: #9fb0c5;
 }
 
 [data-theme="dark"] .request-draft-card {

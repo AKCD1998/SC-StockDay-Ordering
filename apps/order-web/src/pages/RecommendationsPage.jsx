@@ -11,6 +11,8 @@ const ACTION_LABELS = {
   NO_PURCHASE_SLOW_MOVING: "สินค้าหมุนช้า",
 };
 
+const DEFAULT_PAGE_SIZE = 25;
+
 function formatNumber(value, digits = 0) {
   if (value == null || value === "") return "-";
   return Number(value).toLocaleString("th-TH", {
@@ -73,7 +75,7 @@ function buildCartLineFromRecommendation(row) {
       recommendedAction: row.action,
       recommendedTransferQty: Number(row.transferPlanQty || 0),
       recommendedPurchaseQty: Number(row.purchaseQty || 0),
-      recommendedRequestQty,
+      recommendedRequestQty: Math.max(1, Math.ceil(recommendedQty)),
       primarySuggestedDonorBranchCode: row.primarySuggestedDonorBranchCode || null,
       recommendationReason: row.recommendationReason || row.reason || "",
       recommendationFlags: Array.isArray(row.flags) ? row.flags : [],
@@ -152,11 +154,21 @@ export default function RecommendationsPage() {
   const [rows, setRows] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [summaryLoading, setSummaryLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [action, setAction] = useState("");
   const [flashMessage, setFlashMessage] = useState("");
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+    total: 0,
+  });
+
+  useEffect(() => {
+    setPagination((current) => (current.page === 1 ? current : { ...current, page: 1 }));
+  }, [action, search, session?.branchCode]);
 
   useEffect(() => {
     let active = true;
@@ -164,22 +176,25 @@ export default function RecommendationsPage() {
       try {
         setLoading(true);
         setError("");
-        const [listData, summaryData] = await Promise.all([
-          api.getStockRecommendations({
-            branchCode: session?.branchCode || "",
-            search,
-            action,
-            pageSize: 100,
-          }),
-          api.getStockRecommendationSummary({ branchCode: session?.branchCode || "" }),
-        ]);
+        const listData = await api.getStockRecommendations({
+          branchCode: session?.branchCode || "",
+          search,
+          action,
+          page: pagination.page,
+          pageSize: pagination.pageSize,
+        });
         if (!active) return;
         const generatedAt = listData.generatedAt || new Date().toISOString();
         const normalizedRows = Array.isArray(listData.rows)
           ? listData.rows.map((row) => ({ ...row, generatedAt }))
           : [];
         setRows(normalizedRows);
-        setSummary(summaryData?.company || listData?.summary || null);
+        setSummary(listData?.summary || null);
+        setPagination({
+          page: Number(listData.pagination?.page || pagination.page || 1),
+          pageSize: Number(listData.pagination?.pageSize || pagination.pageSize || DEFAULT_PAGE_SIZE),
+          total: Number(listData.pagination?.total || 0),
+        });
       } catch (loadError) {
         if (!active) return;
         setError(loadError.message || "โหลดคำแนะนำสต๊อกไม่สำเร็จ");
@@ -191,7 +206,28 @@ export default function RecommendationsPage() {
     return () => {
       active = false;
     };
-  }, [action, search, session?.branchCode]);
+  }, [action, pagination.page, pagination.pageSize, search, session?.branchCode]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadSummary() {
+      try {
+        setSummaryLoading(true);
+        const summaryData = await api.getStockRecommendationSummary({ branchCode: session?.branchCode || "" });
+        if (!active) return;
+        setSummary(summaryData?.company || null);
+      } catch (_error) {
+        if (!active) return;
+        setSummary(null);
+      } finally {
+        if (active) setSummaryLoading(false);
+      }
+    }
+    loadSummary();
+    return () => {
+      active = false;
+    };
+  }, [session?.branchCode]);
 
   useEffect(() => {
     if (!flashMessage) return undefined;
@@ -203,6 +239,11 @@ export default function RecommendationsPage() {
     () => rows.filter((row) => row.action !== "NO_ACTION" && row.action !== "NO_PURCHASE_SLOW_MOVING").length,
     [rows],
   );
+  const totalPages = Math.max(1, Math.ceil((pagination.total || 0) / (pagination.pageSize || DEFAULT_PAGE_SIZE)));
+  const currentPage = Math.min(totalPages, Math.max(1, pagination.page || 1));
+  const rangeStart = pagination.total === 0 ? 0 : (currentPage - 1) * (pagination.pageSize || DEFAULT_PAGE_SIZE) + 1;
+  const rangeEnd = pagination.total === 0 ? 0 : rangeStart + rows.length - 1;
+  const showLoadingOverlay = loading && (rows.length > 0 || pagination.total > 0);
 
   function handleApplyRecommendation(row) {
     addLines([buildCartLineFromRecommendation(row)]);
@@ -238,6 +279,17 @@ export default function RecommendationsPage() {
               <option value="NO_ACTION">ยังไม่ต้องสั่ง</option>
             </select>
             <button type="submit">ค้นหา</button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => {
+                setSearchInput("");
+                setSearch("");
+                setAction("");
+              }}
+            >
+              ล้างตัวกรอง
+            </button>
           </form>
         </div>
       </div>
@@ -263,25 +315,62 @@ export default function RecommendationsPage() {
 
       {flashMessage ? <div className="notice success compact-notice">{flashMessage}</div> : null}
       {error ? <div className="notice error">{error}</div> : null}
-      {loading ? <div className="notice">กำลังโหลดคำแนะนำสต๊อก...</div> : null}
+      {summaryLoading ? <div className="notice compact-notice">กำลังอัปเดตภาพรวมคำแนะนำ...</div> : null}
 
-      {!loading && rows.length === 0 ? (
-        <div className="empty-cart-card">
-          <p className="empty-state">ไม่พบ recommendation ตามเงื่อนไขนี้</p>
-        </div>
-      ) : null}
+      <div className="recommendation-loading-wrap">
+        {showLoadingOverlay ? (
+          <div className="recommendation-loading-overlay" aria-live="polite" aria-label="กำลังโหลดคำแนะนำสต๊อก">
+            <div className="recommendation-spinner" />
+            <div>กำลังโหลดคำแนะนำสต๊อก...</div>
+          </div>
+        ) : null}
 
-      {!loading && rows.length > 0 ? (
-        <div className="recommendation-grid">
-          {rows.map((row) => (
-            <RecommendationCard
-              key={`${row.branchCode}-${row.productCode}`}
-              row={row}
-              onApply={handleApplyRecommendation}
-            />
-          ))}
+        {!loading && rows.length === 0 ? (
+          <div className="empty-cart-card">
+            <p className="empty-state">ไม่พบ recommendation ตามเงื่อนไขนี้</p>
+          </div>
+        ) : null}
+
+        {(rows.length > 0 || loading) ? (
+          <div className="recommendation-grid">
+            {rows.map((row) => (
+              <RecommendationCard
+                key={`${row.branchCode}-${row.productCode}`}
+                row={row}
+                onApply={handleApplyRecommendation}
+              />
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="pagination recommendation-pagination">
+        <p className="pagination-info">
+          {pagination.total === 0
+            ? "0 รายการ"
+            : `${formatNumber(rangeStart)}-${formatNumber(rangeEnd)} จาก ${formatNumber(pagination.total)} รายการ`}
+        </p>
+        <div className="pagination-actions">
+          <button
+            type="button"
+            className="ghost"
+            disabled={loading || currentPage <= 1}
+            onClick={() => setPagination((current) => ({ ...current, page: Math.max(1, current.page - 1) }))}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="recommendation-page-indicator">
+            หน้า {formatNumber(currentPage)} / {formatNumber(totalPages)}
+          </span>
+          <button
+            type="button"
+            disabled={loading || currentPage >= totalPages}
+            onClick={() => setPagination((current) => ({ ...current, page: Math.min(totalPages, current.page + 1) }))}
+          >
+            ถัดไป
+          </button>
         </div>
-      ) : null}
+      </div>
     </section>
   );
 }

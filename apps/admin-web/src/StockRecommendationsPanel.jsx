@@ -11,6 +11,7 @@ const ACTION_LABELS = {
 };
 
 const BRANCH_OPTIONS = ["000", "001", "003", "004", "005"];
+const DEFAULT_PAGE_SIZE = 25;
 
 function apiFetch(path, options = {}) {
   return fetch(`${apiBaseUrl}${path}`, {
@@ -69,16 +70,26 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
   const [companySummary, setCompanySummary] = useState(null);
   const [branchSummaries, setBranchSummaries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [summaryLoading, setSummaryLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedRow, setSelectedRow] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+    total: 0,
+  });
 
   useEffect(() => {
     if (!isAdminUser) {
       setScopeBranchCode(branchCode || "");
     }
   }, [branchCode, isAdminUser]);
+
+  useEffect(() => {
+    setPagination((current) => (current.page === 1 ? current : { ...current, page: 1 }));
+  }, [action, branchCode, isAdminUser, scopeBranchCode, search, sort]);
 
   useEffect(() => {
     let active = true;
@@ -89,30 +100,25 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
         const branchParam = scopeBranchCode || branchCode || "";
         const params = new URLSearchParams({
           branchCode: branchParam,
-          pageSize: "100",
+          page: String(pagination.page),
+          pageSize: String(pagination.pageSize),
           sort,
         });
         if (search.trim()) params.set("search", search.trim());
         if (action) params.set("action", action);
 
-        const summaryParams = new URLSearchParams({
-          branchCode: isAdminUser ? (scopeBranchCode || "all") : (branchCode || ""),
-        });
-
-        const [listRes, summaryRes] = await Promise.all([
-          apiFetch(`/api/admin/stock-recommendations?${params.toString()}`),
-          apiFetch(`/api/admin/stock-recommendations/summary?${summaryParams.toString()}`),
-        ]);
+        const listRes = await apiFetch(`/api/admin/stock-recommendations?${params.toString()}`);
 
         const listData = await listRes.json().catch(() => ({}));
-        const summaryData = await summaryRes.json().catch(() => ({}));
         if (!listRes.ok) throw new Error(listData.error || listData.message || `HTTP ${listRes.status}`);
-        if (!summaryRes.ok) throw new Error(summaryData.error || summaryData.message || `HTTP ${summaryRes.status}`);
         if (!active) return;
         setRows(Array.isArray(listData.rows) ? listData.rows : []);
         setSummary(listData.summary || null);
-        setCompanySummary(summaryData.company || null);
-        setBranchSummaries(Array.isArray(summaryData.branches) ? summaryData.branches : []);
+        setPagination({
+          page: Number(listData.pagination?.page || pagination.page || 1),
+          pageSize: Number(listData.pagination?.pageSize || pagination.pageSize || DEFAULT_PAGE_SIZE),
+          total: Number(listData.pagination?.total || 0),
+        });
       } catch (loadError) {
         if (!active) return;
         setError(loadError.message || "โหลด recommendation ไม่สำเร็จ");
@@ -124,7 +130,35 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
     return () => {
       active = false;
     };
-  }, [action, branchCode, isAdminUser, scopeBranchCode, search, sort]);
+  }, [action, branchCode, pagination.page, pagination.pageSize, scopeBranchCode, search, sort]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadSummary() {
+      try {
+        setSummaryLoading(true);
+        const summaryParams = new URLSearchParams({
+          branchCode: isAdminUser ? (scopeBranchCode || "all") : (branchCode || ""),
+        });
+        const summaryRes = await apiFetch(`/api/admin/stock-recommendations/summary?${summaryParams.toString()}`);
+        const summaryData = await summaryRes.json().catch(() => ({}));
+        if (!summaryRes.ok) throw new Error(summaryData.error || summaryData.message || `HTTP ${summaryRes.status}`);
+        if (!active) return;
+        setCompanySummary(summaryData.company || null);
+        setBranchSummaries(Array.isArray(summaryData.branches) ? summaryData.branches : []);
+      } catch (_error) {
+        if (!active) return;
+        setCompanySummary(null);
+        setBranchSummaries([]);
+      } finally {
+        if (active) setSummaryLoading(false);
+      }
+    }
+    loadSummary();
+    return () => {
+      active = false;
+    };
+  }, [branchCode, isAdminUser, scopeBranchCode]);
 
   useEffect(() => {
     if (!selectedRow) {
@@ -179,6 +213,11 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
   const targetDays = detail?.targetDays || rows[0]?.targetDays || 90;
   const selectedRecommendation = detail || selectedRow;
   const lastGeneratedAt = rows[0]?.generatedAt || detail?.generatedAt || null;
+  const totalPages = Math.max(1, Math.ceil((pagination.total || 0) / (pagination.pageSize || DEFAULT_PAGE_SIZE)));
+  const currentPage = Math.min(totalPages, Math.max(1, pagination.page || 1));
+  const rangeStart = pagination.total === 0 ? 0 : (currentPage - 1) * (pagination.pageSize || DEFAULT_PAGE_SIZE) + 1;
+  const rangeEnd = pagination.total === 0 ? 0 : rangeStart + rows.length - 1;
+  const showLoadingOverlay = loading && (rows.length > 0 || pagination.total > 0);
 
   function handleSearchSubmit(event) {
     event.preventDefault();
@@ -262,6 +301,8 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
         <SummaryCard label="โอกาสลดต้นทุน" value={formatNumber(displayedSummary?.potentialReductionValue)} hint="ถ้าปรับลงใกล้ target days" />
       </div>
 
+      {summaryLoading ? <div className="notice compact">กำลังอัปเดตภาพรวมสาขา...</div> : null}
+
       {branchSummaries.length > 0 ? (
         <div className="stock-recommendation-branch-grid">
           {branchSummaries.map((branch) => (
@@ -276,112 +317,149 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
       ) : null}
 
       {error ? <div className="notice error">{error}</div> : null}
-      {loading ? <div className="notice">กำลังโหลด recommendation...</div> : null}
+      <div className="branch-stock-loading-wrap stock-recommendations-loading-wrap">
+        {showLoadingOverlay ? (
+          <div className="branch-stock-loading-overlay stock-recommendations-loading-overlay" aria-live="polite" aria-label="กำลังโหลดคำแนะนำสต๊อก">
+            <div className="branch-stock-spinner" />
+            <div>กำลังโหลดคำแนะนำสต๊อก...</div>
+          </div>
+        ) : null}
 
-      {!loading && !error && rows.length === 0 ? (
-        <div className="empty-cart-card stock-recommendation-empty">
-          <strong>ยังไม่มี recommendation ที่เข้าเงื่อนไขใน {scopeLabel}</strong>
-          <p className="empty-state">
-            ตอนนี้ backend ไม่พบสินค้าในสcope นี้ที่มี stock / sales / incoming data มากพอสำหรับคำนวณแถว recommendation
-            ลองเปลี่ยนสาขา, ล้างตัวกรอง, หรือค้นหา SKU ที่ทราบว่ามีการขายล่าสุด
-          </p>
-        </div>
-      ) : null}
+        {!loading && !error && rows.length === 0 ? (
+          <div className="empty-cart-card stock-recommendation-empty">
+            <strong>ยังไม่มี recommendation ที่เข้าเงื่อนไขใน {scopeLabel}</strong>
+            <p className="empty-state">
+              ตอนนี้ backend ไม่พบสินค้าในสcope นี้ที่มี stock / sales / incoming data มากพอสำหรับคำนวณแถว recommendation
+              ลองเปลี่ยนสาขา, ล้างตัวกรอง, หรือค้นหา SKU ที่ทราบว่ามีการขายล่าสุด
+            </p>
+          </div>
+        ) : null}
 
-      {!loading && rows.length > 0 ? (
-        <div className="stock-recommendations-layout">
-          <div className="stock-recommendations-list">
-            {rows.map((row) => {
-              const isSelected =
-                selectedRow?.branchCode === row.branchCode &&
-                selectedRow?.productCode === row.productCode;
-              return (
-                <button
-                  type="button"
-                  key={`${row.branchCode}-${row.productCode}`}
-                  className={`stock-recommendation-row-card${isSelected ? " selected" : ""}`}
-                  onClick={() => setSelectedRow(row)}
-                >
-                  <div className="stock-recommendation-row-top">
-                    <div>
-                      <strong>{row.productNameThai || row.productNameEng || row.productCode}</strong>
-                      <div className="meta-line">{row.productCode} · {scopeBranchCode === "all" ? `สาขา ${row.branchCode}` : scopeLabel}</div>
+        {(rows.length > 0 || loading) ? (
+          <div className="stock-recommendations-layout">
+            <div className="stock-recommendations-list">
+              {rows.map((row) => {
+                const isSelected =
+                  selectedRow?.branchCode === row.branchCode &&
+                  selectedRow?.productCode === row.productCode;
+                return (
+                  <button
+                    type="button"
+                    key={`${row.branchCode}-${row.productCode}`}
+                    className={`stock-recommendation-row-card${isSelected ? " selected" : ""}`}
+                    onClick={() => setSelectedRow(row)}
+                    disabled={loading}
+                  >
+                    <div className="stock-recommendation-row-top">
+                      <div>
+                        <strong>{row.productNameThai || row.productNameEng || row.productCode}</strong>
+                        <div className="meta-line">{row.productCode} · {scopeBranchCode === "all" ? `สาขา ${row.branchCode}` : scopeLabel}</div>
+                      </div>
+                      <span className={`stock-recommendation-badge tone-${actionTone(row.action)}`}>
+                        {ACTION_LABELS[row.action] || row.action}
+                      </span>
                     </div>
-                    <span className={`stock-recommendation-badge tone-${actionTone(row.action)}`}>
-                      {ACTION_LABELS[row.action] || row.action}
+                    <div className="stock-recommendation-row-metrics">
+                      <span>มี {formatNumber(row.currentStock)}</span>
+                      <span>เป้า {formatNumber(row.targetQty)}</span>
+                      <span>cover {formatNumber(row.currentDaysCover, 1)} วัน</span>
+                      <span>priority {formatNumber(row.priorityScore, 0)}</span>
+                    </div>
+                    <div className="stock-recommendation-row-plan">
+                      <span>ขอจากสาขาอื่น {formatNumber(row.transferPlanQty)}</span>
+                      <span>ซื้อเพิ่ม {formatNumber(row.purchaseQty)}</span>
+                      {row.primarySuggestedDonorBranchCode ? (
+                        <span>donor หลัก {row.primarySuggestedDonorBranchCode}</span>
+                      ) : (
+                        <span>donor หลัก -</span>
+                      )}
+                    </div>
+                    <p className="stock-recommendation-row-reason">
+                      {row.recommendationReason || row.reason || "-"}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+
+            <aside className="stock-recommendation-detail-card">
+              {!selectedRow ? (
+                <p className="subtle">เลือก SKU จากคิวด้านซ้ายเพื่อดูรายละเอียด recommendation และ donor plan</p>
+              ) : detailLoading ? (
+                <p className="subtle">กำลังโหลดรายละเอียด...</p>
+              ) : selectedRecommendation ? (
+                <>
+                  <div className="stock-recommendation-detail-header">
+                    <div>
+                      <h3>{selectedRecommendation.productNameThai || selectedRecommendation.productNameEng || selectedRecommendation.productCode}</h3>
+                      <p className="subtle">{selectedRecommendation.productCode} · สาขา {selectedRecommendation.branchCode}</p>
+                    </div>
+                    <span className={`stock-recommendation-badge tone-${actionTone(selectedRecommendation.action)}`}>
+                      {ACTION_LABELS[selectedRecommendation.action] || selectedRecommendation.action}
                     </span>
                   </div>
-                  <div className="stock-recommendation-row-metrics">
-                    <span>มี {formatNumber(row.currentStock)}</span>
-                    <span>เป้า {formatNumber(row.targetQty)}</span>
-                    <span>cover {formatNumber(row.currentDaysCover, 1)} วัน</span>
-                    <span>priority {formatNumber(row.priorityScore, 0)}</span>
+                  <div className="stock-recommendation-detail-grid">
+                    <div><span>มีอยู่</span><strong>{formatNumber(selectedRecommendation.currentStock)}</strong></div>
+                    <div><span>incoming</span><strong>{formatNumber(selectedRecommendation.incomingPoAllocationQty)}</strong></div>
+                    <div><span>เป้าหมาย</span><strong>{formatNumber(selectedRecommendation.targetQty)}</strong></div>
+                    <div><span>effective cover</span><strong>{formatNumber(selectedRecommendation.effectiveDaysCover, 1)}</strong></div>
+                    <div><span>ยอดขาย 30 วัน</span><strong>{formatNumber(selectedRecommendation.soldQty30d)}</strong></div>
+                    <div><span>ยอดขาย 90 วัน</span><strong>{formatNumber(selectedRecommendation.soldQty90d)}</strong></div>
+                    <div><span>แนะนำขอ</span><strong>{formatNumber(selectedRecommendation.transferPlanQty)}</strong></div>
+                    <div><span>แนะนำซื้อ</span><strong>{formatNumber(selectedRecommendation.purchaseQty)}</strong></div>
                   </div>
-                  <div className="stock-recommendation-row-plan">
-                    <span>ขอจากสาขาอื่น {formatNumber(row.transferPlanQty)}</span>
-                    <span>ซื้อเพิ่ม {formatNumber(row.purchaseQty)}</span>
-                    {row.primarySuggestedDonorBranchCode ? (
-                      <span>donor หลัก {row.primarySuggestedDonorBranchCode}</span>
-                    ) : (
-                      <span>donor หลัก -</span>
-                    )}
-                  </div>
-                  <p className="stock-recommendation-row-reason">
-                    {row.recommendationReason || row.reason || "-"}
-                  </p>
-                </button>
-              );
-            })}
+                  <p><strong>เหตุผล:</strong> {selectedRecommendation.recommendationReason || selectedRecommendation.reason || "-"}</p>
+                  {Array.isArray(detail?.donors) && detail.donors.length > 0 ? (
+                    <div className="stock-recommendation-donor-list">
+                      <strong>donor ที่ระบบเสนอ</strong>
+                      {detail.donors.map((donor) => (
+                        <div key={`${donor.branchCode}-${donor.qty || donor.availableQty}`} className="stock-recommendation-donor-item">
+                          <span>{donor.branchName || `สาขา ${donor.branchCode}`}</span>
+                          <span>{formatNumber(donor.qty ?? donor.availableQty)} หน่วย</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p><strong>donor หลัก:</strong> {selectedRecommendation.primarySuggestedDonorBranchCode || "-"}</p>
+                  )}
+                  <p><strong>อัปเดตจาก backend:</strong> {formatDateTime(selectedRecommendation.generatedAt || selectedRow.generatedAt)}</p>
+                </>
+              ) : (
+                <p className="subtle">ไม่มีรายละเอียดเพิ่มเติม</p>
+              )}
+            </aside>
           </div>
+        ) : null}
+      </div>
 
-          <aside className="stock-recommendation-detail-card">
-            {!selectedRow ? (
-              <p className="subtle">เลือก SKU จากคิวด้านซ้ายเพื่อดูรายละเอียด recommendation และ donor plan</p>
-            ) : detailLoading ? (
-              <p className="subtle">กำลังโหลดรายละเอียด...</p>
-            ) : selectedRecommendation ? (
-              <>
-                <div className="stock-recommendation-detail-header">
-                  <div>
-                    <h3>{selectedRecommendation.productNameThai || selectedRecommendation.productNameEng || selectedRecommendation.productCode}</h3>
-                    <p className="subtle">{selectedRecommendation.productCode} · สาขา {selectedRecommendation.branchCode}</p>
-                  </div>
-                  <span className={`stock-recommendation-badge tone-${actionTone(selectedRecommendation.action)}`}>
-                    {ACTION_LABELS[selectedRecommendation.action] || selectedRecommendation.action}
-                  </span>
-                </div>
-                <div className="stock-recommendation-detail-grid">
-                  <div><span>มีอยู่</span><strong>{formatNumber(selectedRecommendation.currentStock)}</strong></div>
-                  <div><span>incoming</span><strong>{formatNumber(selectedRecommendation.incomingPoAllocationQty)}</strong></div>
-                  <div><span>เป้าหมาย</span><strong>{formatNumber(selectedRecommendation.targetQty)}</strong></div>
-                  <div><span>effective cover</span><strong>{formatNumber(selectedRecommendation.effectiveDaysCover, 1)}</strong></div>
-                  <div><span>ยอดขาย 30 วัน</span><strong>{formatNumber(selectedRecommendation.soldQty30d)}</strong></div>
-                  <div><span>ยอดขาย 90 วัน</span><strong>{formatNumber(selectedRecommendation.soldQty90d)}</strong></div>
-                  <div><span>แนะนำขอ</span><strong>{formatNumber(selectedRecommendation.transferPlanQty)}</strong></div>
-                  <div><span>แนะนำซื้อ</span><strong>{formatNumber(selectedRecommendation.purchaseQty)}</strong></div>
-                </div>
-                <p><strong>เหตุผล:</strong> {selectedRecommendation.recommendationReason || selectedRecommendation.reason || "-"}</p>
-                {Array.isArray(detail?.donors) && detail.donors.length > 0 ? (
-                  <div className="stock-recommendation-donor-list">
-                    <strong>donor ที่ระบบเสนอ</strong>
-                    {detail.donors.map((donor) => (
-                      <div key={`${donor.branchCode}-${donor.qty || donor.availableQty}`} className="stock-recommendation-donor-item">
-                        <span>{donor.branchName || `สาขา ${donor.branchCode}`}</span>
-                        <span>{formatNumber(donor.qty ?? donor.availableQty)} หน่วย</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p><strong>donor หลัก:</strong> {selectedRecommendation.primarySuggestedDonorBranchCode || "-"}</p>
-                )}
-                <p><strong>อัปเดตจาก backend:</strong> {formatDateTime(selectedRecommendation.generatedAt || selectedRow.generatedAt)}</p>
-              </>
-            ) : (
-              <p className="subtle">ไม่มีรายละเอียดเพิ่มเติม</p>
-            )}
-          </aside>
+      <div className="pagination stock-recommendation-pagination">
+        <p className="pagination-info">
+          {pagination.total === 0
+            ? "0 รายการ"
+            : `${formatNumber(rangeStart)}-${formatNumber(rangeEnd)} จาก ${formatNumber(pagination.total)} รายการ`}
+        </p>
+        <div className="pagination-actions">
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={loading || currentPage <= 1}
+            onClick={() => setPagination((current) => ({ ...current, page: Math.max(1, current.page - 1) }))}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="stock-recommendation-page-indicator">
+            หน้า {formatNumber(currentPage)} / {formatNumber(totalPages)}
+          </span>
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={loading || currentPage >= totalPages}
+            onClick={() => setPagination((current) => ({ ...current, page: Math.min(totalPages, current.page + 1) }))}
+          >
+            ถัดไป
+          </button>
         </div>
-      ) : null}
+      </div>
     </section>
   );
 }
