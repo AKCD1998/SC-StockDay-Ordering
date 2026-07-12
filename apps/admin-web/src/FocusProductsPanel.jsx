@@ -474,14 +474,17 @@ function GenericFocusTable({ typeRows, isAdminUser, onEdit, onDelete }) {
 // same product (branchTargets override), judged independently — no combined
 // verdict. One pair of columns (เป้า/ขาย) per branch instead of a squished
 // chip cell, matching the source Excel's per-branch layout.
-function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
+function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete, restrictToBranch }) {
   const branchCodes = useMemo(() => {
     const codes = new Set();
     for (const row of rows) {
       for (const code of row.branchCodes || []) codes.add(code);
     }
-    return [...codes].sort();
-  }, [rows]);
+    const all = [...codes].sort();
+    // Staff accounts only see their own branch's target/sold columns here —
+    // the salesperson and group_manager tables are intentionally left alone.
+    return restrictToBranch ? all.filter((code) => code === restrictToBranch) : all;
+  }, [rows, restrictToBranch]);
 
   return (
     <div className="mvt-sales-table-wrap">
@@ -694,12 +697,20 @@ function GroupManagerFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
   );
 }
 
-function FocusSectionTable({ type, typeRows, isAdminUser, onEdit, onDelete }) {
+function FocusSectionTable({ type, typeRows, isAdminUser, onEdit, onDelete, restrictToBranch }) {
   if (type === "salesperson") {
     return <SalespersonFocusTable rows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />;
   }
   if (type === "pharmacist" || type === "store_manager") {
-    return <BranchTargetFocusTable rows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />;
+    return (
+      <BranchTargetFocusTable
+        rows={typeRows}
+        isAdminUser={isAdminUser}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        restrictToBranch={restrictToBranch}
+      />
+    );
   }
   if (type === "group_manager") {
     return <GroupManagerFocusTable rows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />;
@@ -707,7 +718,7 @@ function FocusSectionTable({ type, typeRows, isAdminUser, onEdit, onDelete }) {
   return <GenericFocusTable typeRows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />;
 }
 
-function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete }) {
+function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBranch }) {
   const [expandedType, setExpandedType] = useState(null);
 
   const grouped = useMemo(() => {
@@ -732,7 +743,14 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete }) {
             title="คลิกเพื่อดูแบบเต็มหน้าจอ"
           >
             <h3 className="fp-section-title">{FOCUS_TYPE_LABELS[type]}</h3>
-            <FocusSectionTable type={type} typeRows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />
+            <FocusSectionTable
+              type={type}
+              typeRows={typeRows}
+              isAdminUser={isAdminUser}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              restrictToBranch={restrictToBranch}
+            />
           </section>
         );
       })}
@@ -750,6 +768,7 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete }) {
               isAdminUser={isAdminUser}
               onEdit={onEdit}
               onDelete={onDelete}
+              restrictToBranch={restrictToBranch}
             />
           </div>
         </div>
@@ -867,7 +886,7 @@ function LoadingOverlay({ active }) {
   );
 }
 
-export default function FocusProductsPanel({ csrfToken, isAdminUser }) {
+export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -1040,6 +1059,7 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser }) {
                   isAdminUser={isAdminUser}
                   onEdit={openEditModal}
                   onDelete={handleDelete}
+                  restrictToBranch={!isAdminUser ? branchCode : null}
                 />
               )}
             </div>

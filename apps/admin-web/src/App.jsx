@@ -8741,7 +8741,7 @@ export default function App() {
       ) : view === "movement-trace" ? (
         <MovementAndTransactionsPanel branchCode={branchCode} csrfToken={session.csrfToken} />
       ) : view === "focus-products" ? (
-        <FocusProductsPanel csrfToken={session.csrfToken} isAdminUser={isAdminUser} />
+        <FocusProductsPanel csrfToken={session.csrfToken} isAdminUser={isAdminUser} branchCode={branchCode} />
       ) : view === stockCostAuditView && isAdminUser ? (
         <StockCostAuditPanel branchCode={branchCode} />
       ) : view === "category-review" && isAdminUser ? (
