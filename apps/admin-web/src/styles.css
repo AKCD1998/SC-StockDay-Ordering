@@ -110,79 +110,167 @@ button {
   color: #16344d;
 }
 
+.stock-recommendations-panel {
+  display: grid;
+  gap: 18px;
+}
+
 .stock-recommendations-summary-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.stock-recommendation-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid #d7dfeb;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top right, rgba(71, 125, 233, 0.18), transparent 24%),
+    linear-gradient(180deg, rgba(248, 251, 255, 0.98) 0%, rgba(239, 245, 255, 0.92) 100%);
+}
+
+.stock-recommendation-hero-copy,
+.stock-recommendation-hero-meta,
+.stock-recommendation-branch-card,
+.stock-recommendations-list,
+.stock-recommendation-row-card,
+.stock-recommendation-detail-card,
+.stock-recommendation-donor-list {
+  display: grid;
+  gap: 8px;
+}
+
+.stock-recommendation-hero-copy strong {
+  font-size: 1.08rem;
+  color: #16344d;
+}
+
+.stock-recommendation-hero-copy span,
+.stock-recommendation-hero-meta span {
+  color: #526578;
+}
+
+.stock-recommendation-hero-meta {
+  min-width: 220px;
+  justify-items: end;
+  font-size: 0.92rem;
 }
 
 .stock-recommendation-branch-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
-  margin-bottom: 18px;
 }
 
 .stock-recommendation-branch-card {
-  display: grid;
-  gap: 6px;
-  padding: 14px 16px;
+  padding: 15px 16px;
   border: 1px solid #d7dfeb;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.9);
 }
 
+.stock-recommendation-branch-card strong {
+  color: #16344d;
+}
+
+.stock-recommendation-branch-card span {
+  color: #526578;
+}
+
+.stock-recommendation-empty {
+  display: grid;
+  gap: 10px;
+}
+
 .stock-recommendations-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(340px, 0.95fr);
   gap: 18px;
   align-items: start;
 }
 
-.stock-recommendations-table-shell,
+.stock-recommendations-list {
+  min-width: 0;
+}
+
+.stock-recommendation-row-card,
 .stock-recommendation-detail-card {
   border: 1px solid #d7dfeb;
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.94);
 }
 
-.stock-recommendations-table-shell {
-  overflow: auto;
-}
-
-.stock-recommendations-table {
+.stock-recommendation-row-card {
   width: 100%;
-  min-width: 860px;
-  border-collapse: collapse;
-}
-
-.stock-recommendations-table th,
-.stock-recommendations-table td {
-  padding: 12px 14px;
-  border-bottom: 1px solid #edf2f7;
+  padding: 16px 18px;
   text-align: left;
-  vertical-align: top;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 
-.stock-recommendations-table thead th {
-  background: #f3f6fb;
-  color: #36516d;
-}
-
-.stock-recommendations-table tbody tr {
-  cursor: pointer;
-}
-
-.stock-recommendations-table tbody tr:hover {
+.stock-recommendation-row-card:hover,
+.stock-recommendation-row-card:focus-visible {
+  border-color: #aac4ea;
   background: #f8fbff;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(31, 49, 82, 0.08);
 }
 
-.stock-recommendations-table tbody tr.selected {
-  background: #eef6ff;
+.stock-recommendation-row-card.selected {
+  border-color: #5a83cb;
+  background:
+    linear-gradient(180deg, rgba(238, 246, 255, 0.98) 0%, rgba(248, 251, 255, 0.98) 100%);
+  box-shadow: 0 14px 28px rgba(64, 104, 176, 0.14);
+}
+
+.stock-recommendation-row-top,
+.stock-recommendation-detail-header,
+.stock-recommendation-donor-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.stock-recommendation-row-top strong,
+.stock-recommendation-detail-header h3 {
+  color: #16344d;
+}
+
+.stock-recommendation-detail-header h3 {
+  margin: 0 0 4px;
+}
+
+.stock-recommendation-row-metrics,
+.stock-recommendation-row-plan {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stock-recommendation-row-metrics span,
+.stock-recommendation-row-plan span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #eef4fb;
+  color: #36516d;
+  font-size: 0.88rem;
+}
+
+.stock-recommendation-row-reason {
+  margin: 0;
+  color: #526578;
+  line-height: 1.5;
 }
 
 .stock-recommendation-badge {
   display: inline-flex;
   align-items: center;
-  padding: 5px 10px;
+  padding: 6px 11px;
   border-radius: 999px;
   font-size: 0.78rem;
   font-weight: 700;
@@ -206,22 +294,9 @@ button {
 }
 
 .stock-recommendation-detail-card {
-  padding: 18px;
-  display: grid;
-  gap: 14px;
+  padding: 20px;
   position: sticky;
   top: 16px;
-}
-
-.stock-recommendation-detail-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: flex-start;
-}
-
-.stock-recommendation-detail-header h3 {
-  margin: 0 0 4px;
 }
 
 .stock-recommendation-detail-grid {
@@ -233,7 +308,7 @@ button {
 .stock-recommendation-detail-grid > div {
   border: 1px solid #e6ebf2;
   border-radius: 14px;
-  padding: 10px 12px;
+  padding: 11px 12px;
   background: #fbfdff;
 }
 
@@ -245,6 +320,22 @@ button {
 
 .stock-recommendation-detail-grid strong {
   font-size: 1.12rem;
+  color: #16344d;
+}
+
+.stock-recommendation-donor-list {
+  padding: 14px 16px;
+  border: 1px solid #e6ebf2;
+  border-radius: 16px;
+  background: #fbfdff;
+}
+
+.stock-recommendation-donor-list strong {
+  color: #16344d;
+}
+
+.stock-recommendation-donor-item {
+  color: #526578;
 }
 
 .movement-panel {
@@ -264,6 +355,39 @@ button {
   grid-template-columns: minmax(300px, 360px) 1fr;
   gap: 18px;
   align-items: start;
+}
+
+@media (max-width: 1080px) {
+  .stock-recommendations-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stock-recommendations-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .stock-recommendation-detail-card {
+    position: static;
+  }
+}
+
+@media (max-width: 720px) {
+  .stock-recommendation-hero,
+  .stock-recommendation-row-top,
+  .stock-recommendation-detail-header,
+  .stock-recommendation-donor-item {
+    flex-direction: column;
+  }
+
+  .stock-recommendation-hero-meta {
+    min-width: 0;
+    justify-items: start;
+  }
+
+  .stock-recommendations-summary-grid,
+  .stock-recommendation-detail-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .movement-controls,
@@ -4761,6 +4885,85 @@ input[type="radio"] {
   border-color: rgba(111, 135, 165, 0.72);
   background: rgba(25, 39, 58, 0.96);
   color: #f4f7fb;
+}
+
+[data-theme="dark"] .stock-recommendation-hero {
+  border-color: #263547;
+  background:
+    radial-gradient(circle at top right, rgba(89, 126, 255, 0.16), transparent 26%),
+    linear-gradient(180deg, rgba(18, 30, 46, 0.96) 0%, rgba(12, 22, 35, 0.98) 100%);
+}
+
+[data-theme="dark"] .stock-recommendation-hero-copy strong,
+[data-theme="dark"] .stock-recommendation-branch-card strong,
+[data-theme="dark"] .stock-recommendation-row-top strong,
+[data-theme="dark"] .stock-recommendation-detail-header h3,
+[data-theme="dark"] .stock-recommendation-detail-grid strong,
+[data-theme="dark"] .stock-recommendation-donor-list strong {
+  color: #f4f7fb;
+}
+
+[data-theme="dark"] .stock-recommendation-hero-copy span,
+[data-theme="dark"] .stock-recommendation-hero-meta span,
+[data-theme="dark"] .stock-recommendation-branch-card span,
+[data-theme="dark"] .stock-recommendation-row-reason,
+[data-theme="dark"] .stock-recommendation-donor-item,
+[data-theme="dark"] .stock-recommendation-detail-grid span {
+  color: #8da7c4;
+}
+
+[data-theme="dark"] .stock-recommendation-branch-card,
+[data-theme="dark"] .stock-recommendation-row-card,
+[data-theme="dark"] .stock-recommendation-detail-card {
+  border-color: #263547;
+  background: rgba(13, 22, 35, 0.92);
+}
+
+[data-theme="dark"] .stock-recommendation-row-card:hover,
+[data-theme="dark"] .stock-recommendation-row-card:focus-visible {
+  border-color: #36537d;
+  background: rgba(17, 29, 43, 0.96);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
+}
+
+[data-theme="dark"] .stock-recommendation-row-card.selected {
+  border-color: #5378b4;
+  background:
+    linear-gradient(180deg, rgba(21, 36, 54, 0.98) 0%, rgba(12, 22, 35, 0.98) 100%);
+  box-shadow: 0 16px 32px rgba(7, 13, 21, 0.34);
+}
+
+[data-theme="dark"] .stock-recommendation-row-metrics span,
+[data-theme="dark"] .stock-recommendation-row-plan span {
+  background: #132235;
+  color: #9fb0c5;
+}
+
+[data-theme="dark"] .stock-recommendation-badge.tone-transfer {
+  background: rgba(62, 115, 204, 0.2);
+  color: #9ac2ff;
+}
+
+[data-theme="dark"] .stock-recommendation-badge.tone-purchase {
+  background: rgba(182, 94, 23, 0.22);
+  color: #ffc48a;
+}
+
+[data-theme="dark"] .stock-recommendation-badge.tone-slow,
+[data-theme="dark"] .stock-recommendation-badge.tone-neutral {
+  background: rgba(70, 88, 108, 0.28);
+  color: #a8bbcf;
+}
+
+[data-theme="dark"] .stock-recommendation-detail-grid > div,
+[data-theme="dark"] .stock-recommendation-donor-list {
+  border-color: #223549;
+  background: #101b2a;
+}
+
+[data-theme="dark"] .stock-recommendation-empty {
+  border-color: #263547;
+  background: rgba(13, 22, 35, 0.9);
 }
 
 [data-theme="dark"] .request-draft-card {
