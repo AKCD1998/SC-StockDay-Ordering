@@ -18,6 +18,13 @@ function formatNumber(value, digits = 0) {
   });
 }
 
+// Date columns come over the wire as either "YYYY-MM-DD" or a full
+// "YYYY-MM-DDT00:00:00.000Z" timestamp depending on the pg driver's date
+// parsing — slicing the first 10 chars avoids any timezone re-interpretation.
+function toIsoDateOnly(value) {
+  return value ? String(value).slice(0, 10) : "";
+}
+
 const FOCUS_TYPE_ORDER = ["salesperson", "pharmacist", "store_manager", "group_manager"];
 
 const FOCUS_TYPE_LABELS = {
@@ -26,6 +33,18 @@ const FOCUS_TYPE_LABELS = {
   store_manager: "โฟกัสผู้จัดการหน้าร้าน — แยกปิดต่อสาขา",
   group_manager: "โฟกัสผู้จัดการกลุ่ม — ทุกสาขาต้องปิดครบ",
 };
+
+const FOCUS_TYPE_SHORT_LABELS = {
+  salesperson: "รายคน",
+  pharmacist: "เภสัชกร",
+  store_manager: "ผจก.หน้าร้าน",
+  group_manager: "ผจก.กลุ่ม",
+};
+
+const THAI_MONTH_NAMES = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+];
 
 const EMPTY_FORM = {
   id: null,
@@ -38,6 +57,26 @@ const EMPTY_FORM = {
   branchCodes: [],
   note: "",
 };
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function monthBounds(year, month) {
+  const from = `${year}-${pad2(month)}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const to = `${year}-${pad2(month)}-${pad2(lastDay)}`;
+  return { from, to };
+}
+
+// A focus product "belongs to" a month if its date range overlaps that month at all.
+function rowOverlapsMonth(row, year, month) {
+  const { from, to } = monthBounds(year, month);
+  const rowFrom = toIsoDateOnly(row.dateFrom);
+  const rowTo = toIsoDateOnly(row.dateTo);
+  if (!rowFrom || !rowTo) return false;
+  return rowFrom <= to && rowTo >= from;
+}
 
 function StatusBadge({ achieved }) {
   if (achieved === null || achieved === undefined) return <span className="fp-dash">-</span>;
@@ -220,12 +259,137 @@ function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, 
   );
 }
 
+function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete }) {
+  const grouped = useMemo(() => {
+    const map = new Map(FOCUS_TYPE_ORDER.map((type) => [type, []]));
+    for (const row of rows) {
+      if (!map.has(row.focusType)) map.set(row.focusType, []);
+      map.get(row.focusType).push(row);
+    }
+    return map;
+  }, [rows]);
+
+  return (
+    <>
+      {FOCUS_TYPE_ORDER.map((type) => {
+        const typeRows = grouped.get(type) || [];
+        if (typeRows.length === 0) return null;
+        return (
+          <section key={type} className="fp-section">
+            <h3 className="fp-section-title">{FOCUS_TYPE_LABELS[type]}</h3>
+            <div className="mvt-sales-table-wrap">
+              <table className="mvt-sales-table fp-table">
+                <thead>
+                  <tr>
+                    <th>รหัสสินค้า</th>
+                    <th>ชื่อสินค้า</th>
+                    <th>ช่วงเวลา</th>
+                    <th>เป้าหมาย</th>
+                    <th>ยอดขายแต่ละสาขา</th>
+                    <th>รวม</th>
+                    <th>สถานะ</th>
+                    {isAdminUser && <th>จัดการ</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {typeRows.map((row) => (
+                    <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
+                      <td>{row.productCode}</td>
+                      <td>{row.productName || "-"}</td>
+                      <td>
+                        {toIsoDateOnly(row.dateFrom)} – {toIsoDateOnly(row.dateTo)}
+                      </td>
+                      <td>{formatNumber(row.targetQty)}</td>
+                      <td>
+                        <BranchBreakdown row={row} />
+                      </td>
+                      <td>{formatNumber(row.totalSold)}</td>
+                      <td>
+                        <StatusBadge achieved={row.achieved} />
+                      </td>
+                      {isAdminUser && (
+                        <td className="fp-actions-cell">
+                          <button type="button" className="fp-btn-link" onClick={() => onEdit(row)}>
+                            แก้ไข
+                          </button>
+                          <button type="button" className="fp-btn-link danger" onClick={() => onDelete(row)}>
+                            ลบ
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        );
+      })}
+    </>
+  );
+}
+
+function YearCalendar({ year, onYearChange, selectedMonth, onSelectMonth, monthSummaries }) {
+  return (
+    <div className="fp-calendar">
+      <div className="fp-calendar-header">
+        <button type="button" className="fp-year-nav-btn" onClick={() => onYearChange(year - 1)} aria-label="ปีก่อนหน้า">
+          ‹
+        </button>
+        <input
+          type="number"
+          className="fp-year-input"
+          value={year}
+          onChange={(e) => {
+            const next = Number(e.target.value);
+            if (Number.isInteger(next) && next > 1900) onYearChange(next);
+          }}
+        />
+        <button type="button" className="fp-year-nav-btn" onClick={() => onYearChange(year + 1)} aria-label="ปีถัดไป">
+          ›
+        </button>
+      </div>
+
+      <div className="fp-month-grid">
+        {THAI_MONTH_NAMES.map((name, index) => {
+          const month = index + 1;
+          const summary = monthSummaries[month] || [];
+          const isSelected = selectedMonth === month;
+          return (
+            <button
+              type="button"
+              key={month}
+              className={`fp-month-card${isSelected ? " selected" : ""}`}
+              onClick={() => onSelectMonth(month)}
+            >
+              <span className="fp-month-card-name">{name}</span>
+              {summary.length === 0 ? (
+                <span className="fp-month-empty-note">ยังไม่มี</span>
+              ) : (
+                <div className="fp-month-chips">
+                  {summary.map((type) => (
+                    <span key={type} className={`fp-month-chip fp-type-${type}`}>
+                      {FOCUS_TYPE_SHORT_LABELS[type]}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function FocusProductsPanel({ csrfToken, isAdminUser }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [modalState, setModalState] = useState(null); // null | { form, submitting, submitError }
+  const [year, setYear] = useState(2026);
+  const [selectedMonth, setSelectedMonth] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -249,17 +413,30 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser }) {
     };
   }, [isAdminUser, refreshKey]);
 
-  const grouped = useMemo(() => {
-    const map = new Map(FOCUS_TYPE_ORDER.map((type) => [type, []]));
-    for (const row of rows) {
-      if (!map.has(row.focusType)) map.set(row.focusType, []);
-      map.get(row.focusType).push(row);
+  const monthSummaries = useMemo(() => {
+    const summaries = {};
+    for (let month = 1; month <= 12; month += 1) {
+      const typesPresent = new Set();
+      for (const row of rows) {
+        if (rowOverlapsMonth(row, year, month)) typesPresent.add(row.focusType);
+      }
+      summaries[month] = FOCUS_TYPE_ORDER.filter((type) => typesPresent.has(type));
     }
-    return map;
-  }, [rows]);
+    return summaries;
+  }, [rows, year]);
 
-  function openCreateModal() {
-    setModalState({ form: EMPTY_FORM, submitting: false, submitError: null });
+  const monthRows = useMemo(() => {
+    if (!selectedMonth) return [];
+    return rows.filter((row) => rowOverlapsMonth(row, year, selectedMonth));
+  }, [rows, year, selectedMonth]);
+
+  function handleYearChange(nextYear) {
+    setYear(nextYear);
+    setSelectedMonth(null);
+  }
+
+  function openCreateModal(prefill = {}) {
+    setModalState({ form: { ...EMPTY_FORM, ...prefill }, submitting: false, submitError: null });
   }
 
   function openEditModal(row) {
@@ -270,14 +447,20 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser }) {
         productName: row.productName || "",
         focusType: row.focusType,
         targetQty: String(row.targetQty),
-        dateFrom: row.dateFrom,
-        dateTo: row.dateTo,
+        dateFrom: toIsoDateOnly(row.dateFrom),
+        dateTo: toIsoDateOnly(row.dateTo),
         branchCodes: row.branchCodesRaw || [],
         note: row.note || "",
       },
       submitting: false,
       submitError: null,
     });
+  }
+
+  function openCreateModalForSelectedMonth() {
+    if (!selectedMonth) return openCreateModal();
+    const { from, to } = monthBounds(year, selectedMonth);
+    openCreateModal({ dateFrom: from, dateTo: to });
   }
 
   async function handleSubmit(form, csrf) {
@@ -332,74 +515,46 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser }) {
         <p>เป้าหมายสินค้าโปรโมชั่นที่ต้องผลักดันการขาย และยอดขายสะสมถึงรอบล่าสุด</p>
       </div>
 
-      {isAdminUser && (
-        <div className="fp-toolbar">
-          <button type="button" className="fp-btn-primary" onClick={openCreateModal}>
-            + เพิ่มสินค้าโฟกัส
-          </button>
-        </div>
-      )}
-
       {loading && <div className="fp-loading">กำลังโหลด...</div>}
       {error && <div className="fp-form-error">{error}</div>}
 
-      {!loading && !error && FOCUS_TYPE_ORDER.map((type) => {
-        const typeRows = grouped.get(type) || [];
-        return (
-          <section key={type} className="fp-section">
-            <h3 className="fp-section-title">{FOCUS_TYPE_LABELS[type]}</h3>
-            {typeRows.length === 0 ? (
-              <div className="fp-empty">ยังไม่มีสินค้าโฟกัสประเภทนี้</div>
-            ) : (
-              <div className="mvt-sales-table-wrap">
-                <table className="mvt-sales-table fp-table">
-                  <thead>
-                    <tr>
-                      <th>รหัสสินค้า</th>
-                      <th>ชื่อสินค้า</th>
-                      <th>ช่วงเวลา</th>
-                      <th>เป้าหมาย</th>
-                      <th>ยอดขายแต่ละสาขา</th>
-                      <th>รวม</th>
-                      <th>สถานะ</th>
-                      {isAdminUser && <th>จัดการ</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {typeRows.map((row) => (
-                      <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
-                        <td>{row.productCode}</td>
-                        <td>{row.productName || "-"}</td>
-                        <td>
-                          {row.dateFrom} – {row.dateTo}
-                        </td>
-                        <td>{formatNumber(row.targetQty)}</td>
-                        <td>
-                          <BranchBreakdown row={row} />
-                        </td>
-                        <td>{formatNumber(row.totalSold)}</td>
-                        <td>
-                          <StatusBadge achieved={row.achieved} />
-                        </td>
-                        {isAdminUser && (
-                          <td className="fp-actions-cell">
-                            <button type="button" className="fp-btn-link" onClick={() => openEditModal(row)}>
-                              แก้ไข
-                            </button>
-                            <button type="button" className="fp-btn-link danger" onClick={() => handleDelete(row)}>
-                              ลบ
-                            </button>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+      {!loading && !error && (
+        <>
+          <YearCalendar
+            year={year}
+            onYearChange={handleYearChange}
+            selectedMonth={selectedMonth}
+            onSelectMonth={(month) => setSelectedMonth(month === selectedMonth ? null : month)}
+            monthSummaries={monthSummaries}
+          />
+
+          {selectedMonth && (
+            <div className="fp-month-detail">
+              <div className="fp-month-detail-header">
+                <h3>
+                  สินค้าโฟกัสเดือน{THAI_MONTH_NAMES[selectedMonth - 1]} {year}
+                </h3>
+                {isAdminUser && (
+                  <button type="button" className="fp-btn-primary" onClick={openCreateModalForSelectedMonth}>
+                    + เพิ่มสินค้าโฟกัส
+                  </button>
+                )}
               </div>
-            )}
-          </section>
-        );
-      })}
+
+              {monthRows.length === 0 ? (
+                <div className="fp-empty">ยังไม่มีการตั้งสินค้าโฟกัสในเดือนนี้</div>
+              ) : (
+                <FocusProductsTables
+                  rows={monthRows}
+                  isAdminUser={isAdminUser}
+                  onEdit={openEditModal}
+                  onDelete={handleDelete}
+                />
+              )}
+            </div>
+          )}
+        </>
+      )}
 
       {modalState && (
         <FocusProductForm

@@ -7417,3 +7417,110 @@ input[type="radio"] {
 [data-theme="dark"] .fp-search-results { background: #111e2d; border-color: #263547; }
 [data-theme="dark"] .fp-search-result:hover { background: #1e2e42; }
 
+/* ── Focus products: year calendar ────────────────────────────────────── */
+
+.fp-calendar { margin: 16px 0 24px; }
+
+.fp-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.fp-year-nav-btn {
+  background: #f1f5f9;
+  border: none;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #334155;
+}
+
+.fp-year-nav-btn:hover { background: #e2e8f0; }
+
+.fp-year-input {
+  width: 90px;
+  text-align: center;
+  font-size: 1.15rem;
+  font-weight: 700;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.fp-month-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .fp-month-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.fp-month-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  text-align: left;
+  min-height: 80px;
+}
+
+.fp-month-card:hover { border-color: #94a3b8; }
+
+.fp-month-card.selected {
+  border-color: #2a34ff;
+  background: rgba(42, 52, 255, 0.06);
+  box-shadow: 0 0 0 1px #2a34ff inset;
+}
+
+.fp-month-card-name { font-weight: 700; font-size: 0.92rem; color: #1e293b; }
+
+.fp-month-empty-note { font-size: 0.78rem; color: #94a3b8; }
+
+.fp-month-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.fp-month-chip {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.fp-month-chip.fp-type-salesperson { background: #2a34ff; }
+.fp-month-chip.fp-type-pharmacist { background: #a855f7; }
+.fp-month-chip.fp-type-store_manager { background: #0891b2; }
+.fp-month-chip.fp-type-group_manager { background: #f97316; }
+
+.fp-month-detail { margin-top: 8px; }
+
+.fp-month-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.fp-month-detail-header h3 { margin: 0; font-size: 1.05rem; }
+
+[data-theme="dark"] .fp-year-nav-btn { background: #1e2e42; color: #e2e8f0; }
+[data-theme="dark"] .fp-year-nav-btn:hover { background: #263547; }
+[data-theme="dark"] .fp-year-input { background: #0f1824; border-color: #263547; color: #e2e8f0; }
+[data-theme="dark"] .fp-month-card { background: #0f1824; border-color: #1e2e42; }
+[data-theme="dark"] .fp-month-card:hover { border-color: #3a4a5e; }
+[data-theme="dark"] .fp-month-card.selected { background: rgba(42, 52, 255, 0.12); }
+[data-theme="dark"] .fp-month-card-name { color: #f1f5f9; }
+
