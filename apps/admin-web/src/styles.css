@@ -7725,6 +7725,26 @@ input[type="radio"] {
 [data-theme="dark"] .fp-cell-ok { color: #4ade80; }
 [data-theme="dark"] .fp-cell-fail { color: #f87171; }
 
+.fp-branch-tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+
+.fp-branch-tab {
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fp-branch-tab:hover { background: #e2e8f0; }
+.fp-branch-tab.active { background: #6d28d9; color: #fff; }
+
+[data-theme="dark"] .fp-branch-tab { background: #1e2e42; color: #cbd5e1; }
+[data-theme="dark"] .fp-branch-tab:hover { background: #263547; }
+[data-theme="dark"] .fp-branch-tab.active { background: #7c3aed; color: #fff; }
+
 .fp-frozen-badge {
   display: inline-block;
   margin-left: 6px;

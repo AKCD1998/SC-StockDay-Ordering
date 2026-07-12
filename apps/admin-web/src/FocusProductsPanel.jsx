@@ -566,12 +566,143 @@ function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
   );
 }
 
+// group_manager: same purple-banner Excel layout as SalespersonFocusTable,
+// but with a branch switcher — target/sold/status are dynamic based on which
+// branch (or "ทุกสาขา" combined) is selected, since each branch can have its
+// own target and only "ทุกสาขา" reflects the true all-must-succeed verdict.
+function GroupManagerFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
+  const branchCodes = useMemo(() => {
+    const codes = new Set();
+    for (const row of rows) {
+      for (const code of row.branchCodes || []) codes.add(code);
+    }
+    return [...codes].sort();
+  }, [rows]);
+
+  const [selectedBranch, setSelectedBranch] = useState("all");
+  const activeBranch = branchCodes.includes(selectedBranch) || selectedBranch === "all" ? selectedBranch : "all";
+
+  const monthLabel = rows[0]
+    ? `${THAI_MONTH_NAMES[Number(toIsoDateOnly(rows[0].dateFrom).slice(5, 7)) - 1]} ${toIsoDateOnly(rows[0].dateFrom).slice(0, 4)}`
+    : "";
+
+  return (
+    <div className="mvt-sales-table-wrap">
+      <div className="fp-branch-tabs">
+        {branchCodes.map((code) => (
+          <button
+            key={code}
+            type="button"
+            className={`fp-branch-tab${activeBranch === code ? " active" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedBranch(code);
+            }}
+          >
+            สาขา {code}
+          </button>
+        ))}
+        <button
+          type="button"
+          className={`fp-branch-tab${activeBranch === "all" ? " active" : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedBranch("all");
+          }}
+        >
+          รวมทั้งหมด
+        </button>
+      </div>
+
+      <table className="mvt-sales-table fp-table fp-excel-table">
+        <thead>
+          <tr className="fp-excel-banner-row">
+            <th colSpan={5 + (isAdminUser ? 1 : 0)} className="fp-excel-banner">
+              สินค้าโฟกัส ผู้จัดการกลุ่ม {activeBranch === "all" ? "ทุกสาขา" : `สาขา ${activeBranch}`} เดือน {monthLabel}
+            </th>
+          </tr>
+          <tr>
+            <th>ลำดับ</th>
+            <th>รหัสสินค้า</th>
+            <th className="fp-col-wide">ชื่อสินค้า</th>
+            <th>เป้าสินค้า {activeBranch === "all" ? "รวม" : activeBranch}</th>
+            <th>ยอดล่าสุด</th>
+            <th>สถานะ</th>
+            {isAdminUser && <th>จัดการ</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => {
+            const rowBranchCodes = row.branchCodes || [];
+            let target;
+            let sold;
+            let achieved;
+            if (activeBranch === "all") {
+              target = rowBranchCodes.reduce((sum, code) => sum + (row.branchTargetsEffective?.[code] || 0), 0);
+              sold = row.totalSold;
+              achieved = row.achieved;
+            } else {
+              target = row.branchTargetsEffective?.[activeBranch];
+              sold = row.soldByBranch?.[activeBranch] || 0;
+              achieved = row.branchAchieved ? row.branchAchieved[activeBranch] : null;
+            }
+            return (
+              <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
+                <td>{index + 1}</td>
+                <td>{row.productCode}</td>
+                <td className="fp-col-wide">{row.productName || "-"}</td>
+                <td>{target != null ? formatNumber(target) : "-"}</td>
+                <td>{formatNumber(sold)}</td>
+                <td>
+                  <StatusBadge achieved={achieved} />
+                  {row.isFrozen && (
+                    <span className="fp-frozen-badge" title="ยอดขายถูกล็อกแล้วเมื่อสิ้นสุดช่วงเวลา">
+                      🔒 ปิดยอด
+                    </span>
+                  )}
+                </td>
+                {isAdminUser && (
+                  <td className="fp-actions-cell">
+                    <button
+                      type="button"
+                      className="fp-btn-link"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit(row);
+                      }}
+                    >
+                      แก้ไข
+                    </button>
+                    <button
+                      type="button"
+                      className="fp-btn-link danger"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(row);
+                      }}
+                    >
+                      ลบ
+                    </button>
+                  </td>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function FocusSectionTable({ type, typeRows, isAdminUser, onEdit, onDelete }) {
   if (type === "salesperson") {
     return <SalespersonFocusTable rows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />;
   }
   if (type === "pharmacist" || type === "store_manager") {
     return <BranchTargetFocusTable rows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />;
+  }
+  if (type === "group_manager") {
+    return <GroupManagerFocusTable rows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />;
   }
   return <GenericFocusTable typeRows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />;
 }
