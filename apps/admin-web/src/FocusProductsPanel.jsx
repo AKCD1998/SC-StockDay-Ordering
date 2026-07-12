@@ -363,10 +363,24 @@ function SalespersonFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
               </td>
               {isAdminUser && (
                 <td className="fp-actions-cell">
-                  <button type="button" className="fp-btn-link" onClick={() => onEdit(row)}>
+                  <button
+                    type="button"
+                    className="fp-btn-link"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(row);
+                    }}
+                  >
                     แก้ไข
                   </button>
-                  <button type="button" className="fp-btn-link danger" onClick={() => onDelete(row)}>
+                  <button
+                    type="button"
+                    className="fp-btn-link danger"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(row);
+                    }}
+                  >
                     ลบ
                   </button>
                 </td>
@@ -387,7 +401,86 @@ function SalespersonFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
   );
 }
 
+function GenericFocusTable({ typeRows, isAdminUser, onEdit, onDelete }) {
+  return (
+    <div className="mvt-sales-table-wrap">
+      <table className="mvt-sales-table fp-table">
+        <thead>
+          <tr>
+            <th>รหัสสินค้า</th>
+            <th>ชื่อสินค้า</th>
+            <th>ช่วงเวลา</th>
+            <th>เป้าหมาย</th>
+            <th>ยอดขายแต่ละสาขา</th>
+            <th>รวม</th>
+            <th>สถานะ</th>
+            {isAdminUser && <th>จัดการ</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {typeRows.map((row) => (
+            <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
+              <td>{row.productCode}</td>
+              <td>{row.productName || "-"}</td>
+              <td>
+                {toIsoDateOnly(row.dateFrom)} – {toIsoDateOnly(row.dateTo)}
+              </td>
+              <td>{formatNumber(row.targetQty)}</td>
+              <td>
+                <BranchBreakdown row={row} />
+              </td>
+              <td>{formatNumber(row.totalSold)}</td>
+              <td>
+                <StatusBadge achieved={row.achieved} />
+                {row.isFrozen && (
+                  <span className="fp-frozen-badge" title="ยอดขายถูกล็อกแล้วเมื่อสิ้นสุดช่วงเวลา">
+                    🔒 ปิดยอด
+                  </span>
+                )}
+              </td>
+              {isAdminUser && (
+                <td className="fp-actions-cell">
+                  <button
+                    type="button"
+                    className="fp-btn-link"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(row);
+                    }}
+                  >
+                    แก้ไข
+                  </button>
+                  <button
+                    type="button"
+                    className="fp-btn-link danger"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(row);
+                    }}
+                  >
+                    ลบ
+                  </button>
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function FocusSectionTable({ type, typeRows, isAdminUser, onEdit, onDelete }) {
+  return type === "salesperson" ? (
+    <SalespersonFocusTable rows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />
+  ) : (
+    <GenericFocusTable typeRows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />
+  );
+}
+
 function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete }) {
+  const [expandedType, setExpandedType] = useState(null);
+
   const grouped = useMemo(() => {
     const map = new Map(FOCUS_TYPE_ORDER.map((type) => [type, []]));
     for (const row of rows) {
@@ -403,65 +496,35 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete }) {
         const typeRows = grouped.get(type) || [];
         if (typeRows.length === 0) return null;
         return (
-          <section key={type} className="fp-section">
+          <section
+            key={type}
+            className="fp-section fp-section-clickable"
+            onClick={() => setExpandedType(type)}
+            title="คลิกเพื่อดูแบบเต็มหน้าจอ"
+          >
             <h3 className="fp-section-title">{FOCUS_TYPE_LABELS[type]}</h3>
-            {type === "salesperson" ? (
-              <SalespersonFocusTable rows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />
-            ) : (
-              <div className="mvt-sales-table-wrap">
-                <table className="mvt-sales-table fp-table">
-                  <thead>
-                    <tr>
-                      <th>รหัสสินค้า</th>
-                      <th>ชื่อสินค้า</th>
-                      <th>ช่วงเวลา</th>
-                      <th>เป้าหมาย</th>
-                      <th>ยอดขายแต่ละสาขา</th>
-                      <th>รวม</th>
-                      <th>สถานะ</th>
-                      {isAdminUser && <th>จัดการ</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {typeRows.map((row) => (
-                      <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
-                        <td>{row.productCode}</td>
-                        <td>{row.productName || "-"}</td>
-                        <td>
-                          {toIsoDateOnly(row.dateFrom)} – {toIsoDateOnly(row.dateTo)}
-                        </td>
-                        <td>{formatNumber(row.targetQty)}</td>
-                        <td>
-                          <BranchBreakdown row={row} />
-                        </td>
-                        <td>{formatNumber(row.totalSold)}</td>
-                        <td>
-                          <StatusBadge achieved={row.achieved} />
-                          {row.isFrozen && (
-                            <span className="fp-frozen-badge" title="ยอดขายถูกล็อกแล้วเมื่อสิ้นสุดช่วงเวลา">
-                              🔒 ปิดยอด
-                            </span>
-                          )}
-                        </td>
-                        {isAdminUser && (
-                          <td className="fp-actions-cell">
-                            <button type="button" className="fp-btn-link" onClick={() => onEdit(row)}>
-                              แก้ไข
-                            </button>
-                            <button type="button" className="fp-btn-link danger" onClick={() => onDelete(row)}>
-                              ลบ
-                            </button>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <FocusSectionTable type={type} typeRows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />
           </section>
         );
       })}
+
+      {expandedType && (
+        <div className="fp-table-modal-overlay" onClick={() => setExpandedType(null)}>
+          <div className="fp-table-modal" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="fp-table-modal-close" onClick={() => setExpandedType(null)} aria-label="ปิด">
+              ✕
+            </button>
+            <h3 className="fp-section-title">{FOCUS_TYPE_LABELS[expandedType]}</h3>
+            <FocusSectionTable
+              type={expandedType}
+              typeRows={grouped.get(expandedType) || []}
+              isAdminUser={isAdminUser}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 }
