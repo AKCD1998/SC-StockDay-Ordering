@@ -7242,3 +7242,178 @@ input[type="radio"] {
   border-bottom-color: rgba(148, 163, 184, 0.16);
 }
 
+/* ── Focus products (สินค้าโฟกัส) ─────────────────────────────────────── */
+
+.fp-panel { padding: 0 4px; }
+
+.fp-toolbar { display: flex; justify-content: flex-end; margin: 12px 0; }
+
+.fp-loading, .fp-empty { padding: 16px; color: #6b7280; font-size: 0.9rem; }
+
+.fp-form-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-size: 0.85rem;
+}
+
+.fp-section { margin-bottom: 28px; }
+
+.fp-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 10px;
+  color: #1e293b;
+}
+
+.fp-table td, .fp-table th { vertical-align: top; }
+
+.fp-inactive-row { opacity: 0.5; }
+
+.fp-branch-chips { display: flex; flex-wrap: wrap; gap: 4px; max-width: 260px; }
+
+.fp-branch-chip {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.fp-branch-chip.ok { background: rgba(34, 197, 94, 0.15); color: #15803d; }
+.fp-branch-chip.fail { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
+
+.fp-status-badge {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.fp-status-badge.ok { background: rgba(34, 197, 94, 0.15); color: #15803d; }
+.fp-status-badge.pending { background: rgba(249, 115, 22, 0.15); color: #c2410c; }
+
+.fp-dash { color: #94a3b8; }
+
+.fp-actions-cell { white-space: nowrap; }
+
+.fp-btn-link {
+  background: none;
+  border: none;
+  color: #2a34ff;
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 2px 6px;
+}
+
+.fp-btn-link:hover { text-decoration: underline; }
+.fp-btn-link.danger { color: #dc2626; }
+
+.fp-btn-primary {
+  background: #2a34ff;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fp-btn-primary:hover:not(:disabled) { background: #1f27cc; }
+.fp-btn-primary:disabled { opacity: 0.6; cursor: default; }
+
+.fp-btn-secondary {
+  background: #f1f5f9;
+  color: #334155;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.fp-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.fp-modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px 24px;
+  width: min(480px, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.fp-modal h3 { margin: 0 0 14px; }
+
+.fp-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; position: relative; }
+
+.fp-field span { font-size: 0.8rem; color: #64748b; }
+
+.fp-field input, .fp-field select, .fp-field textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.9rem;
+}
+
+.fp-field-row { display: flex; gap: 12px; }
+.fp-field-row .fp-field { flex: 1; }
+
+.fp-branch-checkboxes { display: flex; gap: 12px; flex-wrap: wrap; }
+
+.fp-branch-checkbox { display: flex; align-items: center; gap: 4px; font-size: 0.85rem; color: #334155; }
+
+.fp-search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  margin-top: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+}
+
+.fp-search-result {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.fp-search-result:hover { background: #f1f5f9; }
+
+.fp-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+
+[data-theme="dark"] .fp-section-title { color: #f1f5f9; }
+[data-theme="dark"] .fp-modal { background: #111e2d; color: #e2e8f0; }
+[data-theme="dark"] .fp-field input,
+[data-theme="dark"] .fp-field select,
+[data-theme="dark"] .fp-field textarea { background: #0f1824; border-color: #263547; color: #e2e8f0; }
+[data-theme="dark"] .fp-btn-secondary { background: #1e2e42; color: #e2e8f0; }
+[data-theme="dark"] .fp-branch-chip { background: #1e2e42; color: #cbd5e1; }
+[data-theme="dark"] .fp-search-results { background: #111e2d; border-color: #263547; }
+[data-theme="dark"] .fp-search-result:hover { background: #1e2e42; }
+

@@ -1,6 +1,7 @@
 ﻿import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import MovementAndTransactionsPanel from "./MovementTransactionsPanel";
+import FocusProductsPanel from "./FocusProductsPanel";
 import BranchStockHistoryPanel from "./BranchStockHistoryPanel";
 import ProductTaxonomyPanel from "./ProductTaxonomyPanel";
 import TaxonomyReviewPanel from "./TaxonomyReviewPanel";
@@ -44,13 +45,14 @@ const stockCostAuditView = "stock-cost-audit";
 const taxonomyView = "product-taxonomy";
 const taxonomyReviewView = "taxonomy-review";
 const adminOnlyViews = [stockCostAuditView, "category-review", "ingredient-dictionary", taxonomyView, taxonomyReviewView, "sync-log"];
-const adminViewKeys = [defaultAdminView, "branch-stock", "branch-stock-history", "movement-trace", "stock-requests", ...adminOnlyViews];
+const adminViewKeys = [defaultAdminView, "branch-stock", "branch-stock-history", "movement-trace", "stock-requests", "focus-products", ...adminOnlyViews];
 const ADMIN_VIEW_ROUTE_SEGMENTS = {
   receipts: "receipts",
   "branch-stock": "branch-stock",
   "branch-stock-history": "branch-stock-history",
   "movement-trace": "movement-trace",
   "stock-requests": "stock-requests",
+  "focus-products": "focus-products",
   [stockCostAuditView]: "stock-cost-audit",
   "category-review": "category-review",
   "ingredient-dictionary": "ingredient-dictionary",
@@ -116,7 +118,7 @@ function getNavigationGroups(isAdminUser) {
       label: "Dashboard",
       shortLabel: "DB",
       items: [
-        { label: "Dashboard", description: "ภาพรวม Stock Day และคำขอจากสาขา", disabled: true },
+        { label: "สินค้าโฟกัส", view: "focus-products", description: "เป้าหมายสินค้าโปรโมชั่นและยอดขายสะสม" },
       ],
     },
     {
@@ -8730,6 +8732,8 @@ export default function App() {
         />
       ) : view === "movement-trace" ? (
         <MovementAndTransactionsPanel branchCode={branchCode} csrfToken={session.csrfToken} />
+      ) : view === "focus-products" ? (
+        <FocusProductsPanel csrfToken={session.csrfToken} isAdminUser={isAdminUser} />
       ) : view === stockCostAuditView && isAdminUser ? (
         <StockCostAuditPanel branchCode={branchCode} />
       ) : view === "category-review" && isAdminUser ? (
