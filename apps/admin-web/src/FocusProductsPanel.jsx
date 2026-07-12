@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
@@ -582,6 +582,62 @@ function YearCalendar({ year, onYearChange, selectedMonth, onSelectMonth, monthS
   );
 }
 
+// Fake-progress loading overlay. The single biggest cause of a "stuck"
+// overlay is a stale interval that outlives the operation it was tracking —
+// so every branch here (load starts, load ends, unmount) clears any existing
+// timers FIRST before deciding what to do next, and the simulated progress
+// only ever climbs to 90%. The jump to 100% happens only when `active`
+// genuinely becomes false — never simulated — so the overlay can't visually
+// finish before the real request actually has.
+function LoadingOverlay({ active }) {
+  const [progress, setProgress] = useState(0);
+  const [visible, setVisible] = useState(active);
+  const intervalRef = useRef(null);
+  const hideTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+
+    if (active) {
+      setVisible(true);
+      setProgress(0);
+      intervalRef.current = setInterval(() => {
+        setProgress((p) => {
+          if (p >= 90) return p;
+          const step = p < 50 ? 4 : p < 75 ? 2 : 0.5;
+          return Math.min(90, p + step);
+        });
+      }, 200);
+    } else {
+      setProgress(100);
+      hideTimeoutRef.current = setTimeout(() => setVisible(false), 350);
+    }
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    };
+  }, [active]);
+
+  if (!visible) return null;
+
+  return (
+    <div className="fp-loading-overlay">
+      <div className="fp-loading-box">
+        <div className="fp-loading-spinner" />
+        <div className="fp-loading-percent">{Math.round(progress)}%</div>
+        <div className="fp-loading-bar-track">
+          <div className="fp-loading-bar-fill" style={{ width: `${progress}%` }} />
+        </div>
+        <div className="fp-loading-label">
+          {progress < 90 ? "กำลังโหลดข้อมูลสินค้าโฟกัส..." : "เกือบเสร็จแล้ว รอสักครู่..."}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function FocusProductsPanel({ csrfToken, isAdminUser }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -721,7 +777,7 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser }) {
         <p>เป้าหมายสินค้าโปรโมชั่นที่ต้องผลักดันการขาย และยอดขายสะสมถึงรอบล่าสุด</p>
       </div>
 
-      {loading && <div className="fp-loading">กำลังโหลด...</div>}
+      <LoadingOverlay active={loading} />
       {error && <div className="fp-form-error">{error}</div>}
 
       {!loading && !error && (
