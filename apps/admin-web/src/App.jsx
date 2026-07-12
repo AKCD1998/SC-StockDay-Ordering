@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import MovementAndTransactionsPanel from "./MovementTransactionsPanel";
 import FocusProductsPanel from "./FocusProductsPanel";
 import BranchStockHistoryPanel from "./BranchStockHistoryPanel";
+import StockRecommendationsPanel from "./StockRecommendationsPanel";
 import ProductTaxonomyPanel from "./ProductTaxonomyPanel";
 import TaxonomyReviewPanel from "./TaxonomyReviewPanel";
 import dkshLogoUrl from "./assets/dksh.svg";
@@ -45,11 +46,12 @@ const stockCostAuditView = "stock-cost-audit";
 const taxonomyView = "product-taxonomy";
 const taxonomyReviewView = "taxonomy-review";
 const adminOnlyViews = [stockCostAuditView, "category-review", "ingredient-dictionary", taxonomyView, taxonomyReviewView, "sync-log"];
-const adminViewKeys = [defaultAdminView, "branch-stock", "branch-stock-history", "movement-trace", "stock-requests", "focus-products", ...adminOnlyViews];
+const adminViewKeys = [defaultAdminView, "branch-stock", "branch-stock-history", "stock-recommendations", "movement-trace", "stock-requests", "focus-products", ...adminOnlyViews];
 const ADMIN_VIEW_ROUTE_SEGMENTS = {
   receipts: "receipts",
   "branch-stock": "branch-stock",
   "branch-stock-history": "branch-stock-history",
+  "stock-recommendations": "stock-recommendations",
   "movement-trace": "movement-trace",
   "stock-requests": "stock-requests",
   "focus-products": "focus-products",
@@ -129,6 +131,7 @@ function getNavigationGroups(isAdminUser) {
         { label: "ใบรับสินค้า", view: "receipts", description: "ตรวจใบรับสินค้าและโลโก้ Supplier" },
         { label: "สต็อกสาขา", view: "branch-stock", description: "สถานะสต็อกแยกตามสาขา" },
         { label: "สต๊อกดูย้อนหลัง", view: "branch-stock-history", description: "ประวัติสต๊อกสะสมตามรอบเวลา sync" },
+        { label: "คำแนะนำสต๊อก", view: "stock-recommendations", description: "ระบบแนะนำว่าควรถือสต๊อก ขอสาขาอื่น หรือซื้อเพิ่มเท่าไหร่" },
         { label: "คำขอสินค้า", view: "stock-requests", description: "ส่งและติดตามคำขอสินค้าระหว่างสาขา" },
         { label: "Movement & Transactions", view: "movement-trace", description: "ยอดรวม · รายการ transaction · เอกสาร" },
         ...(isAdminUser ? [{
@@ -8714,6 +8717,11 @@ export default function App() {
         />
       ) : view === "branch-stock-history" ? (
         <BranchStockHistoryPanel />
+      ) : view === "stock-recommendations" ? (
+        <StockRecommendationsPanel
+          branchCode={branchCode}
+          isAdminUser={isAdminUser}
+        />
       ) : view === "stock-requests" ? (
         <StockRequestsPanel
           branchCode={branchCode}

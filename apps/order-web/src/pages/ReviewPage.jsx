@@ -35,8 +35,18 @@ function BranchReviewCard({ group }) {
               {line.productNameThai || line.productNameEng || line.productCode}
             </span>
             <span className="subtle">{line.productCode}</span>
-            <strong>
+            <strong className="review-line-qty">
               {line.requestedQty.toLocaleString("th-TH")} {line.unit || ""}
+              {line.recommendation ? (
+                <small>
+                  ระบบแนะนำ{" "}
+                  {Number(
+                    (line.recommendation.recommendedRequestQty != null
+                      ? line.recommendation.recommendedRequestQty
+                      : Number(line.recommendation.recommendedTransferQty || 0) + Number(line.recommendation.recommendedPurchaseQty || 0)) || 0,
+                  ).toLocaleString("th-TH")}
+                </small>
+              ) : null}
             </strong>
           </li>
         ))}

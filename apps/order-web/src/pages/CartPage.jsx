@@ -58,6 +58,16 @@ export default function CartPage() {
                       <span>
                         {line.productCode} · snapshot {Number(line.snapshotQty || 0).toLocaleString("th-TH")} {line.unit || ""}
                       </span>
+                      {line.recommendation ? (
+                        <span>
+                          ระบบแนะนำ {Number(
+                            (line.recommendation.recommendedRequestQty != null
+                              ? line.recommendation.recommendedRequestQty
+                              : Number(line.recommendation.recommendedTransferQty || 0) + Number(line.recommendation.recommendedPurchaseQty || 0)) || 0,
+                          ).toLocaleString("th-TH")}{" "}
+                          {line.unit || ""} ({line.recommendation.recommendedAction || "-"})
+                        </span>
+                      ) : null}
                     </div>
                     <input
                       type="number"

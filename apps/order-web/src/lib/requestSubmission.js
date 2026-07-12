@@ -32,6 +32,10 @@ export function buildSubmitPayload(linesOrGroups, { idempotencyKey, note = "" } 
           unit: String(line.unit || "").trim(),
           snapshotQty: Number.isFinite(Number(line.snapshotQty)) ? Number(line.snapshotQty) : null,
           snapshotSyncedAt: line.snapshotSyncedAt || null,
+          recommendation:
+            line.recommendation && typeof line.recommendation === "object" && !Array.isArray(line.recommendation)
+              ? line.recommendation
+              : undefined,
         }))
         .filter((line) => line.productCode && line.unit && line.requestedQty > 0),
     }))

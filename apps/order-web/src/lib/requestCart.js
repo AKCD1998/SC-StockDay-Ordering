@@ -18,6 +18,25 @@ export function normalizeRequestedQty(value) {
 }
 
 export function sanitizeCartLine(line) {
+  const recommendation =
+    line.recommendation && typeof line.recommendation === "object" && !Array.isArray(line.recommendation)
+      ? {
+          ...line.recommendation,
+          recommendationFlags: Array.isArray(line.recommendation.recommendationFlags)
+            ? line.recommendation.recommendationFlags
+            : [],
+          donorSnapshot: Array.isArray(line.recommendation.donorSnapshot)
+            ? line.recommendation.donorSnapshot
+            : [],
+          recommendationSnapshot:
+            line.recommendation.recommendationSnapshot &&
+            typeof line.recommendation.recommendationSnapshot === "object" &&
+            !Array.isArray(line.recommendation.recommendationSnapshot)
+              ? line.recommendation.recommendationSnapshot
+              : {},
+        }
+      : null;
+
   const nextLine = {
     productCode: String(line.productCode || "").trim(),
     productNameThai: String(line.productNameThai || "").trim(),
@@ -30,6 +49,7 @@ export function sanitizeCartLine(line) {
     snapshotQty: Number(line.snapshotQty || 0),
     snapshotSyncedAt: line.snapshotSyncedAt || null,
     lineNote: String(line.lineNote || "").trim(),
+    recommendation,
   };
 
   nextLine.lineKey = buildLineKey(nextLine);
@@ -52,6 +72,7 @@ export function mergeCartLines(currentLines = [], addedLines = []) {
         snapshotQty: Math.max(existing.snapshotQty || 0, line.snapshotQty || 0),
         snapshotSyncedAt: line.snapshotSyncedAt || existing.snapshotSyncedAt,
         lineNote: existing.lineNote || line.lineNote,
+        recommendation: line.recommendation || existing.recommendation || null,
       });
       return;
     }

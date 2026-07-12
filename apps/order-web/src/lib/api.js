@@ -105,6 +105,29 @@ export const api = {
     return requestJson(`/api/branch-stock?${params.toString()}`);
   },
 
+  getStockRecommendations({ branchCode = "", search = "", action = "", sort = "priority_desc", page = 1, pageSize = 50 } = {}) {
+    const params = new URLSearchParams({
+      sort: String(sort || "priority_desc"),
+      page: String(page || 1),
+      pageSize: String(pageSize || 50),
+    });
+    if (branchCode) params.set("branchCode", branchCode);
+    if (search.trim()) params.set("search", search.trim());
+    if (action) params.set("action", action);
+    return requestJson(`/api/admin/stock-recommendations?${params.toString()}`);
+  },
+
+  getStockRecommendationSummary({ branchCode = "all", targetDays } = {}) {
+    const params = new URLSearchParams();
+    if (branchCode) params.set("branchCode", branchCode);
+    if (targetDays != null) params.set("targetDays", String(targetDays));
+    return requestJson(`/api/admin/stock-recommendations/summary?${params.toString()}`);
+  },
+
+  getStockRecommendationDetail(branchCode, productCode) {
+    return requestJson(`/api/admin/stock-recommendations/${encodeURIComponent(branchCode)}/${encodeURIComponent(productCode)}`);
+  },
+
   submitStockRequest(body) {
     return requestJson("/api/stock-requests", {
       method: "POST",

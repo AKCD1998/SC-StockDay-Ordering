@@ -46,6 +46,9 @@ export default function AppShell({ children }) {
         <NavLink to="/stock" className={navClassName}>
           สต็อกสาขา
         </NavLink>
+        <NavLink to="/recommendations" className={navClassName}>
+          คำแนะนำสต๊อก
+        </NavLink>
         <NavLink to="/cart" className={navClassName}>
           ตะกร้า
           <CartBadge count={lineCount} />

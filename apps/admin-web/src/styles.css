@@ -110,6 +110,143 @@ button {
   color: #16344d;
 }
 
+.stock-recommendations-summary-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.stock-recommendation-branch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.stock-recommendation-branch-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid #d7dfeb;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.stock-recommendations-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.stock-recommendations-table-shell,
+.stock-recommendation-detail-card {
+  border: 1px solid #d7dfeb;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.stock-recommendations-table-shell {
+  overflow: auto;
+}
+
+.stock-recommendations-table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+}
+
+.stock-recommendations-table th,
+.stock-recommendations-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #edf2f7;
+  text-align: left;
+  vertical-align: top;
+}
+
+.stock-recommendations-table thead th {
+  background: #f3f6fb;
+  color: #36516d;
+}
+
+.stock-recommendations-table tbody tr {
+  cursor: pointer;
+}
+
+.stock-recommendations-table tbody tr:hover {
+  background: #f8fbff;
+}
+
+.stock-recommendations-table tbody tr.selected {
+  background: #eef6ff;
+}
+
+.stock-recommendation-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stock-recommendation-badge.tone-transfer {
+  background: #d8e9ff;
+  color: #1d4f91;
+}
+
+.stock-recommendation-badge.tone-purchase {
+  background: #ffe2cc;
+  color: #9a4a15;
+}
+
+.stock-recommendation-badge.tone-slow,
+.stock-recommendation-badge.tone-neutral {
+  background: #e9eef3;
+  color: #496175;
+}
+
+.stock-recommendation-detail-card {
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+  position: sticky;
+  top: 16px;
+}
+
+.stock-recommendation-detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.stock-recommendation-detail-header h3 {
+  margin: 0 0 4px;
+}
+
+.stock-recommendation-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stock-recommendation-detail-grid > div {
+  border: 1px solid #e6ebf2;
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #fbfdff;
+}
+
+.stock-recommendation-detail-grid span {
+  display: block;
+  color: #617488;
+  margin-bottom: 4px;
+}
+
+.stock-recommendation-detail-grid strong {
+  font-size: 1.12rem;
+}
+
 .movement-panel {
   display: grid;
   gap: 18px;

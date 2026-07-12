@@ -8,6 +8,7 @@ import IncomingRequestsPage from "./pages/IncomingRequestsPage";
 import LoginPage from "./pages/LoginPage";
 import MyRequestsPage from "./pages/MyRequestsPage";
 import PackingDocumentPage from "./pages/PackingDocumentPage";
+import RecommendationsPage from "./pages/RecommendationsPage";
 import ReviewPage from "./pages/ReviewPage";
 
 const stockRequestsEnabled =
@@ -48,6 +49,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/stock" replace />} />
         <Route path="/stock" element={<BranchStockPage />} />
+        <Route path="/recommendations" element={<RecommendationsPage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/cart/review" element={<ReviewPage />} />
         <Route path="/requests" element={<MyRequestsPage />} />
