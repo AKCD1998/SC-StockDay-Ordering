@@ -7298,6 +7298,14 @@ input[type="radio"] {
 .fp-status-badge.ok { background: rgba(34, 197, 94, 0.15); color: #15803d; }
 .fp-status-badge.pending { background: rgba(249, 115, 22, 0.15); color: #c2410c; }
 
+.fp-frozen-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.7rem;
+  color: #64748b;
+  white-space: nowrap;
+}
+
 .fp-dash { color: #94a3b8; }
 
 .fp-actions-cell { white-space: nowrap; }
@@ -7376,6 +7384,12 @@ input[type="radio"] {
 .fp-branch-checkboxes { display: flex; gap: 12px; flex-wrap: wrap; }
 
 .fp-branch-checkbox { display: flex; align-items: center; gap: 4px; font-size: 0.85rem; color: #334155; }
+
+.fp-branch-target-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.fp-branch-target-field { display: flex; flex-direction: column; gap: 2px; width: 70px; }
+.fp-branch-target-field span { font-size: 0.75rem; color: #64748b; }
+.fp-branch-target-field input { width: 100%; }
 
 .fp-search-results {
   position: absolute;

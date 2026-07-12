@@ -55,8 +55,12 @@ const EMPTY_FORM = {
   dateFrom: "",
   dateTo: "",
   branchCodes: [],
+  branchTargets: {}, // {branchCode: targetQty} — group_manager only
+  assignedPersonName: "",
   note: "",
 };
+
+const BRANCH_CHOICES = ["001", "003", "004", "005"];
 
 function pad2(n) {
   return String(n).padStart(2, "0");
@@ -95,9 +99,10 @@ function BranchBreakdown({ row }) {
         const sold = row.soldByBranch?.[code] || 0;
         const pass = row.branchAchieved ? row.branchAchieved[code] : null;
         const cls = pass === null || pass === undefined ? "" : pass ? "ok" : "fail";
+        const target = row.branchTargetsEffective?.[code];
         return (
           <span key={code} className={`fp-branch-chip ${cls}`}>
-            {code}: {formatNumber(sold)}
+            {code}: {formatNumber(sold)}{target != null ? `/${formatNumber(target)}` : ""}
           </span>
         );
       })}
@@ -197,7 +202,7 @@ function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, 
         </label>
 
         <label className="fp-field">
-          <span>เป้าหมาย (ชิ้น)</span>
+          <span>{form.focusType === "group_manager" ? "เป้าหมายหลัก (ใช้กับสาขาที่ไม่ได้ตั้งเป้าแยก)" : "เป้าหมาย (ชิ้น)"}</span>
           <input
             type="number"
             min="1"
@@ -206,6 +211,46 @@ function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, 
             onChange={(e) => update("targetQty", e.target.value)}
           />
         </label>
+
+        {form.focusType === "group_manager" && (
+          <label className="fp-field">
+            <span>เป้าหมายแยกตามสาขา (แต่ละสาขากำหนดไม่เท่ากันได้ — เว้นว่างเพื่อใช้เป้าหมายหลัก)</span>
+            <div className="fp-branch-target-grid">
+              {BRANCH_CHOICES.map((code) => (
+                <label key={code} className="fp-branch-target-field">
+                  <span>{code}</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={form.branchTargets[code] ?? ""}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setForm((prev) => {
+                        const next = { ...prev.branchTargets };
+                        if (value === "") delete next[code];
+                        else next[code] = value;
+                        return { ...prev, branchTargets: next };
+                      });
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
+          </label>
+        )}
+
+        {form.focusType === "salesperson" && (
+          <label className="fp-field">
+            <span>ชื่อพนักงานที่รับผิดชอบ</span>
+            <input
+              type="text"
+              value={form.assignedPersonName}
+              onChange={(e) => update("assignedPersonName", e.target.value)}
+              placeholder="ชื่อ-นามสกุลพนักงาน"
+            />
+          </label>
+        )}
 
         <div className="fp-field-row">
           <label className="fp-field">
@@ -281,6 +326,7 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete }) {
               <table className="mvt-sales-table fp-table">
                 <thead>
                   <tr>
+                    {type === "salesperson" && <th>ผู้รับผิดชอบ</th>}
                     <th>รหัสสินค้า</th>
                     <th>ชื่อสินค้า</th>
                     <th>ช่วงเวลา</th>
@@ -294,6 +340,7 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete }) {
                 <tbody>
                   {typeRows.map((row) => (
                     <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
+                      {type === "salesperson" && <td>{row.assignedPersonName || "-"}</td>}
                       <td>{row.productCode}</td>
                       <td>{row.productName || "-"}</td>
                       <td>
@@ -306,6 +353,11 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete }) {
                       <td>{formatNumber(row.totalSold)}</td>
                       <td>
                         <StatusBadge achieved={row.achieved} />
+                        {row.isFrozen && (
+                          <span className="fp-frozen-badge" title="ยอดขายถูกล็อกแล้วเมื่อสิ้นสุดช่วงเวลา">
+                            🔒 ปิดยอด
+                          </span>
+                        )}
                       </td>
                       {isAdminUser && (
                         <td className="fp-actions-cell">
@@ -450,6 +502,8 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser }) {
         dateFrom: toIsoDateOnly(row.dateFrom),
         dateTo: toIsoDateOnly(row.dateTo),
         branchCodes: row.branchCodesRaw || [],
+        branchTargets: row.branchTargets || {},
+        assignedPersonName: row.assignedPersonName || "",
         note: row.note || "",
       },
       submitting: false,
@@ -472,6 +526,10 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser }) {
       dateFrom: form.dateFrom,
       dateTo: form.dateTo,
       branchCodes: form.branchCodes.length > 0 ? form.branchCodes : null,
+      branchTargets: form.focusType === "group_manager" && Object.keys(form.branchTargets).length > 0
+        ? Object.fromEntries(Object.entries(form.branchTargets).map(([code, qty]) => [code, Number(qty)]))
+        : null,
+      assignedPersonName: form.focusType === "salesperson" ? (form.assignedPersonName || "").trim() || null : null,
       note: form.note.trim() || null,
     };
     try {
