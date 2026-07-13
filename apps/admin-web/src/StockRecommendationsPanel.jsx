@@ -262,6 +262,26 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
         <div>
           <h2>คำแนะนำสต๊อก</h2>
           <p>ดูว่าแต่ละสินค้าใน{scopeLabel}ควรถือสต๊อกประมาณเท่าไหร่ ควรขอจากสาขาไหน หรือควรซื้อเพิ่มหรือไม่ โดยอิงเป้าหมาย {targetDays} วัน</p>
+          {branchSummaries.length > 0 ? (
+            <article className="stock-recommendation-branch-table-card">
+              <table className="stock-recommendation-branch-table">
+                <thead>
+                  <tr>
+                    <th>รหัสสาขา</th>
+                    <th>Stockday (วัน)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {branchSummaries.map((branch) => (
+                    <tr key={branch.branchCode}>
+                      <td>{branch.branchCode}</td>
+                      <td>{branch.averageDaysCover != null ? formatNumber(branch.averageDaysCover, 1) : "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </article>
+          ) : null}
         </div>
         <form className="stock-recommendations-toolbar-stack" onSubmit={handleSearchSubmit}>
           <div className="toolbar branch-stock-toolbar stock-recommendations-toolbar stock-recommendations-search-toolbar">
@@ -313,27 +333,6 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
           </div>
         </form>
       </div>
-
-      {branchSummaries.length > 0 ? (
-        <article className="stock-recommendation-branch-table-card">
-          <table className="stock-recommendation-branch-table">
-            <thead>
-              <tr>
-                <th>รหัสสาขา</th>
-                <th>Stockday (วัน)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {branchSummaries.map((branch) => (
-                <tr key={branch.branchCode}>
-                  <td>{branch.branchCode}</td>
-                  <td>{branch.averageDaysCover != null ? formatNumber(branch.averageDaysCover, 1) : "-"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </article>
-      ) : null}
 
       <SummaryLoadingOverlay active={summaryLoading} />
       {error ? <div className="notice error">{error}</div> : null}

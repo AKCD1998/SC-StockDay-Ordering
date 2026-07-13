@@ -124,6 +124,7 @@ button {
 }
 
 .stock-recommendation-branch-table-card {
+  margin-top: 12px;
   padding: 10px 12px;
   border: 1px solid #d7dfeb;
   border-radius: 18px;
