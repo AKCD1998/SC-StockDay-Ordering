@@ -321,9 +321,7 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
           {branchSummaries.map((branch) => (
             <article key={branch.branchCode} className="stock-recommendation-branch-card">
               <strong>{branch.label}</strong>
-              <span>days cover เฉลี่ย {formatNumber(branch.averageDaysCover, 1)} วัน</span>
-              <span>ขอจากสาขาอื่น {formatNumber(branch.recommendTransferCount)} SKU</span>
-              <span>ซื้อเพิ่ม {formatNumber(branch.recommendPurchaseCount)} SKU</span>
+              <span>days cover เฉลี่ย (ถ่วงน้ำหนักมูลค่าสต๊อก) {formatNumber(branch.averageDaysCover, 1)} วัน</span>
             </article>
           ))}
         </div>
