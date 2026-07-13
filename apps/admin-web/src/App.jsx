@@ -7746,6 +7746,7 @@ export default function App() {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [openNavGroup, setOpenNavGroup] = useState(null);
   const [incomingRequestBadgeCount, setIncomingRequestBadgeCount] = useState(0);
+  const [syncFailureBranches, setSyncFailureBranches] = useState([]);
   const [requestDraftItems, setRequestDraftItems] = useState([]);
   const [requestBatchNote, setRequestBatchNote] = useState("");
   const [draftPublicId, setDraftPublicId] = useState(null);
@@ -7899,6 +7900,7 @@ export default function App() {
   const activeBranchOption = branchOptions.find((branch) => branch.branchCode === branchCode) || null;
   const activeBranchName = activeBranchOption?.branchName || "";
   const stockRequestBadgeCount = requestDraftItems.length + incomingRequestBadgeCount;
+  const syncFailureBadgeCount = syncFailureBranches.length;
   const canSelectBranchContext =
     session?.user?.role === "admin" ||
     (session?.user?.role === "staff" && !branchCode);
@@ -7949,6 +7951,33 @@ export default function App() {
     const id = setInterval(fetchIncomingBadgeCount, 30_000);
     return () => { active = false; clearInterval(id); };
   }, [branchCode]);
+
+  // Sync-failure nav badge: a branch stays flagged only while its MOST RECENT
+  // run today is still "failed" — one successful run clears it, even if an
+  // earlier run that same day failed. Historical failures from prior days
+  // don't count; only today's unresolved state does.
+  useEffect(() => {
+    if (!session || session.user?.role !== "admin") { setSyncFailureBranches([]); return undefined; }
+    let active = true;
+    async function fetchSyncFailureBadge() {
+      try {
+        const res = await apiFetch("/api/sync/nightly-log?days=1");
+        if (!res.ok || !active) return;
+        const data = await res.json();
+        if (!active) return;
+        const todayIso = Array.isArray(data.dates) ? data.dates[0] : null;
+        const branches = Array.isArray(data.branches) ? data.branches : [];
+        const rows = data.rows || {};
+        const failed = todayIso
+          ? branches.filter((branchCode) => rows[branchCode]?.[todayIso] === "failed")
+          : [];
+        setSyncFailureBranches(failed);
+      } catch { /* silent */ }
+    }
+    fetchSyncFailureBadge();
+    const id = setInterval(fetchSyncFailureBadge, 30_000);
+    return () => { active = false; clearInterval(id); };
+  }, [session]);
 
   // Hydrate draft from server whenever branch context changes
   useEffect(() => {
@@ -8503,7 +8532,12 @@ export default function App() {
             const activeItem = group.items.find((item) => item.view === view);
             const isOpen = openNavGroup === group.id;
             const hasDropdown = group.items.length > 1 || group.items.some((item) => item.disabled);
-            const groupHasNotif = stockRequestBadgeCount > 0 && group.items.some((item) => item.view === "stock-requests");
+            const groupBadgeCount = group.items.some((item) => item.view === "stock-requests")
+              ? stockRequestBadgeCount
+              : group.items.some((item) => item.view === "sync-log")
+                ? syncFailureBadgeCount
+                : 0;
+            const groupHasNotif = groupBadgeCount > 0;
             const triggerClassName = [
               "view-nav-btn",
               "hero-nav-trigger",
@@ -8557,7 +8591,7 @@ export default function App() {
                   <span className="hero-nav-label">{group.label}</span>
                   <span className="hero-nav-chevron" aria-hidden="true">▾</span>
                   {groupHasNotif ? (
-                    <span className="nav-notif-badge nav-trigger-badge">{stockRequestBadgeCount > 99 ? "99+" : stockRequestBadgeCount}</span>
+                    <span className="nav-notif-badge nav-trigger-badge">{groupBadgeCount > 99 ? "99+" : groupBadgeCount}</span>
                   ) : null}
                 </button>
                 <div
@@ -8589,6 +8623,9 @@ export default function App() {
                           {item.disabled ? <span className="view-nav-badge">เร็วๆนี้</span> : null}
                           {item.view === "stock-requests" && stockRequestBadgeCount > 0 ? (
                             <span className="nav-notif-badge">{stockRequestBadgeCount > 99 ? "99+" : stockRequestBadgeCount}</span>
+                          ) : null}
+                          {item.view === "sync-log" && syncFailureBadgeCount > 0 ? (
+                            <span className="nav-notif-badge">{syncFailureBadgeCount > 99 ? "99+" : syncFailureBadgeCount}</span>
                           ) : null}
                         </span>
                         <span className="hero-nav-item-desc">{item.description}</span>
