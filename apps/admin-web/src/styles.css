@@ -130,13 +130,18 @@ button {
   gap: 10px;
 }
 
-.stock-recommendations-search-row {
-  display: flex;
+.stock-recommendations-search-toolbar input {
+  min-width: min(220px, 100%);
+  flex: 1 1 220px;
 }
 
-.stock-recommendations-search-row input {
-  width: 100%;
-  min-width: 0;
+.stock-recommendations-search-toolbar .branch-stock-search-button,
+.stock-recommendations-search-toolbar .branch-stock-refresh-button {
+  min-width: 108px;
+}
+
+.stock-recommendations-select-row {
+  flex-wrap: wrap;
 }
 
 .stock-recommendation-branch-grid {

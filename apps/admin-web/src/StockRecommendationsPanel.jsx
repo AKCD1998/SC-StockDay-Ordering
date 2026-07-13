@@ -264,56 +264,52 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
           <p>ดูว่าแต่ละสินค้าใน{scopeLabel}ควรถือสต๊อกประมาณเท่าไหร่ ควรขอจากสาขาไหน หรือควรซื้อเพิ่มหรือไม่ โดยอิงเป้าหมาย {targetDays} วัน</p>
         </div>
         <form className="stock-recommendations-toolbar-stack" onSubmit={handleSearchSubmit}>
-          <div className="stock-recommendations-search-row">
+          <div className="toolbar branch-stock-toolbar stock-recommendations-toolbar stock-recommendations-search-toolbar">
             <input
               type="search"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
               placeholder="ค้นหา SKU ชื่อสินค้า หรือ barcode"
             />
+            <button type="submit" className="ghost-button branch-stock-search-button">ค้นหา</button>
+            <button
+              type="button"
+              className="ghost-button branch-stock-refresh-button"
+              onClick={() => {
+                setSearchInput("");
+                setSearch("");
+                setAction("");
+                setSort("priority_desc");
+              }}
+            >
+              ล้างตัวกรอง
+            </button>
           </div>
-          <div className="toolbar cluster-toolbar">
-            <div className="toolbar branch-stock-toolbar stock-recommendations-toolbar">
-              <select value={action} onChange={(event) => setAction(event.target.value)}>
-                <option value="">ทุก action</option>
-                <option value="TRANSFER_IN">ขอจากสาขาอื่น</option>
-                <option value="PURCHASE">สั่งซื้อเพิ่ม</option>
-                <option value="TRANSFER_AND_PURCHASE">ขอ + ซื้อเพิ่ม</option>
-                <option value="NO_PURCHASE_SLOW_MOVING">หมุนช้า</option>
-                <option value="NO_ACTION">ยังไม่ต้องสั่ง</option>
+          <div className="toolbar cluster-toolbar stock-recommendations-select-row">
+            <select value={action} onChange={(event) => setAction(event.target.value)}>
+              <option value="">ทุก action</option>
+              <option value="TRANSFER_IN">ขอจากสาขาอื่น</option>
+              <option value="PURCHASE">สั่งซื้อเพิ่ม</option>
+              <option value="TRANSFER_AND_PURCHASE">ขอ + ซื้อเพิ่ม</option>
+              <option value="NO_PURCHASE_SLOW_MOVING">หมุนช้า</option>
+              <option value="NO_ACTION">ยังไม่ต้องสั่ง</option>
+            </select>
+            {isAdminUser ? (
+              <select value={scopeBranchCode} onChange={(event) => setScopeBranchCode(event.target.value)}>
+                <option value="all">ทุกสาขา</option>
+                {BRANCH_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
               </select>
-              <button type="submit" className="ghost-button branch-stock-search-button">ค้นหา</button>
-              <button
-                type="button"
-                className="ghost-button branch-stock-refresh-button"
-                onClick={() => {
-                  setSearchInput("");
-                  setSearch("");
-                  setAction("");
-                  setSort("priority_desc");
-                }}
-              >
-                ล้างตัวกรอง
-              </button>
-            </div>
-            <div className="toolbar">
-              {isAdminUser ? (
-                <select value={scopeBranchCode} onChange={(event) => setScopeBranchCode(event.target.value)}>
-                  <option value="all">ทุกสาขา</option>
-                  {BRANCH_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              ) : null}
-              <select value={sort} onChange={(event) => setSort(event.target.value)}>
-                <option value="priority_desc">เรียงตาม priority</option>
-                <option value="days_cover_asc">เรียงตาม days cover ต่ำสุด</option>
-                <option value="inventory_value_desc">เรียงตามมูลค่าสต๊อก</option>
-                <option value="product_code_asc">เรียงตามรหัสสินค้า</option>
-              </select>
-            </div>
+            ) : null}
+            <select value={sort} onChange={(event) => setSort(event.target.value)}>
+              <option value="priority_desc">เรียงตาม priority</option>
+              <option value="days_cover_asc">เรียงตาม days cover ต่ำสุด</option>
+              <option value="inventory_value_desc">เรียงตามมูลค่าสต๊อก</option>
+              <option value="product_code_asc">เรียงตามรหัสสินค้า</option>
+            </select>
           </div>
         </form>
       </div>
