@@ -17,11 +17,18 @@ function authHeaders() {
   return headers;
 }
 
-async function fetchWithTimeout(url, options) {
+// Guards the whole request lifecycle — connecting, waiting on headers, AND
+// reading the response body — under one bounded timeout. A signal passed to
+// fetch() also aborts an in-progress body read (per the Fetch spec), so
+// keeping the timer alive until text() resolves is what actually makes a
+// slow-to-stream response abort instead of hanging forever.
+async function requestWithTimeout(url, options) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    const text = await response.text();
+    return { response, text };
   } catch (err) {
     if (err.name === "AbortError") {
       throw new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms: ${url}`);
@@ -33,13 +40,12 @@ async function fetchWithTimeout(url, options) {
 }
 
 export async function postJson(url, payload) {
-  const response = await fetchWithTimeout(url, {
+  const { response, text } = await requestWithTimeout(url, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(payload),
   });
 
-  const text = await response.text();
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status} — ${text.slice(0, 300)}`);
   }
@@ -47,8 +53,7 @@ export async function postJson(url, payload) {
 }
 
 export async function getJson(url) {
-  const response = await fetchWithTimeout(url, { method: "GET", headers: authHeaders() });
-  const text = await response.text();
+  const { response, text } = await requestWithTimeout(url, { method: "GET", headers: authHeaders() });
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status} — ${text.slice(0, 300)}`);
   }

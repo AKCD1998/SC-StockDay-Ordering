@@ -57,6 +57,29 @@ pattern นี้ไม่เคยถูกเอามาใช้กับ `.
 เมื่อ SQL Server อยู่เครื่องเดียวกับ sync agent (setup ปกติ) และใช้ LAN
 IP/hostname เฉพาะกรณี SQL Server อยู่คนละเครื่องจริงๆ เท่านั้น
 
+## บั๊กที่สองที่เจอระหว่างทดสอบ ad-hoc sync: timeout ไม่ครอบคลุมการอ่าน response body
+
+หลังแก้ `.env` แล้วลอง ad-hoc sync จริงเพื่อยืนยัน พบว่า POST ไปยัง
+`/api/sync/products` **ค้างไป 9+ นาที** ทั้งที่ตั้ง `ADAPOS_SYNC_REQUEST_TIMEOUT_MS`
+ไว้สูงกว่านั้น (180000ms) — ไม่มี error โผล่ออกมาเลย
+
+สาเหตุ: `apps/adapos-sync/src/client.js` เดิม `clearTimeout(timer)` ถูกเรียกใน
+`finally` ของ `fetchWithTimeout()` ซึ่งจบทันทีที่ `fetch()` resolve (คือแค่รอ
+**response headers** มาถึง) — แต่การอ่าน **response body** (`response.text()`)
+เกิดขึ้นทีหลังใน `postJson`/`getJson` แบบไม่มี timeout คุ้มครองเลย ถ้า backend
+ส่ง header เร็วแต่ stream body ช้า/ค้าง ก็จะแขวนไม่มีที่สิ้นสุดเหมือนบั๊กเดิมที่
+commit `0700995` ตั้งใจแก้ไปแล้ว เพียงแต่เป็นคนละ layer
+
+**แก้ไข:** รวม `fetch()` และ `response.text()` ไว้ใน timer/AbortController
+เดียวกันใน `requestWithTimeout()` (เปลี่ยนชื่อจาก `fetchWithTimeout`) — ไม่เรียก
+`clearTimeout` จนกว่าจะอ่าน body เสร็จ ตรงตาม Fetch spec ที่ signal เดียวกัน
+abort ทั้ง fetch และการอ่าน body ที่กำลังทำอยู่ได้ด้วย
+
+ทดสอบยืนยันแล้ว: หลังแก้ ลอง sync ซ้ำพบว่า timeout ทำงานถูกต้อง (fail สะอาดที่
+60s แทนที่จะค้าง) จากนั้นลองอีกครั้งด้วย timeout 240s ก็ผ่านสำเร็จครบ
+(`Done. 18375 records sent to API.` ใช้เวลารวม 15 นาที 22 วินาที — ช้ากว่าปกติ
+เพราะ backend ตอบช้าเป็นพิเศษวันนี้ ไม่เกี่ยวกับบั๊กนี้)
+
 ## Diagnostic detour ที่ไม่เกี่ยวข้อง (บันทึกไว้กันสับสนซ้ำ)
 
 ระหว่างวินิจฉัย พบ credential `sa` / `adasoft` ที่ถูก document ไว้ใน
