@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
@@ -43,13 +43,56 @@ function actionTone(action) {
   return "neutral";
 }
 
-function SummaryCard({ label, value, hint = "" }) {
+// Fake-progress loading overlay, same pattern as FocusProductsPanel.jsx's
+// LoadingOverlay: simulated progress only ever climbs to 90%, and only jumps
+// to 100% once `active` genuinely becomes false, so it can't visually finish
+// before the real request has.
+function SummaryLoadingOverlay({ active }) {
+  const [progress, setProgress] = useState(0);
+  const [visible, setVisible] = useState(active);
+  const intervalRef = useRef(null);
+  const hideTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+
+    if (active) {
+      setVisible(true);
+      setProgress(0);
+      intervalRef.current = setInterval(() => {
+        setProgress((p) => {
+          if (p >= 90) return p;
+          const step = p < 50 ? 4 : p < 75 ? 2 : 0.5;
+          return Math.min(90, p + step);
+        });
+      }, 200);
+    } else {
+      setProgress(100);
+      hideTimeoutRef.current = setTimeout(() => setVisible(false), 350);
+    }
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    };
+  }, [active]);
+
+  if (!visible) return null;
+
   return (
-    <article className="summary-card">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      {hint ? <small className="subtle">{hint}</small> : null}
-    </article>
+    <div className="fp-loading-overlay">
+      <div className="fp-loading-box">
+        <div className="fp-loading-spinner" />
+        <div className="fp-loading-percent">{Math.round(progress)}%</div>
+        <div className="fp-loading-bar-track">
+          <div className="fp-loading-bar-fill" style={{ width: `${progress}%` }} />
+        </div>
+        <div className="fp-loading-label">
+          {progress < 90 ? "กำลังอัปเดตภาพรวมสาขา..." : "เกือบเสร็จแล้ว รอสักครู่..."}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -66,8 +109,6 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
   const [action, setAction] = useState("");
   const [sort, setSort] = useState("priority_desc");
   const [rows, setRows] = useState([]);
-  const [summary, setSummary] = useState(null);
-  const [companySummary, setCompanySummary] = useState(null);
   const [branchSummaries, setBranchSummaries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(true);
@@ -113,7 +154,6 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
         if (!listRes.ok) throw new Error(listData.error || listData.message || `HTTP ${listRes.status}`);
         if (!active) return;
         setRows(Array.isArray(listData.rows) ? listData.rows : []);
-        setSummary(listData.summary || null);
         setPagination({
           page: Number(listData.pagination?.page || pagination.page || 1),
           pageSize: Number(listData.pagination?.pageSize || pagination.pageSize || DEFAULT_PAGE_SIZE),
@@ -144,11 +184,9 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
         const summaryData = await summaryRes.json().catch(() => ({}));
         if (!summaryRes.ok) throw new Error(summaryData.error || summaryData.message || `HTTP ${summaryRes.status}`);
         if (!active) return;
-        setCompanySummary(summaryData.company || null);
         setBranchSummaries(Array.isArray(summaryData.branches) ? summaryData.branches : []);
       } catch (_error) {
         if (!active) return;
-        setCompanySummary(null);
         setBranchSummaries([]);
       } finally {
         if (active) setSummaryLoading(false);
@@ -204,15 +242,9 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
     });
   }, [rows]);
 
-  const displayedSummary = useMemo(() => companySummary || summary, [companySummary, summary]);
-  const actionableRows = useMemo(
-    () => rows.filter((row) => !["NO_ACTION", "NO_PURCHASE_SLOW_MOVING"].includes(row.action)),
-    [rows],
-  );
   const scopeLabel = getScopeLabel(scopeBranchCode, isAdminUser, branchCode);
   const targetDays = detail?.targetDays || rows[0]?.targetDays || 90;
   const selectedRecommendation = detail || selectedRow;
-  const lastGeneratedAt = rows[0]?.generatedAt || detail?.generatedAt || null;
   const totalPages = Math.max(1, Math.ceil((pagination.total || 0) / (pagination.pageSize || DEFAULT_PAGE_SIZE)));
   const currentPage = Math.min(totalPages, Math.max(1, pagination.page || 1));
   const rangeStart = pagination.total === 0 ? 0 : (currentPage - 1) * (pagination.pageSize || DEFAULT_PAGE_SIZE) + 1;
@@ -231,77 +263,62 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
           <h2>คำแนะนำสต๊อก</h2>
           <p>ดูว่าแต่ละสินค้าใน{scopeLabel}ควรถือสต๊อกประมาณเท่าไหร่ ควรขอจากสาขาไหน หรือควรซื้อเพิ่มหรือไม่ โดยอิงเป้าหมาย {targetDays} วัน</p>
         </div>
-        <div className="toolbar cluster-toolbar">
-          <form className="toolbar branch-stock-toolbar stock-recommendations-toolbar" onSubmit={handleSearchSubmit}>
+        <form className="stock-recommendations-toolbar-stack" onSubmit={handleSearchSubmit}>
+          <div className="stock-recommendations-search-row">
             <input
               type="search"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
               placeholder="ค้นหา SKU ชื่อสินค้า หรือ barcode"
             />
-            <select value={action} onChange={(event) => setAction(event.target.value)}>
-              <option value="">ทุก action</option>
-              <option value="TRANSFER_IN">ขอจากสาขาอื่น</option>
-              <option value="PURCHASE">สั่งซื้อเพิ่ม</option>
-              <option value="TRANSFER_AND_PURCHASE">ขอ + ซื้อเพิ่ม</option>
-              <option value="NO_PURCHASE_SLOW_MOVING">หมุนช้า</option>
-              <option value="NO_ACTION">ยังไม่ต้องสั่ง</option>
-            </select>
-            <button type="submit" className="ghost-button branch-stock-search-button">ค้นหา</button>
-            <button
-              type="button"
-              className="ghost-button branch-stock-refresh-button"
-              onClick={() => {
-                setSearchInput("");
-                setSearch("");
-                setAction("");
-                setSort("priority_desc");
-              }}
-            >
-              ล้างตัวกรอง
-            </button>
-          </form>
-          <div className="toolbar">
-            {isAdminUser ? (
-              <select value={scopeBranchCode} onChange={(event) => setScopeBranchCode(event.target.value)}>
-                <option value="all">ทุกสาขา</option>
-                {BRANCH_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-            <select value={sort} onChange={(event) => setSort(event.target.value)}>
-              <option value="priority_desc">เรียงตาม priority</option>
-              <option value="days_cover_asc">เรียงตาม days cover ต่ำสุด</option>
-              <option value="inventory_value_desc">เรียงตามมูลค่าสต๊อก</option>
-              <option value="product_code_asc">เรียงตามรหัสสินค้า</option>
-            </select>
           </div>
-        </div>
+          <div className="toolbar cluster-toolbar">
+            <div className="toolbar branch-stock-toolbar stock-recommendations-toolbar">
+              <select value={action} onChange={(event) => setAction(event.target.value)}>
+                <option value="">ทุก action</option>
+                <option value="TRANSFER_IN">ขอจากสาขาอื่น</option>
+                <option value="PURCHASE">สั่งซื้อเพิ่ม</option>
+                <option value="TRANSFER_AND_PURCHASE">ขอ + ซื้อเพิ่ม</option>
+                <option value="NO_PURCHASE_SLOW_MOVING">หมุนช้า</option>
+                <option value="NO_ACTION">ยังไม่ต้องสั่ง</option>
+              </select>
+              <button type="submit" className="ghost-button branch-stock-search-button">ค้นหา</button>
+              <button
+                type="button"
+                className="ghost-button branch-stock-refresh-button"
+                onClick={() => {
+                  setSearchInput("");
+                  setSearch("");
+                  setAction("");
+                  setSort("priority_desc");
+                }}
+              >
+                ล้างตัวกรอง
+              </button>
+            </div>
+            <div className="toolbar">
+              {isAdminUser ? (
+                <select value={scopeBranchCode} onChange={(event) => setScopeBranchCode(event.target.value)}>
+                  <option value="all">ทุกสาขา</option>
+                  {BRANCH_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+              <select value={sort} onChange={(event) => setSort(event.target.value)}>
+                <option value="priority_desc">เรียงตาม priority</option>
+                <option value="days_cover_asc">เรียงตาม days cover ต่ำสุด</option>
+                <option value="inventory_value_desc">เรียงตามมูลค่าสต๊อก</option>
+                <option value="product_code_asc">เรียงตามรหัสสินค้า</option>
+              </select>
+            </div>
+          </div>
+        </form>
       </div>
 
-      <div className="stock-recommendation-hero">
-        <div className="stock-recommendation-hero-copy">
-          <strong>คิวตัดสินใจสำหรับ {scopeLabel}</strong>
-          <span>ระบบสรุปให้ก่อนว่าสินค้าตัวไหนควรขอย้าย, ซื้อเพิ่ม, หรือชะลอการซื้อจาก stock จริง + sold 30/90 วัน + incoming PO</span>
-        </div>
-        <div className="stock-recommendation-hero-meta">
-          <span>เป้าหมาย days cover: {formatNumber(targetDays)}</span>
-          <span>อัปเดตล่าสุด: {formatDateTime(lastGeneratedAt)}</span>
-        </div>
-      </div>
-
-      <div className="summary-grid stock-recommendations-summary-grid">
-        <SummaryCard label="SKU ในผลลัพธ์" value={formatNumber(rows.length)} hint={scopeLabel} />
-        <SummaryCard label="SKU ที่ต้องลงมือ" value={formatNumber(actionableRows.length)} hint="ขอของหรือซื้อเพิ่ม" />
-        <SummaryCard label="มูลค่าสต๊อกปัจจุบัน" value={formatNumber(displayedSummary?.currentInventoryValue)} />
-        <SummaryCard label="มูลค่าที่เป้าหมาย 90 วัน" value={formatNumber(displayedSummary?.projectedInventoryValueAtTarget)} />
-        <SummaryCard label="โอกาสลดต้นทุน" value={formatNumber(displayedSummary?.potentialReductionValue)} hint="ถ้าปรับลงใกล้ target days" />
-      </div>
-
-      {summaryLoading ? <div className="notice compact">กำลังอัปเดตภาพรวมสาขา...</div> : null}
+      <SummaryLoadingOverlay active={summaryLoading} />
 
       {branchSummaries.length > 0 ? (
         <div className="stock-recommendation-branch-grid">

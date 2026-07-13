@@ -115,24 +115,6 @@ button {
   gap: 18px;
 }
 
-.stock-recommendations-summary-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-
-.stock-recommendation-hero {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px 20px;
-  border: 1px solid #d7dfeb;
-  border-radius: 20px;
-  background:
-    radial-gradient(circle at top right, rgba(71, 125, 233, 0.18), transparent 24%),
-    linear-gradient(180deg, rgba(248, 251, 255, 0.98) 0%, rgba(239, 245, 255, 0.92) 100%);
-}
-
-.stock-recommendation-hero-copy,
-.stock-recommendation-hero-meta,
 .stock-recommendation-branch-card,
 .stock-recommendations-list,
 .stock-recommendation-row-card,
@@ -142,20 +124,19 @@ button {
   gap: 8px;
 }
 
-.stock-recommendation-hero-copy strong {
-  font-size: 1.08rem;
-  color: #16344d;
+.stock-recommendations-toolbar-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.stock-recommendation-hero-copy span,
-.stock-recommendation-hero-meta span {
-  color: #526578;
+.stock-recommendations-search-row {
+  display: flex;
 }
 
-.stock-recommendation-hero-meta {
-  min-width: 220px;
-  justify-items: end;
-  font-size: 0.92rem;
+.stock-recommendations-search-row input {
+  width: 100%;
+  min-width: 0;
 }
 
 .stock-recommendation-branch-grid {
@@ -378,10 +359,6 @@ button {
 }
 
 @media (max-width: 1080px) {
-  .stock-recommendations-summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .stock-recommendations-layout {
     grid-template-columns: 1fr;
   }
@@ -392,19 +369,12 @@ button {
 }
 
 @media (max-width: 720px) {
-  .stock-recommendation-hero,
   .stock-recommendation-row-top,
   .stock-recommendation-detail-header,
   .stock-recommendation-donor-item {
     flex-direction: column;
   }
 
-  .stock-recommendation-hero-meta {
-    min-width: 0;
-    justify-items: start;
-  }
-
-  .stock-recommendations-summary-grid,
   .stock-recommendation-detail-grid {
     grid-template-columns: 1fr;
   }
@@ -4907,14 +4877,6 @@ input[type="radio"] {
   color: #f4f7fb;
 }
 
-[data-theme="dark"] .stock-recommendation-hero {
-  border-color: #263547;
-  background:
-    radial-gradient(circle at top right, rgba(89, 126, 255, 0.16), transparent 26%),
-    linear-gradient(180deg, rgba(18, 30, 46, 0.96) 0%, rgba(12, 22, 35, 0.98) 100%);
-}
-
-[data-theme="dark"] .stock-recommendation-hero-copy strong,
 [data-theme="dark"] .stock-recommendation-branch-card strong,
 [data-theme="dark"] .stock-recommendation-row-top strong,
 [data-theme="dark"] .stock-recommendation-detail-header h3,
@@ -4923,8 +4885,6 @@ input[type="radio"] {
   color: #f4f7fb;
 }
 
-[data-theme="dark"] .stock-recommendation-hero-copy span,
-[data-theme="dark"] .stock-recommendation-hero-meta span,
 [data-theme="dark"] .stock-recommendation-branch-card span,
 [data-theme="dark"] .stock-recommendation-row-reason,
 [data-theme="dark"] .stock-recommendation-donor-item,
