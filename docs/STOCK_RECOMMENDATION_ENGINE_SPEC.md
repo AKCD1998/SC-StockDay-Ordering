@@ -1,8 +1,57 @@
 # Stock Recommendation Engine Spec
 
-Last updated: 2026-07-12
-Status: Draft v1
+Last updated: 2026-07-13
+Status: Draft v1 (Phase 2 read-only engine live; demand data source corrected)
 Owners: SC StockDay ordering/admin domains
+
+## Implementation Status Update (2026-07-13)
+
+The read-only engine (`PaaSRTSM-project/apps/admin-api/src/services/stockRecommendations.js`)
+was already built per this spec, but two production bugs were found and fixed today:
+
+1. **Priority sort bug**: `priorityScore` was computed from raw `shortageQty`
+   regardless of the resolved `action`. Products with no sales in 90 days and a
+   *negative* recorded `current_stock` (data-quality artifacts, especially on
+   branch `000`, the warehouse, which never sells directly) produced a
+   spuriously positive `shortageQty` and floated to the top of the
+   `priority_desc` sort even though their action was correctly `NO_ACTION`.
+   Fixed: `priorityScore` now derives only from the qty the resolved action
+   will actually move (`purchaseQty`/`transferPlanQty`), so it's 0 whenever
+   the action is `NO_ACTION`/`NO_PURCHASE_SLOW_MOVING`.
+
+2. **Demand data source bug (much bigger)**: this spec's own "Backend
+   Implementation Notes" section (below) already warned *"do not depend on
+   `analytics.product_sales_summary_periods` for arbitrary recommendation date
+   windows"* — but the shipped implementation used it anyway for both the
+   30d and 90d sold-qty windows. In production, that table's `period_days=90`
+   bucket is only ever written by `ada.refresh_sales_summary_period_into_analytics()`
+   (migration 017), which filters `paid_status IN ('1', ...)`; real paid sales
+   use `paid_status='3'` (confirmed against `movement-analytics.js` /
+   `focusProducts.js`). That function ran once, on 2026-05-20, and has been
+   stale ever since. The only thing still populating the table
+   (`adapos_sync`, from the branch senders) only ever pushes `period_days=30`.
+   Net effect: `soldQty90d` was `0` for virtually every SKU, `adjustedAdu`
+   collapsed to `0`, and ~85% of the catalog was misclassified
+   `NO_PURCHASE_SLOW_MOVING` — the engine never recommended a single
+   `PURCHASE`/`TRANSFER_IN` action in production. Fixed by adding
+   `loadRawSalesAggByBranch()`, which aggregates `sold_qty_30d`/`sold_qty_90d`
+   directly from `ada.sales_lines` + `ada.sales_headers` with the correct
+   `paid_status='3'` filter (same pattern as `movement-analytics.js`),
+   replacing the `analytics.product_sales_summary_periods` dependency
+   entirely for this engine. After the fix, a full-catalog snapshot run
+   (`npm run derive:stock-recommendations`) went from 0 actionable rows to
+   1,626 `TRANSFER_IN` + 804 `TRANSFER_AND_PURCHASE` + 698 `PURCHASE` out of
+   ~14,300 branch/product rows.
+
+3. **Nightly refresh scheduled**: `refreshStockRecommendationSnapshots()` now
+   runs on a cron inside the admin-api process (`stockRecommendationSchedule.js`,
+   using `node-cron`), gated behind `FEATURE_STOCK_RECOMMENDATION_CRON`. See
+   `docs/stock-recommendation-performance-implementation.md` for the env vars
+   and operational details — this closes the "Render cron/background job for
+   periodic refresh" item that doc previously listed as not done.
+
+Full session notes: `docs/SESSION_2026-07-13_STOCK_RECOMMENDATION_DEMAND_FIX.md`
+(in `PaaSRTSM-project`).
 
 ## Purpose
 
