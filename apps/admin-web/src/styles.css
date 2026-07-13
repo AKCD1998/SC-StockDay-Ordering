@@ -124,10 +124,11 @@ button {
 }
 
 .stock-recommendation-branch-table-card {
-  padding: 14px 16px;
+  padding: 10px 12px;
   border: 1px solid #d7dfeb;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.9);
+  max-width: 320px;
 }
 
 .stock-recommendation-branch-table {
@@ -138,8 +139,8 @@ button {
 .stock-recommendation-branch-table th,
 .stock-recommendation-branch-table td {
   text-align: left;
-  padding: 6px 10px;
-  font-size: 0.9rem;
+  padding: 4px 8px;
+  font-size: 0.82rem;
 }
 
 .stock-recommendation-branch-table th {

@@ -314,6 +314,27 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
         </form>
       </div>
 
+      {branchSummaries.length > 0 ? (
+        <article className="stock-recommendation-branch-table-card">
+          <table className="stock-recommendation-branch-table">
+            <thead>
+              <tr>
+                <th>รหัสสาขา</th>
+                <th>Stockday (วัน)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {branchSummaries.map((branch) => (
+                <tr key={branch.branchCode}>
+                  <td>{branch.branchCode}</td>
+                  <td>{branch.averageDaysCover != null ? formatNumber(branch.averageDaysCover, 1) : "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </article>
+      ) : null}
+
       <SummaryLoadingOverlay active={summaryLoading} />
       {error ? <div className="notice error">{error}</div> : null}
       <div className="branch-stock-loading-wrap stock-recommendations-loading-wrap">
@@ -337,26 +358,6 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
         {(rows.length > 0 || loading) ? (
           <div className="stock-recommendations-layout">
             <div className="stock-recommendations-list">
-              {branchSummaries.length > 0 ? (
-                <article className="stock-recommendation-branch-table-card">
-                  <table className="stock-recommendation-branch-table">
-                    <thead>
-                      <tr>
-                        <th>รหัสสาขา</th>
-                        <th>Stockday (วัน)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {branchSummaries.map((branch) => (
-                        <tr key={branch.branchCode}>
-                          <td>{branch.branchCode}</td>
-                          <td>{branch.averageDaysCover != null ? formatNumber(branch.averageDaysCover, 1) : "-"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </article>
-              ) : null}
               {rows.map((row) => {
                 const isSelected =
                   selectedRow?.branchCode === row.branchCode &&
