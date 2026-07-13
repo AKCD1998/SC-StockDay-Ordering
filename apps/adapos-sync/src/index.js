@@ -255,10 +255,11 @@ async function runOnce() {
       });
 
       if (data.products?.length) {
-        console.log(`Posting ${data.products.length} products...`);
+        console.log(`Posting ${data.products.length} products (${syncConfig.productBatchSize}/batch)...`);
         const sent = await postBatches(
           `${syncConfig.apiBaseUrl}/api/sync/products`,
           toProductRecords(data.products),
+          syncConfig.productBatchSize,
         );
         console.log(`  products: ${sent} sent`);
         totalSent += sent;

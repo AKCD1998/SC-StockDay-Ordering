@@ -13,6 +13,11 @@ function parseHost(raw) {
   return { server: normalizeLocalHost(raw.slice(0, slash)), instanceName: raw.slice(slash + 1) };
 }
 
+function parsePositiveInteger(raw, fallback) {
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
 // CLI overrides: --dry-run, --execute, --branch=005, --datasets=...
 // Backfill: --date-from=YYYY-MM-DD --date-to=YYYY-MM-DD --lookback-days=N
 const args = process.argv.slice(2);
@@ -65,6 +70,7 @@ export const syncConfig = {
   // (e.g. a specific past month) uses --date-from/--date-to instead, as a
   // one-off run — not this rolling window.
   salesDetailLookbackDays: Number(process.env.SALES_DETAIL_LOOKBACK_DAYS || 7),
+  productBatchSize: parsePositiveInteger(process.env.ADAPOS_SYNC_PRODUCT_BATCH_SIZE, 100),
   // Explicit backfill date range (overrides lookback when both are set).
   // Pass --date-from=YYYY-MM-DD --date-to=YYYY-MM-DD to backfill a specific window.
   dateFrom: cliDateFrom || process.env.SYNC_DATE_FROM || null,
