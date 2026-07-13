@@ -115,7 +115,6 @@ button {
   gap: 18px;
 }
 
-.stock-recommendation-branch-card,
 .stock-recommendations-list,
 .stock-recommendation-row-card,
 .stock-recommendation-detail-card,
@@ -124,45 +123,67 @@ button {
   gap: 8px;
 }
 
+.stock-recommendation-branch-table-card {
+  padding: 14px 16px;
+  border: 1px solid #d7dfeb;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.stock-recommendation-branch-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.stock-recommendation-branch-table th,
+.stock-recommendation-branch-table td {
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+}
+
+.stock-recommendation-branch-table th {
+  color: #526578;
+  font-weight: 600;
+  border-bottom: 1px solid #d7dfeb;
+}
+
+.stock-recommendation-branch-table td {
+  color: #16344d;
+  border-bottom: 1px solid #edf1f7;
+}
+
+.stock-recommendation-branch-table tr:last-child td {
+  border-bottom: none;
+}
+
 .stock-recommendations-toolbar-stack {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.stock-recommendations-search-toolbar input {
-  min-width: min(220px, 100%);
-  flex: 1 1 220px;
+.branch-stock-toolbar.stock-recommendations-search-toolbar {
+  flex-wrap: nowrap;
 }
 
-.stock-recommendations-search-toolbar .branch-stock-search-button,
-.stock-recommendations-search-toolbar .branch-stock-refresh-button {
-  min-width: 108px;
+/* Compound selector (two classes on the same toolbar element) so this wins
+   over the generic .branch-stock-toolbar rules regardless of source order —
+   same specificity would otherwise let whichever is declared later win. */
+.branch-stock-toolbar.stock-recommendations-search-toolbar input {
+  min-width: min(160px, 100%);
+  flex: 1 1 160px;
+}
+
+.branch-stock-toolbar.stock-recommendations-search-toolbar .branch-stock-search-button,
+.branch-stock-toolbar.stock-recommendations-search-toolbar .branch-stock-refresh-button {
+  min-width: 0;
+  flex: 0 0 auto;
+  padding: 0 14px;
 }
 
 .stock-recommendations-select-row {
   flex-wrap: wrap;
-}
-
-.stock-recommendation-branch-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-}
-
-.stock-recommendation-branch-card {
-  padding: 15px 16px;
-  border: 1px solid #d7dfeb;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.stock-recommendation-branch-card strong {
-  color: #16344d;
-}
-
-.stock-recommendation-branch-card span {
-  color: #526578;
 }
 
 .stock-recommendation-empty {
@@ -4882,7 +4903,6 @@ input[type="radio"] {
   color: #f4f7fb;
 }
 
-[data-theme="dark"] .stock-recommendation-branch-card strong,
 [data-theme="dark"] .stock-recommendation-row-top strong,
 [data-theme="dark"] .stock-recommendation-detail-header h3,
 [data-theme="dark"] .stock-recommendation-detail-grid strong,
@@ -4890,18 +4910,31 @@ input[type="radio"] {
   color: #f4f7fb;
 }
 
-[data-theme="dark"] .stock-recommendation-branch-card span,
 [data-theme="dark"] .stock-recommendation-row-reason,
 [data-theme="dark"] .stock-recommendation-donor-item,
 [data-theme="dark"] .stock-recommendation-detail-grid span {
   color: #8da7c4;
 }
 
-[data-theme="dark"] .stock-recommendation-branch-card,
 [data-theme="dark"] .stock-recommendation-row-card,
 [data-theme="dark"] .stock-recommendation-detail-card {
   border-color: #263547;
   background: rgba(13, 22, 35, 0.92);
+}
+
+[data-theme="dark"] .stock-recommendation-branch-table-card {
+  border-color: #263547;
+  background: rgba(13, 22, 35, 0.92);
+}
+
+[data-theme="dark"] .stock-recommendation-branch-table th {
+  color: #8da7c4;
+  border-bottom-color: #263547;
+}
+
+[data-theme="dark"] .stock-recommendation-branch-table td {
+  color: #f4f7fb;
+  border-bottom-color: #1c2938;
 }
 
 [data-theme="dark"] .stock-recommendation-row-card:hover,

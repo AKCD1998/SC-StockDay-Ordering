@@ -315,18 +315,6 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
       </div>
 
       <SummaryLoadingOverlay active={summaryLoading} />
-
-      {branchSummaries.length > 0 ? (
-        <div className="stock-recommendation-branch-grid">
-          {branchSummaries.map((branch) => (
-            <article key={branch.branchCode} className="stock-recommendation-branch-card">
-              <strong>{branch.label}</strong>
-              <span>days cover เฉลี่ย (ถ่วงน้ำหนักมูลค่าสต๊อก) {formatNumber(branch.averageDaysCover, 1)} วัน</span>
-            </article>
-          ))}
-        </div>
-      ) : null}
-
       {error ? <div className="notice error">{error}</div> : null}
       <div className="branch-stock-loading-wrap stock-recommendations-loading-wrap">
         {showLoadingOverlay ? (
@@ -349,6 +337,26 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
         {(rows.length > 0 || loading) ? (
           <div className="stock-recommendations-layout">
             <div className="stock-recommendations-list">
+              {branchSummaries.length > 0 ? (
+                <article className="stock-recommendation-branch-table-card">
+                  <table className="stock-recommendation-branch-table">
+                    <thead>
+                      <tr>
+                        <th>รหัสสาขา</th>
+                        <th>Stockday (วัน)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {branchSummaries.map((branch) => (
+                        <tr key={branch.branchCode}>
+                          <td>{branch.branchCode}</td>
+                          <td>{branch.averageDaysCover != null ? formatNumber(branch.averageDaysCover, 1) : "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </article>
+              ) : null}
               {rows.map((row) => {
                 const isSelected =
                   selectedRow?.branchCode === row.branchCode &&
