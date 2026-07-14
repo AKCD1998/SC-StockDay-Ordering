@@ -150,8 +150,18 @@ Decision + verification recorded in DECISIONS.md. Rollout status:
   "remove products" one meant for 001/003/005 — and correctly caught the
   contradiction against DECISIONS.md before making any change, then asked
   for confirmation instead of guessing. No `.env` was touched.)
-- **001**: prompt sent, awaiting confirmation.
-- **003**: prompt sent, awaiting confirmation.
+- **001**: DONE. `.env` diff confirmed (`products` removed from
+  `ADAPOS_SYNC_DATASETS`), `git status` clean, off-peak manual test
+  2026-07-14 16:05:54-16:10:37 ICT: 16,291 records sent (sales, sales_detail
+  13/13 chunks, transfers, branch_stock — no products line at all), exit 0,
+  282.5s. **Notably faster than the pre-change off-peak run (625.8s ->
+  282.5s, 55% reduction)** even outside peak hours — confirms products was a
+  major cost on its own, not just a peak-contention symptom.
+- **003**: DONE. `.env` diff confirmed, `git status` clean, off-peak manual
+  test: 16,079 records sent (sales, sales_detail 13/13 chunks — last chunk
+  20 headers = 1,820 - 12×150, checks out — transfers, branch_stock, no
+  products line), exit 0, 4m33s (273.2s, in line with 001's post-change
+  time).
 - **005**: prompt sent, awaiting confirmation. (Also still carries the
   known duplicate-Scheduled-Task issue from CP0 — unrelated to this rollout,
   still open.)
