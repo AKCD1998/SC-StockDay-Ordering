@@ -73,6 +73,12 @@ const EMPTY_FORM = {
 };
 
 const BRANCH_CHOICES = ["001", "003", "004", "005"];
+const PRODUCT_LOOKUP_CACHE_TTL_MS = 5 * 60 * 1000;
+const PRODUCT_LOOKUP_CACHE_PREFIX = "focus-product-lookup:v1:";
+
+function productLookupCacheKey(value) {
+  return String(value || "").trim().toLowerCase();
+}
 
 function pad2(n) {
   return String(n).padStart(2, "0");
@@ -1030,11 +1036,42 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved }) {
   const [scheduledPublishAt, setScheduledPublishAt] = useState("");
   const [scanValue, setScanValue] = useState("");
   const [rows, setRows] = useState([]);
-  const [busy, setBusy] = useState(false);
+  const [scanBusy, setScanBusy] = useState(false);
+  const [submitBusy, setSubmitBusy] = useState(false);
+  const [scanningQuery, setScanningQuery] = useState("");
   const [error, setError] = useState(null);
   const [copyFromBranch, setCopyFromBranch] = useState("001");
   const [copyToBranch, setCopyToBranch] = useState("003");
   const scanRef = useRef(null);
+  const lookupCacheRef = useRef(new Map());
+  const busy = scanBusy || submitBusy;
+
+  function readCachedProduct(query) {
+    const key = productLookupCacheKey(query);
+    const memoryEntry = lookupCacheRef.current.get(key);
+    if (memoryEntry && Date.now() - memoryEntry.savedAt < PRODUCT_LOOKUP_CACHE_TTL_MS) return memoryEntry.product;
+    if (memoryEntry) lookupCacheRef.current.delete(key);
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(`${PRODUCT_LOOKUP_CACHE_PREFIX}${key}`) || "null");
+      if (stored?.product && Date.now() - stored.savedAt < PRODUCT_LOOKUP_CACHE_TTL_MS) {
+        lookupCacheRef.current.set(key, stored);
+        return stored.product;
+      }
+      sessionStorage.removeItem(`${PRODUCT_LOOKUP_CACHE_PREFIX}${key}`);
+    } catch {
+      // Cache failure must never prevent barcode lookup.
+    }
+    return null;
+  }
+
+  function cacheProduct(query, product) {
+    const entry = { product, savedAt: Date.now() };
+    const aliases = [query, product.productCode, product.barcode].map(productLookupCacheKey).filter(Boolean);
+    aliases.forEach((key) => {
+      lookupCacheRef.current.set(key, entry);
+      try { sessionStorage.setItem(`${PRODUCT_LOOKUP_CACHE_PREFIX}${key}`, JSON.stringify(entry)); } catch { /* optional cache */ }
+    });
+  }
 
   function updateRow(index, updater) {
     setRows((prev) => prev.map((row, rowIndex) => rowIndex === index ? updater(row) : row));
@@ -1042,17 +1079,22 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved }) {
 
   async function addScannedProduct() {
     const query = scanValue.trim();
-    if (!query) return;
-    setBusy(true);
+    if (!query || scanBusy) return;
+    setScanBusy(true);
+    setScanningQuery(query);
     setError(null);
     try {
-      const response = await apiFetch(`/api/products/search?q=${encodeURIComponent(query)}`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      const results = Array.isArray(data) ? data : data.results || data.products || [];
-      const product = results.find((item) => item.barcode === query || String(item.productCode || "").toLowerCase() === query.toLowerCase())
-        || (results.length === 1 ? results[0] : null);
-      if (!product) throw new Error(results.length ? "พบหลายสินค้า กรุณายิงบาร์โค้ดหรือกรอกรหัสที่ตรงกัน" : "ไม่พบสินค้า");
+      let product = readCachedProduct(query);
+      if (!product) {
+        const response = await apiFetch(`/api/products/search?q=${encodeURIComponent(query)}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const results = Array.isArray(data) ? data : data.results || data.products || [];
+        product = results.find((item) => item.barcode === query || String(item.productCode || "").toLowerCase() === query.toLowerCase())
+          || (results.length === 1 ? results[0] : null);
+        if (!product) throw new Error(results.length ? "พบหลายสินค้า กรุณายิงบาร์โค้ดหรือกรอกรหัสที่ตรงกัน" : "ไม่พบสินค้า");
+        cacheProduct(query, product);
+      }
       if (focusType !== "salesperson" && rows.some((row) => row.productCode === product.productCode)) throw new Error("สินค้านี้อยู่ในรายการแล้ว");
       setRows((prev) => [...prev, {
         productCode: product.productCode,
@@ -1069,7 +1111,8 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved }) {
     } catch (lookupError) {
       setError(lookupError.message || "ค้นหาสินค้าไม่สำเร็จ");
     } finally {
-      setBusy(false);
+      setScanBusy(false);
+      setScanningQuery("");
     }
   }
 
@@ -1123,7 +1166,7 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved }) {
     if (issues.length) { setError(issues.join(" • ")); return; }
     const warningList = warnings();
     if (warningList.length && !window.confirm(`พบคำเตือน แต่ยังสามารถสร้างได้:\n\n${warningList.join("\n")}\n\nต้องการสร้างต่อหรือไม่?`)) return;
-    setBusy(true);
+    setSubmitBusy(true);
     setError(null);
     try {
       const response = await apiFetch("/api/admin/focus-products/bulk", {
@@ -1150,7 +1193,7 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved }) {
     } catch (submitError) {
       setError(submitError.message || "บันทึกไม่สำเร็จ");
     } finally {
-      setBusy(false);
+      setSubmitBusy(false);
     }
   }
 
@@ -1160,6 +1203,16 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved }) {
     <div className="fp-modal-overlay" onClick={onCancel}>
       <div className="fp-modal fp-batch-modal" onClick={(event) => event.stopPropagation()}>
         <h3>เพิ่มสินค้าโฟกัสหลายรายการ</h3>
+        {scanBusy && (
+          <div className="fp-batch-lookup-overlay" role="status" aria-live="polite">
+            <div className="fp-batch-lookup-card">
+              <div className="fp-loading-spinner" />
+              <strong>กำลังค้นหาสินค้า...</strong>
+              <span>รหัสหรือบาร์โค้ด: {scanningQuery}</span>
+              <small>กรุณารอสักครู่ ระบบกำลังโหลดชื่อสินค้า หน่วย และ Stock ของแต่ละสาขา</small>
+            </div>
+          </div>
+        )}
         <div className="fp-field-row">
           <label className="fp-field"><span>ประเภทโฟกัส</span><select value={focusType} onChange={(e) => setFocusType(e.target.value)}>{FOCUS_TYPE_ORDER.map((type) => <option key={type} value={type}>{FOCUS_TYPE_LABELS[type]}</option>)}</select></label>
           <label className="fp-field"><span>จากวันที่</span><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></label>
