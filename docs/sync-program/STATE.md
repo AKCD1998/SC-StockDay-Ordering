@@ -106,12 +106,18 @@ so this change's effect can be measured in isolation from the mitigation's.
 - **004**: NOT YET STARTED — still on stale code (pre-`e71e32f`), still
   batching products at 500 with no `ADAPOS_SYNC_PRODUCT_BATCH_SIZE`. Highest
   remaining containment priority.
-- **001**: fixes present (batch=100, but pre-existing 180s timeout override
-  predates and is unrelated to the fix) but still failing on products as of
-  2026-07-14 08:20 — attributed to DB CPU saturation (see EVIDENCE.md Render
-  section), not a code gap on this branch. Needs re-observation after 003+004
-  are both off the old batch-500 pattern, since that should reduce peak DB
-  load app-wide.
+- **001**: RESOLVED for off-peak conditions, root-cause theory confirmed.
+  Pulled `4b52855` fresh (HEAD `2910867`+ range), manual off-peak test
+  (2026-07-14 15:26:47-15:37:12 ICT, single run, no retries): products 6,591
+  sent (100/batch), sales_detail 1,926 headers / 3,514 lines across 13/13
+  chunks (last chunk 126 headers = 1,926 - 12×150, arithmetic checks out),
+  22,882 total records, exit 0, 625.8s (~10m26s) wall time, no "Sync failed."
+  **This is the key confirming data point**: 001 has the fixes and still
+  failed at 08:20 that same day, but succeeds cleanly off-peak — this is
+  direct evidence for the DB-CPU-saturation theory (EVIDENCE.md Render
+  section), not a per-branch code gap. Still need to observe 001's *next
+  in-window* (08:20 or 19:20) scheduled run now that 003 is also off
+  batch-500, to see whether reduced peak-window load is enough on its own.
 - **CP3 (set-based upsert rewrite)**: design/implementation authorized to
   proceed in parallel (local-code-only), but **not to be deployed** until
   001/003/004 rollout is confirmed stable across at least one more scheduled
