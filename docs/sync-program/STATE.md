@@ -162,14 +162,29 @@ Decision + verification recorded in DECISIONS.md. Rollout status:
   20 headers = 1,820 - 12×150, checks out — transfers, branch_stock, no
   products line), exit 0, 4m33s (273.2s, in line with 001's post-change
   time).
-- **005**: prompt sent, awaiting confirmation. (Also still carries the
-  known duplicate-Scheduled-Task issue from CP0 — unrelated to this rollout,
-  still open.)
+- **005**: DONE. `.env` diff confirmed (`products` removed, `branch_stock`
+  and `branch_stock_history` both correctly left untouched), `git status`
+  clean, off-peak manual test 16:17 ICT: 18,044 records sent (sales,
+  sales_detail, branch_stock, branch_stock_history, transfers — no products
+  line anywhere in the output, not even in the read-phase row counts), exit
+  0, no "Sync failed", no 413. Duplicate-Scheduled-Task issue from CP0
+  (legacy 08:15/19:20 tasks alongside the current Morning/Evening pair) is
+  a separate, still-open item — not part of this rollout.
 
-Expected end state: only 004 has `products` in `ADAPOS_SYNC_DATASETS`;
-000/001/003/005 do not. 000 is out of scope (MA-001) so its `.env` is not
-being touched by this rollout — if branch 000's install is ever revived, it
-should also have `products` removed at that time.
+**ROLLOUT COMPLETE.** All 4 active branches now match the intended
+single-writer state: 004 sends `products`, 001/003/005 do not. 000 stays out
+of scope (MA-001) — if that install is ever revived, it needs `products`
+removed too, to keep the design correct.
+
+Confirmed effect on off-peak wall time (products was the single most
+expensive dataset to sync, independent of the peak-contention issue):
+- 001: 625.8s -> 282.5s (-55%)
+- 003: -> 273.2s (4m33s)
+- 005: -> included in an 18,044-record run with no products at all
+
+Still outstanding: observe one real in-window (08:20/19:20) run on each
+branch now that both the batch/chunk mitigation AND single-writer are both
+live, to see whether peak-window failures are gone entirely or just reduced.
 
 ## Recommended next step
 
