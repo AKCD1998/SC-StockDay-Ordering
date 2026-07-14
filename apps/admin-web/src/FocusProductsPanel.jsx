@@ -67,6 +67,7 @@ const EMPTY_FORM = {
   branchCodes: ["001", "003", "004", "005"],
   branchTargets: {}, // {branchCode: targetQty} — group_manager only
   assignedPersonName: "",
+  assignedStaffId: "",
   note: "",
   publicationStatus: "draft",
   scheduledPublishAt: "",
@@ -139,7 +140,7 @@ function BranchBreakdown({ row }) {
   );
 }
 
-function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, submitError }) {
+function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, submitError, salesStaff }) {
   const [form, setForm] = useState(initial);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -354,13 +355,11 @@ function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, 
 
         {form.focusType === "salesperson" && (
           <label className="fp-field">
-            <span>ชื่อพนักงานที่รับผิดชอบ</span>
-            <input
-              type="text"
-              value={form.assignedPersonName}
-              onChange={(e) => update("assignedPersonName", e.target.value)}
-              placeholder="ชื่อ-นามสกุลพนักงาน"
-            />
+            <span>พนักงานขายที่รับผิดชอบ</span>
+            <select value={form.assignedStaffId || ""} onChange={(e) => { const staff = salesStaff.find((item) => item.staffId === e.target.value); setForm((prev) => ({ ...prev, assignedStaffId: e.target.value, assignedPersonName: staff?.displayName || "" })); }}>
+              <option value="">— เลือกพนักงานขาย —</option>
+              {salesStaff.map((staff) => <option key={staff.staffId} value={staff.staffId}>{staff.displayName} — สาขา {staff.branchCode}{staff.isProbationary ? " — ทดลองงาน" : ""}</option>)}
+            </select>
           </label>
         )}
 
@@ -1028,7 +1027,7 @@ function LoadingOverlay({ active }) {
   );
 }
 
-function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved }) {
+function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved, salesStaff }) {
   const [focusType, setFocusType] = useState("salesperson");
   const [dateFrom, setDateFrom] = useState(initialDates.from);
   const [dateTo, setDateTo] = useState(initialDates.to);
@@ -1121,6 +1120,7 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved }) {
         stockByBranch: product.stockByBranch || {},
         targetQty: "",
         assignedPersonName: "",
+        assignedStaffId: "",
         branchTargets: Object.fromEntries(BRANCH_CHOICES.map((code) => [code, ""])),
       }]);
       setScanValue("");
@@ -1153,7 +1153,7 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved }) {
     if (!dateFrom || !dateTo || dateTo < dateFrom) issues.push("ช่วงวันที่ไม่ถูกต้อง");
     rows.forEach((row, index) => {
       if (!(Number(row.targetQty) > 0)) issues.push(`แถว ${index + 1}: เป้าหมายหลักต้องมากกว่า 0`);
-      if (focusType === "salesperson" && !row.assignedPersonName.trim()) issues.push(`แถว ${index + 1}: ต้องระบุผู้รับผิดชอบ`);
+      if (focusType === "salesperson" && !row.assignedStaffId) issues.push(`แถว ${index + 1}: ต้องเลือกพนักงานขาย`);
       if (focusType !== "salesperson") {
         const missing = BRANCH_CHOICES.filter((code) => !(Number(row.branchTargets[code]) > 0));
         if (missing.length) issues.push(`แถว ${index + 1}: เป้าสาขา ${missing.join(", ")} ยังไม่ครบ`);
@@ -1201,6 +1201,7 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved }) {
             branchCodes: [...BRANCH_CHOICES],
             branchTargets: focusType === "salesperson" ? null : Object.fromEntries(BRANCH_CHOICES.map((code) => [code, Number(row.branchTargets[code])])),
             assignedPersonName: focusType === "salesperson" ? row.assignedPersonName.trim() : null,
+            assignedStaffId: focusType === "salesperson" ? row.assignedStaffId : null,
           })),
         }),
       });
@@ -1250,7 +1251,7 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved }) {
         </div>
         <label className="fp-field"><span>ยิงบาร์โค้ดหรือกรอกรหัสสินค้า</span><div className="fp-batch-scan-row"><input ref={scanRef} autoFocus value={scanValue} onChange={(e) => setScanValue(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addScannedProduct(); } }} placeholder="ยิงบาร์โค้ดแล้ว Enter" /><button type="button" className="fp-btn-secondary" onClick={addScannedProduct} disabled={busy}>เพิ่ม</button></div></label>
         {focusType !== "salesperson" && <div className="fp-copy-tools"><span>คัดลอกเป้าทุกแถวจาก</span><select value={copyFromBranch} onChange={(e) => setCopyFromBranch(e.target.value)}>{BRANCH_CHOICES.map((code) => <option key={code}>{code}</option>)}</select><span>ไป</span><select value={copyToBranch} onChange={(e) => setCopyToBranch(e.target.value)}>{BRANCH_CHOICES.map((code) => <option key={code}>{code}</option>)}</select><button type="button" className="fp-btn-secondary" onClick={copyBranchTargets}>คัดลอก</button></div>}
-        <div className="fp-batch-table-wrap"><table className="fp-batch-table"><thead><tr><th>สินค้า</th><th>หน่วย</th>{focusType === "salesperson" ? <><th>ผู้รับผิดชอบ</th><th>เป้ารวม</th></> : <><th>เป้าหลัก</th>{BRANCH_CHOICES.map((code) => <th key={code}>{code}<small>stock</small></th>)}</>}<th /></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.productCode}-${index}`}><td><strong>{row.productCode}</strong><span>{row.productName}</span></td><td>{row.unit || "-"}</td>{focusType === "salesperson" ? <><td><input value={row.assignedPersonName} onChange={(e) => updateRow(index, (old) => ({ ...old, assignedPersonName: e.target.value }))} /></td><td><input type="number" min="1" value={row.targetQty} onChange={(e) => updateRow(index, (old) => ({ ...old, targetQty: e.target.value }))} /></td></> : <><td><input type="number" min="1" value={row.targetQty} onChange={(e) => updateRow(index, (old) => ({ ...old, targetQty: e.target.value }))} /><button type="button" onClick={() => applySameTarget(index)}>ใช้ทุกสาขา</button></td>{BRANCH_CHOICES.map((code) => <td key={code} className={Number(row.stockByBranch?.[code] || 0) <= 0 ? "warning" : ""}><input type="number" min="1" value={row.branchTargets[code]} onChange={(e) => updateRow(index, (old) => ({ ...old, branchTargets: { ...old.branchTargets, [code]: e.target.value } }))} /><small>{Number(row.stockByBranch?.[code] || 0)}</small></td>)}</>}<td><button type="button" className="fp-btn-link danger" onClick={() => setRows((prev) => prev.filter((_, i) => i !== index))}>ลบ</button></td></tr>)}</tbody></table></div>
+        <div className="fp-batch-table-wrap"><table className="fp-batch-table"><thead><tr><th>สินค้า</th><th>หน่วย</th>{focusType === "salesperson" ? <><th>พนักงานขาย</th><th>เป้ารวม</th></> : <><th>เป้าหลัก</th>{BRANCH_CHOICES.map((code) => <th key={code}>{code}<small>stock</small></th>)}</>}<th /></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.productCode}-${index}`}><td><strong>{row.productCode}</strong><span>{row.productName}</span></td><td>{row.unit || "-"}</td>{focusType === "salesperson" ? <><td><select value={row.assignedStaffId} onChange={(e) => { const staff = salesStaff.find((item) => item.staffId === e.target.value); updateRow(index, (old) => ({ ...old, assignedStaffId: e.target.value, assignedPersonName: staff?.displayName || "" })); }}><option value="">เลือกพนักงานขาย</option>{salesStaff.map((staff) => <option key={staff.staffId} value={staff.staffId}>{staff.displayName} — {staff.branchCode}{staff.isProbationary ? " (ทดลองงาน)" : ""}</option>)}</select></td><td><input type="number" min="1" value={row.targetQty} onChange={(e) => updateRow(index, (old) => ({ ...old, targetQty: e.target.value }))} /></td></> : <><td><input type="number" min="1" value={row.targetQty} onChange={(e) => updateRow(index, (old) => ({ ...old, targetQty: e.target.value }))} /><button type="button" onClick={() => applySameTarget(index)}>ใช้ทุกสาขา</button></td>{BRANCH_CHOICES.map((code) => <td key={code} className={Number(row.stockByBranch?.[code] || 0) <= 0 ? "warning" : ""}><input type="number" min="1" value={row.branchTargets[code]} onChange={(e) => updateRow(index, (old) => ({ ...old, branchTargets: { ...old.branchTargets, [code]: e.target.value } }))} /><small>{Number(row.stockByBranch?.[code] || 0)}</small></td>)}</>}<td><button type="button" className="fp-btn-link danger" onClick={() => setRows((prev) => prev.filter((_, i) => i !== index))}>ลบ</button></td></tr>)}</tbody></table></div>
         {!rows.length && <div className="fp-empty">ยิงบาร์โค้ดเพื่อเพิ่มสินค้าได้ต่อเนื่อง</div>}
         {issues.length > 0 && <div className="fp-batch-issues"><strong>ยังบันทึกไม่ได้</strong>{issues.map((issue) => <span key={issue}>{issue}</span>)}</div>}
         {warningList.length > 0 && <div className="fp-batch-warnings"><strong>คำเตือน (ยังบันทึกได้)</strong>{warningList.slice(0, 8).map((warning) => <span key={warning}>{warning}</span>)}</div>}
@@ -1269,8 +1270,16 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode 
   const [refreshKey, setRefreshKey] = useState(0);
   const [modalState, setModalState] = useState(null); // null | { form, submitting, submitError }
   const [batchModalOpen, setBatchModalOpen] = useState(false);
+  const [salesStaff, setSalesStaff] = useState([]);
   const [year, setYear] = useState(2026);
   const [selectedMonth, setSelectedMonth] = useState(null);
+
+  useEffect(() => {
+    if (!isAdminUser) return;
+    apiFetch("/api/admin/branch-staff").then((response) => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))).then((body) => {
+      setSalesStaff((body.staff || []).filter((staff) => staff.role === "sales" && staff.isActive && BRANCH_CHOICES.includes(staff.branchCode)));
+    }).catch(() => setSalesStaff([]));
+  }, [isAdminUser]);
 
   useEffect(() => {
     let active = true;
@@ -1335,6 +1344,7 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode 
         branchCodes: row.branchCodesRaw || [],
         branchTargets: row.branchTargets || {},
         assignedPersonName: row.assignedPersonName || "",
+        assignedStaffId: row.assignedStaffId || "",
         note: row.note || "",
         publicationStatus: row.publicationState || row.publicationStatus || "published",
         scheduledPublishAt: toDateTimeLocal(row.scheduledPublishAt),
@@ -1361,7 +1371,7 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode 
     else if (!form.dateFrom || !form.dateTo || form.dateTo < form.dateFrom) validationError = "กรุณาระบุช่วงวันที่ให้ถูกต้อง";
     else if (incompleteBranches.length) validationError = `ต้องเลือกสาขา ${BRANCH_CHOICES.join(", ")} ให้ครบ`;
     else if (incompleteTargets.length) validationError = `ต้องกำหนดเป้าหมายมากกว่า 0 ให้สาขา ${incompleteTargets.join(", ")}`;
-    else if (form.focusType === "salesperson" && !(form.assignedPersonName || "").trim()) validationError = "กรุณาระบุผู้รับผิดชอบ";
+    else if (form.focusType === "salesperson" && !form.assignedStaffId) validationError = "กรุณาเลือกพนักงานขาย";
     else if (form.publicationStatus === "scheduled" && !form.scheduledPublishAt) validationError = "กรุณาระบุวันและเวลาที่เผยแพร่";
     else if (form.publicationStatus === "scheduled" && form.scheduledPublishAt.slice(0, 10) > form.dateTo) validationError = "วันเผยแพร่ต้องไม่ช้ากว่าวันสิ้นสุดเป้า";
     if (validationError) {
@@ -1380,6 +1390,7 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode 
         ? Object.fromEntries(Object.entries(form.branchTargets).map(([code, qty]) => [code, Number(qty)]))
         : null,
       assignedPersonName: form.focusType === "salesperson" ? (form.assignedPersonName || "").trim() || null : null,
+      assignedStaffId: form.focusType === "salesperson" ? form.assignedStaffId || null : null,
       note: form.note.trim() || null,
       publicationStatus: form.publicationStatus,
       scheduledPublishAt: form.publicationStatus === "scheduled"
@@ -1475,12 +1486,14 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode 
           csrfToken={csrfToken}
           onCancel={() => setModalState(null)}
           onSubmit={handleSubmit}
+          salesStaff={salesStaff}
         />
       )}
       {batchModalOpen && selectedMonth && (
         <BatchFocusProductForm
           initialDates={monthBounds(year, selectedMonth)}
           csrfToken={csrfToken}
+          salesStaff={salesStaff}
           onCancel={() => setBatchModalOpen(false)}
           onSaved={(count) => { setBatchModalOpen(false); setRefreshKey((value) => value + 1); window.alert(`สร้างสินค้าโฟกัสสำเร็จ ${count} รายการ`); }}
         />
