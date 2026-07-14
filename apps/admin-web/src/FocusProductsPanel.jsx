@@ -75,7 +75,7 @@ const EMPTY_FORM = {
 
 const BRANCH_CHOICES = ["001", "003", "004", "005"];
 const PRODUCT_LOOKUP_CACHE_TTL_MS = 5 * 60 * 1000;
-const PRODUCT_LOOKUP_CACHE_PREFIX = "focus-product-lookup:v1:";
+const PRODUCT_LOOKUP_CACHE_PREFIX = "focus-product-lookup:v2:";
 
 function productLookupCacheKey(value) {
   return String(value || "").trim().toLowerCase();
@@ -151,7 +151,7 @@ function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, 
     return {
       code: product.productCode || product.product_code || "",
       name: product.displayName || product.display_name || product.productName || product.product_name || "",
-      unit: product.unit || product.unitName || product.unit_name || "",
+      unit: product.unitName || product.unit_name || product.unit || product.unitCode || product.unit_code || "",
       barcode: product.barcode || "",
     };
   }
@@ -280,8 +280,8 @@ function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, 
                 >
                   <strong>{product.productCode || product.product_code}</strong>{" "}
                   {product.displayName || product.display_name || product.productName || product.product_name}
-                  {(product.unit || product.unitName || product.unit_name) && (
-                    <span className="fp-search-result-meta">หน่วย: {product.unit || product.unitName || product.unit_name}</span>
+                  {(product.unitName || product.unit_name || product.unit || product.unitCode || product.unit_code) && (
+                    <span className="fp-search-result-meta">หน่วย: {product.unitName || product.unit_name || product.unit || product.unitCode || product.unit_code}</span>
                   )}
                   {product.barcode && <span className="fp-search-result-meta">บาร์โค้ด: {product.barcode}</span>}
                 </button>
@@ -1040,6 +1040,7 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved, sal
   const [scanningQuery, setScanningQuery] = useState("");
   const [error, setError] = useState(null);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+  const [createConfirmOpen, setCreateConfirmOpen] = useState(false);
   const [copyFromBranch, setCopyFromBranch] = useState("001");
   const [copyToBranch, setCopyToBranch] = useState("003");
   const scanRef = useRef(null);
@@ -1116,7 +1117,7 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved, sal
         productCode: product.productCode,
         productName: product.productName || "",
         barcode: product.barcode || query,
-        unit: product.unit || "",
+        unit: product.unitName || product.unit_name || product.unit || product.unitCode || product.unit_code || "",
         stockByBranch: product.stockByBranch || {},
         targetQty: "",
         assignedPersonName: "",
@@ -1178,11 +1179,32 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved, sal
     return result;
   }
 
-  async function submitBatch() {
+  function coverageReminders() {
+    if (focusType === "salesperson") {
+      const selectedStaffIds = new Set(rows.map((row) => String(row.assignedStaffId || "")).filter(Boolean));
+      return salesStaff
+        .filter((staff) => !selectedStaffIds.has(String(staff.staffId)))
+        .map((staff) => `พนักงานขาย ${staff.displayName} — สาขา ${staff.branchCode}`);
+    }
+
+    return BRANCH_CHOICES
+      .filter((code) => !rows.some((row) => Number(row.branchTargets?.[code]) > 0))
+      .map((code) => `สาขา ${code}`);
+  }
+
+  function requestSubmitBatch() {
     const issues = blockingErrors();
     if (issues.length) { setError(issues.join(" • ")); return; }
-    const warningList = warnings();
-    if (warningList.length && !window.confirm(`พบคำเตือน แต่ยังสามารถสร้างได้:\n\n${warningList.join("\n")}\n\nต้องการสร้างต่อหรือไม่?`)) return;
+    setError(null);
+    if (coverageReminders().length || warnings().length) {
+      setCreateConfirmOpen(true);
+      return;
+    }
+    persistBatch();
+  }
+
+  async function persistBatch() {
+    setCreateConfirmOpen(false);
     setSubmitBusy(true);
     setError(null);
     try {
@@ -1217,6 +1239,7 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved, sal
 
   const issues = blockingErrors();
   const warningList = warnings();
+  const coverageReminderList = coverageReminders();
   return (
     <div className="fp-modal-overlay" onClick={requestClose}>
       <div className="fp-modal fp-batch-modal" onClick={(event) => event.stopPropagation()}>
@@ -1244,6 +1267,21 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved, sal
             </div>
           </div>
         )}
+        {createConfirmOpen && (
+          <div className="fp-batch-discard-overlay" role="presentation" onClick={() => setCreateConfirmOpen(false)}>
+            <div className="fp-batch-discard-card fp-batch-create-confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="fp-create-confirm-title" aria-describedby="fp-create-confirm-description" onClick={(event) => event.stopPropagation()}>
+              <div className="fp-batch-discard-icon" aria-hidden="true">!</div>
+              <h4 id="fp-create-confirm-title">ยืนยันสร้างเป้าสินค้าโฟกัส?</h4>
+              <p id="fp-create-confirm-description">ข้อมูลที่กรอกสามารถสร้างได้ แต่ยังมีรายการที่ระบบอยากให้ตรวจสอบก่อน</p>
+              {coverageReminderList.length > 0 && <div className="fp-create-confirm-section"><strong>คุณยังไม่ได้ระบุสินค้าโฟกัสให้</strong>{coverageReminderList.map((item) => <span key={item}>{item}</span>)}</div>}
+              {warningList.length > 0 && <div className="fp-create-confirm-section secondary"><strong>คำเตือนเพิ่มเติม</strong>{warningList.map((item) => <span key={item}>{item}</span>)}</div>}
+              <div className="fp-batch-discard-actions">
+                <button type="button" className="fp-btn-secondary" onClick={() => setCreateConfirmOpen(false)} autoFocus>กลับไปตรวจสอบ</button>
+                <button type="button" className="fp-btn-primary" onClick={persistBatch}>ยืนยันสร้าง</button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="fp-field-row">
           <label className="fp-field"><span>ประเภทโฟกัส</span><select value={focusType} onChange={(e) => setFocusType(e.target.value)}>{FOCUS_TYPE_ORDER.map((type) => <option key={type} value={type}>{FOCUS_TYPE_LABELS[type]}</option>)}</select></label>
           <label className="fp-field"><span>จากวันที่</span><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></label>
@@ -1254,10 +1292,11 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved, sal
         <div className="fp-batch-table-wrap"><table className="fp-batch-table"><thead><tr><th>สินค้า</th><th>หน่วย</th>{focusType === "salesperson" ? <><th>พนักงานขาย</th><th>เป้ารวม</th></> : <><th>เป้าหลัก</th>{BRANCH_CHOICES.map((code) => <th key={code}>{code}<small>stock</small></th>)}</>}<th /></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.productCode}-${index}`}><td><strong>{row.productCode}</strong><span>{row.productName}</span></td><td>{row.unit || "-"}</td>{focusType === "salesperson" ? <><td><select value={row.assignedStaffId} onChange={(e) => { const staff = salesStaff.find((item) => item.staffId === e.target.value); updateRow(index, (old) => ({ ...old, assignedStaffId: e.target.value, assignedPersonName: staff?.displayName || "" })); }}><option value="">เลือกพนักงานขาย</option>{salesStaff.map((staff) => <option key={staff.staffId} value={staff.staffId}>{staff.displayName} — {staff.branchCode}{staff.isProbationary ? " (ทดลองงาน)" : ""}</option>)}</select></td><td><input type="number" min="1" value={row.targetQty} onChange={(e) => updateRow(index, (old) => ({ ...old, targetQty: e.target.value }))} /></td></> : <><td><input type="number" min="1" value={row.targetQty} onChange={(e) => updateRow(index, (old) => ({ ...old, targetQty: e.target.value }))} /><button type="button" onClick={() => applySameTarget(index)}>ใช้ทุกสาขา</button></td>{BRANCH_CHOICES.map((code) => <td key={code} className={Number(row.stockByBranch?.[code] || 0) <= 0 ? "warning" : ""}><input type="number" min="1" value={row.branchTargets[code]} onChange={(e) => updateRow(index, (old) => ({ ...old, branchTargets: { ...old.branchTargets, [code]: e.target.value } }))} /><small>{Number(row.stockByBranch?.[code] || 0)}</small></td>)}</>}<td><button type="button" className="fp-btn-link danger" onClick={() => setRows((prev) => prev.filter((_, i) => i !== index))}>ลบ</button></td></tr>)}</tbody></table></div>
         {!rows.length && <div className="fp-empty">ยิงบาร์โค้ดเพื่อเพิ่มสินค้าได้ต่อเนื่อง</div>}
         {issues.length > 0 && <div className="fp-batch-issues"><strong>ยังบันทึกไม่ได้</strong>{issues.map((issue) => <span key={issue}>{issue}</span>)}</div>}
+        {coverageReminderList.length > 0 && <div className="fp-batch-coverage"><strong>เตือนความครอบคลุม (ยังบันทึกได้)</strong><span>ยังไม่ได้ระบุสินค้าโฟกัสให้:</span>{coverageReminderList.map((item) => <span key={item}>{item}</span>)}</div>}
         {warningList.length > 0 && <div className="fp-batch-warnings"><strong>คำเตือน (ยังบันทึกได้)</strong>{warningList.slice(0, 8).map((warning) => <span key={warning}>{warning}</span>)}</div>}
         <div className="fp-field-row"><label className="fp-field"><span>การเผยแพร่</span><select value={publicationStatus} onChange={(e) => setPublicationStatus(e.target.value)}><option value="draft">บันทึกร่าง</option><option value="published">เผยแพร่ทันที</option><option value="scheduled">ตั้งเวลาเผยแพร่</option></select></label>{publicationStatus === "scheduled" && <label className="fp-field"><span>วันเวลาเผยแพร่</span><input type="datetime-local" value={scheduledPublishAt} onChange={(e) => setScheduledPublishAt(e.target.value)} /></label>}</div>
         {error && <div className="fp-form-error">{error}</div>}
-        <div className="fp-modal-actions"><button type="button" className="fp-btn-secondary" onClick={requestClose} disabled={busy}>ยกเลิก</button><button type="button" className="fp-btn-primary" onClick={submitBatch} disabled={busy || issues.length > 0}>{busy ? "กำลังบันทึก..." : `สร้าง ${rows.length} รายการ`}</button></div>
+        <div className="fp-modal-actions"><button type="button" className="fp-btn-secondary" onClick={requestClose} disabled={busy}>ยกเลิก</button><button type="button" className="fp-btn-primary" onClick={requestSubmitBatch} disabled={busy || issues.length > 0}>{busy ? "กำลังบันทึก..." : `สร้าง ${rows.length} รายการ`}</button></div>
       </div>
     </div>
   );
