@@ -103,9 +103,24 @@ so this change's effect can be measured in isolation from the mitigation's.
   Local uncommitted duplicate-fix diff on that machine was verified
   non-identical-but-subsumed by `e71e32f` (see conversation) and discarded
   before pulling — no work lost.
-- **004**: NOT YET STARTED — still on stale code (pre-`e71e32f`), still
-  batching products at 500 with no `ADAPOS_SYNC_PRODUCT_BATCH_SIZE`. Highest
-  remaining containment priority.
+- **004**: RESOLVED for off-peak conditions. `git status` was clean before
+  pull (no local uncommitted duplicate-fix this time), pulled straight to
+  `2910867` (descendant, has both `e71e32f` and `4b52855`), package files
+  unchanged so no `npm install` needed. Manual off-peak test (started
+  2026-07-14 15:31:12 ICT, single run): products 6,591 sent (100/batch),
+  sales_detail 690 headers / 1,442 lines across 5 chunks (150+150+150+150+90
+  = 690, arithmetic checks out — chunking triggered via the existing `sales`
+  dataset entry, not a literal `sales_detail` string in `ADAPOS_SYNC_DATASETS`,
+  per `wantsSalesDetail` logic in `config.js`), 18,674 total records, exit 0,
+  12m47s wall time, no "Sync failed."
+
+**All three branches (001/003/004) now confirmed working off-peak with the
+mitigation in place.** This is the CP1 containment goal achieved. Remaining
+before calling CP1 fully done per its own gate: each branch needs to clear
+one real *in-window* (08:20 or 19:20) scheduled run without failing — the
+off-peak tests prove the code fix works, not yet that it's sufficient
+mitigation for actual peak contention. Next 08:20/19:20 window should be
+watched (dashboard or logs) rather than assumed.
 - **001**: RESOLVED for off-peak conditions, root-cause theory confirmed.
   Pulled `4b52855` fresh (HEAD `2910867`+ range), manual off-peak test
   (2026-07-14 15:26:47-15:37:12 ICT, single run, no retries): products 6,591
