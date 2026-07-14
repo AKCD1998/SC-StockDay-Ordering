@@ -8125,6 +8125,55 @@ input[type="radio"] {
 .fp-batch-lookup-card span { color: #334155; font-size: 0.88rem; overflow-wrap: anywhere; }
 .fp-batch-lookup-card small { color: #64748b; line-height: 1.5; }
 
+.fp-batch-discard-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(3px);
+  border-radius: inherit;
+}
+
+.fp-batch-discard-card {
+  width: min(92%, 480px);
+  padding: 28px;
+  color: #1e293b;
+  text-align: center;
+  background: #ffffff;
+  border: 1px solid #fecaca;
+  border-radius: 16px;
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.3);
+}
+.fp-batch-discard-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 12px;
+  place-items: center;
+  color: #991b1b;
+  background: #fee2e2;
+  border-radius: 999px;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+.fp-batch-discard-card h4 { margin: 0 0 8px; font-size: 1.1rem; }
+.fp-batch-discard-card p { margin: 0; color: #64748b; line-height: 1.6; }
+.fp-batch-discard-actions { display: flex; justify-content: center; gap: 10px; margin-top: 22px; }
+.fp-btn-danger {
+  padding: 8px 16px;
+  color: #ffffff;
+  background: #dc2626;
+  border: 1px solid #dc2626;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+.fp-btn-danger:hover { background: #b91c1c; border-color: #b91c1c; }
+
 .fp-batch-modal .fp-batch-table-wrap {
   min-height: 190px;
   max-height: 48vh;
@@ -8172,6 +8221,15 @@ input[type="radio"] {
 }
 [data-theme="dark"] .fp-batch-lookup-card span { color: #c4d4e7; }
 [data-theme="dark"] .fp-batch-lookup-card small { color: #91a8c1; }
+[data-theme="dark"] .fp-batch-discard-overlay { background: rgba(2, 8, 16, 0.76); }
+[data-theme="dark"] .fp-batch-discard-card {
+  color: #f1f5f9;
+  background: #142235;
+  border-color: #7f3342;
+  box-shadow: 0 24px 65px rgba(0, 0, 0, 0.62);
+}
+[data-theme="dark"] .fp-batch-discard-icon { color: #fecaca; background: #4a2029; }
+[data-theme="dark"] .fp-batch-discard-card p { color: #9db1c8; }
 [data-theme="dark"] .fp-batch-modal .fp-batch-table-wrap {
   background: #0c1521;
   border-color: #33465e;

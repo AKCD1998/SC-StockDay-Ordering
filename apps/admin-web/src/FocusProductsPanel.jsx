@@ -1040,11 +1040,28 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved }) {
   const [submitBusy, setSubmitBusy] = useState(false);
   const [scanningQuery, setScanningQuery] = useState("");
   const [error, setError] = useState(null);
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
   const [copyFromBranch, setCopyFromBranch] = useState("001");
   const [copyToBranch, setCopyToBranch] = useState("003");
   const scanRef = useRef(null);
   const lookupCacheRef = useRef(new Map());
   const busy = scanBusy || submitBusy;
+  const hasUnsavedChanges = rows.length > 0
+    || scanValue.trim().length > 0
+    || focusType !== "salesperson"
+    || dateFrom !== initialDates.from
+    || dateTo !== initialDates.to
+    || publicationStatus !== "draft"
+    || scheduledPublishAt.length > 0;
+
+  function requestClose() {
+    if (busy) return;
+    if (hasUnsavedChanges) {
+      setDiscardConfirmOpen(true);
+      return;
+    }
+    onCancel();
+  }
 
   function readCachedProduct(query) {
     const key = productLookupCacheKey(query);
@@ -1200,7 +1217,7 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved }) {
   const issues = blockingErrors();
   const warningList = warnings();
   return (
-    <div className="fp-modal-overlay" onClick={onCancel}>
+    <div className="fp-modal-overlay" onClick={requestClose}>
       <div className="fp-modal fp-batch-modal" onClick={(event) => event.stopPropagation()}>
         <h3>เพิ่มสินค้าโฟกัสหลายรายการ</h3>
         {scanBusy && (
@@ -1210,6 +1227,19 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved }) {
               <strong>กำลังค้นหาสินค้า...</strong>
               <span>รหัสหรือบาร์โค้ด: {scanningQuery}</span>
               <small>กรุณารอสักครู่ ระบบกำลังโหลดชื่อสินค้า หน่วย และ Stock ของแต่ละสาขา</small>
+            </div>
+          </div>
+        )}
+        {discardConfirmOpen && (
+          <div className="fp-batch-discard-overlay" role="presentation" onClick={() => setDiscardConfirmOpen(false)}>
+            <div className="fp-batch-discard-card" role="alertdialog" aria-modal="true" aria-labelledby="fp-discard-title" aria-describedby="fp-discard-description" onClick={(event) => event.stopPropagation()}>
+              <div className="fp-batch-discard-icon" aria-hidden="true">!</div>
+              <h4 id="fp-discard-title">ออกโดยไม่บันทึกหรือไม่?</h4>
+              <p id="fp-discard-description">รายการสินค้าและเป้าหมายที่กำลังทำอยู่จะหายทั้งหมด และไม่สามารถกู้คืนจากหน้านี้ได้</p>
+              <div className="fp-batch-discard-actions">
+                <button type="button" className="fp-btn-secondary" onClick={() => setDiscardConfirmOpen(false)} autoFocus>กลับไปทำต่อ</button>
+                <button type="button" className="fp-btn-danger" onClick={onCancel}>ออกและทิ้งข้อมูล</button>
+              </div>
             </div>
           </div>
         )}
@@ -1226,7 +1256,7 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved }) {
         {warningList.length > 0 && <div className="fp-batch-warnings"><strong>คำเตือน (ยังบันทึกได้)</strong>{warningList.slice(0, 8).map((warning) => <span key={warning}>{warning}</span>)}</div>}
         <div className="fp-field-row"><label className="fp-field"><span>การเผยแพร่</span><select value={publicationStatus} onChange={(e) => setPublicationStatus(e.target.value)}><option value="draft">บันทึกร่าง</option><option value="published">เผยแพร่ทันที</option><option value="scheduled">ตั้งเวลาเผยแพร่</option></select></label>{publicationStatus === "scheduled" && <label className="fp-field"><span>วันเวลาเผยแพร่</span><input type="datetime-local" value={scheduledPublishAt} onChange={(e) => setScheduledPublishAt(e.target.value)} /></label>}</div>
         {error && <div className="fp-form-error">{error}</div>}
-        <div className="fp-modal-actions"><button type="button" className="fp-btn-secondary" onClick={onCancel} disabled={busy}>ยกเลิก</button><button type="button" className="fp-btn-primary" onClick={submitBatch} disabled={busy || issues.length > 0}>{busy ? "กำลังบันทึก..." : `สร้าง ${rows.length} รายการ`}</button></div>
+        <div className="fp-modal-actions"><button type="button" className="fp-btn-secondary" onClick={requestClose} disabled={busy}>ยกเลิก</button><button type="button" className="fp-btn-primary" onClick={submitBatch} disabled={busy || issues.length > 0}>{busy ? "กำลังบันทึก..." : `สร้าง ${rows.length} รายการ`}</button></div>
       </div>
     </div>
   );
