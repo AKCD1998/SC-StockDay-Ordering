@@ -8082,6 +8082,7 @@ input[type="radio"] {
 /* Batch editor is intentionally much larger than the single-item dialog.
    Keep these rules after .fp-modal so the generic 480px width cannot win. */
 .fp-modal.fp-batch-modal {
+  position: relative;
   width: min(96vw, 1520px);
   max-width: none;
   height: min(94vh, 980px);
@@ -8093,6 +8094,36 @@ input[type="radio"] {
   border: 1px solid #d8e1ec;
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
 }
+
+.fp-batch-lookup-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(241, 245, 249, 0.76);
+  backdrop-filter: blur(2px);
+  border-radius: inherit;
+}
+
+.fp-batch-lookup-card {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: min(92%, 440px);
+  padding: 28px 32px;
+  color: #1e293b;
+  text-align: center;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.22);
+}
+.fp-batch-lookup-card .fp-loading-spinner { width: 34px; height: 34px; margin-bottom: 4px; }
+.fp-batch-lookup-card strong { font-size: 1rem; }
+.fp-batch-lookup-card span { color: #334155; font-size: 0.88rem; overflow-wrap: anywhere; }
+.fp-batch-lookup-card small { color: #64748b; line-height: 1.5; }
 
 .fp-batch-modal .fp-batch-table-wrap {
   min-height: 190px;
@@ -8132,6 +8163,15 @@ input[type="radio"] {
   border-color: #2a3b50;
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55);
 }
+[data-theme="dark"] .fp-batch-lookup-overlay { background: rgba(6, 13, 22, 0.78); }
+[data-theme="dark"] .fp-batch-lookup-card {
+  color: #e6edf7;
+  background: #142235;
+  border-color: #3a4d66;
+  box-shadow: 0 22px 55px rgba(0, 0, 0, 0.55);
+}
+[data-theme="dark"] .fp-batch-lookup-card span { color: #c4d4e7; }
+[data-theme="dark"] .fp-batch-lookup-card small { color: #91a8c1; }
 [data-theme="dark"] .fp-batch-modal .fp-batch-table-wrap {
   background: #0c1521;
   border-color: #33465e;
