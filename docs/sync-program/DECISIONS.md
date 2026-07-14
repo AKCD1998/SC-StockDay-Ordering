@@ -54,3 +54,51 @@ laptops that don't need it.
 of "found a secret, did something with it" action the program's authorization
 rules are strict about. Recording it explicitly so it's auditable, not buried
 in a tool-call log.
+
+## 2026-07-14 — CP3 planning — Branch 004 chosen as the single product-master writer
+
+**Context**: CP3 (design/architecture question, not yet the set-based-upsert
+DB work) — since `public.items`/`skus`/`barcodes` have no branch column at
+all, every branch sending the full product catalog is duplicate work with no
+benefit (whichever branch's sync lands last silently overwrites the others,
+today, unconditionally). Reducing this to one writer removes the single
+largest source of redundant DB load, independent of the CP3.1 set-based
+rewrite (that only makes each branch's redundant upload cheaper — it doesn't
+stop the duplication itself).
+
+**User's stated reasoning for choosing 004** (not 000/HQ): "traffic น้อยที่สุด
+จาก 4 สาขาที่เป็น shop หน้าร้าน" — 004 is the lowest-traffic storefront
+branch, so debugging/iterating on this new responsibility disrupts real
+checkout activity the least. 000 (HQ) was explicitly ruled out even though
+it's the "natural" HQ choice, because HQ's own sync development moves slower
+and issues there are harder to observe against real day-to-day sales
+activity than at an actual storefront — and per an earlier decision, branch
+000's install is stale/unreliable and explicitly out of scope for this
+program (see MA-001 in MANUAL-ACTIONS.md).
+
+**Verification performed before accepting this as safe** (session connected
+directly to each branch's local SQL Server over Tailscale using the
+`readonly_pilot` credentials already present in each branch's `.env`,
+read-only, single `SELECT FTPdtCode, FTPdtName FROM TCNMPdt` per branch — no
+writes, no production Postgres touched):
+
+| Branch | Product codes | Notes |
+|---|---|---|
+| 001 | 6,810 | |
+| 003 | 6,810 | |
+| 004 | 6,810 | chosen master — has the full catalog |
+| 005 | 6,796 | strict subset of the other three (missing 14, not divergent) |
+
+Union across all 4: 6,810. Codes present in all 4: 6,796 (99.8%). **Codes
+unique to any single branch: 0. Product-name mismatches on shared codes: 0.**
+This confirms the catalog is genuinely one shared list, not four diverging
+ones — switching to a single writer loses nothing that any branch other than
+004 currently has, and 004 already has everything.
+
+**Decision**: 004 keeps `products` in `ADAPOS_SYNC_DATASETS`. Branches
+000/001/003/005 should have `products` removed from theirs (a `.env`-only
+change on each machine — `apps/adapos-sync` already gates every dataset
+behind `datasets.includes(...)`, so this requires zero code changes). Per
+program authorization rules, Claude does not edit remote `.env` files
+directly — this goes out as a prompt to each branch's session, same pattern
+as the CP1 rollout.
