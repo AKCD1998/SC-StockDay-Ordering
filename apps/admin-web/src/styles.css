@@ -7607,6 +7607,36 @@ input[type="radio"] {
 }
 
 /* ── Focus products (สินค้าโฟกัส) ─────────────────────────────────────── */
+.fp-publication-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.fp-publication-badge.draft {
+  color: #854d0e;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+}
+
+.fp-publication-badge.scheduled {
+  color: #1e40af;
+  background: #dbeafe;
+  border: 1px solid #93c5fd;
+}
+
+.fp-publication-badge.published {
+  color: #166534;
+  background: #dcfce7;
+  border: 1px solid #86efac;
+}
+
 
 .fp-panel { padding: 0 4px; }
 
@@ -8070,4 +8100,3 @@ input[type="radio"] {
 [data-theme="dark"] .fp-month-card:hover { border-color: #3a4a5e; }
 [data-theme="dark"] .fp-month-card.selected { background: rgba(42, 52, 255, 0.12); }
 [data-theme="dark"] .fp-month-card-name { color: #f1f5f9; }
-

@@ -1,95 +1,241 @@
-# Session 2026-07-12 — Focus Products (สินค้าโฟกัส) feature
+# ระบบตรวจสอบสินค้าโฟกัส (Focus Products)
 
-New dashboard feature: admin sets monthly sales targets per product across four categories, and every logged-in account sees live progress computed from real AdaPOS sales data. Built end-to-end in this session — schema, backend, frontend, performance fixes, and July 2026 data entry for all four branches.
+> ตรวจทานล่าสุด: 2026-07-14 (เพิ่ม workflow ร่าง/เผยแพร่/ตั้งเวลาเผยแพร่)
+>
+> สถานะเอกสาร: ตรวจเทียบกับ frontend, backend, migrations และโครงสร้างระบบจริงแล้ว
+>
+> เอกสาร architecture หลัก: [ARCHITECTURE.md](ARCHITECTURE.md)
 
----
+## 1. ภาพรวมแบบเข้าใจง่าย
 
-## 1. What it does
+ระบบนี้ใช้ติดตามว่า “สินค้าที่กำหนดให้พนักงานหรือผู้รับผิดชอบผลักดันในช่วงเวลาหนึ่ง ขายได้ถึงเป้าหรือยัง” โดยผู้ดูแลระบบกำหนดสินค้า เป้า ช่วงวันที่ สาขาที่เกี่ยวข้อง และประเภทผู้รับผิดชอบ ส่วนยอดขายจริงระบบจะอ่านจากข้อมูลการขาย AdaPOS แล้วคำนวณให้เอง
 
-Admin defines a **focus product**: a product code, a target quantity, a date range (typically one month), and which of four types it is:
+ข้อมูลแบ่งเป็น 3 ชั้น:
 
-| Type | Success rule |
-|---|---|
-| **โฟกัสรายคน** (salesperson) | One combined target, summed across branches 001/003/004/005. |
-| **โฟกัสเภสัชกร** (pharmacist) | Each branch has its own target, judged independently — no combined verdict. |
-| **โฟกัสผู้จัดการหน้าร้าน** (store_manager) | Same as pharmacist — per-branch, independent. |
-| **โฟกัสผู้จัดการกลุ่ม** (group_manager) | Each branch can have its own target, but success requires **every** branch to independently clear its own number. |
+1. **Admin กำหนดเป้า** ในหน้า `สินค้าโฟกัส`
+2. **Backend อ่านยอดขายจริง** จาก `ada.sales_headers` และ `ada.sales_lines`
+3. **หน้าเว็บแสดงผล** เป็นปฏิทินรายปี ตารางรายเดือน ยอดขาย และสถานะผ่าน/ไม่ผ่าน
 
-Every account (`admin`/`staff`/`branch`) can view the page; only `admin` can create/edit/delete. Staff accounts (`staffXXX`) only see their own branch's columns in the pharmacist/store_manager tables — salesperson and group_manager stay company-wide for everyone.
+ยอดขายสะสมระหว่างช่วงเวลาจะไม่ถูกบันทึกซ้ำทุกครั้ง แต่คำนวณจากบิลจริง เมื่อช่วงเวลาจบแล้ว ระบบจะบันทึก snapshot เพื่อ “ปิดยอด” ตอนที่มีการเปิดอ่านข้อมูลครั้งแรกหลังวันสิ้นสุด
 
-Sold-qty progress is **never stored** — it's computed live from `ada.sales_lines`/`ada.sales_headers` on every read, filtered to the row's own date range. The one exception: once a row's `date_to` has passed, progress **freezes** automatically on the next read, so later AdaPOS corrections (voids/refunds synced after month-end) can't rewrite a month's historical HR-record numbers.
+## 2. ประเภทสินค้าโฟกัส 4 หมวด
 
----
+| หมวดที่ผู้ใช้เห็น | รหัสในระบบ | วิธีคิดเป้า | คำตัดสินรวม |
+|---|---|---|---|
+| โฟกัสรายคน (พนักงานขาย) | `salesperson` | รวมยอดขายของสาขาที่เกี่ยวข้อง แล้วเทียบกับเป้าหมายเดียว | ผ่านเมื่อยอดรวม ≥ เป้า |
+| โฟกัสเภสัชกร | `pharmacist` | แต่ละสาขาเทียบกับเป้าของตัวเอง | ไม่มีคำตัดสินรวม แต่ละสาขาผ่าน/ไม่ผ่านแยกกัน |
+| โฟกัสผู้จัดการหน้าร้าน | `store_manager` | เหมือนเภสัชกร แต่ใช้กับผู้จัดการหน้าร้าน | ไม่มีคำตัดสินรวม แต่ละสาขาผ่าน/ไม่ผ่านแยกกัน |
+| โฟกัสผู้จัดการกลุ่ม | `group_manager` | แต่ละสาขาเทียบกับเป้าของตัวเอง | ผ่านรวมต่อเมื่อทุกสาขาที่เกี่ยวข้องผ่านทั้งหมด |
 
-## 2. Backend (PaaSRTSM-project)
+### ตัวอย่าง
 
-### Schema — `focus.focus_products`
+ถ้าสินค้า A มีเป้าแยกเป็น 001 = 10, 003 = 8, 004 = 5 และยอดขายเป็น 12, 8, 4:
 
-| Column | Purpose |
-|---|---|
-| `product_code`, `focus_type`, `target_qty`, `date_from`, `date_to` | Core target definition (migration 045) |
-| `branch_codes` | Which branches this row applies to; `NULL` = all active branches |
-| `assigned_person_name` | Free-text employee name for salesperson rows — hardcoded until an HR/employee system exists (migration 046) |
-| `frozen_sold_by_branch`, `frozen_total_sold`, `frozen_at` | Snapshot written once `date_to` has passed (migration 046) |
-| `branch_targets` (jsonb) | `{branchCode: targetQty}` override — lets pharmacist/store_manager/group_manager rows have a different target per branch. `0` is a valid value meaning "not set yet" (migrations 049→051 renumbered, 046 validation relaxed later) |
+- `pharmacist` / `store_manager`: สาขา 001 และ 003 ผ่าน ส่วน 004 ไม่ผ่าน โดยไม่มีผลรวมว่า “ทั้งรายการผ่าน”
+- `group_manager`: ทั้งรายการยังไม่ผ่าน เพราะสาขา 004 ยังไม่ถึง 5
+- `salesperson`: ไม่สนใจการผ่านรายสาขา นำ 12 + 8 + 4 = 24 ไปเทียบกับเป้ารวมของรายการ
 
-Migrations: `045_add_focus_products.sql`, `046_add_focus_products_person_and_freeze.sql`, `051_add_focus_products_branch_targets.sql`, `052_add_ada_sales_headers_doc_date_index.sql` (superseded), `053_add_ada_sales_covering_indexes.sql` (the real perf fix).
+## 3. ความหมายของเป้าหมายและสาขา
 
-### Service — `apps/admin-api/src/services/focusProducts.js`
+### เป้าหมายหลัก (`target_qty`)
 
-- `listFocusProducts` / `createFocusProduct` / `updateFocusProduct` / `deactivateFocusProduct`
-- `attachProgress` computes live sold-qty for every row in one batched query per distinct date range (not one query per row — see §4), applies the freeze-on-read logic, and returns `soldByBranch`, `totalSold`, `achieved`, `branchAchieved`, `branchTargetsEffective`, `isFrozen`.
-- `computeStatus` implements the four types' differing success rules described above.
-- `GET /api/focus-products?debug=1` returns a `timings` array breaking down each query phase — added during the perf investigation, harmless to leave in.
+- ต้องมากกว่า 0 เสมอ
+- `salesperson` ใช้เป็นเป้ารวมโดยตรง
+- หมวดอื่นใช้เป็นค่า fallback: ถ้าสาขาใดไม่มีค่าใน `branch_targets` จะใช้ `target_qty`
 
-### Routes — `apps/admin-api/src/routes/focus-products.js`
+### เป้าแยกสาขา (`branch_targets`)
 
-- `GET /api/focus-products` — any authenticated account, active rows only.
-- `GET/POST/PATCH/DELETE /api/admin/focus-products[...]` — admin + CSRF only. `DELETE` is a soft-delete (`is_active = false`).
+เก็บเป็น JSON เช่น:
 
----
+```json
+{
+  "001": 10,
+  "003": 8,
+  "004": 5,
+  "005": 3
+}
+```
 
-## 3. Frontend (SC-StockDay-Ordering/apps/admin-web)
+- ใช้จริงกับ `pharmacist`, `store_manager` และ `group_manager`
+- สาขาที่ไม่มีใน JSON จะกลับไปใช้เป้าหมายหลัก
+- ค่า `0` ใส่ได้เพื่อสื่อว่า “ยังไม่รู้เป้า” แต่ตามสูตรปัจจุบัน `ยอดขาย >= 0` ทำให้สาขานั้นแสดงว่าผ่านทันที จึงไม่ควรตีความ `0` ว่าเป็นสถานะรอข้อมูลโดยอัตโนมัติ
+- เมื่อ PATCH `branchTargets` ค่าใหม่จะแทนที่ object เดิมทั้งก้อน ไม่ได้ merge รายสาขา ผู้เรียก API ต้องส่งทุกสาขาที่ต้องการเก็บไว้
 
-`FocusProductsPanel.jsx`, wired into the Dashboard nav group (`App.jsx`, view key `focus-products`).
+### สาขาที่เกี่ยวข้อง (`branch_codes`)
 
-- **Year calendar**: `‹ [year] ›` header + 12 month cards. Each card shows colored pills for whichever focus types have a product overlapping that month (date-range overlap, not just start month), or "ยังไม่มี" if none. Clicking a month reveals the detail section below.
-- **Four table components**, one per focus type, each mirroring the source Excel layouts the business actually uses:
-  - `SalespersonFocusTable` — purple Excel banner, ลำดับ/เป้ารายคน/รหัสสินค้า/จำนวน(เป้า)/สินค้าโฟกัส/ยอดสาขา×4/รวม.
-  - `BranchTargetFocusTable` (pharmacist/store_manager) — one เป้า/ขาย column pair per branch, colored green/red per branch's own pass/fail. Accepts `restrictToBranch` to scope down to one branch for staff accounts.
-  - `GroupManagerFocusTable` — purple banner + pill tabs (per branch + "รวมทั้งหมด"); target/ยอดล่าสุด/สถานะ swap based on the selected tab. "รวมทั้งหมด" shows the summed target, total sold, and the true all-branches-must-succeed verdict.
-- **Fullscreen modal**: clicking any section expands it full-screen (click backdrop or ✕ to close); `table-layout: fixed` + text wrapping scoped to the modal so long Thai product names don't force a horizontal scrollbar.
-- **Loading overlay**: full-panel overlay with a simulated progress bar that climbs to 90% while waiting and only jumps to 100% on genuine completion — every transition (start/end/unmount) clears any existing timer first, so it can't get stuck mid-progress.
-- **Admin form**: product search (debounced against `/api/products/search`), focus type, target, date range, branch checkboxes, per-branch target grid (pharmacist/store_manager/group_manager), assigned-person field (salesperson only), note.
+- เป็น array เช่น `['001','003','004','005']`
+- ถ้าเป็น `NULL` หรือผู้ใช้ไม่เลือกสาขา ระบบจะใช้ **ทุกสาขาที่ active ใน `core.branches` ณ เวลาที่อ่านข้อมูล**
+- สูตรยอดรวมและสูตรผ่านจะพิจารณาเฉพาะสาขาในรายการนี้
+- แต่ query ยอดขายดึงยอดของทุกสาขามาก่อน แล้วจึงเลือกสาขาที่เกี่ยวข้องตอนคำนวณ
 
----
+ข้อควรระวัง: ถ้า `branch_codes = NULL` และภายหลังเปิดสาขาใหม่ใน `core.branches` สาขาใหม่นั้นจะเข้ามาอยู่ในเป้าเดิมด้วย สำหรับ `group_manager` อาจทำให้ผลรวมเปลี่ยน จึงควรระบุสาขาให้ชัดในรายการที่ต้องการรักษาความหมายทางประวัติศาสตร์
 
-## 4. Performance investigation
+## 4. แหล่งยอดขายและเงื่อนไขนับยอด
 
-The sold-qty query hung production entirely at one point, then stayed at 20-30+ seconds after a partial fix. Root-caused with `EXPLAIN (ANALYZE, BUFFERS)` run directly against production (user shared a temporary read connection string):
+Backend ใช้ข้อมูลดิบที่ sync จาก AdaPOS:
 
-1. **N+1 queries** — the first version issued one query per focus row instead of batching by date range. Fixed by grouping rows into one `WHERE product_code = ANY($1::text[])` query per distinct date range.
-2. **JSONB filter defeats plain indexes** — `raw_payload->>'FTShdStaPaid'` etc. can't be pushed into a normal btree index, so Postgres heap-fetched and evaluated the filter per row regardless of which index it started from. Fixed with a **partial index** whose predicate matches the query's filter exactly (`idx_ada_sales_headers_paid_doc_date`) — turned into an index-only scan with zero heap fetches.
-3. **Wrong index column order** — `ada.sales_lines`'s existing unique index has `line_no` between `doc_no` and `product_code`, so a query constraining `branch_code`+`doc_no`+`product_code` (not `line_no`) couldn't seek directly; it scanned every line of every matching receipt. Fixed with a dedicated `(branch_code, doc_no, product_code)` index.
+- หัวบิล: `ada.sales_headers`
+- รายการสินค้าในบิล: `ada.sales_lines`
+- join ด้วย `(branch_code, doc_no)`
+- เลือก `product_code` และ `doc_date` ที่อยู่ระหว่าง `date_from` ถึง `date_to` รวมวันต้นและวันท้าย
+- รับเฉพาะเอกสารที่ `FTShdDocType = '1'` (ถ้าไม่มีค่าให้ถือเป็น `'1'`)
+- รับเฉพาะบิลที่ชำระแล้ว โดย `FTShdStaPaid` หรือ `paid_status = '3'`
 
-Combined effect: **~26-30s → ~2.9-3.7s** on the real 26-row/one-month query. See migration `053` and the ADA sales query perf memory for the general lesson (applies to any future query against these tables).
+จำนวนขายต่อบรรทัดเลือกตามลำดับนี้:
 
----
+```text
+qty_base
+หรือ qty × stock_factor
+หรือ qty
+```
 
-## 5. Data entered (July 2026 / กรกฎาคม 2569)
+จากนั้น `SUM` แยกตามรหัสสินค้าและสาขา ค่าไม่มีข้อมูลถือเป็น 0
 
-All sourced from the business's real Excel workbooks (`โฟกัสปี69.xlsx` and `โฟกัสปี69(1).xlsx`), transcribed sheet-by-sheet per branch and confirmed with the user before writing. All four branches (001/003/004/005) now have real targets across every focus type as of end of session:
+ดังนั้นผลบนหน้าจอขึ้นกับความครบถ้วนและความสดใหม่ของ AdaPOS sync ด้วย ระบบนี้ไม่ได้อ่านยอดจาก `sales_daily` และไม่ได้อ่านจาก stock snapshot
 
-- **Salesperson** (7 rows, ids 6-12) — shared/global, one combined target across all 4 branches, with `assigned_person_name` set.
-- **Pharmacist** (6 products, ids 21-26) — per-branch targets via `branchTargets`.
-- **Store manager** (8 products, ids 13-20) — per-branch targets via `branchTargets`. Two line items in the source sheets bundle two product codes under one shared target (IC-002462+IC-005185, IC-004754+IC-004755) — only the first code was seeded per row, the paired code is recorded in `note` since the schema is one-product-per-row.
-- **Group manager** (5 products, ids 1-5) — per-branch targets via `branchTargets`; confirmed with the user that branch 003's targets are intentionally identical to branch 001's (not a copy-paste artifact, unlike some sheets' stale month-label text which *was* an unedited copy-paste leftover).
+## 5. การปิดยอด (freeze)
 
----
+- ใช้วันที่ปัจจุบันตาม timezone `Asia/Bangkok`
+- เมื่อ `date_to` น้อยกว่าวันปัจจุบัน และรายการยังไม่เคย freeze ระบบจะคำนวณยอดแล้วเขียน `frozen_sold_by_branch`, `frozen_total_sold`, `frozen_at`
+- การ freeze เกิดแบบ **freeze-on-read**: ต้องมีคนหรือระบบเรียกหน้า/API หลังวันสิ้นสุดก่อน ไม่ได้มี scheduled job ปิดยอดตอนเที่ยงคืน
+- เมื่อ freeze แล้ว การอ่านครั้งต่อไปใช้ snapshot และไม่ query ยอดขายสดของรายการนั้น
+- ถ้าแก้ `date_from` หรือ `date_to` ระบบจะล้าง snapshot แล้วคำนวณ/freeze ใหม่ตามช่วงใหม่
+- ถ้าแก้สินค้า เป้า ประเภท หรือสาขาโดยไม่แก้ช่วงวันที่ snapshot ยอดขายเดิมจะยังอยู่ แต่สถานะจะถูกคำนวณใหม่ด้วยนิยามเป้าใหม่
+- `frozen_total_sold` ถูกบันทึกไว้ในฐานข้อมูล แต่ response ปัจจุบันคำนวณ `totalSold` ใหม่จาก `frozen_sold_by_branch` เฉพาะสาขาที่เกี่ยวข้อง
 
-## 6. Notable friction / lessons
+## 6. Database schema
 
-- **Two agents, one working directory.** Codex runs concurrently in this exact `PaaSRTSM-project` checkout on an unrelated "stock recommendation workflow" feature. This caused a migration filename collision **twice** in one session (047 renumbered to 049, then 049 collided again and became 051) and one commit that swept up this session's uncommitted changes as a side effect of a broad `git add`. Always re-check the latest migration number immediately before creating a file *and* again immediately before pushing.
-- **PaaSRTSM-project needs a Manual Deploy click every single push** — no `render.yaml`, no auto-deploy. `SC-StockDay-Ordering`'s admin-web *does* auto-deploy. Several rounds of "it's still broken" were actually "the fix hasn't been deployed yet."
-- **`PATCH .../branchTargets` replaces the whole object, it does not merge.** Every patch to add one branch's target had to include all previously-set branches' overrides too, or they'd silently get dropped.
-- **Don't trust a sheet's title text at face value** — staff copy-paste Excel templates without editing header text (wrong month shown on a sheet that was actually for July), but the row data itself (codes, quantities) was reliable. When something looks suspicious (e.g. one branch's targets exactly matching another's), ask before assuming either way.
+ตารางหลักอยู่ในฐานข้อมูล live ของ PaaSRTSM admin-api ไม่ได้อยู่ในฐานข้อมูล legacy ของ repo นี้:
+
+`focus.focus_products`
+
+| กลุ่ม | คอลัมน์ | ความหมาย |
+|---|---|---|
+| ตัวตน | `id bigserial PK` | เลขรายการภายใน |
+| สินค้า | `product_code text NOT NULL` | รหัสสินค้าที่ใช้เทียบ `ada.sales_lines.product_code` |
+| ประเภท | `focus_type text NOT NULL` | จำกัดไว้ 4 ค่าเท่านั้น |
+| เป้า | `target_qty numeric(14,4)` | เป้าหลัก ต้อง > 0 |
+| ช่วงเวลา | `date_from`, `date_to` | วันเริ่มและวันจบ โดยวันจบต้องไม่ก่อนวันเริ่ม |
+| ขอบเขต | `branch_codes text[] NULL` | สาขาที่เกี่ยวข้อง; NULL = active ทุกสาขา |
+| เป้ารายสาขา | `branch_targets jsonb` | map รหัสสาขาไปยังเป้า override |
+| ผู้รับผิดชอบ | `assigned_person_name text` | ชื่อพนักงานแบบ free text ใช้กับ salesperson; ยังไม่มี FK ไป HR |
+| รายละเอียด | `note text` | หมายเหตุ; service ตัดไว้สูงสุด 2,000 ตัวอักษร |
+| สถานะ | `is_active boolean` | ลบแบบ soft-delete โดยเปลี่ยนเป็น false |
+| ผู้สร้าง/เวลา | `created_by`, `created_at`, `updated_at` | metadata การสร้างและแก้ไข |
+| ปิดยอด | `frozen_sold_by_branch`, `frozen_total_sold`, `frozen_at` | snapshot หลังหมดช่วงเวลา |
+| การเผยแพร่ | `publication_status`, `scheduled_publish_at`, `published_at`, `published_by` | ร่าง/เผยแพร่ทันที/ตั้งเวลาเผยแพร่ |
+
+Indexes หลัก:
+
+- `(is_active, date_from, date_to)` สำหรับค้นหารายการ active ตามช่วง
+- `(focus_type)` และ `(product_code)`
+- `ada.sales_headers (doc_date, branch_code, doc_no)` แบบ partial index เฉพาะบิลขายที่ชำระแล้ว
+- `ada.sales_lines (branch_code, doc_no, product_code)` สำหรับ join และหาสินค้าเร็วขึ้น
+
+Migrations ที่เกี่ยวข้อง: `045`, `046`, `051`, `052` (ถูกแทนที่), `053` และ `054`
+
+### สิ่งที่ schema ยังไม่ได้บังคับ
+
+- ไม่มี foreign key ตรวจว่า `product_code` มีอยู่จริง
+- ไม่มี foreign key ตรวจ `branch_codes` หรือ key ภายใน `branch_targets`
+- ไม่มี CHECK ตรวจรูปแบบ JSON/ชนิดตัวเลขใน `branch_targets`; validation อยู่ใน Node service
+- ไม่มี unique constraint ป้องกันการสร้างสินค้าชนิดเดียวกันและช่วงเวลาเดียวกันซ้ำ
+- `assigned_person_name` เป็นข้อความธรรมดา ไม่ใช่ employee ID
+
+## 7. API และสิทธิ์
+
+| Endpoint | สิทธิ์ | หน้าที่ |
+|---|---|---|
+| `GET /api/focus-products` | ผู้ที่ login แล้วทุก role | อ่านเฉพาะรายการ active |
+| `GET /api/admin/focus-products` | admin | อ่านรวมรายการ inactive |
+| `POST /api/admin/focus-products` | admin + CSRF | สร้างรายการ |
+| `PATCH /api/admin/focus-products/:id` | admin + CSRF | แก้ไขบาง field |
+| `DELETE /api/admin/focus-products/:id` | admin + CSRF | soft-delete |
+
+`?debug=1` เพิ่ม timings ของ query ใน response และ endpoint ปัจจุบันยอมให้ authenticated user ใช้ได้ด้วย
+
+Backend ส่งข้อมูลที่คำนวณแล้วกลับมา เช่น `soldByBranch`, `totalSold`, `branchAchieved`, `achieved`, `branchTargetsEffective`, `isFrozen` และ `productName`
+
+ชื่อสินค้าค้นตามลำดับ fallback จาก `ada.branch_stock_snapshots` → `ada.products` → `public.skus` แต่รหัสสินค้ายังคงเป็นตัวเชื่อมหลัก
+
+### Workflow การเผยแพร่
+
+Admin เลือกสถานะของแต่ละรายการได้ 3 แบบ:
+
+| สถานะ | ค่าในฐานข้อมูล | ใครมองเห็น |
+|---|---|---|
+| บันทึกร่าง | `draft` | admin เท่านั้น |
+| เผยแพร่ทันที | `published` | ผู้ใช้ที่ login แล้วทั้งหมด |
+| ตั้งเวลาเผยแพร่ | `scheduled` | admin เห็นทันที; ผู้ใช้อื่นเห็นเมื่อ `scheduled_publish_at <= now()` |
+
+การเผยแพร่ตามเวลาใช้เงื่อนไขใน read query จึงไม่ต้องรอ cron job และไม่เสี่ยงพลาดเพราะ worker หยุดทำงาน ข้อมูลเดิมก่อน migration 054 ถูก backfill เป็น `published` ทั้งหมด
+
+คอลัมน์เพิ่มใน `focus.focus_products`: `publication_status`, `scheduled_publish_at`, `published_at`, `published_by` และ index `(is_active, publication_status, scheduled_publish_at)`
+
+## 8. หน้าเว็บและการมองเห็นข้อมูล
+
+Frontend อยู่ที่ `apps/admin-web/src/FocusProductsPanel.jsx` และเปิดจากเมนู Dashboard → `สินค้าโฟกัส`
+
+- ปฏิทิน 12 เดือน: รายการจะอยู่ในทุกเดือนที่ช่วงวันที่ทับซ้อน ไม่ได้ดูเฉพาะเดือนของ `date_from`
+- คลิกเดือนแล้วจึงแสดงตารางรายละเอียดด้านล่าง
+- คลิก section เพื่อขยายตารางเต็มหน้าจอ
+- admin ใช้ `/api/admin/focus-products` จึงเห็นทั้ง active/inactive และมีปุ่มเพิ่ม แก้ไข ลบ
+- แบบฟอร์ม admin เลือกบันทึกร่าง, บันทึกและเผยแพร่ทันที หรือตั้งวันเวลาเผยแพร่ได้
+- ตารางของ admin แสดง badge ร่าง/ตั้งเวลา/เผยแพร่แล้วข้างชื่อสินค้า
+- user อื่นใช้ `/api/focus-products` และแก้ข้อมูลไม่ได้
+- สำหรับ `pharmacist` และ `store_manager` ถ้ามี `branchCode` หน้าเว็บจะแสดงเฉพาะคอลัมน์ของสาขานั้น
+- `salesperson` และ `group_manager` ยังแสดงภาพรวมทุกสาขา
+
+ข้อควรเข้าใจ: การจำกัดคอลัมน์ตามสาขาเป็น logic ฝั่ง React เท่านั้น API read endpoint ยังส่งยอดและเป้าทุกสาขากลับมา จึงเป็นการจัดหน้าจอ ไม่ใช่ security boundary
+
+## 9. Data flow
+
+```text
+Admin กรอกเป้าใน admin-web
+        ↓ POST/PATCH + cookie session + CSRF
+PaaSRTSM admin-api
+        ↓ บันทึกนิยามเป้า
+focus.focus_products
+
+เมื่อเปิดหน้า
+admin-web → GET focus-products → backend อ่านนิยามเป้า
+                              → อ่านยอดจาก ada.sales_headers/lines
+                              → คำนวณตามประเภทและสาขา
+                              → freeze ถ้าหมดช่วงและยังไม่เคย freeze
+                              → ส่งผลให้ React แสดงตาราง
+```
+
+## 10. ข้อมูลที่ใส่ไว้เมื่อสร้างฟีเจอร์ (กรกฎาคม 2569)
+
+- Salesperson 7 รายการ (เดิม ids 6–12)
+- Pharmacist 6 รายการ (เดิม ids 21–26)
+- Store manager 8 รายการ (เดิม ids 13–20)
+- Group manager 5 รายการ (เดิม ids 1–5)
+
+ข้อมูลมาจากไฟล์ Excel ธุรกิจจริง `โฟกัสปี69.xlsx` และ `โฟกัสปี69(1).xlsx` สำหรับสาขา 001/003/004/005
+
+ข้อจำกัดของข้อมูลเดิม: เป้าบางบรรทัดใน Excel รวมสินค้าสองรหัส แต่ schema ปัจจุบันรองรับหนึ่ง `product_code` ต่อหนึ่งแถว จึงบันทึกเพียงรหัสแรกและใส่รหัสคู่ไว้ใน `note` ผลรวมยอดขายของสินค้ารหัสคู่จึงไม่ได้ถูกรวมโดยระบบจริง
+
+## 11. ประเด็นสำคัญก่อนพัฒนาต่อ
+
+1. **เป้า 0 มีความหมายคลุมเครือ** — UI บอกว่า “ยังไม่รู้เป้า” แต่สูตรถือว่าผ่าน ควรออกแบบสถานะ `target_pending` หรือใช้ `NULL` หากต้องการให้ยังไม่ถูกตัดสิน
+2. **การซ่อนข้อมูลสาขาไม่ได้ทำที่ backend** — หากภายหลังถือว่าเป้ารายสาขาเป็นข้อมูลลับ ต้องกรอง response ตามสิทธิ์ใน API
+3. **การ freeze อาศัยการเปิดอ่าน** — หากต้องการยอดปิดเดือนที่เวลาชัดเจน ควรมี scheduled close job และบันทึก audit
+4. **แก้รายการที่ freeze แล้วได้** — admin สามารถเปลี่ยนเป้าหรือชนิดจนคำตัดสินอดีตเปลี่ยน โดยยังไม่มี revision history/audit เฉพาะระบบนี้
+5. **ยังไม่มี domain audit log** — CRUD ของ focus product ไม่ได้เขียนประวัติ before/after เฉพาะฟีเจอร์
+6. **หนึ่งแถวรองรับสินค้าหนึ่งรหัส** — ยังรองรับเป้ารวมของหลาย SKU ไม่ได้
+7. **มี automated tests พื้นฐานแล้ว** — ครอบคลุมสูตร 4 หมวด, draft visibility, publish และ validation ของ schedule; ควรเพิ่มกรณี scheduled visibility และ migration integration เมื่อขยายระบบ
+8. **รายชื่อสาขาใน form hardcode เป็น 001/003/004/005** แต่ backend ใช้ `core.branches`; เพิ่มสาขาใหม่แล้วหน้า form จะยังเลือกไม่ได้จนแก้ frontend
+9. **รายการ active ถูกโหลดทั้งหมดก่อนกรองปี/เดือนใน browser** — ถ้าข้อมูลหลายปีมากขึ้นควรเพิ่ม date/filter/pagination ที่ API
+10. **API debug เปิดแก่ผู้ใช้ทุกคนที่ login** — ควรจำกัด admin หรือปิดใน production หาก timings ไม่จำเป็นต่อผู้ใช้ทั่วไป
+
+## 12. ไฟล์หลักสำหรับพัฒนาต่อ
+
+- Frontend: `apps/admin-web/src/FocusProductsPanel.jsx`
+- การผูกเมนู/สิทธิ์สาขา: `apps/admin-web/src/App.jsx`
+- Styles: `apps/admin-web/src/styles.css`
+- Live backend service: `../PaaSRTSM-project/apps/admin-api/src/services/focusProducts.js`
+- Live backend routes: `../PaaSRTSM-project/apps/admin-api/src/routes/focus-products.js`
+- Schema: `../PaaSRTSM-project/migrations/045_add_focus_products.sql`, `046...`, `051...`, `053...`, `054...`
+
+หมายเหตุ: `SC-StockDay-Ordering/server/` เป็น legacy backend และไม่มี schema/API ของสินค้าโฟกัส การแก้ backend ของฟีเจอร์นี้ต้องทำที่ `PaaSRTSM-project` และต้อง Manual Deploy บน Render หลัง push ส่วน admin-web ของ repo นี้ auto-deploy ตาม architecture ปัจจุบัน

@@ -25,6 +25,14 @@ function toIsoDateOnly(value) {
   return value ? String(value).slice(0, 10) : "";
 }
 
+function toDateTimeLocal(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const offsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
 const FOCUS_TYPE_ORDER = ["salesperson", "pharmacist", "store_manager", "group_manager"];
 
 const FOCUS_TYPE_LABELS = {
@@ -58,6 +66,8 @@ const EMPTY_FORM = {
   branchTargets: {}, // {branchCode: targetQty} — group_manager only
   assignedPersonName: "",
   note: "",
+  publicationStatus: "draft",
+  scheduledPublishAt: "",
 };
 
 const BRANCH_CHOICES = ["001", "003", "004", "005"];
@@ -89,6 +99,17 @@ function StatusBadge({ achieved }) {
       {achieved ? "สำเร็จ" : "ยังไม่ถึงเป้า"}
     </span>
   );
+}
+
+function PublicationBadge({ row }) {
+  if (!row) return null;
+  const state = row.publicationState || row.publicationStatus || "published";
+  const labels = {
+    draft: "ร่าง",
+    scheduled: "ตั้งเวลาเผยแพร่",
+    published: row.publicationStatus === "scheduled" ? "เผยแพร่อัตโนมัติแล้ว" : "เผยแพร่แล้ว",
+  };
+  return <span className={`fp-publication-badge ${state}`}>{labels[state] || state}</span>;
 }
 
 function BranchBreakdown({ row }) {
@@ -284,6 +305,27 @@ function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, 
           <textarea value={form.note} onChange={(e) => update("note", e.target.value)} rows={2} />
         </label>
 
+        <label className="fp-field">
+          <span>การเผยแพร่</span>
+          <select value={form.publicationStatus} onChange={(e) => update("publicationStatus", e.target.value)}>
+            <option value="draft">บันทึกร่าง — เฉพาะ admin มองเห็น</option>
+            <option value="published">บันทึกและเผยแพร่ทันที</option>
+            <option value="scheduled">บันทึกและตั้งเวลาเผยแพร่</option>
+          </select>
+        </label>
+
+        {form.publicationStatus === "scheduled" && (
+          <label className="fp-field">
+            <span>วันและเวลาที่เผยแพร่</span>
+            <input
+              type="datetime-local"
+              value={form.scheduledPublishAt}
+              onChange={(e) => update("scheduledPublishAt", e.target.value)}
+            />
+            <small>เมื่อถึงเวลานี้ พนักงานจะเห็นรายการโดยอัตโนมัติ</small>
+          </label>
+        )}
+
         {submitError && <div className="fp-form-error">{submitError}</div>}
 
         <div className="fp-modal-actions">
@@ -296,7 +338,13 @@ function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, 
             disabled={submitting}
             onClick={() => onSubmit(form, csrfToken)}
           >
-            {submitting ? "กำลังบันทึก..." : "บันทึก"}
+            {submitting
+              ? "กำลังบันทึก..."
+              : form.publicationStatus === "draft"
+                ? "บันทึกร่าง"
+                : form.publicationStatus === "scheduled"
+                  ? "บันทึกและตั้งเวลา"
+                  : "บันทึกและเผยแพร่ทันที"}
           </button>
         </div>
       </div>
@@ -346,7 +394,7 @@ function SalespersonFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
               <td>{row.assignedPersonName || "-"}</td>
               <td>{row.productCode}</td>
               <td>{formatNumber(row.targetQty)}</td>
-              <td className="fp-col-wide">{row.productName || "-"}</td>
+              <td className="fp-col-wide">{row.productName || "-"}{isAdminUser && <PublicationBadge row={row} />}</td>
               {branchCodes.map((code) => (
                 <td key={code}>{formatNumber(row.soldByBranch?.[code] || 0)}</td>
               ))}
@@ -421,7 +469,7 @@ function GenericFocusTable({ typeRows, isAdminUser, onEdit, onDelete }) {
           {typeRows.map((row) => (
             <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
               <td>{row.productCode}</td>
-              <td className="fp-col-wide">{row.productName || "-"}</td>
+              <td className="fp-col-wide">{row.productName || "-"}{isAdminUser && <PublicationBadge row={row} />}</td>
               <td>
                 {toIsoDateOnly(row.dateFrom)} – {toIsoDateOnly(row.dateTo)}
               </td>
@@ -516,7 +564,7 @@ function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete, restrictT
           {rows.map((row) => (
             <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
               <td>{row.productCode}</td>
-              <td className="fp-col-wide">{row.productName || "-"}</td>
+              <td className="fp-col-wide">{row.productName || "-"}{isAdminUser && <PublicationBadge row={row} />}</td>
               {branchCodes.map((code) => {
                 const target = row.branchTargetsEffective?.[code];
                 const sold = row.soldByBranch?.[code] || 0;
@@ -653,7 +701,7 @@ function GroupManagerFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
               <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
                 <td>{index + 1}</td>
                 <td>{row.productCode}</td>
-                <td className="fp-col-wide">{row.productName || "-"}</td>
+                <td className="fp-col-wide">{row.productName || "-"}{isAdminUser && <PublicationBadge row={row} />}</td>
                 <td>{target != null ? formatNumber(target) : "-"}</td>
                 <td>{formatNumber(sold)}</td>
                 <td>
@@ -957,6 +1005,8 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode 
         branchTargets: row.branchTargets || {},
         assignedPersonName: row.assignedPersonName || "",
         note: row.note || "",
+        publicationStatus: row.publicationState || row.publicationStatus || "published",
+        scheduledPublishAt: toDateTimeLocal(row.scheduledPublishAt),
       },
       submitting: false,
       submitError: null,
@@ -983,6 +1033,10 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode 
         : null,
       assignedPersonName: form.focusType === "salesperson" ? (form.assignedPersonName || "").trim() || null : null,
       note: form.note.trim() || null,
+      publicationStatus: form.publicationStatus,
+      scheduledPublishAt: form.publicationStatus === "scheduled"
+        ? (form.scheduledPublishAt ? new Date(form.scheduledPublishAt).toISOString() : null)
+        : null,
     };
     try {
       const response = await apiFetch(
