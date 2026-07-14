@@ -70,6 +70,31 @@ backend API had CPU/memory to spare. This reframes the fix priority:
   before scaling hardware" principle, doing the set-based rewrite first means
   any plan upgrade later goes further.
 
+## CP1 rollout progress (2026-07-14, post-CP0)
+
+- **003**: RESOLVED (pending one more scheduled-window confirmation).
+  Pulled `4b52855` (products batch=100 + sales_detail chunk=150), `.env`
+  updated with both new vars, manual off-peak test run: products 6,591 sent
+  (100/batch), sales_detail 1,820 headers / 3,629 lines across 13/13 chunks
+  accepted, 22,670 total records, exit 0, 10m04s wall time, no "Sync failed."
+  Local uncommitted duplicate-fix diff on that machine was verified
+  non-identical-but-subsumed by `e71e32f` (see conversation) and discarded
+  before pulling — no work lost.
+- **004**: NOT YET STARTED — still on stale code (pre-`e71e32f`), still
+  batching products at 500 with no `ADAPOS_SYNC_PRODUCT_BATCH_SIZE`. Highest
+  remaining containment priority.
+- **001**: fixes present (batch=100, but pre-existing 180s timeout override
+  predates and is unrelated to the fix) but still failing on products as of
+  2026-07-14 08:20 — attributed to DB CPU saturation (see EVIDENCE.md Render
+  section), not a code gap on this branch. Needs re-observation after 003+004
+  are both off the old batch-500 pattern, since that should reduce peak DB
+  load app-wide.
+- **CP3 (set-based upsert rewrite)**: design/implementation authorized to
+  proceed in parallel (local-code-only), but **not to be deployed** until
+  001/003/004 rollout is confirmed stable across at least one more scheduled
+  window — deploying both changes at once would make it impossible to tell
+  which one actually fixed things.
+
 ## Recommended next step
 
 CP0 is close enough to complete that starting CP1 work which doesn't depend
