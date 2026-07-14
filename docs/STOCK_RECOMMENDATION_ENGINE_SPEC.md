@@ -217,20 +217,59 @@ Network-level inputs:
 
 ### Incoming PO allocation
 
-The real branch allocation formula for incoming PO is not available yet.
+Current manual process (2026-07-13, photographed reference table): head office
+keeps a printed lookup table mapping total received qty (1-200) to a
+per-branch split for branches 001/003/004/005. Decoded from the table: it is
+a **fixed ratio of 3:3:1:1** (001:003:004:005), applied via a largest-remainder
+apportionment method (the same style used to apportion parliamentary seats)
+so the split stays as close to that ratio as possible at every whole-unit
+total. Confirmed from multiple rows, e.g. qty=8 -> 3,3,1,1 exactly; qty=200 ->
+75,75,25,25 (= 3:3:1:1 exactly).
 
-Default phase 1 behavior:
+Problem with the fixed-ratio table: it never adapts. Whatever drove 3:3:1:1
+historically (branch size, opening-day estimate, etc.) may no longer match
+current real demand, and the table has no way to notice. A branch that's
+currently selling faster than its historical share still only gets its fixed
+25% (or whatever slot it's in), and a branch that's already overstocked still
+gets its full fixed share of every new shipment regardless of how much it
+already has on hand — directly undermines the 90-day-cover goal this whole
+project is built around.
 
-- if an incoming PO is intended for multiple branches and no allocation matrix exists, split equally across active branches
-- if an incoming PO is already branch-specific, use the real branch-specific quantity
+Decided direction (design agreed 2026-07-13, not yet implemented): replace
+the fixed 3:3:1:1 weight with a dynamic per-branch weight computed from real
+data, keeping the same largest-remainder apportionment mechanics as the
+existing table (so the allocation math itself doesn't need to be reinvented,
+just its input weights):
 
-Formula:
+- **Primary weight: shortage** — `shortage_qty` per branch (already computed
+  per product/branch in the engine), using the 90-day-window-derived demand
+  figures already in place (not a single day's shortage) to avoid the
+  allocation flipping around between shipments. A branch that's already at
+  or above its 90-day target gets `shortage_qty = 0` and receives none of a
+  new shipment for that SKU — this is what makes it self-correcting toward
+  the 90-day goal, unlike the fixed-ratio table.
+- **Fallback weight: demand (`adjusted_adu`)** — used only when every branch's
+  shortage is 0 for that SKU (nobody currently needs it), so a shipment still
+  has some defensible way to be split rather than an undefined 0/0 case.
+
+Explicitly **advisory, not enforced** — matches the existing "system
+recommendation vs branch request vs admin decision" three-layer model
+described earlier in this doc. The computed split is a starting suggestion
+branch staff/admin can override before acting on it, specifically so a
+one-off case (e.g. a government procurement order suddenly buying out a
+branch that doesn't normally carry much of that SKU) doesn't get blocked by
+the system insisting on its computed split.
+
+Formula (previous placeholder, superseded by the above):
 
 ```text
 incoming_po_allocation_qty = incoming_po_qty_total / active_branch_count
 ```
 
-This is a placeholder and must be replaceable later by a branch allocation table.
+Not yet implemented in code — `stockRecommendations.js` still uses the
+equal-split placeholder above as of 2026-07-13. This section records the
+agreed design so the next implementation session doesn't have to re-derive
+it.
 
 ### Target stock cover
 
