@@ -1,6 +1,6 @@
 # Architecture
 
-> Last revised: 2026-07-03
+> Last revised: 2026-07-14
 
 ---
 
@@ -145,6 +145,7 @@ Monolithic single-file `App.jsx`. Cookie-session auth. Admin role unlocks extra 
 | Group | View key | Description |
 |---|---|---|
 | Dashboard | *(disabled)* | Stock Day overview — not yet built |
+| | `focus-products` | Monthly focus-product targets and live AdaPOS sales progress; all authenticated users can view, admin manages targets |
 | ข้อมูลสินค้า | `receipts` (default) | Approved receipts viewer, supplier logos |
 | | `branch-stock` | Wide branch-stock table (qty_000..005) |
 | | `stock-requests` | Inter-branch stock requests — submit, track, filter by branch |
@@ -206,6 +207,7 @@ Code39 barcode renderer built inline (used for packing documents).
 | `health.js` | `/api/health` | Health check |
 | `auth.js (admin)` | `/api/auth` | — |
 | `video-content.js` | `/api/content` | AI Video Content Studio — job CRUD/submit/retry/cancel/approve/reject, asset upload, signed download proxy. Gated by `FEATURE_VIDEO_STUDIO`. See `docs/AI_VIDEO_CONTENT_STUDIO.md`. |
+| `focus-products.js` | `/api/focus-products`, `/api/admin/focus-products` | Authenticated read + admin-only CRUD for focus-product targets |
 
 ### Services
 
@@ -213,6 +215,7 @@ Code39 barcode renderer built inline (used for packing documents).
 |---|---|
 | `stockRequests.js` | Inter-branch request business logic |
 | `stockRequestDrafts.js` | Server-side draft cart persistence |
+| `focusProducts.js` | Focus-product validation, batched AdaPOS sales progress, four success rules, and freeze-on-read snapshots |
 | `videoJobsService.js` | AI video job CRUD, submit/retry/cancel/approve/reject, role-based visibility |
 | `videoAssetsService.js` | AI video asset upload finalize + download authorization |
 | `videoJobRunner.js` | In-process `setTimeout`-chain poller for AI video render jobs (no separate worker) |
@@ -259,7 +262,7 @@ Runs on each branch PC via Windows Task Scheduler.
 
 ## 7. Database schemas (PaaSRTSM Postgres)
 
-Migrations run via `npm run db:migrate` from `PaaSRTSM-project/`. 43 migrations as of 2026-07-03.
+Migrations run via `npm run db:migrate` from `PaaSRTSM-project/`. 50 migration files as of 2026-07-14.
 
 | Schema | Tables / purpose |
 |---|---|
@@ -272,6 +275,7 @@ Migrations run via `npm run db:migrate` from `PaaSRTSM-project/`. 43 migrations 
 | `ingest` | `sync_runs`, `sync_errors` |
 | `admin` | Admin-facing audit / log tables |
 | `content` | AI Video Content Studio (migration 043): `video_jobs`, `video_assets`, `video_job_events`. See `docs/AI_VIDEO_CONTENT_STUDIO.md`. |
+| `focus` | `focus_products` — product/date/branch targets plus frozen month-end sales snapshots. See `docs/SESSION_2026-07-12_FOCUS_PRODUCTS_FEATURE.md`. |
 
 **Pricing (migration 039):** `ada.branch_prices` stores per-branch retail/cost prices synced from AdaPOS. Canonical selling price is `public.sku_unit_prices.retail_price` (per sku + unit + is_active). `public.prices` is written in parallel but `sku_unit_prices` is authoritative.
 
@@ -308,6 +312,10 @@ Batch-seeded Thai ingredient dictionary (16 batches, batch 6 = soap/cleanser ~23
 ### Product categorization / enrichment
 
 4-tier rule engine (tier 0–3) + pgvector embeddings. Category review queue in admin-web. `apply_enrichment_rules.js` batch applies rules. `backfill_sku_embeddings.js` / `sync_sku_embeddings.js` maintain vector index.
+
+### Focus products (migrations 045, 046, 051, 053, 054)
+
+Admin defines product sales targets for a date range in four categories: salesperson (combined target), pharmacist and store manager (independent branch verdicts), and group manager (all relevant branches must pass). Each target can be saved as a private draft, published immediately, or scheduled for automatic visibility. Progress is computed from paid AdaPOS sales and freezes on the first read after the period ends. The frontend lives in `apps/admin-web/src/FocusProductsPanel.jsx`; the live service and schema live in the sibling `PaaSRTSM-project`. Detailed behavior, schema, caveats, and development context: [SESSION_2026-07-12_FOCUS_PRODUCTS_FEATURE.md](SESSION_2026-07-12_FOCUS_PRODUCTS_FEATURE.md).
 
 ### Mobile enrollment (migration 038, backend done, no UI yet)
 
