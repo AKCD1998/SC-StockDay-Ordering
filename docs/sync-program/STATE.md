@@ -139,6 +139,28 @@ watched (dashboard or logs) rather than assumed.
   window — deploying both changes at once would make it impossible to tell
   which one actually fixed things.
 
+## Single-writer product-master rollout (2026-07-14, post-CP3-planning decision)
+
+Decision + verification recorded in DECISIONS.md. Rollout status:
+
+- **004**: CONFIRMED correct, no change needed. `.env` line 13:
+  `ADAPOS_SYNC_DATASETS=products,sales,branch_stock,transfers,transfer_lines,pending_receipts,approved_receipts`
+  — `products` present as expected for the designated single writer.
+  (Note: this branch's session initially received the wrong prompt — the
+  "remove products" one meant for 001/003/005 — and correctly caught the
+  contradiction against DECISIONS.md before making any change, then asked
+  for confirmation instead of guessing. No `.env` was touched.)
+- **001**: prompt sent, awaiting confirmation.
+- **003**: prompt sent, awaiting confirmation.
+- **005**: prompt sent, awaiting confirmation. (Also still carries the
+  known duplicate-Scheduled-Task issue from CP0 — unrelated to this rollout,
+  still open.)
+
+Expected end state: only 004 has `products` in `ADAPOS_SYNC_DATASETS`;
+000/001/003/005 do not. 000 is out of scope (MA-001) so its `.env` is not
+being touched by this rollout — if branch 000's install is ever revived, it
+should also have `products` removed at that time.
+
 ## Recommended next step
 
 CP0 is close enough to complete that starting CP1 work which doesn't depend
