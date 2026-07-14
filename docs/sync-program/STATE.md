@@ -70,6 +70,29 @@ backend API had CPU/memory to spare. This reframes the fix priority:
   before scaling hardware" principle, doing the set-based rewrite first means
   any plan upgrade later goes further.
 
+## CP3.1 progress (set-based product upsert) — WRITTEN, NOT DEPLOYED
+
+Branch `claude/set-based-product-upsert` pushed to PaaSRTSM-project origin
+(commit `f7034a1`, based on `origin/main` @ `0873c284`). Rewrites
+`upsertProductRecord()` (5-8 queries/product, looped) into
+`upsertProductBatch()` (4 set-based queries total per request, regardless of
+batch size). Verified via a mocked-pg-client harness that exercises the real
+route handler end-to-end (`verify-upsert-batch.js` in that branch) — sort
+order, item_id/sku_id linking between steps, barcode primary-flag placement,
+and record-count preservation all pass. **Not benchmarked against a real
+Postgres** (no staging DB — see MANUAL-ACTIONS.md) and **not reconciled with
+CP3.2** (snapshot-runaway) — it still inserts one `product_stock_snapshots`
+row per product per sync, just via one bulk INSERT instead of N.
+
+Built in an isolated `git worktree` specifically because the shared
+PaaSRTSM-project working directory had a concurrent session's uncommitted
+work on a different branch at the time (see DECISIONS.md) — the main
+checkout was never touched.
+
+**Deploy gate unchanged**: do not merge/deploy this until 001/003/004
+mitigation rollout (below) is confirmed stable across a scheduled window,
+so this change's effect can be measured in isolation from the mitigation's.
+
 ## CP1 rollout progress (2026-07-14, post-CP0)
 
 - **003**: RESOLVED (pending one more scheduled-window confirmation).
