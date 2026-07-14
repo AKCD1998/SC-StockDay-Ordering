@@ -20,7 +20,7 @@ import {
   getBranchPriceOverrideRows,
 } from "./queries.js";
 import { postJson, getJson } from "./client.js";
-import { toProductRecords, toSalesRecords, toSalesDetailPayload, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toStockSnapshotRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
+import { toProductRecords, toSalesRecords, toSalesDetailPayload, chunkSalesDetailPayload, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toStockSnapshotRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
 
 const PERIOD_DAYS = 30;
 
@@ -278,13 +278,18 @@ async function runOnce() {
       if (data.sales_detail_headers?.length || data.sales_detail_lines?.length) {
         const hCount = data.sales_detail_headers?.length ?? 0;
         const lCount = data.sales_detail_lines?.length ?? 0;
-        console.log(`Posting ${hCount} detailed sales headers, ${lCount} lines...`);
-        const result = await postJson(
-          `${syncConfig.apiBaseUrl}/api/sync/ada/sales`,
-          toSalesDetailPayload(data.sales_detail_headers ?? [], data.sales_detail_lines ?? []),
-        );
-        const hAccepted = result.acceptedHeaders ?? 0;
-        const lAccepted = result.acceptedLines ?? 0;
+        const payload = toSalesDetailPayload(data.sales_detail_headers ?? [], data.sales_detail_lines ?? []);
+        const chunks = chunkSalesDetailPayload(payload, syncConfig.salesDetailChunkDocs);
+        console.log(`Posting ${hCount} detailed sales headers, ${lCount} lines in ${chunks.length} chunk(s) of up to ${syncConfig.salesDetailChunkDocs} docs...`);
+        let hAccepted = 0;
+        let lAccepted = 0;
+        for (const [chunkIndex, chunk] of chunks.entries()) {
+          // eslint-disable-next-line no-await-in-loop
+          const result = await postJson(`${syncConfig.apiBaseUrl}/api/sync/ada/sales`, chunk);
+          hAccepted += result.acceptedHeaders ?? 0;
+          lAccepted += result.acceptedLines ?? 0;
+          console.log(`  chunk ${chunkIndex + 1}/${chunks.length}: ${result.acceptedHeaders ?? 0} headers, ${result.acceptedLines ?? 0} lines accepted`);
+        }
         console.log(`  sales_detail: ${hAccepted} headers, ${lAccepted} lines accepted`);
         totalSent += hAccepted + lAccepted;
       }

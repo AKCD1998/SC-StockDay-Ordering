@@ -71,6 +71,13 @@ export const syncConfig = {
   // one-off run — not this rolling window.
   salesDetailLookbackDays: Number(process.env.SALES_DETAIL_LOOKBACK_DAYS || 7),
   productBatchSize: parsePositiveInteger(process.env.ADAPOS_SYNC_PRODUCT_BATCH_SIZE, 100),
+  // /api/sync/ada/sales has the same one-transaction-per-request shape as
+  // products, but the client never chunked it — a busy branch's whole day of
+  // sales_detail goes in a single request. Bound it by document count (a
+  // header + its lines always stay together) so one branch's big sales day
+  // can't build a request that outruns the client timeout before the backend
+  // transaction commits.
+  salesDetailChunkDocs: parsePositiveInteger(process.env.ADAPOS_SYNC_SALES_DETAIL_CHUNK_DOCS, 150),
   // Explicit backfill date range (overrides lookback when both are set).
   // Pass --date-from=YYYY-MM-DD --date-to=YYYY-MM-DD to backfill a specific window.
   dateFrom: cliDateFrom || process.env.SYNC_DATE_FROM || null,

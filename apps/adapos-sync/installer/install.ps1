@@ -203,7 +203,8 @@ function Write-EnvFile {
     "ADAPOS_SYNC_DATASETS",
     "ADAPOS_SYNC_BRANCH_CODE",
     "BRANCH_STOCK_SYNC_TOKEN",
-    "ADAPOS_SYNC_PRODUCT_BATCH_SIZE"
+    "ADAPOS_SYNC_PRODUCT_BATCH_SIZE",
+    "ADAPOS_SYNC_SALES_DETAIL_CHUNK_DOCS"
   )
 
   $lines = New-Object System.Collections.Generic.List[string]
@@ -425,6 +426,9 @@ if ($mode -eq "K") {
   }
   if (-not $finalValues.ContainsKey("ADAPOS_SYNC_PRODUCT_BATCH_SIZE") -or [string]::IsNullOrWhiteSpace($finalValues["ADAPOS_SYNC_PRODUCT_BATCH_SIZE"])) {
     $finalValues["ADAPOS_SYNC_PRODUCT_BATCH_SIZE"] = "100"
+  }
+  if (-not $finalValues.ContainsKey("ADAPOS_SYNC_SALES_DETAIL_CHUNK_DOCS") -or [string]::IsNullOrWhiteSpace($finalValues["ADAPOS_SYNC_SALES_DETAIL_CHUNK_DOCS"])) {
+    $finalValues["ADAPOS_SYNC_SALES_DETAIL_CHUNK_DOCS"] = "150"
   }
 
   Write-EnvFile -Path $EnvPath -Values $finalValues

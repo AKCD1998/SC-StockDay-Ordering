@@ -287,6 +287,35 @@ export function toSalesDetailPayload(headerRows, lineRows) {
   };
 }
 
+// Splits an already-built sales_detail payload into chunks of whole documents
+// (a header + all of its lines always stay in the same chunk — never split a
+// document across two requests). Mirrors the products batch-size mitigation:
+// /api/sync/ada/sales wraps a whole request in one DB transaction with
+// per-record queries, so a branch with a big sales day can build a payload
+// that takes longer to commit than the client's request timeout. Chunking by
+// document count bounds each request/transaction to a predictable size.
+export function chunkSalesDetailPayload(payload, maxDocsPerChunk) {
+  const { sourceSystem, sourceSyncedAt, headers, lines } = payload;
+  if (headers.length === 0) {
+    return lines.length > 0 ? [{ sourceSystem, sourceSyncedAt, headers: [], lines }] : [];
+  }
+
+  const linesByDoc = new Map();
+  for (const line of lines) {
+    const key = line.docNo;
+    if (!linesByDoc.has(key)) linesByDoc.set(key, []);
+    linesByDoc.get(key).push(line);
+  }
+
+  const chunks = [];
+  for (let i = 0; i < headers.length; i += maxDocsPerChunk) {
+    const headerChunk = headers.slice(i, i + maxDocsPerChunk);
+    const lineChunk = headerChunk.flatMap((h) => linesByDoc.get(h.docNo) ?? []);
+    chunks.push({ sourceSystem, sourceSyncedAt, headers: headerChunk, lines: lineChunk });
+  }
+  return chunks;
+}
+
 export function toSalesRecords(rows, branchCode, periodDays) {
   return rows.map((r) => ({
     productCode:   r.FTPdtCode,
