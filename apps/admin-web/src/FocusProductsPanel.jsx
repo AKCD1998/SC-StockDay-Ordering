@@ -1483,6 +1483,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   const [branchPickerOpen, setBranchPickerOpen] = useState(false);
   const [salesTargetTableExpanded, setSalesTargetTableExpanded] = useState(false);
   const [salesTargetEditModalOpen, setSalesTargetEditModalOpen] = useState(false);
+  const [salesTargetExitConfirmOpen, setSalesTargetExitConfirmOpen] = useState(false);
   const [dailyOpen, setDailyOpen] = useState(true);
   const [dailyDateFilterOpen, setDailyDateFilterOpen] = useState(false);
   const [dailyDateSort, setDailyDateSort] = useState("desc");
@@ -1587,13 +1588,18 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
     if (!salesTargetTableExpanded && !salesTargetEditModalOpen) return undefined;
     const closeOnEscape = (event) => {
       if (event.key === "Escape") {
-        setSalesTargetTableExpanded(false);
-        setSalesTargetEditModalOpen(false);
+        if (salesTargetExitConfirmOpen) {
+          setSalesTargetExitConfirmOpen(false);
+        } else if (salesTargetEditModalOpen) {
+          setSalesTargetExitConfirmOpen(true);
+        } else {
+          setSalesTargetTableExpanded(false);
+        }
       }
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [salesTargetEditModalOpen, salesTargetTableExpanded]);
+  }, [salesTargetEditModalOpen, salesTargetExitConfirmOpen, salesTargetTableExpanded]);
 
   async function saveTiers(targetBranch, tiers) {
     setSavedBranch("");
@@ -2118,6 +2124,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
                   setSaveError(null);
                   setSaveErrorBranch("");
                   setSavedBranch("");
+                  setSalesTargetExitConfirmOpen(false);
                   setSalesTargetEditModalOpen(true);
                 }}
                 aria-haspopup="dialog"
@@ -2129,7 +2136,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
           )}
 
           {isAdminUser && salesTargetEditModalOpen && (
-            <div className="fp-table-modal-overlay" onClick={() => setSalesTargetEditModalOpen(false)}>
+            <div className="fp-table-modal-overlay" onClick={() => setSalesTargetExitConfirmOpen(true)}>
               <div
                 className="fp-table-modal fp-sales-target-edit-modal"
                 role="dialog"
@@ -2140,7 +2147,10 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
                 <button
                   type="button"
                   className="fp-table-modal-close"
-                  onClick={() => setSalesTargetEditModalOpen(false)}
+                  onClick={() => {
+                    setSalesTargetExitConfirmOpen(false);
+                    setSalesTargetEditModalOpen(false);
+                  }}
                   aria-label="ปิด"
                 >
                   ✕
@@ -2178,6 +2188,46 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
                     );
                   })}
                 </div>
+
+                {salesTargetExitConfirmOpen && (
+                  <div
+                    className="fp-sales-target-exit-confirm-overlay"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <div
+                      className="fp-sales-target-exit-confirm"
+                      role="alertdialog"
+                      aria-modal="true"
+                      aria-labelledby="fp-sales-target-exit-confirm-title"
+                      aria-describedby="fp-sales-target-exit-confirm-description"
+                    >
+                      <h4 id="fp-sales-target-exit-confirm-title">ออกจากหน้ากำหนดเป้าแน่หรือไม่?</h4>
+                      <p id="fp-sales-target-exit-confirm-description">
+                        ข้อมูลที่กรอกไว้แต่ยังไม่ได้กดบันทึกจะหายไป
+                      </p>
+                      <div className="fp-sales-target-exit-confirm-actions">
+                        <button
+                          type="button"
+                          className="fp-btn-secondary"
+                          onClick={() => setSalesTargetExitConfirmOpen(false)}
+                          autoFocus
+                        >
+                          กลับไปกรอกต่อ
+                        </button>
+                        <button
+                          type="button"
+                          className="fp-sales-target-exit-confirm-leave"
+                          onClick={() => {
+                            setSalesTargetExitConfirmOpen(false);
+                            setSalesTargetEditModalOpen(false);
+                          }}
+                        >
+                          ออกจากหน้าต่าง
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
