@@ -1460,8 +1460,12 @@ function SalesTargetEditForm({ tiers, onSave, saving, saveError }) {
 
 function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   const [selectedBranch, setSelectedBranch] = useState(isAdminUser ? BRANCH_CHOICES[0] : branchCode);
+  const [selectedBranches, setSelectedBranches] = useState(() =>
+    isAdminUser ? [BRANCH_CHOICES[0]] : (branchCode ? [branchCode] : []),
+  );
   const [month, setMonth] = useState(currentMonthValue());
   const [progress, setProgress] = useState(null);
+  const [progressByBranch, setProgressByBranch] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -1469,8 +1473,9 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   const [saveError, setSaveError] = useState(null);
   const [visibleColumns, setVisibleColumns] = useState(loadVisibleColumns);
   const [columnPickerOpen, setColumnPickerOpen] = useState(false);
+  const [branchPickerOpen, setBranchPickerOpen] = useState(false);
+  const [salesTargetTableExpanded, setSalesTargetTableExpanded] = useState(false);
   const [dailyOpen, setDailyOpen] = useState(true);
-  const [dailyActualsByBranch, setDailyActualsByBranch] = useState({});
   const [dailyDateFilterOpen, setDailyDateFilterOpen] = useState(false);
   const [dailyDateSort, setDailyDateSort] = useState("desc");
   const [excludedDailyDates, setExcludedDailyDates] = useState(() => new Set());
@@ -1490,6 +1495,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   }, [month]);
 
   useEffect(() => {
+    if (isAdminUser) return undefined;
     if (!activeBranch) {
       setProgress(null);
       setLoading(false);
@@ -1513,34 +1519,70 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
     return () => {
       active = false;
     };
-  }, [activeBranch, month, refreshKey]);
+  }, [activeBranch, isAdminUser, month, refreshKey]);
 
   useEffect(() => {
     if (!isAdminUser) {
-      setDailyActualsByBranch({});
+      setProgressByBranch({});
       return undefined;
     }
 
     let active = true;
+    setLoading(true);
+    setError(null);
+    setProgressByBranch({});
     Promise.all(
       BRANCH_CHOICES.map(async (code) => {
         try {
           const response = await apiFetch(`/api/admin/sales-targets/progress?branchCode=${encodeURIComponent(code)}&month=${encodeURIComponent(month)}`);
-          if (!response.ok) return [code, []];
+          if (!response.ok) return [code, null];
           const data = await response.json();
-          return [code, Array.isArray(data.dailyActuals) ? data.dailyActuals : []];
+          return [code, data];
         } catch {
-          return [code, []];
+          return [code, null];
         }
       }),
     ).then((entries) => {
-      if (active) setDailyActualsByBranch(Object.fromEntries(entries));
+      if (!active) return;
+      const nextProgressByBranch = Object.fromEntries(entries);
+      const availableProgress = Object.values(nextProgressByBranch).find(Boolean) || null;
+      setProgressByBranch(nextProgressByBranch);
+      setProgress(availableProgress);
+      if (!availableProgress) setError("โหลดเป้ายอดขายของสาขาไม่สำเร็จ");
+    }).finally(() => {
+      if (active) setLoading(false);
     });
 
     return () => {
       active = false;
     };
   }, [isAdminUser, month, refreshKey]);
+
+  useEffect(() => {
+    if (!isAdminUser) return;
+    const selectedProgress = progressByBranch[selectedBranch];
+    if (selectedProgress) {
+      setProgress(selectedProgress);
+      setError(null);
+    } else if (Object.keys(progressByBranch).length > 0) {
+      setProgress(null);
+      setError(`โหลดเป้ายอดขายของสาขา ${selectedBranch} ไม่สำเร็จ`);
+    }
+  }, [isAdminUser, progressByBranch, selectedBranch]);
+
+  useEffect(() => {
+    if (!isAdminUser || selectedBranches.includes(selectedBranch)) return;
+    setSelectedBranch(selectedBranches[0] || BRANCH_CHOICES[0]);
+  }, [isAdminUser, selectedBranch, selectedBranches]);
+
+  useEffect(() => {
+    if (!salesTargetTableExpanded) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setSalesTargetTableExpanded(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [salesTargetTableExpanded]);
 
   async function saveTiers(tiers) {
     if (!tiers.length) {
@@ -1574,19 +1616,32 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
     });
   }
 
+  function toggleSelectedBranch(code) {
+    setSelectedBranches((current) => {
+      if (current.includes(code)) {
+        if (current.length === 1) return current;
+        return current.filter((branch) => branch !== code);
+      }
+      return BRANCH_CHOICES.filter((branch) => current.includes(branch) || branch === code);
+    });
+  }
+
   const columns = SALES_TARGET_COLUMN_DEFS.filter((col) => visibleColumns.has(col.key));
+  const branchPickerLabel = selectedBranches.length === BRANCH_CHOICES.length
+    ? "ทุกสาขา"
+    : `สาขา ${selectedBranches.join(", ")}`;
   const adminDailyRows = useMemo(() => {
     if (!isAdminUser) return [];
     const rowsByDate = new Map();
     for (const code of BRANCH_CHOICES) {
-      for (const day of dailyActualsByBranch[code] || []) {
+      for (const day of progressByBranch[code]?.dailyActuals || []) {
         const current = rowsByDate.get(day.date) || { date: day.date, byBranch: {} };
         current.byBranch[code] = Number(day.actual || 0);
         rowsByDate.set(day.date, current);
       }
     }
     return [...rowsByDate.values()].sort((a, b) => b.date.localeCompare(a.date));
-  }, [dailyActualsByBranch, isAdminUser]);
+  }, [isAdminUser, progressByBranch]);
 
   const baseDailyRows = useMemo(
     () => (isAdminUser ? adminDailyRows : (progress?.dailyActuals || []).map((day) => ({ ...day }))),
@@ -1614,6 +1669,76 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   useEffect(() => {
     setDailyPage((current) => Math.min(current, dailyPageCount));
   }, [dailyPageCount]);
+
+  function renderAdminSalesTargetTable({ inModal = false } = {}) {
+    if (columns.length === 0) {
+      return <div className="fp-empty">กรุณาเลือกอย่างน้อย 1 คอลัมน์</div>;
+    }
+
+    return (
+      <div
+        className={`mvt-sales-table-wrap fp-sales-target-tier-wrap fp-sales-target-comparison-wrap${inModal ? " in-modal" : ""}`}
+        onClick={inModal ? undefined : () => setSalesTargetTableExpanded(true)}
+        onKeyDown={inModal ? undefined : (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setSalesTargetTableExpanded(true);
+          }
+        }}
+        role={inModal ? undefined : "button"}
+        tabIndex={inModal ? undefined : 0}
+        title={inModal ? undefined : "คลิกเพื่อดูตารางแบบเต็มหน้าจอ"}
+        aria-label={inModal ? "ตารางเป้ายอดขายแบบเต็มหน้าจอ" : "เปิดตารางเป้ายอดขายแบบเต็มหน้าจอ"}
+      >
+        <table className="mvt-sales-table fp-table fp-sales-target-comparison-table">
+          <thead>
+            <tr>
+              <th rowSpan={2} className="fp-sales-target-tier-sticky">ขั้น</th>
+              {selectedBranches.map((code, branchIndex) => (
+                <th
+                  key={code}
+                  colSpan={columns.length}
+                  className={`fp-sales-target-branch-group fp-sales-target-branch-tone-${branchIndex % 4}`}
+                >
+                  สาขา {code}
+                </th>
+              ))}
+            </tr>
+            <tr>
+              {selectedBranches.flatMap((code, branchIndex) => columns.map((col, columnIndex) => (
+                <th
+                  key={`${code}-${col.key}`}
+                  className={`fp-sales-target-branch-subhead fp-sales-target-branch-tone-${branchIndex % 4}${columnIndex === 0 ? " branch-start" : ""}`}
+                >
+                  {col.label}
+                </th>
+              )))}
+            </tr>
+          </thead>
+          <tbody>
+            {[1, 2, 3].map((tierNumber) => (
+              <tr key={tierNumber}>
+                <td className="fp-sales-target-tier-sticky">{SALES_TARGET_TIER_LABELS[tierNumber]}</td>
+                {selectedBranches.flatMap((code, branchIndex) => {
+                  const tier = progressByBranch[code]?.tiers?.find((item) => item.tier === tierNumber);
+                  return columns.map((col, columnIndex) => (
+                    <td
+                      key={`${code}-${tierNumber}-${col.key}`}
+                      className={`fp-sales-target-branch-cell fp-sales-target-branch-tone-${branchIndex % 4}${columnIndex === 0 ? " branch-start" : ""}`}
+                    >
+                      {col.key === "achieved"
+                        ? <StatusBadge achieved={tier?.achieved} />
+                        : formatCurrency(tier?.[col.key])}
+                    </td>
+                  ));
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
 
   return (
     <section className="fp-section fp-sales-target-section">
@@ -1762,17 +1887,54 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
             <h3 className="fp-section-title">เป้ายอดขาย</h3>
             <div className="fp-sales-target-controls">
               {isAdminUser && (
-                <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}>
-                  {BRANCH_CHOICES.map((code) => (
-                    <option key={code} value={code}>
-                      สาขา {code}
-                    </option>
-                  ))}
-                </select>
+                <div className="fp-sales-target-branch-picker">
+                  <button
+                    type="button"
+                    className="fp-btn-secondary fp-sales-target-branch-picker-button"
+                    onClick={() => {
+                      setBranchPickerOpen((open) => !open);
+                      setColumnPickerOpen(false);
+                    }}
+                    aria-expanded={branchPickerOpen}
+                  >
+                    {branchPickerLabel} ({selectedBranches.length}) ▾
+                  </button>
+                  {branchPickerOpen && (
+                    <div className="fp-sales-target-col-menu fp-sales-target-branch-menu">
+                      <button
+                        type="button"
+                        className="fp-sales-target-branch-select-all"
+                        onClick={() => setSelectedBranches([...BRANCH_CHOICES])}
+                        disabled={selectedBranches.length === BRANCH_CHOICES.length}
+                      >
+                        เลือกทุกสาขา
+                      </button>
+                      {BRANCH_CHOICES.map((code) => (
+                        <label key={code} className="fp-branch-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={selectedBranches.includes(code)}
+                            disabled={selectedBranches.length === 1 && selectedBranches.includes(code)}
+                            onChange={() => toggleSelectedBranch(code)}
+                          />
+                          สาขา {code}
+                        </label>
+                      ))}
+                      <small>ต้องเลือกอย่างน้อย 1 สาขา</small>
+                    </div>
+                  )}
+                </div>
               )}
               <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
               <div className="fp-sales-target-col-picker">
-                <button type="button" className="fp-btn-secondary" onClick={() => setColumnPickerOpen((v) => !v)}>
+                <button
+                  type="button"
+                  className="fp-btn-secondary"
+                  onClick={() => {
+                    setColumnPickerOpen((v) => !v);
+                    setBranchPickerOpen(false);
+                  }}
+                >
                   คอลัมน์ ▾
                 </button>
                 {columnPickerOpen && (
@@ -1793,47 +1955,112 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
             </div>
           </div>
 
-          <div className="fp-sales-target-summary">
-            <span>
-              ยอดขายสะสมเดือนนี้: <strong>{formatCurrency(progress.actualSoFar)}</strong>
-            </span>
-            <span>
-              วันที่ผ่านไป {progress.daysElapsed}/{progress.totalDaysInMonth} วัน (เหลือ {progress.daysRemaining} วัน)
-            </span>
-          </div>
+          {isAdminUser ? (
+            <div className="fp-sales-target-branch-summaries">
+              {selectedBranches.map((code) => {
+                const branchProgress = progressByBranch[code];
+                return (
+                  <article key={code} className="fp-sales-target-branch-summary">
+                    <strong>สาขา {code}</strong>
+                    <span>ยอดขายสะสม {formatCurrency(branchProgress?.actualSoFar)}</span>
+                    <small>
+                      {branchProgress
+                        ? `ผ่านไป ${branchProgress.daysElapsed}/${branchProgress.totalDaysInMonth} วัน · เหลือ ${branchProgress.daysRemaining} วัน`
+                        : "ไม่มีข้อมูล"}
+                    </small>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="fp-sales-target-summary">
+              <span>
+                ยอดขายสะสมเดือนนี้: <strong>{formatCurrency(progress.actualSoFar)}</strong>
+              </span>
+              <span>
+                วันที่ผ่านไป {progress.daysElapsed}/{progress.totalDaysInMonth} วัน (เหลือ {progress.daysRemaining} วัน)
+              </span>
+            </div>
+          )}
 
-          <div className="mvt-sales-table-wrap fp-sales-target-tier-wrap">
-            <table className="mvt-sales-table fp-table">
-              <thead>
-                <tr>
-                  <th>ขั้น</th>
-                  {columns.map((col) => (
-                    <th key={col.key}>{col.label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {progress.tiers.map((tier) => (
-                  <tr key={tier.tier}>
-                    <td>{SALES_TARGET_TIER_LABELS[tier.tier]}</td>
-                    {columns.map((col) => {
-                      if (col.key === "achieved") {
-                        return (
-                          <td key={col.key}>
-                            <StatusBadge achieved={tier.achieved} />
-                          </td>
-                        );
-                      }
-                      return <td key={col.key}>{formatCurrency(tier[col.key])}</td>;
-                    })}
+          {isAdminUser ? (
+            <>
+              <div className="fp-sales-target-table-heading">
+                <span>เปรียบเทียบ {selectedBranches.length} สาขา · เลื่อนแนวนอนเพื่อดูคอลัมน์เพิ่มเติม</span>
+                <button type="button" className="fp-btn-secondary" onClick={() => setSalesTargetTableExpanded(true)}>
+                  ⛶ ดูเต็มจอ
+                </button>
+              </div>
+              {renderAdminSalesTargetTable()}
+            </>
+          ) : (
+            <div className="mvt-sales-table-wrap fp-sales-target-tier-wrap">
+              <table className="mvt-sales-table fp-table">
+                <thead>
+                  <tr>
+                    <th>ขั้น</th>
+                    {columns.map((col) => (
+                      <th key={col.key}>{col.label}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {progress.tiers.map((tier) => (
+                    <tr key={tier.tier}>
+                      <td>{SALES_TARGET_TIER_LABELS[tier.tier]}</td>
+                      {columns.map((col) => {
+                        if (col.key === "achieved") {
+                          return (
+                            <td key={col.key}>
+                              <StatusBadge achieved={tier.achieved} />
+                            </td>
+                          );
+                        }
+                        return <td key={col.key}>{formatCurrency(tier[col.key])}</td>;
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {isAdminUser && (
-            <SalesTargetEditForm tiers={progress.tiers} onSave={saveTiers} saving={saving} saveError={saveError} />
+            <div className="fp-sales-target-admin-edit">
+              <label className="fp-sales-target-edit-branch">
+                <span>สาขาที่กำลังแก้ไขเป้า</span>
+                <select value={selectedBranch} onChange={(event) => setSelectedBranch(event.target.value)}>
+                  {selectedBranches.map((code) => <option key={code} value={code}>สาขา {code}</option>)}
+                </select>
+              </label>
+              <SalesTargetEditForm tiers={progress.tiers} onSave={saveTiers} saving={saving} saveError={saveError} />
+            </div>
+          )}
+
+          {isAdminUser && salesTargetTableExpanded && (
+            <div className="fp-table-modal-overlay" onClick={() => setSalesTargetTableExpanded(false)}>
+              <div
+                className="fp-table-modal fp-sales-target-table-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="fp-sales-target-modal-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  className="fp-table-modal-close"
+                  onClick={() => setSalesTargetTableExpanded(false)}
+                  aria-label="ปิด"
+                >
+                  ✕
+                </button>
+                <div className="fp-sales-target-modal-header">
+                  <h3 id="fp-sales-target-modal-title" className="fp-section-title">เป้ายอดขายแบบเต็มหน้าจอ</h3>
+                  <span>{branchPickerLabel} · {month}</span>
+                </div>
+                {renderAdminSalesTargetTable({ inModal: true })}
+              </div>
+            </div>
           )}
         </>
       )}
