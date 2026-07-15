@@ -8125,12 +8125,22 @@ input[type="radio"] {
 .fp-sales-target-tier-header { margin-top: 28px; padding-top: 18px; border-top: 1px solid rgba(148, 163, 184, 0.35); }
 [data-theme="dark"] .fp-sales-target-tier-header { border-top-color: rgba(148, 163, 184, 0.22); }
 
-.fp-sales-target-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fp-sales-target-controls { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
 .fp-sales-target-controls select, .fp-sales-target-controls input[type="month"] {
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   padding: 6px 10px;
   font-size: 0.85rem;
+}
+
+.fp-sales-target-controls input[type="month"] {
+  flex: 0 0 148px;
+  width: 148px;
+  min-width: 148px;
+}
+
+@media (max-width: 600px) {
+  .fp-sales-target-controls { flex-wrap: wrap; }
 }
 
 .fp-sales-target-col-picker { position: relative; }
@@ -8424,7 +8434,7 @@ input[type="radio"] {
 .fp-sales-target-branch-picker { position: relative; }
 
 .fp-sales-target-branch-picker-button {
-  min-width: 170px;
+  min-width: 150px;
   max-width: min(300px, 70vw);
   overflow: hidden;
   text-overflow: ellipsis;
