@@ -942,7 +942,7 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBr
         return (
           <section
             key={type}
-            className="fp-section fp-section-clickable"
+            className={`fp-section fp-section-clickable fp-focus-section fp-focus-section--${type}`}
             onClick={() => setExpandedType(type)}
             title="คลิกเพื่อดูแบบเต็มหน้าจอ"
           >
@@ -961,7 +961,10 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBr
 
       {expandedType && (
         <div className="fp-table-modal-overlay" onClick={() => setExpandedType(null)}>
-          <div className="fp-table-modal" onClick={(e) => e.stopPropagation()}>
+          <div
+            className={`fp-table-modal fp-focus-table-modal fp-focus-section--${expandedType}`}
+            onClick={(e) => e.stopPropagation()}
+          >
             <button type="button" className="fp-table-modal-close" onClick={() => setExpandedType(null)} aria-label="ปิด">
               ✕
             </button>
