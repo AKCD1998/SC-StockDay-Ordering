@@ -629,15 +629,19 @@ function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete, restrictT
 
   return (
     <div className="mvt-sales-table-wrap">
-      <table className="mvt-sales-table fp-table">
+      <table className="mvt-sales-table fp-table fp-branch-matrix">
         <thead>
           <tr>
             <th rowSpan={2}>รหัสสินค้า</th>
             <th className="fp-col-wide" rowSpan={2}>
               สินค้า
             </th>
-            {branchCodes.map((code) => (
-              <th key={code} colSpan={2}>
+            {branchCodes.map((code, branchIndex) => (
+              <th
+                key={code}
+                colSpan={2}
+                className={`fp-branch-group fp-branch-group-${branchIndex % 2 === 0 ? "a" : "b"}`}
+              >
                 สาขา {code}
               </th>
             ))}
@@ -645,10 +649,10 @@ function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete, restrictT
             {isAdminUser && <th rowSpan={2}>จัดการ</th>}
           </tr>
           <tr>
-            {branchCodes.map((code) => (
+            {branchCodes.map((code, branchIndex) => (
               <Fragment key={code}>
-                <th>เป้า</th>
-                <th>ขาย</th>
+                <th className={`fp-target-col fp-branch-group-${branchIndex % 2 === 0 ? "a" : "b"}`}>เป้า</th>
+                <th className={`fp-sold-col fp-branch-group-${branchIndex % 2 === 0 ? "a" : "b"}`}>ขาย</th>
               </Fragment>
             ))}
           </tr>
@@ -658,15 +662,19 @@ function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete, restrictT
             <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
               <td>{row.productCode}</td>
               <td className="fp-col-wide">{row.productName || "-"}{isAdminUser && <PublicationBadge row={row} />}</td>
-              {branchCodes.map((code) => {
+              {branchCodes.map((code, branchIndex) => {
                 const target = row.branchTargetsEffective?.[code];
                 const sold = row.soldByBranch?.[code] || 0;
                 const pass = row.branchAchieved ? row.branchAchieved[code] : null;
                 const cls = pass === null || pass === undefined ? "" : pass ? "fp-cell-ok" : "fp-cell-fail";
                 return (
                   <Fragment key={code}>
-                    <td>{target != null ? formatNumber(target) : "-"}</td>
-                    <td className={cls}>{formatNumber(sold)}</td>
+                    <td className={`fp-target-col fp-branch-group-${branchIndex % 2 === 0 ? "a" : "b"}`}>
+                      {target != null ? formatNumber(target) : "-"}
+                    </td>
+                    <td className={`fp-sold-col fp-branch-group-${branchIndex % 2 === 0 ? "a" : "b"} ${cls}`}>
+                      {formatNumber(sold)}
+                    </td>
                   </Fragment>
                 );
               })}
