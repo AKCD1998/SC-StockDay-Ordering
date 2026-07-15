@@ -1610,7 +1610,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
             <div className="fp-sales-target-daily">
               <button
                 type="button"
-                className="fp-btn-link"
+                className="fp-btn-link fp-sales-daily-toggle"
                 onClick={() => setDailyOpen((v) => !v)}
               >
                 {dailyOpen ? "▾" : "▸"} ยอดขายรายวัน ({dailyFilterActive ? `${displayedDailyCount}/${baseDailyRows.length}` : displayedDailyCount} วัน)
