@@ -306,10 +306,14 @@ in the session.
   old, so the "check for stale-like-000" condition didn't trigger). Pulled
   fast-forward `ef33ee2` → `e0fb718` (41 files, +10,200/-328 lines, 8 days
   of work). No sync test run (already validated earlier today).
-- **001/003/004**: not yet done — each is a genuinely separate machine this
-  session cannot reach directly (only via a session with real access
-  running on that specific machine, same pattern used all day). Prompts
-  prepared with per-branch paths; awaiting execution.
+- **001/003**: not yet done — awaiting execution on those machines.
+- **004 (SERVER004)**: DONE. Gate check passed (hostname=SERVER004, branch
+  code=004, clean tree, HEAD `143ee25` from 2026-07-14 16:02). Pulled
+  fast-forward `143ee25` → `eb8de2e` (17 files, includes
+  `ADAPOS_SYNC_TRANSFER_CHUNK_DOCS` newly added to `.env.example`). Real
+  `.env` was missing that var — added `ADAPOS_SYNC_TRANSFER_CHUNK_DOCS=30`
+  (same default already validated on 003 earlier today). No sync test run
+  (already validated earlier today).
 
 ## Recommended next step
 
