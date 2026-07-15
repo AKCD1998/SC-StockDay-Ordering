@@ -1405,6 +1405,11 @@ function formatDailyDateLabel(iso) {
   return `${day}/${month} (${weekday})`;
 }
 
+function dailyWeekdayClass(iso) {
+  const weekday = new Date(`${iso}T00:00:00Z`).getUTCDay();
+  return `fp-weekday-${weekday}`;
+}
+
 // Admin-only inline form for setting the 3 tier targets for the currently
 // selected branch/month. Kept separate from the read-only progress table so
 // staff (who never see this) get a strictly smaller component tree.
@@ -1714,14 +1719,14 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
                         const total = BRANCH_CHOICES.reduce((sum, code) => sum + Number(day.byBranch[code] || 0), 0);
                         return (
                           <tr key={day.date}>
-                            <td>{formatDailyDateLabel(day.date)}</td>
+                            <td className={`fp-daily-date-cell ${dailyWeekdayClass(day.date)}`}>{formatDailyDateLabel(day.date)}</td>
                             {BRANCH_CHOICES.map((code) => <td key={code}>{formatCurrency(day.byBranch[code] || 0)}</td>)}
                             <td className="fp-daily-total-col">{formatCurrency(total)}</td>
                           </tr>
                         );
                       }) : filteredDailyRows.map((day) => (
                           <tr key={day.date}>
-                            <td>{formatDailyDateLabel(day.date)}</td>
+                            <td className={`fp-daily-date-cell ${dailyWeekdayClass(day.date)}`}>{formatDailyDateLabel(day.date)}</td>
                             <td>{formatCurrency(day.actual)}</td>
                           </tr>
                         ))}

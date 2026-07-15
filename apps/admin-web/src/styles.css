@@ -8194,6 +8194,29 @@ input[type="radio"] {
   color: #e5f0ff;
 }
 
+.fp-sales-target-daily-wrap td.fp-daily-date-cell {
+  border-left: 4px solid transparent;
+  font-weight: 650;
+}
+
+/* Subtle Thai weekday colours: Sunday through Saturday. The tint stays in
+   the date cell only so financial values remain calm and easy to scan. */
+.fp-sales-target-daily-wrap td.fp-weekday-0 { background: #fff3f5; border-left-color: #d85b70; color: #8f2940; }
+.fp-sales-target-daily-wrap td.fp-weekday-1 { background: #fffbea; border-left-color: #c9a634; color: #715b15; }
+.fp-sales-target-daily-wrap td.fp-weekday-2 { background: #fdf2f8; border-left-color: #cf6a9a; color: #8c315d; }
+.fp-sales-target-daily-wrap td.fp-weekday-3 { background: #f0f8f2; border-left-color: #5a9b6b; color: #2f6b40; }
+.fp-sales-target-daily-wrap td.fp-weekday-4 { background: #fff7ed; border-left-color: #d78343; color: #8b4b1e; }
+.fp-sales-target-daily-wrap td.fp-weekday-5 { background: #eff6fc; border-left-color: #5c8fbd; color: #315f88; }
+.fp-sales-target-daily-wrap td.fp-weekday-6 { background: #f5f2fa; border-left-color: #8267ad; color: #5b467d; }
+
+[data-theme="dark"] .fp-sales-target-daily-wrap td.fp-weekday-0 { background: #291b22; border-left-color: #a94f63; color: #efb4c0; }
+[data-theme="dark"] .fp-sales-target-daily-wrap td.fp-weekday-1 { background: #292617; border-left-color: #9b8535; color: #dfcf91; }
+[data-theme="dark"] .fp-sales-target-daily-wrap td.fp-weekday-2 { background: #281c28; border-left-color: #a6567e; color: #e2acc7; }
+[data-theme="dark"] .fp-sales-target-daily-wrap td.fp-weekday-3 { background: #19271f; border-left-color: #4c8560; color: #a9d5b7; }
+[data-theme="dark"] .fp-sales-target-daily-wrap td.fp-weekday-4 { background: #2b2119; border-left-color: #a66b3c; color: #e7b68e; }
+[data-theme="dark"] .fp-sales-target-daily-wrap td.fp-weekday-5 { background: #182532; border-left-color: #4f7da7; color: #abc9e5; }
+[data-theme="dark"] .fp-sales-target-daily-wrap td.fp-weekday-6 { background: #211d2d; border-left-color: #70599b; color: #c7b7e2; }
+
 .fp-daily-date-header { position: relative; overflow: visible; }
 
 .fp-daily-date-filter-button {
