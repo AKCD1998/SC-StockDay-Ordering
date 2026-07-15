@@ -287,17 +287,20 @@ export function toSalesDetailPayload(headerRows, lineRows) {
   };
 }
 
-// Splits an already-built sales_detail payload into chunks of whole documents
-// (a header + all of its lines always stay in the same chunk — never split a
-// document across two requests). Mirrors the products batch-size mitigation:
-// /api/sync/ada/sales wraps a whole request in one DB transaction with
-// per-record queries, so a branch with a big sales day can build a payload
-// that takes longer to commit than the client's request timeout. Chunking by
-// document count bounds each request/transaction to a predictable size.
-export function chunkSalesDetailPayload(payload, maxDocsPerChunk) {
-  const { sourceSystem, sourceSyncedAt, headers, lines } = payload;
+// Splits an already-built { headers, lines, ...rest } payload into chunks of
+// whole documents (a header + all of its lines always stay in the same
+// chunk — never split a document across two requests). Any other fields on
+// the payload (e.g. sales_detail's sourceSystem/sourceSyncedAt) are copied
+// onto every chunk unchanged. Generic across every doc-shaped sync endpoint
+// (sales_detail, transfers, ...) — they all share the same architecture:
+// the backend wraps a whole request in one DB transaction with per-record
+// queries, so a branch with a big day can build a payload that takes longer
+// to commit than the client's request timeout. Chunking by document count
+// bounds each request/transaction to a predictable size.
+export function chunkPayloadByDoc(payload, maxDocsPerChunk) {
+  const { headers, lines, ...rest } = payload;
   if (headers.length === 0) {
-    return lines.length > 0 ? [{ sourceSystem, sourceSyncedAt, headers: [], lines }] : [];
+    return lines.length > 0 ? [{ ...rest, headers: [], lines }] : [];
   }
 
   const linesByDoc = new Map();
@@ -311,7 +314,7 @@ export function chunkSalesDetailPayload(payload, maxDocsPerChunk) {
   for (let i = 0; i < headers.length; i += maxDocsPerChunk) {
     const headerChunk = headers.slice(i, i + maxDocsPerChunk);
     const lineChunk = headerChunk.flatMap((h) => linesByDoc.get(h.docNo) ?? []);
-    chunks.push({ sourceSystem, sourceSyncedAt, headers: headerChunk, lines: lineChunk });
+    chunks.push({ ...rest, headers: headerChunk, lines: lineChunk });
   }
   return chunks;
 }

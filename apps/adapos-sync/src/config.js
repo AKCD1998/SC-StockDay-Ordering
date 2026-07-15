@@ -78,6 +78,13 @@ export const syncConfig = {
   // can't build a request that outruns the client timeout before the backend
   // transaction commits.
   salesDetailChunkDocs: parsePositiveInteger(process.env.ADAPOS_SYNC_SALES_DETAIL_CHUNK_DOCS, 150),
+  // /api/sync/ada/transfers has the identical one-transaction-per-request
+  // shape (found 2026-07-15 after sales_detail's chunking fix let branch 003
+  // progress further and hit this as the next bottleneck). Transfer docs
+  // run far more lines/header than sales (observed ~10.5 vs ~2), so this
+  // gets its own, smaller default rather than reusing salesDetailChunkDocs —
+  // 150 transfer headers can still mean 1500+ lines in one transaction.
+  transferChunkDocs: parsePositiveInteger(process.env.ADAPOS_SYNC_TRANSFER_CHUNK_DOCS, 30),
   // Explicit backfill date range (overrides lookback when both are set).
   // Pass --date-from=YYYY-MM-DD --date-to=YYYY-MM-DD to backfill a specific window.
   dateFrom: cliDateFrom || process.env.SYNC_DATE_FROM || null,

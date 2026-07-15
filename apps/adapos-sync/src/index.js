@@ -20,7 +20,7 @@ import {
   getBranchPriceOverrideRows,
 } from "./queries.js";
 import { postJson, getJson } from "./client.js";
-import { toProductRecords, toSalesRecords, toSalesDetailPayload, chunkSalesDetailPayload, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toStockSnapshotRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
+import { toProductRecords, toSalesRecords, toSalesDetailPayload, chunkPayloadByDoc, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toStockSnapshotRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
 
 const PERIOD_DAYS = 30;
 
@@ -279,7 +279,7 @@ async function runOnce() {
         const hCount = data.sales_detail_headers?.length ?? 0;
         const lCount = data.sales_detail_lines?.length ?? 0;
         const payload = toSalesDetailPayload(data.sales_detail_headers ?? [], data.sales_detail_lines ?? []);
-        const chunks = chunkSalesDetailPayload(payload, syncConfig.salesDetailChunkDocs);
+        const chunks = chunkPayloadByDoc(payload, syncConfig.salesDetailChunkDocs);
         console.log(`Posting ${hCount} detailed sales headers, ${lCount} lines in ${chunks.length} chunk(s) of up to ${syncConfig.salesDetailChunkDocs} docs...`);
         let hAccepted = 0;
         let lAccepted = 0;
@@ -297,13 +297,20 @@ async function runOnce() {
       if (data.transfers?.length || data.transfer_lines?.length) {
         const hCount = data.transfers?.length ?? 0;
         const lCount = data.transfer_lines?.length ?? 0;
-        console.log(`Posting ${hCount} transfer headers, ${lCount} lines...`);
-        const result = await postJson(
-          `${syncConfig.apiBaseUrl}/api/sync/ada/transfers`,
-          toTransferPayload(data.transfers ?? [], data.transfer_lines ?? []),
-        );
-        const hAccepted = result.acceptedHeaders ?? result.headersAccepted ?? 0;
-        const lAccepted = result.acceptedLines   ?? result.linesAccepted   ?? 0;
+        const transferPayload = toTransferPayload(data.transfers ?? [], data.transfer_lines ?? []);
+        const transferChunks = chunkPayloadByDoc(transferPayload, syncConfig.transferChunkDocs);
+        console.log(`Posting ${hCount} transfer headers, ${lCount} lines in ${transferChunks.length} chunk(s) of up to ${syncConfig.transferChunkDocs} docs...`);
+        let hAccepted = 0;
+        let lAccepted = 0;
+        for (const [chunkIndex, chunk] of transferChunks.entries()) {
+          // eslint-disable-next-line no-await-in-loop
+          const result = await postJson(`${syncConfig.apiBaseUrl}/api/sync/ada/transfers`, chunk);
+          const chunkHAccepted = result.acceptedHeaders ?? result.headersAccepted ?? 0;
+          const chunkLAccepted = result.acceptedLines   ?? result.linesAccepted   ?? 0;
+          hAccepted += chunkHAccepted;
+          lAccepted += chunkLAccepted;
+          console.log(`  chunk ${chunkIndex + 1}/${transferChunks.length}: ${chunkHAccepted} headers, ${chunkLAccepted} lines accepted`);
+        }
         console.log(`  transfers: ${hAccepted} headers, ${lAccepted} lines accepted`);
         totalSent += hAccepted + lAccepted;
       }
