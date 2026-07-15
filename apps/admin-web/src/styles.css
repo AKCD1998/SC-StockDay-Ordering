@@ -8173,6 +8173,7 @@ input[type="radio"] {
 
 .fp-sales-target-daily { margin-bottom: 0; }
 .fp-sales-target-daily-wrap { max-height: 260px; overflow-y: auto; margin-top: 6px; }
+.fp-sales-target-daily-wrap.filter-open { max-height: 520px; }
 
 .fp-sales-target-daily-wrap th:not(:first-child),
 .fp-sales-target-daily-wrap td:not(:first-child) {
@@ -8192,6 +8193,69 @@ input[type="radio"] {
   background: #1b2b3d;
   color: #e5f0ff;
 }
+
+.fp-daily-date-header { position: relative; overflow: visible; }
+
+.fp-daily-date-filter-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 7px;
+  margin: -4px -7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fp-daily-date-filter-button:hover,
+.fp-daily-date-filter-button.active { background: rgba(42, 52, 255, 0.12); color: #2a34ff; }
+
+.fp-daily-date-filter-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  width: 230px;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: #334155;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.2);
+  text-align: left;
+}
+
+.fp-daily-date-filter-menu > button {
+  display: block;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fp-daily-date-filter-menu > button:hover,
+.fp-daily-date-filter-menu > button.selected { background: #eef2ff; color: #2a34ff; }
+.fp-daily-filter-actions { display: flex; gap: 6px; padding: 9px 0; margin-top: 6px; border-top: 1px solid #e2e8f0; }
+.fp-daily-filter-actions button { flex: 1; border: 0; background: transparent; color: #2a34ff; font-size: 0.78rem; cursor: pointer; }
+.fp-daily-filter-options { max-height: 190px; overflow-y: auto; padding: 4px 0; border-block: 1px solid #e2e8f0; }
+.fp-daily-filter-options label { display: flex; align-items: center; gap: 8px; padding: 5px 6px; font-size: 0.82rem; cursor: pointer; }
+.fp-daily-filter-options label:hover { background: #f8fafc; }
+.fp-daily-date-filter-menu > button.fp-daily-filter-done { margin-top: 8px; background: #2a34ff; color: #fff; text-align: center; }
+
+[data-theme="dark"] .fp-daily-date-filter-menu { background: #111d2b; border-color: #33465c; color: #e2e8f0; }
+[data-theme="dark"] .fp-daily-date-filter-menu > button:hover,
+[data-theme="dark"] .fp-daily-date-filter-menu > button.selected { background: #1b2d43; color: #aeb8ff; }
+[data-theme="dark"] .fp-daily-filter-actions,
+[data-theme="dark"] .fp-daily-filter-options { border-color: #2b3d52; }
+[data-theme="dark"] .fp-daily-filter-options label:hover { background: #172638; }
 
 .fp-sales-target-tier-wrap {
   margin-top: 28px;

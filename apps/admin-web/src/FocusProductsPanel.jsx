@@ -1465,12 +1465,20 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   const [columnPickerOpen, setColumnPickerOpen] = useState(false);
   const [dailyOpen, setDailyOpen] = useState(true);
   const [dailyActualsByBranch, setDailyActualsByBranch] = useState({});
+  const [dailyDateFilterOpen, setDailyDateFilterOpen] = useState(false);
+  const [dailyDateSort, setDailyDateSort] = useState("desc");
+  const [excludedDailyDates, setExcludedDailyDates] = useState(() => new Set());
 
   const activeBranch = isAdminUser ? selectedBranch : branchCode;
 
   useEffect(() => {
     localStorage.setItem(SALES_TARGET_COLUMN_VISIBILITY_KEY, JSON.stringify([...visibleColumns]));
   }, [visibleColumns]);
+
+  useEffect(() => {
+    setExcludedDailyDates(new Set());
+    setDailyDateFilterOpen(false);
+  }, [month]);
 
   useEffect(() => {
     if (!activeBranch) {
@@ -1571,7 +1579,19 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
     return [...rowsByDate.values()].sort((a, b) => b.date.localeCompare(a.date));
   }, [dailyActualsByBranch, isAdminUser]);
 
-  const displayedDailyCount = isAdminUser ? adminDailyRows.length : (progress?.dailyActuals?.length || 0);
+  const baseDailyRows = useMemo(
+    () => (isAdminUser ? adminDailyRows : (progress?.dailyActuals || []).map((day) => ({ ...day }))),
+    [adminDailyRows, isAdminUser, progress?.dailyActuals],
+  );
+  const availableDailyDates = useMemo(() => baseDailyRows.map((day) => day.date).sort((a, b) => b.localeCompare(a)), [baseDailyRows]);
+  const filteredDailyRows = useMemo(
+    () => baseDailyRows
+      .filter((day) => !excludedDailyDates.has(day.date))
+      .sort((a, b) => dailyDateSort === "asc" ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date)),
+    [baseDailyRows, dailyDateSort, excludedDailyDates],
+  );
+  const displayedDailyCount = filteredDailyRows.length;
+  const dailyFilterActive = excludedDailyDates.size > 0;
 
   return (
     <section className="fp-section fp-sales-target-section">
@@ -1625,21 +1645,62 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
             </span>
           </div>
 
-          {displayedDailyCount > 0 && (
+          {baseDailyRows.length > 0 && (
             <div className="fp-sales-target-daily">
               <button
                 type="button"
                 className="fp-btn-link"
                 onClick={() => setDailyOpen((v) => !v)}
               >
-                {dailyOpen ? "▾" : "▸"} ยอดขายรายวัน ({displayedDailyCount} วัน)
+                {dailyOpen ? "▾" : "▸"} ยอดขายรายวัน ({dailyFilterActive ? `${displayedDailyCount}/${baseDailyRows.length}` : displayedDailyCount} วัน)
               </button>
               {dailyOpen && (
-                <div className="mvt-sales-table-wrap fp-sales-target-daily-wrap">
+                <div className={`mvt-sales-table-wrap fp-sales-target-daily-wrap${dailyDateFilterOpen ? " filter-open" : ""}`}>
                   <table className="mvt-sales-table fp-table">
                     <thead>
                       <tr>
-                        <th>วันที่</th>
+                        <th className="fp-daily-date-header">
+                          <button
+                            type="button"
+                            className={`fp-daily-date-filter-button${dailyFilterActive ? " active" : ""}`}
+                            onClick={() => setDailyDateFilterOpen((open) => !open)}
+                            aria-expanded={dailyDateFilterOpen}
+                          >
+                            วันที่ <span aria-hidden="true">▾</span>
+                          </button>
+                          {dailyDateFilterOpen && (
+                            <div className="fp-daily-date-filter-menu">
+                              <button type="button" onClick={() => setDailyDateSort("desc")} className={dailyDateSort === "desc" ? "selected" : ""}>
+                                เรียงใหม่ → เก่า
+                              </button>
+                              <button type="button" onClick={() => setDailyDateSort("asc")} className={dailyDateSort === "asc" ? "selected" : ""}>
+                                เรียงเก่า → ใหม่
+                              </button>
+                              <div className="fp-daily-filter-actions">
+                                <button type="button" onClick={() => setExcludedDailyDates(new Set())}>เลือกทั้งหมด</button>
+                                <button type="button" onClick={() => setExcludedDailyDates(new Set(availableDailyDates))}>ล้างทั้งหมด</button>
+                              </div>
+                              <div className="fp-daily-filter-options">
+                                {availableDailyDates.map((date) => (
+                                  <label key={date}>
+                                    <input
+                                      type="checkbox"
+                                      checked={!excludedDailyDates.has(date)}
+                                      onChange={() => setExcludedDailyDates((current) => {
+                                        const next = new Set(current);
+                                        if (next.has(date)) next.delete(date);
+                                        else next.add(date);
+                                        return next;
+                                      })}
+                                    />
+                                    {formatDailyDateLabel(date)}
+                                  </label>
+                                ))}
+                              </div>
+                              <button type="button" className="fp-daily-filter-done" onClick={() => setDailyDateFilterOpen(false)}>ตกลง</button>
+                            </div>
+                          )}
+                        </th>
                         {isAdminUser ? (
                           <>
                             {BRANCH_CHOICES.map((code) => <th key={code}>สาขา {code}</th>)}
@@ -1649,7 +1710,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {isAdminUser ? adminDailyRows.map((day) => {
+                      {isAdminUser ? filteredDailyRows.map((day) => {
                         const total = BRANCH_CHOICES.reduce((sum, code) => sum + Number(day.byBranch[code] || 0), 0);
                         return (
                           <tr key={day.date}>
@@ -1658,7 +1719,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
                             <td className="fp-daily-total-col">{formatCurrency(total)}</td>
                           </tr>
                         );
-                      }) : [...progress.dailyActuals].reverse().map((day) => (
+                      }) : filteredDailyRows.map((day) => (
                           <tr key={day.date}>
                             <td>{formatDailyDateLabel(day.date)}</td>
                             <td>{formatCurrency(day.actual)}</td>
