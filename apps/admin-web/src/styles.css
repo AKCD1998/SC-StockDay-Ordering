@@ -7872,6 +7872,19 @@ input[type="radio"] {
 [data-theme="dark"] .fp-branch-matrix td.fp-sold-col.fp-cell-ok { color: #6ee7a0; }
 [data-theme="dark"] .fp-branch-matrix td.fp-sold-col.fp-cell-fail { color: #fda29b; }
 
+.fp-branch-matrix .fp-total-target-col,
+.fp-branch-matrix .fp-total-sold-col {
+  text-align: center;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+  border-left: 2px solid #7f91a8;
+}
+
+.fp-branch-matrix .fp-total-target-col { background: #eef2f7; color: #334155; font-weight: 700; }
+.fp-branch-matrix .fp-total-sold-col { background: #dfe8f3; color: #172554; font-weight: 800; }
+[data-theme="dark"] .fp-branch-matrix .fp-total-target-col { background: #192536; color: #c0cede; border-left-color: #53677f; }
+[data-theme="dark"] .fp-branch-matrix .fp-total-sold-col { background: #22344a; color: #f0f6ff; border-left-color: #53677f; }
+
 .fp-inactive-row { opacity: 0.5; }
 
 .fp-branch-chips { display: flex; flex-wrap: wrap; gap: 4px; max-width: 260px; }

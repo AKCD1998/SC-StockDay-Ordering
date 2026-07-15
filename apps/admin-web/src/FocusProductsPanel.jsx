@@ -766,22 +766,56 @@ function GroupManagerFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
         </button>
       </div>
 
-      <table className="mvt-sales-table fp-table fp-excel-table">
+      <table className={`mvt-sales-table fp-table fp-excel-table${activeBranch === "all" ? " fp-branch-matrix" : ""}`}>
         <thead>
           <tr className="fp-excel-banner-row">
-            <th colSpan={5 + (isAdminUser ? 1 : 0)} className="fp-excel-banner">
+            <th
+              colSpan={activeBranch === "all" ? 6 + (branchCodes.length * 2) + (isAdminUser ? 1 : 0) : 6 + (isAdminUser ? 1 : 0)}
+              className="fp-excel-banner"
+            >
               สินค้าโฟกัส ผู้จัดการกลุ่ม {activeBranch === "all" ? "ทุกสาขา" : `สาขา ${activeBranch}`} เดือน {monthLabel}
             </th>
           </tr>
-          <tr>
-            <th>ลำดับ</th>
-            <th>รหัสสินค้า</th>
-            <th className="fp-col-wide">ชื่อสินค้า</th>
-            <th>เป้าสินค้า {activeBranch === "all" ? "รวม" : activeBranch}</th>
-            <th>ยอดล่าสุด</th>
-            <th>สถานะ</th>
-            {isAdminUser && <th>จัดการ</th>}
-          </tr>
+          {activeBranch === "all" ? (
+            <>
+              <tr>
+                <th rowSpan={2}>ลำดับ</th>
+                <th rowSpan={2}>รหัสสินค้า</th>
+                <th className="fp-col-wide" rowSpan={2}>ชื่อสินค้า</th>
+                {branchCodes.map((code, branchIndex) => (
+                  <th
+                    key={code}
+                    colSpan={2}
+                    className={`fp-branch-group fp-branch-group-${branchIndex % 2 === 0 ? "a" : "b"}`}
+                  >
+                    สาขา {code}
+                  </th>
+                ))}
+                <th rowSpan={2} className="fp-total-target-col">เป้ารวม</th>
+                <th rowSpan={2} className="fp-total-sold-col">ขายรวม</th>
+                <th rowSpan={2}>สถานะ</th>
+                {isAdminUser && <th rowSpan={2}>จัดการ</th>}
+              </tr>
+              <tr>
+                {branchCodes.map((code, branchIndex) => (
+                  <Fragment key={code}>
+                    <th className={`fp-target-col fp-branch-group-${branchIndex % 2 === 0 ? "a" : "b"}`}>เป้า</th>
+                    <th className={`fp-sold-col fp-branch-group-${branchIndex % 2 === 0 ? "a" : "b"}`}>ขาย</th>
+                  </Fragment>
+                ))}
+              </tr>
+            </>
+          ) : (
+            <tr>
+              <th>ลำดับ</th>
+              <th>รหัสสินค้า</th>
+              <th className="fp-col-wide">ชื่อสินค้า</th>
+              <th>เป้าสินค้า {activeBranch}</th>
+              <th>ยอดล่าสุด</th>
+              <th>สถานะ</th>
+              {isAdminUser && <th>จัดการ</th>}
+            </tr>
+          )}
         </thead>
         <tbody>
           {rows.map((row, index) => {
@@ -803,8 +837,24 @@ function GroupManagerFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
                 <td>{index + 1}</td>
                 <td>{row.productCode}</td>
                 <td className="fp-col-wide">{row.productName || "-"}{isAdminUser && <PublicationBadge row={row} />}</td>
-                <td>{target != null ? formatNumber(target) : "-"}</td>
-                <td>{formatNumber(sold)}</td>
+                {activeBranch === "all" ? branchCodes.map((code, branchIndex) => {
+                  const branchTarget = row.branchTargetsEffective?.[code];
+                  const branchSold = row.soldByBranch?.[code] || 0;
+                  const branchPass = row.branchAchieved ? row.branchAchieved[code] : null;
+                  const branchClass = branchPass === null || branchPass === undefined ? "" : branchPass ? "fp-cell-ok" : "fp-cell-fail";
+                  return (
+                    <Fragment key={code}>
+                      <td className={`fp-target-col fp-branch-group-${branchIndex % 2 === 0 ? "a" : "b"}`}>
+                        {branchTarget != null ? formatNumber(branchTarget) : "-"}
+                      </td>
+                      <td className={`fp-sold-col fp-branch-group-${branchIndex % 2 === 0 ? "a" : "b"} ${branchClass}`}>
+                        {formatNumber(branchSold)}
+                      </td>
+                    </Fragment>
+                  );
+                }) : null}
+                <td className={activeBranch === "all" ? "fp-total-target-col" : ""}>{target != null ? formatNumber(target) : "-"}</td>
+                <td className={activeBranch === "all" ? "fp-total-sold-col" : ""}>{formatNumber(sold)}</td>
                 <td>
                   <StatusBadge achieved={achieved} />
                   {row.isFrozen && (
