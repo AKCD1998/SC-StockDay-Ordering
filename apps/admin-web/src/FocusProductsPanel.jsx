@@ -1518,23 +1518,36 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
     }
 
     let active = true;
-    Promise.all(
-      BRANCH_CHOICES.map(async (code) => {
+    const controller = new AbortController();
+    setDailyActualsByBranch({});
+
+    async function loadBranchesSequentially() {
+      const entries = {};
+      for (const code of BRANCH_CHOICES) {
+        if (!active) return;
         try {
-          const response = await apiFetch(`/api/admin/sales-targets/progress?branchCode=${encodeURIComponent(code)}&month=${encodeURIComponent(month)}`);
-          if (!response.ok) return [code, []];
-          const data = await response.json();
-          return [code, Array.isArray(data.dailyActuals) ? data.dailyActuals : []];
+          const response = await apiFetch(
+            `/api/admin/sales-targets/progress?branchCode=${encodeURIComponent(code)}&month=${encodeURIComponent(month)}`,
+            { signal: controller.signal },
+          );
+          if (response.ok) {
+            const data = await response.json();
+            entries[code] = Array.isArray(data.dailyActuals) ? data.dailyActuals : [];
+          } else {
+            entries[code] = [];
+          }
         } catch {
-          return [code, []];
+          entries[code] = [];
         }
-      }),
-    ).then((entries) => {
-      if (active) setDailyActualsByBranch(Object.fromEntries(entries));
-    });
+        if (active) setDailyActualsByBranch({ ...entries });
+      }
+    }
+
+    loadBranchesSequentially();
 
     return () => {
       active = false;
+      controller.abort();
     };
   }, [isAdminUser, month, refreshKey]);
 
