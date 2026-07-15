@@ -460,6 +460,32 @@ the 365-day mark, ~10 months out.
 longer depend on history-table size (current-stock table), and the
 history table itself no longer grows without bound (retention pruning).
 
+## 2026-07-15 ~18:15 ICT — CP4/CP5 sequencing decision (operator, not urgent)
+
+Operator is a solo developer juggling multiple projects — deliberately
+recorded here so this reasoning isn't lost between sessions and doesn't
+need re-litigating later.
+
+- **CP4** (async ingestion, queue+worker): stays gated on tonight's
+  ~19:20 ICT sync window — the first real peak-window observation of
+  set-based upsert (`bd64f60`) running alone, isolated from any other new
+  variable. If 001/003/004/005 still fail the same "DB CPU saturated"
+  way tonight, CP4 becomes necessary just to stabilize the **current 5
+  branches** — independent of any branch-count expansion. Decide
+  tomorrow based on actual results, not before.
+- **CP5** (load-testing ladder, 5→1000 synthetic branches, to get a real
+  answer to "how many branches can this handle"): explicitly **not
+  urgent**. No near-term plan to add branches. Operator wants this
+  tracked so it isn't forgotten, not started now. Reasonable trigger to
+  revisit: when a concrete branch-count expansion is actually being
+  planned, not on a calendar date.
+- Read-side (admin-web dashboard) capacity is a separate, still-open
+  question from either of the above — today's stock-day fix removed one
+  known crash risk, but the system as a whole has never been load-tested
+  for concurrent dashboard users, and the known-slow
+  movement-analytics query (see prior entry) is still unaddressed. Not
+  gated on CP4/CP5, would need its own pass if it ever becomes urgent.
+
 ## Recommended next step
 
 CP0 is close enough to complete that starting CP1 work which doesn't depend
