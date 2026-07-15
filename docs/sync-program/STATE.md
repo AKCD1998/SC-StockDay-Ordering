@@ -306,7 +306,16 @@ in the session.
   old, so the "check for stale-like-000" condition didn't trigger). Pulled
   fast-forward `ef33ee2` → `e0fb718` (41 files, +10,200/-328 lines, 8 days
   of work). No sync test run (already validated earlier today).
-- **001/003**: not yet done — awaiting execution on those machines.
+- **001 (SC_001)**: DONE. Gate check passed (hostname=SC_001, branch
+  code=001, tree clean apart from 2 harmless untracked manual-test log
+  files from earlier today). Pulled fast-forward `2910867` (2026-07-14
+  15:23) → `1f92974` (2026-07-15 11:38). Same session correctly checked for
+  003/004/005 install paths on this machine, found none, and stopped
+  rather than guess — exactly the identity-safety discipline this program
+  adopted after the branch-000 X:/possrv mix-up. Those three are handled by
+  separate sessions on their own separate machines, not a gap.
+- **003**: in progress on a separate session (POSSRV, identity already
+  confirmed: hostname=POSSRV, branch code=003) — awaiting its pull result.
 - **004 (SERVER004)**: DONE. Gate check passed (hostname=SERVER004, branch
   code=004, clean tree, HEAD `143ee25` from 2026-07-14 16:02). Pulled
   fast-forward `143ee25` → `eb8de2e` (17 files, includes
