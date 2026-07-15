@@ -279,31 +279,36 @@ queryable instead of scattered across per-branch log files.
 2. **DECIDED 2026-07-15**: polling, not `LISTEN/NOTIFY`. Simpler, and fine
    at the batch volumes observed so far (low hundreds/day). Revisit only if
    queue latency becomes a real user-facing problem at higher volume.
-3. ~~No staging database exists~~ **DECIDED 2026-07-15 — not provisioning
-   one.** User's explicit call: no additional Render spend for this right
-   now (budget-conscious, small current scale). Mitigated instead by a
-   **canary-on-production** testing approach rather than a staging
-   environment:
-   - Deploy schema + v2 endpoint + worker, but **no agent points at v2
-     yet** — v1 stays the only thing any branch actually uses, so a bug in
-     v2 cannot affect a real sync.
-   - Manually POST a handful of synthetic/throwaway batches directly to v2
-     on production (a branch code and data that's obviously not real, e.g.
-     `branchCode: "test-cp4"`) and confirm by hand: batch appears
-     `queued` → worker claims it (`processing`) → `applied`, with correct
-     data landing in the target tables and correct idempotency behavior
-     (re-POST the exact same batch, confirm it's a no-op, not a duplicate).
-   - Only once that's confirmed working, point ONE real branch's agent at
-     v2 (canary — 004 is the natural choice, already the lowest-traffic
-     storefront and already the product-master single-writer) for one full
-     day/window cycle before considering wider rollout.
-   - This is a lower-confidence substitute for genuine concurrent-load
-     testing (it does not prove the worker behaves correctly under many
-     simultaneous claims — `FOR UPDATE SKIP LOCKED` is a well-established
-     Postgres pattern, which is why this substitution is considered
-     acceptable risk at the current fleet size, not a risk-free
-     equivalent). Revisit provisioning a real staging DB if/when branch
-     count grows enough that this program's own scaling roadmap
-     (`SCALE_TO_1000_BRANCHES_ROADMAP.md`) becomes active — that document's
-     load-testing ladder genuinely does need a staging environment and
-     should not be skipped at that point.
+3. ~~No staging database exists~~ **RESOLVED 2026-07-15 — free, local, zero
+   Render spend.** User's explicit call was no additional Render cost for
+   this — solved by using the existing local PostgreSQL 18 *server*
+   binaries already installed on this session's machine
+   (`C:\Program Files\PostgreSQL\18\bin\`), which is more than a client —
+   `initdb`/`pg_ctl`/`postgres.exe` are all present. Rather than touch the
+   machine's existing `postgresql-x64-18` Windows service (unknown
+   password, and it may be used for other local work), initialized a
+   **completely separate data cluster** in the scratch directory, trust
+   auth (local-only, no password needed, nothing production-facing), on a
+   non-conflicting port:
+   ```
+   initdb -D <scratch>/pg-staging-data -U staginguser --auth=trust
+   pg_ctl -D <scratch>/pg-staging-data -o "-p 5544" start
+   ```
+   Result: `postgresql://staginguser@localhost:5544/sync_staging`, real
+   **PostgreSQL 18.1** (version-matched to production's 18.3 — same major
+   version), fully isolated, free, disposable (`pg_ctl stop` + delete the
+   directory tears it down completely, nothing to clean up on Render).
+
+   This means CP4 no longer needs the canary-on-production compromise for
+   *correctness* testing — genuine concurrent-worker behavior (multiple
+   worker processes racing on `FOR UPDATE SKIP LOCKED`, retry/backoff,
+   dead-lettering, idempotency under real concurrent load) can be verified
+   against a real Postgres instance before anything touches production.
+   **Canary-on-production is still the right *rollout* strategy** (v2 dark
+   until manually verified, then one branch before wide rollout) — that
+   part of the plan is unchanged, it's the correctness-testing gap that's
+   now closed. This local cluster only proves the design works in
+   principle; it's still a single machine, not 1000 simulated branches — a
+   dedicated staging DB is still the right call if/when
+   `SCALE_TO_1000_BRANCHES_ROADMAP.md`'s load-testing ladder becomes
+   relevant.
