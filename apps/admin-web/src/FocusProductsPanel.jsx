@@ -1600,56 +1600,12 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
 
   return (
     <section className="fp-section fp-sales-target-section">
-      <div className="fp-sales-target-header">
-        <h3 className="fp-section-title">เป้ายอดขาย</h3>
-        <div className="fp-sales-target-controls">
-          {isAdminUser && (
-            <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}>
-              {BRANCH_CHOICES.map((code) => (
-                <option key={code} value={code}>
-                  สาขา {code}
-                </option>
-              ))}
-            </select>
-          )}
-          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-          <div className="fp-sales-target-col-picker">
-            <button type="button" className="fp-btn-secondary" onClick={() => setColumnPickerOpen((v) => !v)}>
-              คอลัมน์ ▾
-            </button>
-            {columnPickerOpen && (
-              <div className="fp-sales-target-col-menu">
-                {SALES_TARGET_COLUMN_DEFS.map((col) => (
-                  <label key={col.key} className="fp-branch-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={visibleColumns.has(col.key)}
-                      onChange={() => toggleColumn(col.key)}
-                    />
-                    {col.label}
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
       {!activeBranch && <div className="fp-empty">ยังไม่ได้เลือกสาขา</div>}
       {loading && activeBranch && <div className="fp-loading">กำลังโหลด...</div>}
       {error && <div className="fp-form-error">{error}</div>}
 
       {!loading && !error && progress && (
         <>
-          <div className="fp-sales-target-summary">
-            <span>
-              ยอดขายสะสมเดือนนี้: <strong>{formatCurrency(progress.actualSoFar)}</strong>
-            </span>
-            <span>
-              วันที่ผ่านไป {progress.daysElapsed}/{progress.totalDaysInMonth} วัน (เหลือ {progress.daysRemaining} วัน)
-            </span>
-          </div>
-
           {baseDailyRows.length > 0 && (
             <div className="fp-sales-target-daily">
               <button
@@ -1736,6 +1692,50 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
               )}
             </div>
           )}
+
+          <div className="fp-sales-target-header fp-sales-target-tier-header">
+            <h3 className="fp-section-title">เป้ายอดขาย</h3>
+            <div className="fp-sales-target-controls">
+              {isAdminUser && (
+                <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}>
+                  {BRANCH_CHOICES.map((code) => (
+                    <option key={code} value={code}>
+                      สาขา {code}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+              <div className="fp-sales-target-col-picker">
+                <button type="button" className="fp-btn-secondary" onClick={() => setColumnPickerOpen((v) => !v)}>
+                  คอลัมน์ ▾
+                </button>
+                {columnPickerOpen && (
+                  <div className="fp-sales-target-col-menu">
+                    {SALES_TARGET_COLUMN_DEFS.map((col) => (
+                      <label key={col.key} className="fp-branch-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={visibleColumns.has(col.key)}
+                          onChange={() => toggleColumn(col.key)}
+                        />
+                        {col.label}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="fp-sales-target-summary">
+            <span>
+              ยอดขายสะสมเดือนนี้: <strong>{formatCurrency(progress.actualSoFar)}</strong>
+            </span>
+            <span>
+              วันที่ผ่านไป {progress.daysElapsed}/{progress.totalDaysInMonth} วัน (เหลือ {progress.daysRemaining} วัน)
+            </span>
+          </div>
 
           <div className="mvt-sales-table-wrap fp-sales-target-tier-wrap">
             <table className="mvt-sales-table fp-table">

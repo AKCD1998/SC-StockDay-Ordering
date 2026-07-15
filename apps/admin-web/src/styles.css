@@ -8122,6 +8122,8 @@ input[type="radio"] {
 
 .fp-sales-target-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
 .fp-sales-target-header .fp-section-title { margin: 0; }
+.fp-sales-target-tier-header { margin-top: 28px; padding-top: 18px; border-top: 1px solid rgba(148, 163, 184, 0.35); }
+[data-theme="dark"] .fp-sales-target-tier-header { border-top-color: rgba(148, 163, 184, 0.22); }
 
 .fp-sales-target-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .fp-sales-target-controls select, .fp-sales-target-controls input[type="month"] {
@@ -8281,13 +8283,7 @@ input[type="radio"] {
 [data-theme="dark"] .fp-daily-filter-options label:hover { background: #172638; }
 
 .fp-sales-target-tier-wrap {
-  margin-top: 28px;
-  padding-top: 18px;
-  border-top: 1px solid rgba(148, 163, 184, 0.35);
-}
-
-[data-theme="dark"] .fp-sales-target-tier-wrap {
-  border-top-color: rgba(148, 163, 184, 0.22);
+  margin-top: 12px;
 }
 
 .fp-search-results {
