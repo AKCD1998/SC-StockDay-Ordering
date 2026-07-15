@@ -1438,7 +1438,6 @@ function SalesTargetEditForm({ tiers, onSave, saving, saveError }) {
           </label>
         ))}
       </div>
-      {saveError && <div className="fp-form-error">{saveError}</div>}
       <button
         type="button"
         className="fp-btn-primary"
@@ -1453,6 +1452,7 @@ function SalesTargetEditForm({ tiers, onSave, saving, saveError }) {
       >
         {saving ? "กำลังบันทึก..." : "บันทึกเป้า"}
       </button>
+      {saveError && <div className="fp-form-error">{saveError}</div>}
     </div>
   );
 }

@@ -8155,6 +8155,10 @@ input[type="radio"] {
 [data-theme="dark"] .fp-sales-target-summary { color: #cbd5e1; }
 
 .fp-sales-target-edit {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
   margin-top: 20px;
   padding-top: 18px;
   border-top: 1px dashed #cbd5e1;
@@ -8163,7 +8167,7 @@ input[type="radio"] {
 .fp-sales-target-edit .fp-branch-target-grid {
   column-gap: 16px;
   row-gap: 14px;
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
 .fp-sales-target-tier-field {
@@ -8171,7 +8175,8 @@ input[type="radio"] {
   gap: 6px;
 }
 
-.fp-sales-target-edit > .fp-btn-primary { margin-top: 2px; }
+.fp-sales-target-edit > .fp-btn-primary { flex: 0 0 auto; }
+.fp-sales-target-edit > .fp-form-error { flex: 1 0 100%; margin: 0; }
 
 .fp-sales-target-daily { margin-bottom: 0; }
 .fp-sales-target-daily-wrap { max-height: 260px; overflow-y: auto; margin-top: 6px; }
