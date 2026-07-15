@@ -291,6 +291,26 @@ truncates the value — caused one login failure on the first 004 attempt,
 confirmed via a raw `mssql` connection test isolating the bug to `.env`
 parsing rather than the credential or network path itself.
 
+## 2026-07-15 ~11:20 ICT — self-update fleet bootstrap begins
+
+Rolling `2adff19`/`ec65f888` (self-update mechanism + everything since) out
+to every branch — the one-time manual pull each branch needs before it can
+self-update going forward. New standing rule adopted after the branch-000
+X:/possrv path mix-up earlier today: **every rollout prompt now requires
+verifying `hostname` + `.env`'s `ADAPOS_SYNC_BRANCH_CODE` before touching
+anything**, not just trusting a known-good path/drive-letter from earlier
+in the session.
+
+- **005 (POSSRV)**: DONE. Gate check passed (hostname=POSSRV, branch
+  code=005, clean tree, HEAD `ef33ee2` from 2026-07-07 — not suspiciously
+  old, so the "check for stale-like-000" condition didn't trigger). Pulled
+  fast-forward `ef33ee2` → `e0fb718` (41 files, +10,200/-328 lines, 8 days
+  of work). No sync test run (already validated earlier today).
+- **001/003/004**: not yet done — each is a genuinely separate machine this
+  session cannot reach directly (only via a session with real access
+  running on that specific machine, same pattern used all day). Prompts
+  prepared with per-branch paths; awaiting execution.
+
 ## Recommended next step
 
 CP0 is close enough to complete that starting CP1 work which doesn't depend
