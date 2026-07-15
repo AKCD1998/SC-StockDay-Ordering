@@ -314,8 +314,21 @@ in the session.
   rather than guess — exactly the identity-safety discipline this program
   adopted after the branch-000 X:/possrv mix-up. Those three are handled by
   separate sessions on their own separate machines, not a gap.
-- **003**: in progress on a separate session (POSSRV, identity already
-  confirmed: hostname=POSSRV, branch code=003) — awaiting its pull result.
+- **003 (POSSRV)**: DONE. Gate check passed (hostname=POSSRV, branch
+  code=003, tree clean). Pulled fast-forward `4b52855` (2026-07-14 14:12)
+  → `1f92974` (2026-07-15 11:38). No sync test run (already validated
+  earlier today).
+
+**BOOTSTRAP COMPLETE — all 5 branches (000/001/003/004/005) now on
+current `main` and self-update-capable.** From here forward, a fix only
+needs one commit to `main` — every branch picks it up automatically on its
+own next scheduled sync run, no per-branch coordination prompts needed
+(the entire point of this exercise, per the user's original ask). Every
+branch's identity was verified via `hostname` + `.env`'s
+`ADAPOS_SYNC_BRANCH_CODE` before any git operation, per the standing rule
+adopted after the branch-000 X:/possrv path mix-up earlier — zero further
+misdirected operations occurred across the remaining 4 branches once that
+rule was in place.
 - **004 (SERVER004)**: DONE. Gate check passed (hostname=SERVER004, branch
   code=004, clean tree, HEAD `143ee25` from 2026-07-14 16:02). Pulled
   fast-forward `143ee25` → `eb8de2e` (17 files, includes
