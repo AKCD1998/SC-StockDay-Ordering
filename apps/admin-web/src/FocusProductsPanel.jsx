@@ -1392,6 +1392,14 @@ function formatCurrency(value) {
   return formatNumber(value, 2);
 }
 
+const THAI_WEEKDAY_SHORT = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+
+function formatDailyDateLabel(iso) {
+  const [, month, day] = iso.split("-");
+  const weekday = THAI_WEEKDAY_SHORT[new Date(`${iso}T00:00:00Z`).getUTCDay()];
+  return `${day}/${month} (${weekday})`;
+}
+
 // Admin-only inline form for setting the 3 tier targets for the currently
 // selected branch/month. Kept separate from the read-only progress table so
 // staff (who never see this) get a strictly smaller component tree.
@@ -1450,6 +1458,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   const [saveError, setSaveError] = useState(null);
   const [visibleColumns, setVisibleColumns] = useState(loadVisibleColumns);
   const [columnPickerOpen, setColumnPickerOpen] = useState(false);
+  const [dailyOpen, setDailyOpen] = useState(true);
 
   const activeBranch = isAdminUser ? selectedBranch : branchCode;
 
@@ -1568,6 +1577,38 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
               วันที่ผ่านไป {progress.daysElapsed}/{progress.totalDaysInMonth} วัน (เหลือ {progress.daysRemaining} วัน)
             </span>
           </div>
+
+          {progress.dailyActuals?.length > 0 && (
+            <div className="fp-sales-target-daily">
+              <button
+                type="button"
+                className="fp-btn-link"
+                onClick={() => setDailyOpen((v) => !v)}
+              >
+                {dailyOpen ? "▾" : "▸"} ยอดขายรายวัน ({progress.dailyActuals.length} วัน)
+              </button>
+              {dailyOpen && (
+                <div className="mvt-sales-table-wrap fp-sales-target-daily-wrap">
+                  <table className="mvt-sales-table fp-table">
+                    <thead>
+                      <tr>
+                        <th>วันที่</th>
+                        <th>ยอดขาย</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...progress.dailyActuals].reverse().map((day) => (
+                        <tr key={day.date}>
+                          <td>{formatDailyDateLabel(day.date)}</td>
+                          <td>{formatCurrency(day.actual)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="mvt-sales-table-wrap">
             <table className="mvt-sales-table fp-table">

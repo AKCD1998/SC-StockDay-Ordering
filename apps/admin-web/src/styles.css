@@ -8171,6 +8171,9 @@ input[type="radio"] {
 
 .fp-sales-target-edit > .fp-btn-primary { margin-top: 2px; }
 
+.fp-sales-target-daily { margin-bottom: 14px; }
+.fp-sales-target-daily-wrap { max-height: 260px; overflow-y: auto; margin-top: 6px; }
+
 .fp-search-results {
   position: absolute;
   top: 100%;
