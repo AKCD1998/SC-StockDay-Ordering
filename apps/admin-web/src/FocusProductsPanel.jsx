@@ -1360,6 +1360,254 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved, sal
   );
 }
 
+const SALES_TARGET_TIER_LABELS = { 1: "ขั้นที่ 1", 2: "ขั้นที่ 2", 3: "ขั้นที่ 3" };
+
+const SALES_TARGET_COLUMN_DEFS = [
+  { key: "monthlyTarget", label: "เป้าเดือน" },
+  { key: "dailyTarget", label: "เป้า/วัน" },
+  { key: "actualAvgPerDay", label: "เฉลี่ย/วัน (สะสม)" },
+  { key: "remainingAmount", label: "คงเหลือ" },
+  { key: "remainingAvgPerDay", label: "เฉลี่ย/วัน (คงเหลือ)" },
+  { key: "achieved", label: "สถานะ" },
+];
+
+const SALES_TARGET_COLUMN_VISIBILITY_KEY = "sales-targets:visible-columns:v1";
+
+function loadVisibleColumns() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(SALES_TARGET_COLUMN_VISIBILITY_KEY) || "null");
+    if (Array.isArray(stored)) return new Set(stored);
+  } catch {
+    // fall through to default
+  }
+  return new Set(SALES_TARGET_COLUMN_DEFS.map((col) => col.key));
+}
+
+function currentMonthValue() {
+  return new Date().toISOString().slice(0, 7);
+}
+
+function formatCurrency(value) {
+  if (value === null || value === undefined) return "-";
+  return formatNumber(value, 2);
+}
+
+// Admin-only inline form for setting the 3 tier targets for the currently
+// selected branch/month. Kept separate from the read-only progress table so
+// staff (who never see this) get a strictly smaller component tree.
+function SalesTargetEditForm({ tiers, onSave, saving, saveError }) {
+  const [drafts, setDrafts] = useState(() =>
+    Object.fromEntries([1, 2, 3].map((tier) => [tier, tiers.find((t) => t.tier === tier)?.monthlyTarget ?? ""])),
+  );
+
+  useEffect(() => {
+    setDrafts(Object.fromEntries([1, 2, 3].map((tier) => [tier, tiers.find((t) => t.tier === tier)?.monthlyTarget ?? ""])));
+  }, [tiers]);
+
+  return (
+    <div className="fp-sales-target-edit">
+      <div className="fp-branch-target-grid">
+        {[1, 2, 3].map((tier) => (
+          <label key={tier} className="fp-branch-target-field fp-sales-target-tier-field">
+            <span>{SALES_TARGET_TIER_LABELS[tier]}</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={drafts[tier]}
+              onChange={(e) => setDrafts((prev) => ({ ...prev, [tier]: e.target.value }))}
+            />
+          </label>
+        ))}
+      </div>
+      {saveError && <div className="fp-form-error">{saveError}</div>}
+      <button
+        type="button"
+        className="fp-btn-primary"
+        disabled={saving}
+        onClick={() =>
+          onSave(
+            [1, 2, 3]
+              .filter((tier) => drafts[tier] !== "" && Number.isFinite(Number(drafts[tier])))
+              .map((tier) => ({ tier, monthlyTarget: Number(drafts[tier]) })),
+          )
+        }
+      >
+        {saving ? "กำลังบันทึก..." : "บันทึกเป้า"}
+      </button>
+    </div>
+  );
+}
+
+function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
+  const [selectedBranch, setSelectedBranch] = useState(isAdminUser ? BRANCH_CHOICES[0] : branchCode);
+  const [month, setMonth] = useState(currentMonthValue());
+  const [progress, setProgress] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [visibleColumns, setVisibleColumns] = useState(loadVisibleColumns);
+  const [columnPickerOpen, setColumnPickerOpen] = useState(false);
+
+  const activeBranch = isAdminUser ? selectedBranch : branchCode;
+
+  useEffect(() => {
+    localStorage.setItem(SALES_TARGET_COLUMN_VISIBILITY_KEY, JSON.stringify([...visibleColumns]));
+  }, [visibleColumns]);
+
+  useEffect(() => {
+    if (!activeBranch) {
+      setProgress(null);
+      setLoading(false);
+      return undefined;
+    }
+    let active = true;
+    setLoading(true);
+    setError(null);
+    apiFetch(`/api/admin/sales-targets/progress?branchCode=${encodeURIComponent(activeBranch)}&month=${encodeURIComponent(month)}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (active) setProgress(data);
+      })
+      .catch((err) => {
+        if (active) setError(err.message || "โหลดเป้ายอดขายไม่สำเร็จ");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [activeBranch, month, refreshKey]);
+
+  async function saveTiers(tiers) {
+    if (!tiers.length) {
+      setSaveError("กรุณากรอกเป้าหมายอย่างน้อย 1 ขั้น");
+      return;
+    }
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await apiFetch(`/api/admin/sales-targets?branchCode=${encodeURIComponent(activeBranch)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
+        body: JSON.stringify({ month, tiers }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.message || body.error || `HTTP ${res.status}`);
+      setRefreshKey((v) => v + 1);
+    } catch (err) {
+      setSaveError(err.message || "บันทึกเป้าไม่สำเร็จ");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function toggleColumn(key) {
+    setVisibleColumns((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  const columns = SALES_TARGET_COLUMN_DEFS.filter((col) => visibleColumns.has(col.key));
+
+  return (
+    <section className="fp-section fp-sales-target-section">
+      <div className="fp-sales-target-header">
+        <h3 className="fp-section-title">เป้ายอดขาย</h3>
+        <div className="fp-sales-target-controls">
+          {isAdminUser && (
+            <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}>
+              {BRANCH_CHOICES.map((code) => (
+                <option key={code} value={code}>
+                  สาขา {code}
+                </option>
+              ))}
+            </select>
+          )}
+          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+          <div className="fp-sales-target-col-picker">
+            <button type="button" className="fp-btn-secondary" onClick={() => setColumnPickerOpen((v) => !v)}>
+              คอลัมน์ ▾
+            </button>
+            {columnPickerOpen && (
+              <div className="fp-sales-target-col-menu">
+                {SALES_TARGET_COLUMN_DEFS.map((col) => (
+                  <label key={col.key} className="fp-branch-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={visibleColumns.has(col.key)}
+                      onChange={() => toggleColumn(col.key)}
+                    />
+                    {col.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {!activeBranch && <div className="fp-empty">ยังไม่ได้เลือกสาขา</div>}
+      {loading && activeBranch && <div className="fp-loading">กำลังโหลด...</div>}
+      {error && <div className="fp-form-error">{error}</div>}
+
+      {!loading && !error && progress && (
+        <>
+          <div className="fp-sales-target-summary">
+            <span>
+              ยอดขายสะสมเดือนนี้: <strong>{formatCurrency(progress.actualSoFar)}</strong>
+            </span>
+            <span>
+              วันที่ผ่านไป {progress.daysElapsed}/{progress.totalDaysInMonth} วัน (เหลือ {progress.daysRemaining} วัน)
+            </span>
+          </div>
+
+          <div className="mvt-sales-table-wrap">
+            <table className="mvt-sales-table fp-table">
+              <thead>
+                <tr>
+                  <th>ขั้น</th>
+                  {columns.map((col) => (
+                    <th key={col.key}>{col.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {progress.tiers.map((tier) => (
+                  <tr key={tier.tier}>
+                    <td>{SALES_TARGET_TIER_LABELS[tier.tier]}</td>
+                    {columns.map((col) => {
+                      if (col.key === "achieved") {
+                        return (
+                          <td key={col.key}>
+                            <StatusBadge achieved={tier.achieved} />
+                          </td>
+                        );
+                      }
+                      return <td key={col.key}>{formatCurrency(tier[col.key])}</td>;
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {isAdminUser && (
+            <SalesTargetEditForm tiers={progress.tiers} onSave={saveTiers} saving={saving} saveError={saveError} />
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1537,6 +1785,8 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode 
 
       <LoadingOverlay active={loading} />
       {error && <div className="fp-form-error">{error}</div>}
+
+      <SalesTargetsSection csrfToken={csrfToken} isAdminUser={isAdminUser} branchCode={branchCode} />
 
       {!loading && !error && (
         <>
