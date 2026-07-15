@@ -8179,8 +8179,96 @@ input[type="radio"] {
 .fp-sales-target-edit > .fp-form-error { flex: 1 0 100%; margin: 0; }
 
 .fp-sales-target-daily { margin-bottom: 0; }
-.fp-sales-target-daily-wrap { max-height: 260px; overflow-y: auto; margin-top: 6px; }
-.fp-sales-target-daily-wrap.filter-open { max-height: 520px; }
+
+.fp-sales-target-daily-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fp-btn-link.fp-sales-target-daily-toggle {
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #2833d8;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+.fp-btn-link.fp-sales-target-daily-toggle:hover {
+  background: #e0e7ff;
+  text-decoration: none;
+}
+
+[data-theme="dark"] .fp-btn-link.fp-sales-target-daily-toggle {
+  border-color: #334a70;
+  background: #16243a;
+  color: #b9c5ff;
+}
+
+[data-theme="dark"] .fp-btn-link.fp-sales-target-daily-toggle:hover { background: #1d3150; }
+
+.fp-sales-target-daily-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.fp-sales-target-daily-page-size select {
+  min-width: 76px;
+  min-height: 40px;
+  padding: 7px 30px 7px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #1e293b;
+  font: inherit;
+  cursor: pointer;
+}
+
+[data-theme="dark"] .fp-sales-target-daily-page-size { color: #cbd5e1; }
+[data-theme="dark"] .fp-sales-target-daily-page-size select {
+  border-color: #33465c;
+  background: #111d2b;
+  color: #e2e8f0;
+}
+
+.fp-sales-target-daily-wrap {
+  max-height: none;
+  overflow: auto;
+  margin-top: 12px;
+}
+.fp-sales-target-daily-wrap.filter-open { max-height: none; }
+
+.fp-sales-target-daily-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  color: #64748b;
+  font-size: 0.86rem;
+}
+
+.fp-sales-target-daily-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fp-sales-target-daily-page-actions .fp-btn-secondary { min-width: 84px; }
+.fp-sales-target-daily-page-actions .fp-btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+[data-theme="dark"] .fp-sales-target-daily-pagination { color: #a9b8ca; }
 
 .fp-sales-target-daily-wrap th:not(:first-child),
 .fp-sales-target-daily-wrap td:not(:first-child) {

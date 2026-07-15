@@ -1377,6 +1377,7 @@ const SALES_TARGET_COLUMN_DEFS = [
 ];
 
 const SALES_TARGET_COLUMN_VISIBILITY_KEY = "sales-targets:visible-columns:v1";
+const DAILY_PAGE_SIZE_OPTIONS = [10, 50, 100];
 
 function loadVisibleColumns() {
   try {
@@ -1473,6 +1474,8 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   const [dailyDateFilterOpen, setDailyDateFilterOpen] = useState(false);
   const [dailyDateSort, setDailyDateSort] = useState("desc");
   const [excludedDailyDates, setExcludedDailyDates] = useState(() => new Set());
+  const [dailyPageSize, setDailyPageSize] = useState(DAILY_PAGE_SIZE_OPTIONS[0]);
+  const [dailyPage, setDailyPage] = useState(1);
 
   const activeBranch = isAdminUser ? selectedBranch : branchCode;
 
@@ -1483,6 +1486,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   useEffect(() => {
     setExcludedDailyDates(new Set());
     setDailyDateFilterOpen(false);
+    setDailyPage(1);
   }, [month]);
 
   useEffect(() => {
@@ -1597,6 +1601,19 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   );
   const displayedDailyCount = filteredDailyRows.length;
   const dailyFilterActive = excludedDailyDates.size > 0;
+  const dailyPageCount = Math.max(1, Math.ceil(displayedDailyCount / dailyPageSize));
+  const dailyPageStartIndex = (dailyPage - 1) * dailyPageSize;
+  const pagedDailyRows = filteredDailyRows.slice(dailyPageStartIndex, dailyPageStartIndex + dailyPageSize);
+  const dailyPageStart = displayedDailyCount > 0 ? dailyPageStartIndex + 1 : 0;
+  const dailyPageEnd = Math.min(dailyPageStartIndex + dailyPageSize, displayedDailyCount);
+
+  useEffect(() => {
+    setDailyPage(1);
+  }, [dailyDateSort, dailyPageSize, excludedDailyDates]);
+
+  useEffect(() => {
+    setDailyPage((current) => Math.min(current, dailyPageCount));
+  }, [dailyPageCount]);
 
   return (
     <section className="fp-section fp-sales-target-section">
@@ -1608,87 +1625,135 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
         <>
           {baseDailyRows.length > 0 && (
             <div className="fp-sales-target-daily">
-              <button
-                type="button"
-                className="fp-btn-link"
-                onClick={() => setDailyOpen((v) => !v)}
-              >
-                {dailyOpen ? "▾" : "▸"} ยอดขายรายวัน ({dailyFilterActive ? `${displayedDailyCount}/${baseDailyRows.length}` : displayedDailyCount} วัน)
-              </button>
+              <div className="fp-sales-target-daily-toolbar">
+                <button
+                  type="button"
+                  className="fp-btn-link fp-sales-target-daily-toggle"
+                  onClick={() => setDailyOpen((v) => !v)}
+                  aria-expanded={dailyOpen}
+                >
+                  {dailyOpen ? "▾" : "▸"} ยอดขายรายวัน ({dailyFilterActive ? `${displayedDailyCount}/${baseDailyRows.length}` : displayedDailyCount} วัน)
+                </button>
+                {dailyOpen && (
+                  <label className="fp-sales-target-daily-page-size">
+                    <span>แสดง</span>
+                    <select
+                      value={dailyPageSize}
+                      onChange={(event) => setDailyPageSize(Number(event.target.value))}
+                      aria-label="จำนวนรายการยอดขายรายวันต่อหน้า"
+                    >
+                      {DAILY_PAGE_SIZE_OPTIONS.map((size) => (
+                        <option key={size} value={size}>{size}</option>
+                      ))}
+                    </select>
+                    <span>รายการ</span>
+                  </label>
+                )}
+              </div>
               {dailyOpen && (
-                <div className={`mvt-sales-table-wrap fp-sales-target-daily-wrap${dailyDateFilterOpen ? " filter-open" : ""}`}>
-                  <table className="mvt-sales-table fp-table">
-                    <thead>
-                      <tr>
-                        <th className="fp-daily-date-header">
-                          <button
-                            type="button"
-                            className={`fp-daily-date-filter-button${dailyFilterActive ? " active" : ""}`}
-                            onClick={() => setDailyDateFilterOpen((open) => !open)}
-                            aria-expanded={dailyDateFilterOpen}
-                          >
-                            วันที่ <span aria-hidden="true">▾</span>
-                          </button>
-                          {dailyDateFilterOpen && (
-                            <div className="fp-daily-date-filter-menu">
-                              <button type="button" onClick={() => setDailyDateSort("desc")} className={dailyDateSort === "desc" ? "selected" : ""}>
-                                เรียงใหม่ → เก่า
-                              </button>
-                              <button type="button" onClick={() => setDailyDateSort("asc")} className={dailyDateSort === "asc" ? "selected" : ""}>
-                                เรียงเก่า → ใหม่
-                              </button>
-                              <div className="fp-daily-filter-actions">
-                                <button type="button" onClick={() => setExcludedDailyDates(new Set())}>เลือกทั้งหมด</button>
-                                <button type="button" onClick={() => setExcludedDailyDates(new Set(availableDailyDates))}>ล้างทั้งหมด</button>
+                <>
+                  <div className={`mvt-sales-table-wrap fp-sales-target-daily-wrap${dailyDateFilterOpen ? " filter-open" : ""}`}>
+                    <table className="mvt-sales-table fp-table">
+                      <thead>
+                        <tr>
+                          <th className="fp-daily-date-header">
+                            <button
+                              type="button"
+                              className={`fp-daily-date-filter-button${dailyFilterActive ? " active" : ""}`}
+                              onClick={() => setDailyDateFilterOpen((open) => !open)}
+                              aria-expanded={dailyDateFilterOpen}
+                            >
+                              วันที่ <span aria-hidden="true">▾</span>
+                            </button>
+                            {dailyDateFilterOpen && (
+                              <div className="fp-daily-date-filter-menu">
+                                <button type="button" onClick={() => setDailyDateSort("desc")} className={dailyDateSort === "desc" ? "selected" : ""}>
+                                  เรียงใหม่ → เก่า
+                                </button>
+                                <button type="button" onClick={() => setDailyDateSort("asc")} className={dailyDateSort === "asc" ? "selected" : ""}>
+                                  เรียงเก่า → ใหม่
+                                </button>
+                                <div className="fp-daily-filter-actions">
+                                  <button type="button" onClick={() => setExcludedDailyDates(new Set())}>เลือกทั้งหมด</button>
+                                  <button type="button" onClick={() => setExcludedDailyDates(new Set(availableDailyDates))}>ล้างทั้งหมด</button>
+                                </div>
+                                <div className="fp-daily-filter-options">
+                                  {availableDailyDates.map((date) => (
+                                    <label key={date}>
+                                      <input
+                                        type="checkbox"
+                                        checked={!excludedDailyDates.has(date)}
+                                        onChange={() => setExcludedDailyDates((current) => {
+                                          const next = new Set(current);
+                                          if (next.has(date)) next.delete(date);
+                                          else next.add(date);
+                                          return next;
+                                        })}
+                                      />
+                                      {formatDailyDateLabel(date)}
+                                    </label>
+                                  ))}
+                                </div>
+                                <button type="button" className="fp-daily-filter-done" onClick={() => setDailyDateFilterOpen(false)}>ตกลง</button>
                               </div>
-                              <div className="fp-daily-filter-options">
-                                {availableDailyDates.map((date) => (
-                                  <label key={date}>
-                                    <input
-                                      type="checkbox"
-                                      checked={!excludedDailyDates.has(date)}
-                                      onChange={() => setExcludedDailyDates((current) => {
-                                        const next = new Set(current);
-                                        if (next.has(date)) next.delete(date);
-                                        else next.add(date);
-                                        return next;
-                                      })}
-                                    />
-                                    {formatDailyDateLabel(date)}
-                                  </label>
-                                ))}
-                              </div>
-                              <button type="button" className="fp-daily-filter-done" onClick={() => setDailyDateFilterOpen(false)}>ตกลง</button>
-                            </div>
-                          )}
-                        </th>
-                        {isAdminUser ? (
-                          <>
-                            {BRANCH_CHOICES.map((code) => <th key={code}>สาขา {code}</th>)}
-                            <th className="fp-daily-total-col">รวมทุกสาขา</th>
-                          </>
-                        ) : <th>ยอดขาย</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {isAdminUser ? filteredDailyRows.map((day) => {
-                        const total = BRANCH_CHOICES.reduce((sum, code) => sum + Number(day.byBranch[code] || 0), 0);
-                        return (
-                          <tr key={day.date}>
-                            <td className={`fp-daily-date-cell ${dailyWeekdayClass(day.date)}`}>{formatDailyDateLabel(day.date)}</td>
-                            {BRANCH_CHOICES.map((code) => <td key={code}>{formatCurrency(day.byBranch[code] || 0)}</td>)}
-                            <td className="fp-daily-total-col">{formatCurrency(total)}</td>
-                          </tr>
-                        );
-                      }) : filteredDailyRows.map((day) => (
+                            )}
+                          </th>
+                          {isAdminUser ? (
+                            <>
+                              {BRANCH_CHOICES.map((code) => <th key={code}>สาขา {code}</th>)}
+                              <th className="fp-daily-total-col">รวมทุกสาขา</th>
+                            </>
+                          ) : <th>ยอดขาย</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {isAdminUser ? pagedDailyRows.map((day) => {
+                          const total = BRANCH_CHOICES.reduce((sum, code) => sum + Number(day.byBranch[code] || 0), 0);
+                          return (
+                            <tr key={day.date}>
+                              <td className={`fp-daily-date-cell ${dailyWeekdayClass(day.date)}`}>{formatDailyDateLabel(day.date)}</td>
+                              {BRANCH_CHOICES.map((code) => <td key={code}>{formatCurrency(day.byBranch[code] || 0)}</td>)}
+                              <td className="fp-daily-total-col">{formatCurrency(total)}</td>
+                            </tr>
+                          );
+                        }) : pagedDailyRows.map((day) => (
                           <tr key={day.date}>
                             <td className={`fp-daily-date-cell ${dailyWeekdayClass(day.date)}`}>{formatDailyDateLabel(day.date)}</td>
                             <td>{formatCurrency(day.actual)}</td>
                           </tr>
                         ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="fp-sales-target-daily-pagination" aria-label="การแบ่งหน้ายอดขายรายวัน">
+                    <span className="fp-sales-target-daily-range">
+                      {displayedDailyCount > 0
+                        ? `แสดง ${dailyPageStart}-${dailyPageEnd} จาก ${displayedDailyCount} รายการ`
+                        : "0 รายการ"}
+                    </span>
+                    {dailyPageCount > 1 && (
+                      <div className="fp-sales-target-daily-page-actions">
+                        <button
+                          type="button"
+                          className="fp-btn-secondary"
+                          disabled={dailyPage <= 1}
+                          onClick={() => setDailyPage((current) => Math.max(1, current - 1))}
+                        >
+                          ก่อนหน้า
+                        </button>
+                        <span>หน้า {dailyPage} / {dailyPageCount}</span>
+                        <button
+                          type="button"
+                          className="fp-btn-secondary"
+                          disabled={dailyPage >= dailyPageCount}
+                          onClick={() => setDailyPage((current) => Math.min(dailyPageCount, current + 1))}
+                        >
+                          ถัดไป
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           )}
