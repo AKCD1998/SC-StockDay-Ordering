@@ -10,7 +10,10 @@ param(
   # Pass this on the 19:20 evening trigger only. It makes the sync agent check
   # whether the 08:20 run already succeeded today and, if so, send a heartbeat
   # and skip the full resync instead of re-sending unchanged stock numbers.
-  [switch]$SkipIfSyncedToday
+  [switch]$SkipIfSyncedToday,
+  # Pass this to skip the self-update check (e.g. while intentionally testing
+  # a local uncommitted change on this specific machine).
+  [switch]$NoAutoUpdate
 )
 
 $ErrorActionPreference = "Stop"
@@ -34,6 +37,62 @@ function Get-EnvValue([string]$Key) {
           Select-Object -First 1
   if ($line) { return ($line -replace "^$Key=", "").Trim() }
   return ""
+}
+
+function Invoke-SelfUpdate {
+  # Fleet self-update: fetches the same fix/config improvements every branch
+  # gets, on this branch's own next scheduled run, with no per-machine
+  # coordination needed. Pull-based via the Scheduled Task this machine
+  # already runs unattended — never push-based (no remote-exec trust exists
+  # between machines, and none is needed for this). Fails safe by design:
+  # any reason to be unsure (dirty tree, wrong branch, git missing, pull
+  # error) just skips the update and runs the sync with whatever code is
+  # already on disk — an update check must never block the actual sync.
+  $git = Get-Command git -ErrorAction SilentlyContinue
+  if (-not $git) {
+    Write-Log "SELF-UPDATE: git not found on PATH, skipping."
+    return
+  }
+
+  $topLevel = (& git -C $ScriptDir rev-parse --show-toplevel 2>$null)
+  if ($LASTEXITCODE -ne 0 -or -not $topLevel) {
+    Write-Log "SELF-UPDATE: not inside a git repo, skipping."
+    return
+  }
+
+  $status = (& git -C $topLevel status --porcelain 2>$null)
+  if ($status) {
+    $fileCount = ($status | Measure-Object -Line).Lines
+    Write-Log "SELF-UPDATE: $fileCount local uncommitted change(s) present, skipping to avoid clobbering. Investigate manually if this persists."
+    return
+  }
+
+  $branchName = (& git -C $topLevel rev-parse --abbrev-ref HEAD 2>$null)
+  if ($branchName -ne "main") {
+    Write-Log "SELF-UPDATE: on branch '$branchName', not 'main' — skipping (assuming intentional)."
+    return
+  }
+
+  & git -C $topLevel fetch origin main --quiet 2>$null
+  if ($LASTEXITCODE -ne 0) {
+    Write-Log "SELF-UPDATE: git fetch failed (no network / origin unreachable?), continuing with existing code."
+    return
+  }
+
+  $localHead = (& git -C $topLevel rev-parse HEAD 2>$null)
+  $remoteHead = (& git -C $topLevel rev-parse origin/main 2>$null)
+  if ($localHead -eq $remoteHead) {
+    Write-Log "SELF-UPDATE: already up to date ($($localHead.Substring(0,7)))."
+    return
+  }
+
+  Write-Log "SELF-UPDATE: $($localHead.Substring(0,7)) -> $($remoteHead.Substring(0,7)), pulling..."
+  & git -C $topLevel pull origin main --ff-only --quiet 2>&1 | ForEach-Object { Write-Log "SELF-UPDATE: $_" }
+  if ($LASTEXITCODE -eq 0) {
+    Write-Log "SELF-UPDATE: pulled successfully, now at $($remoteHead.Substring(0,7))."
+  } else {
+    Write-Log "SELF-UPDATE: git pull failed (exit $LASTEXITCODE) — possibly a non-fast-forward history divergence. Continuing with existing code; investigate manually."
+  }
 }
 
 function Invoke-LoggedProcess {
@@ -62,6 +121,12 @@ if (-not (Test-Path -LiteralPath $NodeExe)) {
 
 if (-not (Test-Path -LiteralPath ".env")) {
   Write-Log "WARNING: .env not found in $ScriptDir. The sync may fail unless environment variables are set elsewhere."
+}
+
+if ($NoAutoUpdate) {
+  Write-Log "SELF-UPDATE: skipped (-NoAutoUpdate passed)."
+} else {
+  Invoke-SelfUpdate
 }
 
 if (-not $Branch) {
