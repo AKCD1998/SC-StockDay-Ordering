@@ -1817,8 +1817,7 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode 
     }, 30_000);
     setLoading(true);
     setError(null);
-    const endpointBase = isAdminUser ? "/api/admin/focus-products" : "/api/focus-products";
-    const endpoint = `${endpointBase}?year=${encodeURIComponent(year)}`;
+    const endpoint = isAdminUser ? "/api/admin/focus-products" : "/api/focus-products";
     apiFetch(endpoint, { signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1838,7 +1837,7 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode 
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [isAdminUser, refreshKey, year]);
+  }, [isAdminUser, refreshKey]);
 
   const monthSummaries = useMemo(() => {
     const summaries = {};
