@@ -121,6 +121,47 @@ one real *in-window* (08:20 or 19:20) scheduled run without failing — the
 off-peak tests prove the code fix works, not yet that it's sufficient
 mitigation for actual peak contention. Next 08:20/19:20 window should be
 watched (dashboard or logs) rather than assumed.
+
+## 2026-07-15 08:20 in-window results — CP1 mitigation alone is NOT sufficient
+
+First real peak-window observation after every mitigation so far was live
+(batch=100, sales_detail chunk=150, single-writer product master on 004,
+transfers chunk=30 committed but **not yet rolled out to any branch**).
+Dashboard at end of window: 001 ✅, 005 ✅, 003 ❌, 004 ❌, 000 pending
+(out of scope).
+
+- **001**: eventually succeeded — `Sync succeeded` at 08:42:50, i.e. **22m44s**
+  wall time (started 08:20:06). Slow but no failure — attributable to its
+  pre-existing 180s per-request timeout override giving it enough headroom
+  to outlast peak contention on every individual request, not to the
+  mitigation reducing total load.
+- **003**: FAILED. Got through products (removed, single-writer working),
+  all 12 sales_detail chunks — then `Request timed out after 60000ms` on
+  `POST /api/sync/ada/transfers` (163 headers / 1715 lines, one unbatched
+  request). This is the exact bug fixed in commit `72e4e1b` the same
+  morning — **not yet pulled to branch 003's machine**, so this failure was
+  already expected/diagnosed, not a new mystery.
+- **004**: FAILED. `Request timed out after 60000ms` on `POST
+  /api/sync/products` itself — **the single remaining product-master
+  writer, with no other branch competing for that dataset anymore, still
+  couldn't get a products batch through inside its default 60s timeout.**
+  This is the critical data point: it rules out "branches duplicating
+  work" and "one transaction too big" as the *remaining* dominant cause —
+  the database's raw capacity (0.1 CPU, confirmed via Render dashboard, see
+  EVIDENCE.md) can't keep up with the combined genuine per-branch load of
+  4-5 branches syncing in the same ~20-minute window, independent of
+  request size.
+
+**Conclusion, stated plainly per the user's explicit ask**: batch/chunk
+mitigation + single-writer + (not-yet-deployed) set-based upsert are real,
+measured improvements (001: -55% wall time off-peak; 003/001 got much
+further into their sync before failing than before any of this work) but
+**do not fully solve peak-window contention, and won't at higher branch
+counts either — schedule staggering was explicitly rejected by the user as
+a "just moves the problem" fix, not a real solve.** Next real step: CP4
+async ingestion (queue + worker), design written 2026-07-15 — see
+`CP4_ASYNC_INGESTION_DESIGN.md`. Not yet implemented; open questions listed
+in that doc block starting implementation (worker hosting, no staging DB).
 - **001**: RESOLVED for off-peak conditions, root-cause theory confirmed.
   Pulled `4b52855` fresh (HEAD `2910867`+ range), manual off-peak test
   (2026-07-14 15:26:47-15:37:12 ICT, single run, no retries): products 6,591
