@@ -70,9 +70,27 @@ backend API had CPU/memory to spare. This reframes the fix priority:
   before scaling hardware" principle, doing the set-based rewrite first means
   any plan upgrade later goes further.
 
-## CP3.1 progress (set-based product upsert) — WRITTEN, NOT DEPLOYED
+## CP3.1 — set-based product upsert — DEPLOYED 2026-07-15
 
-Branch `claude/set-based-product-upsert` pushed to PaaSRTSM-project origin
+**Live in production.** Merged `claude/set-based-product-upsert` into
+PaaSRTSM-project `main` (merge commit `bd64f60`), pushed, deployed via
+`render deploys create srv-d6c0sd0gjchc73fvup5g --wait --confirm`
+(`dep-d9bf9i0k1i2s738cdr0g`, status `live`, finished 2026-07-15 02:49:43
+UTC). `/admin/health` returns 200 post-deploy.
+
+**Decision context**: user chose to deploy this now (small, already
+mock-verified, low risk) rather than bundle it with delta sync (not started
+— bigger, deserves its own design doc like CP4 got, shouldn't share a
+deploy with unrelated tested-vs-untested work). Plan: observe today's
+remaining 08:20/19:20-equivalent peak window(s) with set-based live but
+CP4 (queue+worker) NOT yet built, to isolate set-based's standalone effect
+before CP4 adds another variable tomorrow.
+
+**Still not reconciled with CP3.2** (snapshot-runaway) — still inserts one
+`product_stock_snapshots` row per product per sync, just via one bulk
+INSERT instead of N per-record inserts.
+
+Original branch note, kept for history: pushed to PaaSRTSM-project origin
 (commit `f7034a1`, based on `origin/main` @ `0873c284`). Rewrites
 `upsertProductRecord()` (5-8 queries/product, looped) into
 `upsertProductBatch()` (4 set-based queries total per request, regardless of
