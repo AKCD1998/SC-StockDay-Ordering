@@ -8481,9 +8481,9 @@ input[type="radio"] {
   display: grid;
   gap: 3px;
   padding: 11px 13px;
-  border: 1px solid #d8e0eb;
+  border: 1px solid var(--fp-branch-border, #d8e0eb);
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--fp-branch-head, #f8fafc);
   color: #334155;
 }
 
@@ -8492,8 +8492,8 @@ input[type="radio"] {
 .fp-sales-target-branch-summary > small { color: #64748b; }
 
 [data-theme="dark"] .fp-sales-target-branch-summary {
-  border-color: #2e4259;
-  background: #101c2a;
+  border-color: var(--fp-branch-border, #2e4259);
+  background: var(--fp-branch-head, #101c2a);
   color: #e2e8f0;
 }
 

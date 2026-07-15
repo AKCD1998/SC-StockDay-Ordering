@@ -77,6 +77,10 @@ const BRANCH_CHOICES = ["001", "003", "004", "005"];
 const PRODUCT_LOOKUP_CACHE_TTL_MS = 5 * 60 * 1000;
 const PRODUCT_LOOKUP_CACHE_PREFIX = "focus-product-lookup:v2:";
 
+function branchToneIndex(code) {
+  return Math.max(0, BRANCH_CHOICES.indexOf(code)) % 4;
+}
+
 function productLookupCacheKey(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -1461,7 +1465,7 @@ function SalesTargetEditForm({ tiers, onSave, saving, saveError }) {
 function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   const [selectedBranch, setSelectedBranch] = useState(isAdminUser ? BRANCH_CHOICES[0] : branchCode);
   const [selectedBranches, setSelectedBranches] = useState(() =>
-    isAdminUser ? [BRANCH_CHOICES[0]] : (branchCode ? [branchCode] : []),
+    isAdminUser ? [...BRANCH_CHOICES] : (branchCode ? [branchCode] : []),
   );
   const [month, setMonth] = useState(currentMonthValue());
   const [progress, setProgress] = useState(null);
@@ -1694,21 +1698,21 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
           <thead>
             <tr>
               <th rowSpan={2} className="fp-sales-target-tier-sticky">ขั้น</th>
-              {selectedBranches.map((code, branchIndex) => (
+              {selectedBranches.map((code) => (
                 <th
                   key={code}
                   colSpan={columns.length}
-                  className={`fp-sales-target-branch-group fp-sales-target-branch-tone-${branchIndex % 4}`}
+                  className={`fp-sales-target-branch-group fp-sales-target-branch-tone-${branchToneIndex(code)}`}
                 >
                   สาขา {code}
                 </th>
               ))}
             </tr>
             <tr>
-              {selectedBranches.flatMap((code, branchIndex) => columns.map((col, columnIndex) => (
+              {selectedBranches.flatMap((code) => columns.map((col, columnIndex) => (
                 <th
                   key={`${code}-${col.key}`}
-                  className={`fp-sales-target-branch-subhead fp-sales-target-branch-tone-${branchIndex % 4}${columnIndex === 0 ? " branch-start" : ""}`}
+                  className={`fp-sales-target-branch-subhead fp-sales-target-branch-tone-${branchToneIndex(code)}${columnIndex === 0 ? " branch-start" : ""}`}
                 >
                   {col.label}
                 </th>
@@ -1719,12 +1723,12 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
             {[1, 2, 3].map((tierNumber) => (
               <tr key={tierNumber}>
                 <td className="fp-sales-target-tier-sticky">{SALES_TARGET_TIER_LABELS[tierNumber]}</td>
-                {selectedBranches.flatMap((code, branchIndex) => {
+                {selectedBranches.flatMap((code) => {
                   const tier = progressByBranch[code]?.tiers?.find((item) => item.tier === tierNumber);
                   return columns.map((col, columnIndex) => (
                     <td
                       key={`${code}-${tierNumber}-${col.key}`}
-                      className={`fp-sales-target-branch-cell fp-sales-target-branch-tone-${branchIndex % 4}${columnIndex === 0 ? " branch-start" : ""}`}
+                      className={`fp-sales-target-branch-cell fp-sales-target-branch-tone-${branchToneIndex(code)}${columnIndex === 0 ? " branch-start" : ""}`}
                     >
                       {col.key === "achieved"
                         ? <StatusBadge achieved={tier?.achieved} />
@@ -1747,13 +1751,13 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
 
     return (
       <div className="fp-sales-target-branch-grid">
-        {selectedBranches.map((code, branchIndex) => {
+        {selectedBranches.map((code) => {
           const branchProgress = progressByBranch[code];
           const tiersByNumber = new Map((branchProgress?.tiers || []).map((tier) => [tier.tier, tier]));
           return (
             <article
               key={code}
-              className={`fp-sales-target-branch-card fp-sales-target-branch-tone-${branchIndex % 4}`}
+              className={`fp-sales-target-branch-card fp-sales-target-branch-tone-${branchToneIndex(code)}`}
             >
               <header className="fp-sales-target-branch-card-header">
                 <div>
@@ -2022,7 +2026,10 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
               {selectedBranches.map((code) => {
                 const branchProgress = progressByBranch[code];
                 return (
-                  <article key={code} className="fp-sales-target-branch-summary">
+                  <article
+                    key={code}
+                    className={`fp-sales-target-branch-summary fp-sales-target-branch-tone-${branchToneIndex(code)}`}
+                  >
                     <strong>สาขา {code}</strong>
                     <span>ยอดขายสะสม {formatCurrency(branchProgress?.actualSoFar)}</span>
                     <small>
