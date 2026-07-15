@@ -980,6 +980,10 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBr
 function YearCalendar({ year, onYearChange, selectedMonth, onSelectMonth, monthSummaries }) {
   return (
     <div className="fp-calendar">
+      <div className="fp-calendar-title">
+        <h2>สินค้าโฟกัส</h2>
+        <p>เลือกเดือนเพื่อดูและจัดการเป้าหมายสินค้า</p>
+      </div>
       <div className="fp-calendar-header">
         <button type="button" className="fp-year-nav-btn" onClick={() => onYearChange(year - 1)} aria-label="ปีก่อนหน้า">
           ‹

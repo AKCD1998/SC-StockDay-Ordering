@@ -8458,7 +8458,32 @@ input[type="radio"] {
 
 /* ── Focus products: year calendar ────────────────────────────────────── */
 
-.fp-calendar { margin: 16px 0 24px; }
+.fp-calendar {
+  margin: 16px 0 24px;
+  padding: 20px;
+  border: 1px solid #dbe3ee;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+}
+
+.fp-calendar-title {
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.fp-calendar-title h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 1.15rem;
+}
+
+.fp-calendar-title p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 0.82rem;
+}
 
 .fp-calendar-header {
   display: flex;
@@ -8556,6 +8581,10 @@ input[type="radio"] {
 .fp-month-detail-header h3 { margin: 0; font-size: 1.05rem; }
 
 [data-theme="dark"] .fp-year-nav-btn { background: #1e2e42; color: #e2e8f0; }
+[data-theme="dark"] .fp-calendar { background: #101a28; border-color: #263547; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2); }
+[data-theme="dark"] .fp-calendar-title { border-bottom-color: #263547; }
+[data-theme="dark"] .fp-calendar-title h2 { color: #f1f5f9; }
+[data-theme="dark"] .fp-calendar-title p { color: #94a3b8; }
 [data-theme="dark"] .fp-year-nav-btn:hover { background: #263547; }
 [data-theme="dark"] .fp-year-input { background: #0f1824; border-color: #263547; color: #e2e8f0; }
 [data-theme="dark"] .fp-month-card { background: #0f1824; border-color: #1e2e42; }
