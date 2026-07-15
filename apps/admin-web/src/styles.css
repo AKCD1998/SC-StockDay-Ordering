@@ -8179,25 +8179,6 @@ input[type="radio"] {
 .fp-sales-target-edit > .fp-form-error { flex: 1 0 100%; margin: 0; }
 
 .fp-sales-target-daily { margin-bottom: 0; }
-.fp-sales-daily-toggle {
-  min-height: 40px;
-  padding: 9px 14px;
-  border-radius: 9px;
-  background: #eef2ff;
-  color: #2732d4;
-  font-size: 0.98rem;
-  font-weight: 750;
-  line-height: 1.35;
-  text-decoration: none;
-}
-
-.fp-sales-daily-toggle:hover {
-  background: #e0e7ff;
-  text-decoration: none;
-}
-
-[data-theme="dark"] .fp-sales-daily-toggle { background: #1b2940; color: #c7ceff; }
-[data-theme="dark"] .fp-sales-daily-toggle:hover { background: #253754; }
 .fp-sales-target-daily-wrap { max-height: 260px; overflow-y: auto; margin-top: 6px; }
 .fp-sales-target-daily-wrap.filter-open { max-height: 520px; }
 

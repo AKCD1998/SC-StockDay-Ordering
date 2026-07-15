@@ -1518,36 +1518,23 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
     }
 
     let active = true;
-    const controller = new AbortController();
-    setDailyActualsByBranch({});
-
-    async function loadBranchesSequentially() {
-      const entries = {};
-      for (const code of BRANCH_CHOICES) {
-        if (!active) return;
+    Promise.all(
+      BRANCH_CHOICES.map(async (code) => {
         try {
-          const response = await apiFetch(
-            `/api/admin/sales-targets/progress?branchCode=${encodeURIComponent(code)}&month=${encodeURIComponent(month)}`,
-            { signal: controller.signal },
-          );
-          if (response.ok) {
-            const data = await response.json();
-            entries[code] = Array.isArray(data.dailyActuals) ? data.dailyActuals : [];
-          } else {
-            entries[code] = [];
-          }
+          const response = await apiFetch(`/api/admin/sales-targets/progress?branchCode=${encodeURIComponent(code)}&month=${encodeURIComponent(month)}`);
+          if (!response.ok) return [code, []];
+          const data = await response.json();
+          return [code, Array.isArray(data.dailyActuals) ? data.dailyActuals : []];
         } catch {
-          entries[code] = [];
+          return [code, []];
         }
-        if (active) setDailyActualsByBranch({ ...entries });
-      }
-    }
-
-    loadBranchesSequentially();
+      }),
+    ).then((entries) => {
+      if (active) setDailyActualsByBranch(Object.fromEntries(entries));
+    });
 
     return () => {
       active = false;
-      controller.abort();
     };
   }, [isAdminUser, month, refreshKey]);
 
@@ -1623,7 +1610,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
             <div className="fp-sales-target-daily">
               <button
                 type="button"
-                className="fp-btn-link fp-sales-daily-toggle"
+                className="fp-btn-link"
                 onClick={() => setDailyOpen((v) => !v)}
               >
                 {dailyOpen ? "▾" : "▸"} ยอดขายรายวัน ({dailyFilterActive ? `${displayedDailyCount}/${baseDailyRows.length}` : displayedDailyCount} วัน)
@@ -1809,33 +1796,23 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode 
 
   useEffect(() => {
     let active = true;
-    let timedOut = false;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-    }, 30_000);
     setLoading(true);
     setError(null);
     const endpoint = isAdminUser ? "/api/admin/focus-products" : "/api/focus-products";
-    apiFetch(endpoint, { signal: controller.signal })
+    apiFetch(endpoint)
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (active) setRows(Array.isArray(data.focusProducts) ? data.focusProducts : []);
       })
       .catch((err) => {
-        if (!active) return;
-        setError(timedOut ? "โหลดข้อมูลสินค้าโฟกัสนานเกิน 30 วินาที กรุณาลองใหม่" : (err.message || "โหลดข้อมูลไม่สำเร็จ"));
+        if (active) setError(err.message || "โหลดข้อมูลไม่สำเร็จ");
       })
       .finally(() => {
-        clearTimeout(timeoutId);
         if (active) setLoading(false);
       });
     return () => {
       active = false;
-      clearTimeout(timeoutId);
-      controller.abort();
     };
   }, [isAdminUser, refreshKey]);
 
@@ -1974,7 +1951,7 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode 
         <p>เป้าหมายสินค้าโปรโมชั่นที่ต้องผลักดันการขาย และยอดขายสะสมถึงรอบล่าสุด</p>
       </div>
 
-      <LoadingOverlay active={loading && rows.length === 0} />
+      <LoadingOverlay active={loading} />
       {error && <div className="fp-form-error">{error}</div>}
 
       <SalesTargetsSection csrfToken={csrfToken} isAdminUser={isAdminUser} branchCode={branchCode} />
