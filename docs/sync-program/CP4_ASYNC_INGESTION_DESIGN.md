@@ -276,13 +276,34 @@ queryable instead of scattered across per-branch log files.
    from the web service, same repo/deploy) is the plan: build the queue
    consumer as its own entry point (e.g. `apps/admin-api/src/worker.js`),
    deployed as its own Render service pointing at the same repo/Postgres.
-2. Polling loop vs. `LISTEN/NOTIFY` for the worker to wake promptly on new
-   batches (polling is simpler and fine to start with given batch counts
-   observed so far — low hundreds/day — but worth deciding explicitly
-   rather than defaulting silently).
-3. No staging database exists yet to test any of this against real
-   concurrency before touching production (existing open item in
-   MANUAL-ACTIONS.md) — this is a harder blocker for CP4 than it was for
-   the smaller fixes so far, since correctness here depends on genuine
-   concurrent-worker behavior that can't be verified with a mocked client
-   the way `upsertProductBatch()` was.
+2. **DECIDED 2026-07-15**: polling, not `LISTEN/NOTIFY`. Simpler, and fine
+   at the batch volumes observed so far (low hundreds/day). Revisit only if
+   queue latency becomes a real user-facing problem at higher volume.
+3. ~~No staging database exists~~ **DECIDED 2026-07-15 — not provisioning
+   one.** User's explicit call: no additional Render spend for this right
+   now (budget-conscious, small current scale). Mitigated instead by a
+   **canary-on-production** testing approach rather than a staging
+   environment:
+   - Deploy schema + v2 endpoint + worker, but **no agent points at v2
+     yet** — v1 stays the only thing any branch actually uses, so a bug in
+     v2 cannot affect a real sync.
+   - Manually POST a handful of synthetic/throwaway batches directly to v2
+     on production (a branch code and data that's obviously not real, e.g.
+     `branchCode: "test-cp4"`) and confirm by hand: batch appears
+     `queued` → worker claims it (`processing`) → `applied`, with correct
+     data landing in the target tables and correct idempotency behavior
+     (re-POST the exact same batch, confirm it's a no-op, not a duplicate).
+   - Only once that's confirmed working, point ONE real branch's agent at
+     v2 (canary — 004 is the natural choice, already the lowest-traffic
+     storefront and already the product-master single-writer) for one full
+     day/window cycle before considering wider rollout.
+   - This is a lower-confidence substitute for genuine concurrent-load
+     testing (it does not prove the worker behaves correctly under many
+     simultaneous claims — `FOR UPDATE SKIP LOCKED` is a well-established
+     Postgres pattern, which is why this substitution is considered
+     acceptable risk at the current fleet size, not a risk-free
+     equivalent). Revisit provisioning a real staging DB if/when branch
+     count grows enough that this program's own scaling roadmap
+     (`SCALE_TO_1000_BRANCHES_ROADMAP.md`) becomes active — that document's
+     load-testing ladder genuinely does need a staging environment and
+     should not be skipped at that point.
