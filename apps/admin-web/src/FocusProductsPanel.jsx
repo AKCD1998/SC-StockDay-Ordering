@@ -1796,23 +1796,33 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode 
 
   useEffect(() => {
     let active = true;
+    let timedOut = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 30_000);
     setLoading(true);
     setError(null);
     const endpoint = isAdminUser ? "/api/admin/focus-products" : "/api/focus-products";
-    apiFetch(endpoint)
+    apiFetch(endpoint, { signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (active) setRows(Array.isArray(data.focusProducts) ? data.focusProducts : []);
       })
       .catch((err) => {
-        if (active) setError(err.message || "โหลดข้อมูลไม่สำเร็จ");
+        if (!active) return;
+        setError(timedOut ? "โหลดข้อมูลสินค้าโฟกัสนานเกิน 30 วินาที กรุณาลองใหม่" : (err.message || "โหลดข้อมูลไม่สำเร็จ"));
       })
       .finally(() => {
+        clearTimeout(timeoutId);
         if (active) setLoading(false);
       });
     return () => {
       active = false;
+      clearTimeout(timeoutId);
+      controller.abort();
     };
   }, [isAdminUser, refreshKey]);
 
@@ -1951,7 +1961,7 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode 
         <p>เป้าหมายสินค้าโปรโมชั่นที่ต้องผลักดันการขาย และยอดขายสะสมถึงรอบล่าสุด</p>
       </div>
 
-      <LoadingOverlay active={loading} />
+      <LoadingOverlay active={loading && rows.length === 0} />
       {error && <div className="fp-form-error">{error}</div>}
 
       <SalesTargetsSection csrfToken={csrfToken} isAdminUser={isAdminUser} branchCode={branchCode} />
