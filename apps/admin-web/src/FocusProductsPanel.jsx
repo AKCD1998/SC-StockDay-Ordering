@@ -984,26 +984,29 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBr
 function YearCalendar({ year, onYearChange, selectedMonth, onSelectMonth, monthSummaries }) {
   return (
     <div className="fp-calendar">
-      <div className="fp-calendar-title">
-        <h2>สินค้าโฟกัส และ ยอดขาย</h2>
-        <p>เลือกเดือนเพื่อดูและจัดการเป้าหมายสินค้า</p>
-      </div>
-      <div className="fp-calendar-header">
-        <button type="button" className="fp-year-nav-btn" onClick={() => onYearChange(year - 1)} aria-label="ปีก่อนหน้า">
-          ‹
-        </button>
-        <input
-          type="number"
-          className="fp-year-input"
-          value={year}
-          onChange={(e) => {
-            const next = Number(e.target.value);
-            if (Number.isInteger(next) && next > 1900) onYearChange(next);
-          }}
-        />
-        <button type="button" className="fp-year-nav-btn" onClick={() => onYearChange(year + 1)} aria-label="ปีถัดไป">
-          ›
-        </button>
+      <div className="fp-calendar-topbar">
+        <div className="fp-calendar-title">
+          <h2>สินค้าโฟกัส และ ยอดขาย</h2>
+          <p>เลือกเดือนเพื่อดูและจัดการเป้าหมายสินค้า</p>
+        </div>
+        <div className="fp-calendar-header">
+          <button type="button" className="fp-year-nav-btn" onClick={() => onYearChange(year - 1)} aria-label="ปีก่อนหน้า">
+            ‹
+          </button>
+          <input
+            type="number"
+            className="fp-year-input"
+            value={year}
+            aria-label="ปีที่ต้องการดู"
+            onChange={(e) => {
+              const next = Number(e.target.value);
+              if (Number.isInteger(next) && next > 1900) onYearChange(next);
+            }}
+          />
+          <button type="button" className="fp-year-nav-btn" onClick={() => onYearChange(year + 1)} aria-label="ปีถัดไป">
+            ›
+          </button>
+        </div>
       </div>
 
       <div className="fp-month-grid">

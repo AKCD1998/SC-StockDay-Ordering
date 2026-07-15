@@ -9169,10 +9169,18 @@ input[type="radio"] {
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
 }
 
-.fp-calendar-title {
+.fp-calendar-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
   margin-bottom: 18px;
-  padding-bottom: 14px;
+  padding-bottom: 16px;
   border-bottom: 1px solid #e2e8f0;
+}
+
+.fp-calendar-title {
+  min-width: 0;
 }
 
 .fp-calendar-title h2 {
@@ -9190,18 +9198,19 @@ input[type="radio"] {
 .fp-calendar-header {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
   gap: 12px;
-  margin-bottom: 16px;
 }
 
 .fp-year-nav-btn {
   background: #f1f5f9;
-  border: none;
-  border-radius: 8px;
-  width: 32px;
-  height: 32px;
-  font-size: 1.1rem;
+  border: 1px solid #dbe3ee;
+  border-radius: 12px;
+  width: 52px;
+  height: 52px;
+  font-size: 1.6rem;
+  font-weight: 800;
   line-height: 1;
   cursor: pointer;
   color: #334155;
@@ -9210,13 +9219,15 @@ input[type="radio"] {
 .fp-year-nav-btn:hover { background: #e2e8f0; }
 
 .fp-year-input {
-  width: 90px;
+  width: 180px;
+  min-height: 58px;
+  box-sizing: border-box;
   text-align: center;
-  font-size: 1.15rem;
-  font-weight: 700;
+  font-size: 1.65rem;
+  font-weight: 800;
   border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 4px 8px;
+  border-radius: 12px;
+  padding: 8px 14px;
 }
 
 .fp-month-grid {
@@ -9227,6 +9238,24 @@ input[type="radio"] {
 
 @media (max-width: 900px) {
   .fp-month-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .fp-calendar-topbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .fp-calendar-header {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .fp-year-input {
+    flex: 1;
+    width: auto;
+    max-width: 220px;
+  }
 }
 
 .fp-month-card {
@@ -9284,7 +9313,7 @@ input[type="radio"] {
 
 [data-theme="dark"] .fp-year-nav-btn { background: #1e2e42; color: #e2e8f0; }
 [data-theme="dark"] .fp-calendar { background: #101a28; border-color: #263547; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2); }
-[data-theme="dark"] .fp-calendar-title { border-bottom-color: #263547; }
+[data-theme="dark"] .fp-calendar-topbar { border-bottom-color: #263547; }
 [data-theme="dark"] .fp-calendar-title h2 { color: #f1f5f9; }
 [data-theme="dark"] .fp-calendar-title p { color: #94a3b8; }
 [data-theme="dark"] .fp-year-nav-btn:hover { background: #263547; }
