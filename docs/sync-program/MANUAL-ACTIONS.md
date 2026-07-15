@@ -60,10 +60,12 @@ commits correctly (resolves earlier uncertainty about whether fixes were
 actually reaching production).
 
 **Still open** (narrower scope than originally written):
-- Workspace billing/plan tier (`team` workspace type confirmed, but Render
-  MCP doesn't expose Starter/Standard/Pro-level billing tier) — needed to know
-  if Background Workers / Key Value are available for CP4 without a plan
-  upgrade
+- ~~Workspace billing/plan tier~~ **RESOLVED 2026-07-15**: user confirmed via
+  Render dashboard billing page — **Professional plan** (~$78.60 projected
+  July 2026, note: Render is updating pricing 2026-08-01). Confirmed neither
+  the CLI nor MCP can read this field regardless of auth — it's dashboard-
+  only. Professional comfortably supports Background Workers / Key Value for
+  CP4, no plan upgrade needed.
 - Autoscaling min/max configuration (only current instance count, 1, was
   visible; no explicit "autoscaling: off" confirmation)
 - PITR retention days (SQL shows `archive_mode=on`, `wal_level=replica`, but

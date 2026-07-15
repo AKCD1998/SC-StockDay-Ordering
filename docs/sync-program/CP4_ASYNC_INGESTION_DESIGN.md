@@ -267,10 +267,15 @@ queryable instead of scattered across per-branch log files.
 
 ## Open questions before implementation starts
 
-1. Where does the worker run? Render Background Worker service (separate
-   from the web service) is the natural fit — needs the workspace
-   billing-tier question from MANUAL-ACTIONS (MA-002 remainder) answered
-   first, since Background Workers may be a Pro-tier feature.
+1. ~~Where does the worker run?~~ **RESOLVED 2026-07-15**: workspace
+   confirmed on Render's Professional plan (via user checking the
+   dashboard billing page directly — CLI/API cannot expose this field, see
+   MA-002). Professional comfortably covers a Background Worker service —
+   this is not a Pro-only feature gate, just needs a paid workspace, which
+   this already is. A dedicated Render Background Worker service (separate
+   from the web service, same repo/deploy) is the plan: build the queue
+   consumer as its own entry point (e.g. `apps/admin-api/src/worker.js`),
+   deployed as its own Render service pointing at the same repo/Postgres.
 2. Polling loop vs. `LISTEN/NOTIFY` for the worker to wake promptly on new
    batches (polling is simpler and fine to start with given batch counts
    observed so far — low hundreds/day — but worth deciding explicitly

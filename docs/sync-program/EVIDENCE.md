@@ -137,7 +137,13 @@ during any sync window and was not previously known to this investigation.
 
 **Frontend (`SC-StockDay-Ordering`, static site, `srv-d87t9sjeo5us738ldfu0`)**: root dir `apps/admin-web`, auto-deploy On, tracks `main`, current live deploy matches commit `46a48d6` (this session's last known SC-StockDay-Ordering HEAD) — confirms the frontend is not lagging behind the repo.
 
-**Still unresolved (narrower MA-002 follow-up, see updated MANUAL-ACTIONS.md)**: workspace billing/plan tier (Background Worker and Key Value entitlement can't be confirmed without it), autoscaling min/max config, PITR retention days, Disk I/O metrics (Render MCP's metrics endpoint doesn't expose this).
+**Still unresolved (narrower MA-002 follow-up, see updated MANUAL-ACTIONS.md)**: autoscaling min/max config, PITR retention days, Disk I/O metrics (neither Render MCP nor CLI expose these). ~~Workspace billing/plan tier~~ resolved 2026-07-15 (Professional, see MANUAL-ACTIONS.md).
+
+## Render CLI access confirmed working (2026-07-15)
+
+`render` CLI v2.21.0 is installed (`C:\Users\scgro\AppData\Local\Programs\RenderCLI`) and has a valid, non-expired login token in `~/.render/cli.yaml` (workspace `tea-d58i7hchg0os73bqofb0`, matches the MCP-based checks from 2026-07-14 exactly). **Gotcha**: a stale/dummy `RENDER_API_KEY=S123123c` environment variable in the shell profile overrides the valid config file and causes every command to fail with `401 unauthorized` — must `unset RENDER_API_KEY` before each `render` invocation (env vars don't persist across separate Bash tool calls in this session). Worth permanently removing that env var from the user's system/user environment variables rather than working around it every time — flagged, not yet done (low priority, not blocking).
+
+Used this to independently re-verify (all matched exactly): backend (`srv-d6c0sd0gjchc73fvup5g`) live deploy = current `origin/main` HEAD on PaaSRTSM-project, no commits pending. Frontend (`srv-d87t9sjeo5us738ldfu0`) live deploy commit `a9acfe5` is an ancestor relationship away from being stale — checked directly and confirmed the 3 commits ahead of it on SC-StockDay-Ordering `main` touch only `apps/adapos-sync` and `docs/`, none touch `apps/admin-web`, so there is genuinely nothing pending to deploy for the frontend (the earlier concern that the notification badge feature, `e8b5efb`, might not be live was a false alarm — it's an ancestor of the deployed commit, already live). No Background Worker or Key Value instances exist yet in the workspace (confirmed via both MCP and CLI, consistently). Six other Postgres instances exist in the same workspace, all belonging to unrelated projects (`scDigitalPJKform`, `scglam-db`, `scGlam-receptionDb`, `SCUserAccountInfo`, `rx1011-postgres`, `scai-rag-pdf-storage`) and all `basic_256mb` — none suitable to reuse as a staging DB for this program's concurrency testing.
 
 ## What CP0 could NOT gather from this session (see MANUAL-ACTIONS.md)
 
