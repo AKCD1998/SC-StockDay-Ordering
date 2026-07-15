@@ -1610,7 +1610,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
             </div>
           )}
 
-          <div className="mvt-sales-table-wrap">
+          <div className="mvt-sales-table-wrap fp-sales-target-tier-wrap">
             <table className="mvt-sales-table fp-table">
               <thead>
                 <tr>
