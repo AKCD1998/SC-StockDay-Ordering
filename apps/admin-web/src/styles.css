@@ -8152,8 +8152,24 @@ input[type="radio"] {
 .fp-sales-target-summary { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 10px; font-size: 0.88rem; color: #334155; }
 [data-theme="dark"] .fp-sales-target-summary { color: #cbd5e1; }
 
-.fp-sales-target-edit { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #cbd5e1; }
-.fp-sales-target-tier-field { width: 130px; }
+.fp-sales-target-edit {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px dashed #cbd5e1;
+}
+
+.fp-sales-target-edit .fp-branch-target-grid {
+  column-gap: 16px;
+  row-gap: 14px;
+  margin-bottom: 16px;
+}
+
+.fp-sales-target-tier-field {
+  width: 130px;
+  gap: 6px;
+}
+
+.fp-sales-target-edit > .fp-btn-primary { margin-top: 2px; }
 
 .fp-search-results {
   position: absolute;
