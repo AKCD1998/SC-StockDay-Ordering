@@ -7,20 +7,50 @@ with physical/dashboard access.
 
 ---
 
-## Action ID: MA-001 — Identify branch 000's agent installation — CLOSED (out of scope, user decision 2026-07-14)
+## Action ID: MA-001 — Identify branch 000's agent installation — REOPENED 2026-07-15, cleanup done
 
-**Resolution**: found at `Y:\SC-StockDay-Ordering\apps\adapos-sync` (`.env`
-confirms `ADAPOS_SYNC_BRANCH_CODE=000`). Code is stale (git HEAD `ee58bfd9`,
-2026-06-01 — 6+ weeks old), last log is 2026-06-26 and appears to be cut off
-mid-sync, and `sync-and-shutdown.ps1` in that folder defaults to `-Branch 005`
-suggesting this may be a copy-pasted-then-repointed install rather than a
-purpose-built 000 install. Whether this is still the live install or has been
-superseded elsewhere is unresolved.
+**Original resolution (2026-07-14)**: found at `Y:\SC-StockDay-Ordering\apps\adapos-sync`
+via a mapped network drive. Turned out to be a **red herring path** — that
+share actually pointed to a different machine entirely (later determined to
+be branch 005/possrv's D: drive, coincidentally also readable as a drive
+letter from this session). Real install confirmed 2026-07-15: **local path
+`C:\SC-StockDay-Ordering` on the "server" host** (`.env` confirms
+`ADAPOS_SYNC_BRANCH_CODE=000`), accessed this time via a session with real
+console access on that machine, not a network share — resolves the
+drive-letter ambiguity that caused the original misidentification.
 
-**User decision**: 000 is currently working from the dashboard's perspective
-and is explicitly **out of scope** for this program. Do not investigate
-further or touch anything related to branch 000. Left here only as a
-breadcrumb in case it becomes relevant later.
+**2026-07-15 cleanup, done via a session with real access on that machine**:
+- Found 4 uncommitted local modifications: `.env.example` (root),
+  `apps/adapos-sync/.env.example`, `apps/adapos-sync/RUN-ADAPOS-SYNC.bat`,
+  `apps/adapos-sync/src/index.js`. All confirmed safe to discard — either
+  superseded by newer code already on `main`, or (the `.env.example` files)
+  actively risky: contained a real-looking token
+  (`sAin6bHxBjepr0tZ6984PEZV61ty5AsA`) pasted into a template file meant to
+  be safely committable.
+  - Checked whether that token is still live: it's present as a
+    **commented-out, inactive** line in the real `.env`
+    (`apps/adapos-sync/.env:13`) — the active token is different
+    (`sc-branch-sync-2026-...`). Lower urgency to rotate since it's not
+    currently in use, but still worth rotating/removing at some point since
+    it sat in a git-trackable file.
+  - All 4 files discarded (`git checkout --`), tree confirmed clean
+    afterward (only harmless untracked `.log` files remained).
+- `git pull origin main`: fast-forward `ee58bfd9` → `ec65f888` (175 files,
+  +53k/-2.9k lines — 6 weeks of work, everything from this whole program).
+- Added the 3 new env vars (`ADAPOS_SYNC_PRODUCT_BATCH_SIZE=100`,
+  `ADAPOS_SYNC_SALES_DETAIL_CHUNK_DOCS=150`,
+  `ADAPOS_SYNC_TRANSFER_CHUNK_DOCS=30`) — all were missing.
+- **No sync run performed yet** — deliberately deferred per the user's own
+  instruction ("ทำให้มันคลีนก่อน") to separate "get the code right" from
+  "prove it actually syncs."
+
+**Still open / not yet answered**: whether branch 000's Scheduled Task is
+even healthy — the original finding that its last log (2026-06-26) cut off
+mid-sync with no completion/failure line was never explained, and hasn't
+been re-checked since the code cleanup. Code being current doesn't by
+itself mean scheduled syncs will resume; that needs its own verification
+(check Task Scheduler status/history, then an off-peak manual test run
+matching the pattern used for 001/003/004/005 earlier this session).
 
 <details><summary>Original request (kept for reference, no longer active)</summary>
 
@@ -152,7 +182,7 @@ alongside this program's docs folder or hand back to this session to store.
 
 | Action ID | Status | Blocks |
 |---|---|---|
-| MA-001 | CLOSED — out of scope | none (000 explicitly excluded from this program) |
+| MA-001 | REOPENED — cleanup done, code current | scheduled-task health + first test run still unverified |
 | MA-002 | MOSTLY RESOLVED (4 narrow sub-items open) | CP5 capacity claims only now — deploy mechanism question fully resolved |
 | MA-003 | OPEN | CP1's stated justification (not the fix itself) |
 | MA-004 | OPEN | CP1 branch-005 task work |
