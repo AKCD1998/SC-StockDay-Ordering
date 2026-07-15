@@ -981,7 +981,7 @@ function YearCalendar({ year, onYearChange, selectedMonth, onSelectMonth, monthS
   return (
     <div className="fp-calendar">
       <div className="fp-calendar-title">
-        <h2>สินค้าโฟกัส</h2>
+        <h2>สินค้าโฟกัส และ ยอดขาย</h2>
         <p>เลือกเดือนเพื่อดูและจัดการเป้าหมายสินค้า</p>
       </div>
       <div className="fp-calendar-header">
