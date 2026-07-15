@@ -8133,6 +8133,18 @@ input[type="radio"] {
   font-size: 0.85rem;
 }
 
+.fp-form-success {
+  background: rgba(22, 163, 74, 0.1);
+  color: #15803d;
+  border: 1px solid rgba(22, 163, 74, 0.3);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-size: 0.85rem;
+}
+
+[data-theme="dark"] .fp-form-success { color: #86efac; }
+
 .fp-sales-target-controls input[type="month"] {
   flex: 0 0 148px;
   width: 148px;
@@ -8186,7 +8198,8 @@ input[type="radio"] {
 }
 
 .fp-sales-target-edit > .fp-btn-primary { flex: 0 0 auto; }
-.fp-sales-target-edit > .fp-form-error { flex: 1 0 100%; margin: 0; }
+.fp-sales-target-edit > .fp-form-error,
+.fp-sales-target-edit > .fp-form-success { flex: 1 0 100%; margin: 0; }
 
 .fp-sales-target-daily { margin-bottom: 0; }
 
@@ -8603,29 +8616,38 @@ input[type="radio"] {
 [data-theme="dark"] .fp-sales-target-branch-group,
 [data-theme="dark"] .fp-sales-target-branch-subhead { color: #f1f5ff !important; }
 
-.fp-sales-target-admin-edit { margin-top: 20px; }
-
-.fp-sales-target-edit-branch {
-  display: inline-flex;
+.fp-sales-target-config-action {
+  display: flex;
   align-items: center;
-  gap: 10px;
-  color: #475569;
-  font-size: 0.84rem;
-  font-weight: 650;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px dashed #cbd5e1;
 }
 
-.fp-sales-target-edit-branch select {
-  min-height: 38px;
-  padding: 6px 30px 6px 10px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background: #fff;
-  color: #1e293b;
-  font: inherit;
+.fp-sales-target-config-button {
+  min-height: 46px;
+  padding: 10px 18px;
+  border: 1px solid #d66b18;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ff9f43 0%, #f47b20 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(226, 106, 23, 0.24);
+  font-size: 0.94rem;
+  font-weight: 750;
+  cursor: pointer;
 }
 
-[data-theme="dark"] .fp-sales-target-edit-branch { color: #cbd5e1; }
-[data-theme="dark"] .fp-sales-target-edit-branch select { border-color: #33465c; background: #111d2b; color: #e2e8f0; }
+.fp-sales-target-config-button:hover {
+  filter: brightness(1.05);
+  box-shadow: 0 10px 22px rgba(226, 106, 23, 0.32);
+}
+
+.fp-sales-target-config-action > span { color: #64748b; font-size: 0.82rem; }
+
+[data-theme="dark"] .fp-sales-target-config-action { border-top-color: #33465c; }
+[data-theme="dark"] .fp-sales-target-config-action > span { color: #9fb0c3; }
 
 .fp-sales-target-modal-header {
   display: flex;
@@ -8640,6 +8662,74 @@ input[type="radio"] {
 [data-theme="dark"] .fp-sales-target-modal-header span { color: #9fb0c3; }
 
 .fp-sales-target-table-modal { max-width: none; }
+
+.fp-sales-target-edit-modal {
+  width: min(1400px, 100%);
+  height: auto;
+  max-height: calc(100vh - 48px);
+}
+
+.fp-sales-target-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.fp-sales-target-edit-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--fp-branch-border);
+  border-radius: 13px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(30, 49, 70, 0.08);
+}
+
+.fp-sales-target-edit-card-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--fp-branch-border);
+  background: var(--fp-branch-head);
+  color: #29445f;
+}
+
+.fp-sales-target-edit-card-header h4 { margin: 0 0 2px; font-size: 1rem; }
+.fp-sales-target-edit-card-header span { font-size: 0.84rem; font-weight: 650; }
+.fp-sales-target-edit-card-header small { color: #5f7185; text-align: right; }
+
+.fp-sales-target-edit-card .fp-sales-target-edit {
+  margin: 0;
+  padding: 16px;
+  border-top: 0;
+  gap: 12px;
+}
+
+.fp-sales-target-edit-card .fp-branch-target-grid {
+  flex: 1 1 390px;
+  flex-wrap: nowrap;
+}
+
+.fp-sales-target-edit-card .fp-sales-target-tier-field {
+  flex: 1 1 0;
+  min-width: 105px;
+  width: auto;
+}
+
+[data-theme="dark"] .fp-sales-target-edit-card {
+  background: #0d1724;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
+[data-theme="dark"] .fp-sales-target-edit-card-header { color: #f2f6ff; }
+[data-theme="dark"] .fp-sales-target-edit-card-header small { color: #a5b5c7; }
+
+@media (max-width: 700px) {
+  .fp-sales-target-edit-grid { grid-template-columns: 1fr; }
+  .fp-sales-target-edit-card .fp-branch-target-grid { flex-wrap: wrap; }
+}
 
 .fp-sales-target-branch-grid {
   display: grid;

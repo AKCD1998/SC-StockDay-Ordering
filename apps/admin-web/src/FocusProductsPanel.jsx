@@ -1418,7 +1418,7 @@ function dailyWeekdayClass(iso) {
 // Admin-only inline form for setting the 3 tier targets for the currently
 // selected branch/month. Kept separate from the read-only progress table so
 // staff (who never see this) get a strictly smaller component tree.
-function SalesTargetEditForm({ tiers, onSave, saving, saveError }) {
+function SalesTargetEditForm({ tiers, onSave, saving, disabled = false, saveError, saveSuccess }) {
   const [drafts, setDrafts] = useState(() =>
     Object.fromEntries([1, 2, 3].map((tier) => [tier, tiers.find((t) => t.tier === tier)?.monthlyTarget ?? ""])),
   );
@@ -1446,7 +1446,7 @@ function SalesTargetEditForm({ tiers, onSave, saving, saveError }) {
       <button
         type="button"
         className="fp-btn-primary"
-        disabled={saving}
+        disabled={saving || disabled}
         onClick={() =>
           onSave(
             [1, 2, 3]
@@ -1458,6 +1458,7 @@ function SalesTargetEditForm({ tiers, onSave, saving, saveError }) {
         {saving ? "กำลังบันทึก..." : "บันทึกเป้า"}
       </button>
       {saveError && <div className="fp-form-error">{saveError}</div>}
+      {saveSuccess && <div className="fp-form-success">บันทึกเป้าเรียบร้อยแล้ว</div>}
     </div>
   );
 }
@@ -1473,12 +1474,15 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [saving, setSaving] = useState(false);
+  const [savingBranch, setSavingBranch] = useState("");
   const [saveError, setSaveError] = useState(null);
+  const [saveErrorBranch, setSaveErrorBranch] = useState("");
+  const [savedBranch, setSavedBranch] = useState("");
   const [visibleColumns, setVisibleColumns] = useState(loadVisibleColumns);
   const [columnPickerOpen, setColumnPickerOpen] = useState(false);
   const [branchPickerOpen, setBranchPickerOpen] = useState(false);
   const [salesTargetTableExpanded, setSalesTargetTableExpanded] = useState(false);
+  const [salesTargetEditModalOpen, setSalesTargetEditModalOpen] = useState(false);
   const [dailyOpen, setDailyOpen] = useState(true);
   const [dailyDateFilterOpen, setDailyDateFilterOpen] = useState(false);
   const [dailyDateSort, setDailyDateSort] = useState("desc");
@@ -1580,34 +1584,42 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   }, [isAdminUser, selectedBranch, selectedBranches]);
 
   useEffect(() => {
-    if (!salesTargetTableExpanded) return undefined;
+    if (!salesTargetTableExpanded && !salesTargetEditModalOpen) return undefined;
     const closeOnEscape = (event) => {
-      if (event.key === "Escape") setSalesTargetTableExpanded(false);
+      if (event.key === "Escape") {
+        setSalesTargetTableExpanded(false);
+        setSalesTargetEditModalOpen(false);
+      }
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [salesTargetTableExpanded]);
+  }, [salesTargetEditModalOpen, salesTargetTableExpanded]);
 
-  async function saveTiers(tiers) {
+  async function saveTiers(targetBranch, tiers) {
+    setSavedBranch("");
     if (!tiers.length) {
+      setSaveErrorBranch(targetBranch);
       setSaveError("กรุณากรอกเป้าหมายอย่างน้อย 1 ขั้น");
       return;
     }
-    setSaving(true);
+    setSavingBranch(targetBranch);
+    setSaveErrorBranch("");
     setSaveError(null);
     try {
-      const res = await apiFetch(`/api/admin/sales-targets?branchCode=${encodeURIComponent(activeBranch)}`, {
+      const res = await apiFetch(`/api/admin/sales-targets?branchCode=${encodeURIComponent(targetBranch)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
         body: JSON.stringify({ month, tiers }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.message || body.error || `HTTP ${res.status}`);
+      setSavedBranch(targetBranch);
       setRefreshKey((v) => v + 1);
     } catch (err) {
+      setSaveErrorBranch(targetBranch);
       setSaveError(err.message || "บันทึกเป้าไม่สำเร็จ");
     } finally {
-      setSaving(false);
+      setSavingBranch("");
     }
   }
 
@@ -2095,14 +2107,75 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
           )}
 
           {isAdminUser && (
-            <div className="fp-sales-target-admin-edit">
-              <label className="fp-sales-target-edit-branch">
-                <span>สาขาที่กำลังแก้ไขเป้า</span>
-                <select value={selectedBranch} onChange={(event) => setSelectedBranch(event.target.value)}>
-                  {selectedBranches.map((code) => <option key={code} value={code}>สาขา {code}</option>)}
-                </select>
-              </label>
-              <SalesTargetEditForm tiers={progress.tiers} onSave={saveTiers} saving={saving} saveError={saveError} />
+            <div className="fp-sales-target-config-action">
+              <button
+                type="button"
+                className="fp-sales-target-config-button"
+                onClick={() => {
+                  setSaveError(null);
+                  setSaveErrorBranch("");
+                  setSavedBranch("");
+                  setSalesTargetEditModalOpen(true);
+                }}
+                aria-haspopup="dialog"
+              >
+                กำหนดเป้ายอดขายต่อเดือนร้านค้า
+              </button>
+              <span>ตั้งเป้า 3 ขั้นแยกตามสาขา สำหรับเดือน {month}</span>
+            </div>
+          )}
+
+          {isAdminUser && salesTargetEditModalOpen && (
+            <div className="fp-table-modal-overlay" onClick={() => setSalesTargetEditModalOpen(false)}>
+              <div
+                className="fp-table-modal fp-sales-target-edit-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="fp-sales-target-edit-modal-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  className="fp-table-modal-close"
+                  onClick={() => setSalesTargetEditModalOpen(false)}
+                  aria-label="ปิด"
+                >
+                  ✕
+                </button>
+                <div className="fp-sales-target-modal-header">
+                  <h3 id="fp-sales-target-edit-modal-title" className="fp-section-title">
+                    กำหนดเป้ายอดขายต่อเดือนร้านค้า
+                  </h3>
+                  <span>เดือน {month} · บันทึกแยกแต่ละสาขา</span>
+                </div>
+                <div className="fp-sales-target-edit-grid">
+                  {BRANCH_CHOICES.map((code) => {
+                    const branchProgress = progressByBranch[code];
+                    return (
+                      <article
+                        key={code}
+                        className={`fp-sales-target-edit-card fp-sales-target-branch-tone-${branchToneIndex(code)}`}
+                      >
+                        <header className="fp-sales-target-edit-card-header">
+                          <div>
+                            <h4>สาขา {code}</h4>
+                            <span>ยอดขายสะสม {formatCurrency(branchProgress?.actualSoFar)}</span>
+                          </div>
+                          <small>กำหนดเป้ารายเดือน 3 ขั้น</small>
+                        </header>
+                        <SalesTargetEditForm
+                          tiers={branchProgress?.tiers || []}
+                          onSave={(tiers) => saveTiers(code, tiers)}
+                          saving={savingBranch === code}
+                          disabled={Boolean(savingBranch) && savingBranch !== code}
+                          saveError={saveErrorBranch === code ? saveError : null}
+                          saveSuccess={savedBranch === code}
+                        />
+                      </article>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
 
