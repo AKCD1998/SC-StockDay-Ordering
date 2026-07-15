@@ -175,7 +175,40 @@ pattern, just server-driven instead of `.env`-driven.
 ~15-line change to `apps/adapos-sync/src/config.js` to fetch-and-merge
 before the rest of `runOnce()` runs.
 
-### 2b — Agent self-update (bigger, do this only once 2a is solid)
+### 2b — Agent self-update — **IMPLEMENTED 2026-07-15** (simplified version, ahead of 2a)
+
+Built sooner than originally sequenced here, because the pain of manual
+per-branch coordination became acute mid-session (every fix that day needed
+a hand-written prompt for a separate session with real exec access on that
+specific branch machine, verify-then-pull, report back — repeated per
+branch, per fix). `apps/adapos-sync/open-adapos-and-sync.ps1` (the wrapper
+every branch's Scheduled Task already calls) now checks `git status` +
+compares local `HEAD` to `origin/main` **before every sync run** and
+`git pull --ff-only` if behind — see commit `2adff19`. This is simpler than
+the "version manifest" design below (no new backend endpoint, just direct
+git comparison, since every branch install is already a git checkout) but
+covers the same need.
+
+**What this does and doesn't solve**:
+- Solves: every fix from now on needs exactly one commit to `main` — no
+  more per-branch prompts. Each branch picks it up on its own next
+  scheduled run (worst case ~12h lag, next 08:20 or 19:20).
+- Does NOT solve: getting *this* capability onto every branch in the first
+  place still needs one more round of the old manual-pull process (chicken-
+  and-egg — a machine needs the self-update code before it can self-update).
+  That's a one-time cost, not a recurring one.
+- Fails safe exactly as designed below: dirty tree, wrong branch, or a pull
+  failure just skips the update and runs with existing code — never blocks
+  the actual sync.
+- No canary/staged-rollout mechanism yet — a bad commit to `main` reaches
+  every branch on their next run, all at once. Acceptable at 5 branches;
+  revisit (add a version-pin/staged-rollout mechanism) before this matters
+  at higher branch counts — see the version-manifest design immediately
+  below, which is the natural next step if a canary gate becomes necessary.
+
+Original design (superseded in the details above, kept for the version-
+manifest/staged-rollout idea which the simpler implementation above doesn't
+yet have):
 
 For actual code changes, the "push it like a phone app" mental model maps
 to: **the agent checks a version manifest and updates itself before
