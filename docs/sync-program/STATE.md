@@ -375,18 +375,62 @@ Fixes applied (all verified against production):
    query per minute, which is the actual concurrency fix (the "burst"
    pattern can't recur by construction).
 
-Still open, feeds CP3.2 and future capacity work:
-- Snapshot retention/pruning still unimplemented — the table keeps growing
-  and every unpruned row makes the (now-indexed) probes and the index
-  itself bigger. CP3.2 remains the durable fix.
-- A maintained "current stock" table (one row per product, updated at
-  sync-write time) would remove history scans from the read path entirely —
-  candidate CP3.2 companion, needs migration + sync-writer change +
-  explicit sign-off.
-- Pool isolation / per-route statement timeouts (blast-radius containment)
-  discussed, not yet implemented.
-- Backend Render service auto-deploy found switched OFF (was ON per
-  2026-07-14 notes) — every push now needs a manual
+## 2026-07-15 later same day — pool timeouts + CP3.2 current-stock table (CLOSES the read-path half of CP3.2)
+
+Two more commits, both deployed and verified against production (not just
+build-passing):
+
+**`04174ff`** — pool hardening in `apps/admin-api/src/db.js`: `max: 10`
+(explicit), `connectionTimeoutMillis: 15s`, `statement_timeout: 300s`,
+`idle_in_transaction_session_timeout: 60s`. Root cause of *why* the
+2026-07-15 outage's stuck queries ran 25-45+ min: a client giving up
+(browser 499) does not stop Postgres from finishing the query — nothing
+existed to kill abandoned work. 300s chosen from `pg_stat_statements`
+evidence: the slowest *legitimate* query observed maxed at ~298s, so this
+only kills zombies no client is still waiting on. Verified live: a Pool
+built with these exact options reports `SHOW statement_timeout` = `5min`,
+`idle_in_transaction_session_timeout` = `1min` on the actual server.
+
+**`4693f2d`** — `analytics.product_current_stock` (migration 057): one row
+per product_code (confirmed via `information_schema` that
+`product_stock_snapshots` has no branch dimension, so per-product is the
+correct grain), kept in sync by `upsertProductBatch()` in `sync.js` inside
+the same transaction as the history insert, guarded by
+`WHERE ... snapshot_at <= EXCLUDED.snapshot_at` so a late-arriving batch
+can't clobber newer data. Both `ordering.js` read paths
+(`queryStockDayBase`, product search) now join this table directly instead
+of computing "latest stock" per call.
+
+Backfill note: the migration's backfill originally used `DISTINCT ON`
+(matching the old query shape) — confirmed live that Postgres will **not**
+use the new index for that pattern even though the index exists (still
+full seq-scan+sort, ~60s+). Rewritten to the same per-SKU `LATERAL` probe
+already used in the read-path fix; measured 30.4s via `EXPLAIN ANALYZE`
+against production before shipping.
+
+**Result, measured on production via `EXPLAIN ANALYZE` post-deploy**:
+`queryStockDayBase`'s core query: **6.6 min avg (435 historical calls,
+pg_stat_statements) → 6.57s (index+LATERAL fix, same day) → 8.7ms
+(current-stock table)**. 6,597 rows backfilled, 5/5 spot-checked against
+direct history lookups, all exact matches. The read path's cost is now
+independent of `product_stock_snapshots` size entirely.
+
+**This closes the read-path half of CP3.2.** What's still genuinely open:
+- **Retention/pruning of `product_stock_snapshots` itself** — still
+  unbounded growth (1.85M inserts and counting), still needs a business
+  decision on retention window before any DELETE. No longer performance-
+  urgent (reads don't depend on this table's size anymore), so this is now
+  purely a disk/cost decision on the operator's own timeline.
+- Pool isolation (separate pools per route) — discussed, likely
+  unnecessary now that statement_timeout exists; only worth revisiting if
+  a specific route needs stronger isolation later.
+- A second slow-query risk was found during this investigation and
+  deliberately NOT touched (separate scope): a `movement-analytics`
+  query ("`WITH filtered_sales`") observed at up to 2h/call in
+  `pg_stat_statements`, 3 calls total so far. Same shared-pool blast-radius
+  risk as stock-day had — now contained by the new `statement_timeout`,
+  but the query itself is still slow and worth its own fix.
+- Backend Render service auto-deploy still OFF — every push needs a manual
   `render deploys create`. Worth confirming with the operator whether
   intentional.
 
