@@ -337,6 +337,59 @@ rule was in place.
   (same default already validated on 003 earlier today). No sync test run
   (already validated earlier today).
 
+## 2026-07-15 ~15:10-16:30 ICT — READ-side outage: stock-day query saturation (new finding, adjacent to CP3.2)
+
+Full backend outage (~40 min, every route 499ing, some requests 30+ min)
+initially blamed on the day's focus-products/sales-targets UI commits —
+disproven with evidence (all rollbacks verified byte-identical, and the two
+"suspect" backend commits had never even deployed because auto-deploy is
+off). Actual root cause, confirmed via pg_stat_activity + EXPLAIN:
+
+- `queryStockDayBase()` (`apps/admin-api/src/routes/ordering.js`, behind
+  `GET /api/admin/stock-day`) recomputed "latest stock per product" with an
+  unfiltered `DISTINCT ON` over **all of `analytics.product_stock_snapshots`**
+  — 5,043,579 rows / 1.17 GB, growing forever because CP3.2 (snapshot
+  retention) was never implemented. Plan: Seq Scan 5M rows -> Sort (cost
+  ~938k) on a 0.1-CPU DB.
+- A few staff loading the Stock Day page concurrently queued enough copies
+  (observed: 11 simultaneous, 25-45+ min each) to exhaust the app's pg Pool
+  (default max 10, no explicit config in `apps/admin-api/src/db.js`) —
+  which is why completely unrelated routes died too.
+
+Fixes applied (all verified against production):
+1. `pg_terminate_backend()` on stuck read-only SELECTs (thrice — recurrence
+   confirmed the query itself was the problem, not a one-off).
+2. `CREATE INDEX CONCURRENTLY idx_product_stock_snapshots_latest
+   (product_code, snapshot_at DESC, stock_snapshot_id DESC)` — ~35 min
+   build; final validation phase was itself blocked by the stuck queries
+   (waiting-for-old-snapshots / virtualxid) until they were terminated.
+   NOTE: index alone did NOT change the plan — Postgres can't skip-scan
+   DISTINCT ON, so seq+sort remained cheaper than a full index walk.
+3. Query rewrite (PaaSRTSM `4237abe`): DISTINCT ON CTE -> LATERAL 1-row
+   probe per SKU using the new index. EXPLAIN cost 938k -> 12k (~78x);
+   real run 6,811 rows in ~5-12s on the still-loaded DB vs never-completing.
+   Spot-checked 5 products: latest-snapshot values identical to old
+   semantics.
+4. 60s response cache + in-flight promise coalescing on
+   `/admin/stock-day` — N concurrent page loads now cost exactly 1 DB
+   query per minute, which is the actual concurrency fix (the "burst"
+   pattern can't recur by construction).
+
+Still open, feeds CP3.2 and future capacity work:
+- Snapshot retention/pruning still unimplemented — the table keeps growing
+  and every unpruned row makes the (now-indexed) probes and the index
+  itself bigger. CP3.2 remains the durable fix.
+- A maintained "current stock" table (one row per product, updated at
+  sync-write time) would remove history scans from the read path entirely —
+  candidate CP3.2 companion, needs migration + sync-writer change +
+  explicit sign-off.
+- Pool isolation / per-route statement timeouts (blast-radius containment)
+  discussed, not yet implemented.
+- Backend Render service auto-deploy found switched OFF (was ON per
+  2026-07-14 notes) — every push now needs a manual
+  `render deploys create`. Worth confirming with the operator whether
+  intentional.
+
 ## Recommended next step
 
 CP0 is close enough to complete that starting CP1 work which doesn't depend
