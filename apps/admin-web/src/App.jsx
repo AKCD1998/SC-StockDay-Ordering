@@ -462,20 +462,20 @@ function compactFileName(value) {
 }
 
 const BRANCH_STOCK_COLUMNS = [
-  { key: "productCode", label: "รหัสสินค้า", type: "text" },
   { key: "productNameThai", label: "ชื่อสินค้าไทย", type: "text" },
-  { key: "productNameEng", label: "ชื่ออังกฤษ", type: "text" },
+  { key: "productCode", label: "รหัสสินค้า", type: "text" },
   { key: "barcode", label: "Barcode", type: "text" },
   { key: "unit", label: "หน่วย", type: "text" },
-  { key: "category", label: "หมวดหมู่", type: "text" },
-  { key: "categoryStatus", label: "สถานะหมวดหมู่", type: "text" },
   { key: "qtyBranch000", label: "สาขา 000", type: "number" },
   { key: "qtyBranch001", label: "สาขา 001", type: "number" },
   { key: "qtyBranch003", label: "สาขา 003", type: "number" },
   { key: "qtyBranch004", label: "สาขา 004", type: "number" },
   { key: "qtyBranch005", label: "สาขา 005", type: "number" },
-  { key: "qtyTotalAllBranches", label: "รวมทุกสาขา", type: "number" },
-  { key: "syncedAt", label: "synced_at", type: "date" },
+  { key: "qtyTotalAllBranches", label: "รวม", type: "number" },
+  { key: "productNameEng", label: "ชื่อภาษาอังกฤษ", type: "text" },
+  { key: "category", label: "หมวดหมู่", type: "text" },
+  { key: "categoryStatus", label: "สถานะหมวดหมู่", type: "text" },
+  { key: "syncedAt", label: "Sync At", type: "date" },
 ];
 
 const STOCK_COST_COMPARE_BRANCHES = [
