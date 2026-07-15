@@ -416,11 +416,6 @@ direct history lookups, all exact matches. The read path's cost is now
 independent of `product_stock_snapshots` size entirely.
 
 **This closes the read-path half of CP3.2.** What's still genuinely open:
-- **Retention/pruning of `product_stock_snapshots` itself** — still
-  unbounded growth (1.85M inserts and counting), still needs a business
-  decision on retention window before any DELETE. No longer performance-
-  urgent (reads don't depend on this table's size anymore), so this is now
-  purely a disk/cost decision on the operator's own timeline.
 - Pool isolation (separate pools per route) — discussed, likely
   unnecessary now that statement_timeout exists; only worth revisiting if
   a specific route needs stronger isolation later.
@@ -433,6 +428,37 @@ independent of `product_stock_snapshots` size entirely.
 - Backend Render service auto-deploy still OFF — every push needs a manual
   `render deploys create`. Worth confirming with the operator whether
   intentional.
+
+## 2026-07-15 later still — CP3.2 CLOSED (retention pruning shipped)
+
+**`48d5419`** — the other half of CP3.2. Operator decisions (asked
+explicitly, not assumed): **365-day retention**, **piggybacked on existing
+sync traffic** rather than a new Render Cron service (no new billed
+infrastructure).
+
+`pruneOldSnapshotsIfDue()` in `sync.js`, called after every
+`/api/sync/products` commit, fire-and-forget on its own connection (never
+affects the sync response either way):
+- Self-throttles via an atomic claim UPSERT against
+  `analytics.maintenance_runs` (migration 058) — at most one prune run per
+  24h regardless of how many branches/batches call in that window. Verified
+  live post-deploy: first claim succeeds, immediate second claim correctly
+  returns 0 rows (blocked).
+- Batch-bounded delete (20k rows/run cap), not one unbounded DELETE.
+- Verified via `EXPLAIN` that the candidate-row subquery uses
+  `idx_product_stock_snapshots_snapshot_at` (cost ~1.56) rather than
+  scanning.
+
+**Confirmed deliberately, not assumed**: `product_stock_snapshots` data
+currently spans only ~58 days (earliest row 2026-05-18), so this deletes
+**0 rows today** — this is future-proofing against continued growth
+(1.85M inserts and counting per `pg_stat_statements`), not an immediate
+destructive change. Nothing will actually get pruned until real rows cross
+the 365-day mark, ~10 months out.
+
+**CP3.2 (snapshot-runaway) is now fully closed** — both halves: reads no
+longer depend on history-table size (current-stock table), and the
+history table itself no longer grows without bound (retention pruning).
 
 ## Recommended next step
 
