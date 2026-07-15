@@ -464,7 +464,7 @@ function compactFileName(value) {
 const BRANCH_STOCK_COLUMNS = [
   { key: "productNameThai", label: "ชื่อสินค้าไทย", type: "text" },
   { key: "productCode", label: "รหัสสินค้า", type: "text" },
-  { key: "barcode", label: "Barcode", type: "text" },
+  { key: "barcode", label: "รหัสบาร์โค้ด", type: "text" },
   { key: "unit", label: "หน่วย", type: "text" },
   { key: "qtyBranch000", label: "สาขา 000", type: "number" },
   { key: "qtyBranch001", label: "สาขา 001", type: "number" },
