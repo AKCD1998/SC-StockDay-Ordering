@@ -110,6 +110,14 @@ function StatusBadge({ achieved }) {
   );
 }
 
+function TargetCloseStatusBadge({ isFrozen }) {
+  return (
+    <span className={`fp-status-badge ${isFrozen ? "ok" : "pending"}`}>
+      {isFrozen ? "ปิดเป้าแล้ว" : "ยังไม่ปิดเป้า"}
+    </span>
+  );
+}
+
 function PublicationBadge({ row }) {
   if (!row) return null;
   const state = row.publicationState || row.publicationStatus || "published";
@@ -678,14 +686,7 @@ function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete, restrictT
                   </Fragment>
                 );
               })}
-              <td>
-                <StatusBadge achieved={row.achieved} />
-                {row.isFrozen && (
-                  <span className="fp-frozen-badge" title="ยอดขายถูกล็อกแล้วเมื่อสิ้นสุดช่วงเวลา">
-                    🔒 ปิดยอด
-                  </span>
-                )}
-              </td>
+              <td><TargetCloseStatusBadge isFrozen={row.isFrozen} /></td>
               {isAdminUser && (
                 <td className="fp-actions-cell">
                   <button
