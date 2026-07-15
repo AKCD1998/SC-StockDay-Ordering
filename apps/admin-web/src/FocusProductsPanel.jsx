@@ -1670,25 +1670,25 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
     setDailyPage((current) => Math.min(current, dailyPageCount));
   }, [dailyPageCount]);
 
-  function renderAdminSalesTargetTable({ inModal = false } = {}) {
+  function renderAdminSalesTargetTable() {
     if (columns.length === 0) {
       return <div className="fp-empty">กรุณาเลือกอย่างน้อย 1 คอลัมน์</div>;
     }
 
     return (
       <div
-        className={`mvt-sales-table-wrap fp-sales-target-tier-wrap fp-sales-target-comparison-wrap${inModal ? " in-modal" : ""}`}
-        onClick={inModal ? undefined : () => setSalesTargetTableExpanded(true)}
-        onKeyDown={inModal ? undefined : (event) => {
+        className="mvt-sales-table-wrap fp-sales-target-tier-wrap fp-sales-target-comparison-wrap"
+        onClick={() => setSalesTargetTableExpanded(true)}
+        onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
             setSalesTargetTableExpanded(true);
           }
         }}
-        role={inModal ? undefined : "button"}
-        tabIndex={inModal ? undefined : 0}
-        title={inModal ? undefined : "คลิกเพื่อดูตารางแบบเต็มหน้าจอ"}
-        aria-label={inModal ? "ตารางเป้ายอดขายแบบเต็มหน้าจอ" : "เปิดตารางเป้ายอดขายแบบเต็มหน้าจอ"}
+        role="button"
+        tabIndex={0}
+        title="คลิกเพื่อดูตารางแบบเต็มหน้าจอ"
+        aria-label="เปิดตารางเป้ายอดขายแบบเต็มหน้าจอ"
       >
         <table className="mvt-sales-table fp-table fp-sales-target-comparison-table">
           <thead>
@@ -1736,6 +1736,68 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
             ))}
           </tbody>
         </table>
+      </div>
+    );
+  }
+
+  function renderAdminSalesTargetGrid() {
+    if (columns.length === 0) {
+      return <div className="fp-empty">กรุณาเลือกอย่างน้อย 1 คอลัมน์</div>;
+    }
+
+    return (
+      <div className="fp-sales-target-branch-grid">
+        {selectedBranches.map((code, branchIndex) => {
+          const branchProgress = progressByBranch[code];
+          const tiersByNumber = new Map((branchProgress?.tiers || []).map((tier) => [tier.tier, tier]));
+          return (
+            <article
+              key={code}
+              className={`fp-sales-target-branch-card fp-sales-target-branch-tone-${branchIndex % 4}`}
+            >
+              <header className="fp-sales-target-branch-card-header">
+                <div>
+                  <h4>สาขา {code}</h4>
+                  <span>ยอดขายสะสม {formatCurrency(branchProgress?.actualSoFar)}</span>
+                </div>
+                <small>
+                  {branchProgress
+                    ? `ผ่านไป ${branchProgress.daysElapsed}/${branchProgress.totalDaysInMonth} วัน · เหลือ ${branchProgress.daysRemaining} วัน`
+                    : "ไม่มีข้อมูล"}
+                </small>
+              </header>
+              <div className="mvt-sales-table-wrap fp-sales-target-branch-card-table-wrap">
+                <table className="mvt-sales-table fp-table fp-sales-target-branch-card-table">
+                  <thead>
+                    <tr>
+                      <th>ตัวชี้วัด</th>
+                      {[1, 2, 3].map((tierNumber) => (
+                        <th key={tierNumber}>{SALES_TARGET_TIER_LABELS[tierNumber]}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {columns.map((col) => (
+                      <tr key={col.key}>
+                        <th scope="row">{col.label}</th>
+                        {[1, 2, 3].map((tierNumber) => {
+                          const tier = tiersByNumber.get(tierNumber);
+                          return (
+                            <td key={tierNumber}>
+                              {col.key === "achieved"
+                                ? <StatusBadge achieved={tier?.achieved} />
+                                : formatCurrency(tier?.[col.key])}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          );
+        })}
       </div>
     );
   }
@@ -2058,7 +2120,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
                   <h3 id="fp-sales-target-modal-title" className="fp-section-title">เป้ายอดขายแบบเต็มหน้าจอ</h3>
                   <span>{branchPickerLabel} · {month}</span>
                 </div>
-                {renderAdminSalesTargetTable({ inModal: true })}
+                {renderAdminSalesTargetGrid()}
               </div>
             </div>
           )}

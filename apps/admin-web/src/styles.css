@@ -8630,23 +8630,84 @@ input[type="radio"] {
 [data-theme="dark"] .fp-sales-target-modal-header span { color: #9fb0c3; }
 
 .fp-sales-target-table-modal { max-width: none; }
-.fp-table-modal .fp-sales-target-comparison-wrap {
-  max-width: 100%;
-  max-height: calc(100vh - 150px);
-  overflow: auto;
-  cursor: default;
+
+.fp-sales-target-branch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(560px, 1fr));
+  gap: 16px;
+  align-items: start;
+  padding: 2px;
 }
 
-.fp-sales-target-table-modal .fp-sales-target-comparison-table {
-  width: max-content;
-  min-width: 100%;
+.fp-sales-target-branch-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--fp-branch-border);
+  border-radius: 13px;
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(30, 49, 70, 0.09);
+}
+
+.fp-sales-target-branch-card-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--fp-branch-border);
+  background: var(--fp-branch-head);
+  color: #29445f;
+}
+
+.fp-sales-target-branch-card-header h4 { margin: 0 0 2px; font-size: 1rem; }
+.fp-sales-target-branch-card-header span { font-size: 0.85rem; font-weight: 650; }
+.fp-sales-target-branch-card-header small { color: #5f7185; text-align: right; }
+
+.fp-table-modal .fp-sales-target-branch-card-table-wrap {
+  max-width: 100%;
+  max-height: none;
+  overflow: auto;
+  margin: 0;
+}
+
+.fp-sales-target-table-modal .fp-sales-target-branch-card-table {
+  width: 100%;
+  min-width: 540px;
   table-layout: auto;
 }
 
-.fp-sales-target-table-modal .fp-sales-target-comparison-table th,
-.fp-sales-target-table-modal .fp-sales-target-comparison-table td {
+.fp-sales-target-table-modal .fp-sales-target-branch-card-table th,
+.fp-sales-target-table-modal .fp-sales-target-branch-card-table td {
+  min-width: 110px;
+  padding: 9px 11px;
   white-space: nowrap;
   word-break: normal;
+  text-align: right;
+}
+
+.fp-sales-target-table-modal .fp-sales-target-branch-card-table th:first-child {
+  min-width: 155px;
+  text-align: left;
+}
+
+.fp-sales-target-branch-card-table tbody th {
+  position: static;
+  background: #f8fafc;
+  color: #38506b;
+  font-weight: 650;
+}
+
+[data-theme="dark"] .fp-sales-target-branch-card {
+  background: #0d1724;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.24);
+}
+
+[data-theme="dark"] .fp-sales-target-branch-card-header { color: #f2f6ff; }
+[data-theme="dark"] .fp-sales-target-branch-card-header small { color: #a5b5c7; }
+[data-theme="dark"] .fp-sales-target-branch-card-table tbody th { background: #101d2b; color: #dce7f5; }
+
+@media (max-width: 1100px) {
+  .fp-sales-target-branch-grid { grid-template-columns: 1fr; }
 }
 
 .fp-search-results {
