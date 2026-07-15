@@ -2042,8 +2042,11 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
                     key={code}
                     className={`fp-sales-target-branch-summary fp-sales-target-branch-tone-${branchToneIndex(code)}`}
                   >
-                    <strong>สาขา {code}</strong>
-                    <span>ยอดขายสะสม {formatCurrency(branchProgress?.actualSoFar)}</span>
+                    <strong className="fp-sales-target-branch-summary-title">สาขา {code}</strong>
+                    <div className="fp-sales-target-branch-summary-total">
+                      <span>ยอดขายสะสม</span>
+                      <strong>{formatCurrency(branchProgress?.actualSoFar)}</strong>
+                    </div>
                     <small>
                       {branchProgress
                         ? `ผ่านไป ${branchProgress.daysElapsed}/${branchProgress.totalDaysInMonth} วัน · เหลือ ${branchProgress.daysRemaining} วัน`
