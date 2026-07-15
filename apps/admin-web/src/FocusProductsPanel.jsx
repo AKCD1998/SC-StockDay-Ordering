@@ -1460,6 +1460,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   const [visibleColumns, setVisibleColumns] = useState(loadVisibleColumns);
   const [columnPickerOpen, setColumnPickerOpen] = useState(false);
   const [dailyOpen, setDailyOpen] = useState(true);
+  const [dailyActualsByBranch, setDailyActualsByBranch] = useState({});
 
   const activeBranch = isAdminUser ? selectedBranch : branchCode;
 
@@ -1492,6 +1493,33 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
       active = false;
     };
   }, [activeBranch, month, refreshKey]);
+
+  useEffect(() => {
+    if (!isAdminUser) {
+      setDailyActualsByBranch({});
+      return undefined;
+    }
+
+    let active = true;
+    Promise.all(
+      BRANCH_CHOICES.map(async (code) => {
+        try {
+          const response = await apiFetch(`/api/admin/sales-targets/progress?branchCode=${encodeURIComponent(code)}&month=${encodeURIComponent(month)}`);
+          if (!response.ok) return [code, []];
+          const data = await response.json();
+          return [code, Array.isArray(data.dailyActuals) ? data.dailyActuals : []];
+        } catch {
+          return [code, []];
+        }
+      }),
+    ).then((entries) => {
+      if (active) setDailyActualsByBranch(Object.fromEntries(entries));
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [isAdminUser, month, refreshKey]);
 
   async function saveTiers(tiers) {
     if (!tiers.length) {
@@ -1526,6 +1554,20 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   }
 
   const columns = SALES_TARGET_COLUMN_DEFS.filter((col) => visibleColumns.has(col.key));
+  const adminDailyRows = useMemo(() => {
+    if (!isAdminUser) return [];
+    const rowsByDate = new Map();
+    for (const code of BRANCH_CHOICES) {
+      for (const day of dailyActualsByBranch[code] || []) {
+        const current = rowsByDate.get(day.date) || { date: day.date, byBranch: {} };
+        current.byBranch[code] = Number(day.actual || 0);
+        rowsByDate.set(day.date, current);
+      }
+    }
+    return [...rowsByDate.values()].sort((a, b) => b.date.localeCompare(a.date));
+  }, [dailyActualsByBranch, isAdminUser]);
+
+  const displayedDailyCount = isAdminUser ? adminDailyRows.length : (progress?.dailyActuals?.length || 0);
 
   return (
     <section className="fp-section fp-sales-target-section">
@@ -1579,14 +1621,14 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
             </span>
           </div>
 
-          {progress.dailyActuals?.length > 0 && (
+          {displayedDailyCount > 0 && (
             <div className="fp-sales-target-daily">
               <button
                 type="button"
                 className="fp-btn-link"
                 onClick={() => setDailyOpen((v) => !v)}
               >
-                {dailyOpen ? "▾" : "▸"} ยอดขายรายวัน ({progress.dailyActuals.length} วัน)
+                {dailyOpen ? "▾" : "▸"} ยอดขายรายวัน ({displayedDailyCount} วัน)
               </button>
               {dailyOpen && (
                 <div className="mvt-sales-table-wrap fp-sales-target-daily-wrap">
@@ -1594,16 +1636,30 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
                     <thead>
                       <tr>
                         <th>วันที่</th>
-                        <th>ยอดขาย</th>
+                        {isAdminUser ? (
+                          <>
+                            {BRANCH_CHOICES.map((code) => <th key={code}>สาขา {code}</th>)}
+                            <th className="fp-daily-total-col">รวมทุกสาขา</th>
+                          </>
+                        ) : <th>ยอดขาย</th>}
                       </tr>
                     </thead>
                     <tbody>
-                      {[...progress.dailyActuals].reverse().map((day) => (
-                        <tr key={day.date}>
-                          <td>{formatDailyDateLabel(day.date)}</td>
-                          <td>{formatCurrency(day.actual)}</td>
-                        </tr>
-                      ))}
+                      {isAdminUser ? adminDailyRows.map((day) => {
+                        const total = BRANCH_CHOICES.reduce((sum, code) => sum + Number(day.byBranch[code] || 0), 0);
+                        return (
+                          <tr key={day.date}>
+                            <td>{formatDailyDateLabel(day.date)}</td>
+                            {BRANCH_CHOICES.map((code) => <td key={code}>{formatCurrency(day.byBranch[code] || 0)}</td>)}
+                            <td className="fp-daily-total-col">{formatCurrency(total)}</td>
+                          </tr>
+                        );
+                      }) : [...progress.dailyActuals].reverse().map((day) => (
+                          <tr key={day.date}>
+                            <td>{formatDailyDateLabel(day.date)}</td>
+                            <td>{formatCurrency(day.actual)}</td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
