@@ -44,13 +44,31 @@ drive-letter ambiguity that caused the original misidentification.
   instruction ("ทำให้มันคลีนก่อน") to separate "get the code right" from
   "prove it actually syncs."
 
-**Still open / not yet answered**: whether branch 000's Scheduled Task is
-even healthy — the original finding that its last log (2026-06-26) cut off
-mid-sync with no completion/failure line was never explained, and hasn't
-been re-checked since the code cleanup. Code being current doesn't by
-itself mean scheduled syncs will resume; that needs its own verification
-(check Task Scheduler status/history, then an off-peak manual test run
-matching the pattern used for 001/003/004/005 earlier this session).
+**RESOLVED 2026-07-15 ~11:05-11:09 ICT — first successful sync since the
+2026-06-26 stall.** Manual off-peak run (single attempt, no retries): exit
+0, "Done." — products 6,584 sent (100/batch), branch_stock 6,584 snapshots,
+pending_receipts 26 headers/75 lines accepted, approved_receipts 123
+upserted/0 failed. `sales`/`sales_detail`/`purchases` all read 0 rows —
+flagged by the reporting session as worth a sanity check, not asserted as a
+problem. 13,715 records read, 13,392 sent.
+
+**On the zero sales/purchases**: worth noting (not yet confirmed) — branch
+000's `ADAPOS_SYNC_DATASETS` is `products,sales,purchases,pending_receipts,
+approved_receipts,branch_stock`, which is a **different profile** from every
+storefront branch (001/003/004/005 use `sales_detail`+`transfers` instead of
+`purchases`, and none of them have `purchases` at all). This is consistent
+with 000 being HQ — a warehouse/admin hub rather than a customer-facing
+storefront — where zero retail sales and zero supplier purchases over a
+given 7-day window could be entirely normal, unlike it would be alarming
+for an actual storefront branch. Not confirmed against real AdaPos data at
+HQ — flagging the reasoning, not the conclusion.
+
+**Scheduled Task health**: still not separately verified (a PowerShell
+check was handed to the user to run themselves as Administrator, per their
+preference not to have Claude touch Scheduled Tasks) — but this successful
+manual run at minimum proves the SQL Server, network path, and backend
+ingestion all work correctly again for this branch, which was the larger
+unknown.
 
 <details><summary>Original request (kept for reference, no longer active)</summary>
 
@@ -182,7 +200,7 @@ alongside this program's docs folder or hand back to this session to store.
 
 | Action ID | Status | Blocks |
 |---|---|---|
-| MA-001 | REOPENED — cleanup done, code current | scheduled-task health + first test run still unverified |
+| MA-001 | RESOLVED — code current, manual sync confirmed working | Scheduled Task health check handed to user (Administrator-only) |
 | MA-002 | MOSTLY RESOLVED (4 narrow sub-items open) | CP5 capacity claims only now — deploy mechanism question fully resolved |
 | MA-003 | OPEN | CP1's stated justification (not the fix itself) |
 | MA-004 | OPEN | CP1 branch-005 task work |
