@@ -245,6 +245,52 @@ Still outstanding: observe one real in-window (08:20/19:20) run on each
 branch now that both the batch/chunk mitigation AND single-writer are both
 live, to see whether peak-window failures are gone entirely or just reduced.
 
+## 2026-07-15 ~10:00 ICT — remote off-peak verification for 003 and 004 (post set-based-upsert deploy)
+
+New capability established this session: this session's own machine
+(scproductdev) can reach each branch's local SQL Server directly over the
+same Tailscale network used for file access (already proven earlier when
+comparing product catalogs across branches — see DECISIONS.md). This means
+a sync run can be executed **from here**, using this session's own local
+(most current) code checkout and a temporary `.env` pointing at the
+branch's SQL Server via its Tailscale IP, without remoting into the
+branch's actual PC at all — explicitly requested by the user to avoid
+disrupting storefront staff. The temporary `.env` is deleted immediately
+after each run (contains real DB credentials, never committed, never left
+on disk).
+
+**003**: ran with this session's local code (already has the transfers
+chunking fix, `72e4e1b` — this run effectively validates that fix without
+ever needing branch 003's own machine to `git pull`). Full success: sales
+2,086, sales_detail 1,744 headers/3,453 lines across 12/12 chunks,
+**transfers 163 headers/1,715 lines across 6/6 chunks** (30-doc chunks,
+last chunk 13 headers = 163 - 5×30, checks out), branch_stock 6,591 —
+15,752 total records, no `Sync failed`.
+
+**004**: ran with this session's local code + the newly-deployed set-based
+upsert live on the backend. Full success including **products**: 6,595
+sent at 100/batch (now backed by `upsertProductBatch()` server-side, not
+the old per-record loop), sales 1,647, sales_detail 634/1,344 across 5/5
+chunks, transfers 162/1,538 across 6/6 chunks, branch_stock 6,595 — 18,515
+total records, no `Sync failed`.
+
+**Caveat, stated plainly**: this run happened around 10:00 ICT — **outside**
+the 08:00-08:40/19:15-19:30 peak-contention windows this whole program
+exists because of. It confirms both branches' code is now fully correct
+(transfers chunking for 003, everything + set-based upsert for 004) and
+that the remote-execution-from-here technique works — it does **not** yet
+confirm set-based upsert's effect during real peak contention, since no
+peak window has occurred since it deployed. That data point still needs an
+in-window observation (next natural one: today ~19:20 ICT, or tomorrow
+08:20).
+
+One credential/config gotcha hit and fixed during this: a `.env` value
+containing `#` (the SQL password) must be quoted (`PASSWORD="value#part"`),
+otherwise dotenv treats everything after `#` as a comment and silently
+truncates the value — caused one login failure on the first 004 attempt,
+confirmed via a raw `mssql` connection test isolating the bug to `.env`
+parsing rather than the credential or network path itself.
+
 ## Recommended next step
 
 CP0 is close enough to complete that starting CP1 work which doesn't depend
