@@ -558,6 +558,53 @@ fine for the guess, catastrophic for reality. Confirmed with
 Normal case unaffected (6-7s before and after — no regression). Deployed,
 `/admin/health` and the endpoint both verified responsive post-deploy.
 
+## 2026-07-16 later still — proactive pg_stat_statements audit (commit `ab2e00a`, deployed, verified)
+
+Requested a broad audit (via a Fable 5 session) rather than waiting to
+trip over a third outage-class landmine. Result: **none found** — no
+remaining query matches the "unbounded read + planner misestimate ->
+nested-loop blowup" shape that caused the two real incidents. Three
+smaller, real items were found and fixed anyway while the DB was calm:
+
+- **A — stockRecommendations.js `loadRawSalesAggByBranch`** (30 calls,
+  mean 40.4s, max 70.1s). Verified via `EXPLAIN ANALYZE` this is NOT a
+  bad-plan bug — both Nested Loop and Hash Join cost 20-30s, because
+  `sales_lines` carries no date column so a 90-day/5-branch rollup
+  genuinely touches a large slice of real data regardless of join
+  strategy. **The audit's own suggested fix (switch back to
+  `analytics.product_sales_summary_periods`) was checked and found
+  wrong before being applied** — queried the table directly:
+  `period_days=90` has 1 row total, last updated 2026-05-20. Switching
+  back would have silently reintroduced the exact bug the raw-query
+  workaround already fixed once (2026-07-13, "คำแนะนำสต๊อก recommended
+  nothing"). Applied a cache instead (branchCodes+anchorDate key,
+  15min TTL) — same lever as the stock-day fix, no correctness risk.
+- **C — branch-stock.js listing + count** (~4,565/4,592 calls, ~11,120
+  total DB-seconds, #2 all-time consumer after the now-fixed stock-day
+  query). Default page load was paying for an ILIKE/LATERAL-barcode
+  join it never needed. Now skips straight to a bare `COUNT(*)` and
+  drops the join/WHERE entirely when there's no search term. Measured
+  466ms -> 272ms on the idle DB (modest in isolation; the larger value
+  is removing join work that scales with concurrent load and table
+  growth).
+- **D — movement-analytics.js `/movement-transactions` and
+  `/movement-documents`** — same unbounded-date shape `d130069` fixed
+  for `branch-product-sales`, not yet responsible for an incident.
+  Same server-side 90-day floor applied preventively.
+
+**Not applied, flagged for a separate decision**: database role-level
+`statement_timeout` (currently 0/unlimited at server and role level —
+only the app pool has protection, via commit `04174ff`'s 300s). Would
+extend protection to non-app connections (ad-hoc psql, future scripts,
+the migration runner) but needs its own review since the migration
+runner shares the same role/credentials and a future large index build
+could legitimately need more than 300s.
+
+All three fixes verified against production post-deploy (health +
+each affected endpoint responds correctly). This closes the proactive
+audit — no further landmine hunting queued unless something new turns
+up in normal use.
+
 ## Recommended next step
 
 CP0 is close enough to complete that starting CP1 work which doesn't depend
