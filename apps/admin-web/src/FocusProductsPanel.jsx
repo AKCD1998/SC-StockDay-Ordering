@@ -253,8 +253,8 @@ function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, 
   }
 
   return (
-    <div className="fp-modal-overlay" onClick={onCancel}>
-      <div className="fp-modal" onClick={(e) => e.stopPropagation()}>
+    <div className={`fp-modal-overlay fp-focus-form-overlay${form.id ? " is-edit" : ""}`} onClick={onCancel}>
+      <div className={`fp-modal fp-focus-form-modal${form.id ? " is-edit" : ""}`} onClick={(e) => e.stopPropagation()}>
         <h3>{form.id ? "แก้ไขสินค้าโฟกัส" : "เพิ่มสินค้าโฟกัส"}</h3>
 
         <label className="fp-field">

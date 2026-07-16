@@ -8241,6 +8241,47 @@ input[type="radio"] {
 
 .fp-modal h3 { margin: 0 0 14px; }
 
+.fp-focus-form-overlay.is-edit {
+  background: rgba(3, 8, 18, 0.8);
+  backdrop-filter: blur(5px) saturate(0.72);
+}
+
+.fp-focus-form-modal.is-edit {
+  overflow: hidden auto;
+  border: 1px solid #9aabc0;
+  border-top: 5px solid #4f46e5;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow:
+    0 30px 90px rgba(2, 8, 23, 0.46),
+    0 0 0 1px rgba(255, 255, 255, 0.75);
+}
+
+.fp-focus-form-modal.is-edit > h3 {
+  margin: -20px -24px 18px;
+  padding: 16px 24px 15px;
+  border-bottom: 1px solid #cbd5e1;
+  background: #eef2ff;
+  color: #312e81;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+[data-theme="dark"] .fp-focus-form-modal.is-edit {
+  border-color: #526b86;
+  border-top-color: #818cf8;
+  background: linear-gradient(180deg, #122135 0%, #0d1826 100%);
+  box-shadow:
+    0 34px 100px rgba(0, 0, 0, 0.72),
+    0 0 0 1px rgba(148, 163, 184, 0.14),
+    0 0 36px rgba(99, 102, 241, 0.12);
+}
+
+[data-theme="dark"] .fp-focus-form-modal.is-edit > h3 {
+  border-bottom-color: #3b5069;
+  background: #192a40;
+  color: #f1f5ff;
+}
+
 .fp-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; position: relative; }
 
 .fp-field span { font-size: 0.8rem; color: #64748b; }
