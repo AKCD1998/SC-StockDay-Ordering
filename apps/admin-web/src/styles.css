@@ -9220,7 +9220,8 @@ input[type="radio"] {
 
 .fp-batch-modal .fp-batch-basics {
   display: grid;
-  grid-template-columns: minmax(280px, 410px) 190px 190px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: min(100%, 1080px);
   justify-content: start;
   gap: 16px;
 }
