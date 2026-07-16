@@ -605,6 +605,70 @@ each affected endpoint responds correctly). This closes the proactive
 audit — no further landmine hunting queued unless something new turns
 up in normal use.
 
+## 2026-07-16 afternoon — CP2 (observability) shipped, all 4 parts
+
+Operator decided to do CP2 now rather than after CP4, reasoning: can't
+act on the pending 19:20/08:20 verification windows right now anyway,
+and CP4 (bigger, riskier) deserves observability in place *before* it's
+built, not after — otherwise a CP4 problem gets debugged the same
+blind way today's 003/004 investigation was.
+
+**The gap this closes**: a sync run only ever got recorded once, at the
+very end, as a single free-text message. A run that crashed mid-way
+(2026-07-16's self-update bug on branch 004) left zero rows anywhere in
+any table — the only way to notice was absence of expected activity,
+cross-checked by hand across three separate systems (Render logs, this
+table, branch machine log files). `ingest.sync_runs.status` already
+allowed `'running'` in its CHECK constraint from the start; the code
+just never used it.
+
+Four commits, backend -> agent -> backend -> frontend, each verified
+against production before moving to the next:
+
+1. **`79993ed`** (PaaSRTSM-project) — `POST /run-start` opens the run row
+   immediately (`status='running'`); new `ingest.sync_run_datasets`
+   table (migration 059) plus a middleware that logs any dataset POST
+   carrying an `X-Sync-Run-Id` header; `POST /run-log` now UPDATEs that
+   same row to its final status instead of always INSERTing a new one
+   (falls back to old insert-once behavior if no runId is sent, so
+   agents mid-self-update don't break). Verified end-to-end with a
+   rolled-back test transaction before committing.
+2. **`65ab33f`** (SC-StockDay-Ordering) — agent calls `/run-start`
+   first (best-effort, never blocks the sync if it fails), then
+   `client.js`'s `setSyncRunId()` makes every subsequent request carry
+   the correlation header automatically — no per-call-site changes
+   needed elsewhere. Ships to every branch automatically via
+   self-update on its own next scheduled run.
+3. **`0a46422`** (PaaSRTSM-project) — `/sync/nightly-log` now returns
+   the rich per-cell object the frontend's `SyncLogMetaCard` component
+   already expected but never received (it was built ahead of the
+   backend — totalRuns/syncType/message were always showing "-"),
+   plus the actual new capability: that day's latest run's per-dataset
+   breakdown via a `json_agg` over `sync_run_datasets`. Verified
+   282ms against production; `datasets` is null for every existing row
+   today since no branch has run the new agent code yet — expected.
+4. **`5273771`** (SC-StockDay-Ordering) — `SyncLogMetaCard` renders the
+   per-dataset list when present (✅/❌ per dataset, records sent or
+   error message); renders nothing extra for older runs that predate
+   this.
+
+**Known, accepted gaps** (documented in commit messages, not silently
+dropped):
+- A PowerShell-wrapper-level crash before Node even starts (like the
+  self-update bug) predates `/run-start` and still won't be visible
+  this way — that specific failure mode is already separately fixed.
+- `/api/branch-stock/sync` lives in a different backend router
+  (`branch-stock.js`) without the new logging middleware yet, so that
+  one dataset's outcome doesn't show up in the per-dataset breakdown
+  until that router gets the same treatment.
+
+**Not yet observed with real data** — every branch is still running
+pre-CP2 agent code as of this writing. First real test: whichever
+branch runs next (003's re-registered evening task fires 19:20 ICT
+tonight, others on their normal schedule) will be the first to show a
+populated `datasets` array in the dashboard. Worth checking after
+tonight's window alongside the already-planned 003 verification.
+
 ## Recommended next step
 
 CP0 is close enough to complete that starting CP1 work which doesn't depend
