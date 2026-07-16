@@ -486,6 +486,49 @@ need re-litigating later.
   movement-analytics query (see prior entry) is still unaddressed. Not
   gated on CP4/CP5, would need its own pass if it ever becomes urgent.
 
+## 2026-07-16 morning — CP4 gate pushed further out: 003/004 failures were never a DB signal
+
+Full detail in `2026-07-16-branch-003-004-sync-outage.md`. Short version:
+both branches' failures since 2026-07-15 turned out to be **local-machine
+bugs with zero relation to backend/DB capacity** — branch 003's Scheduled
+Tasks were completely deleted from Task Scheduler (re-registered, fix
+confirmed, evening test pending tonight); branch 004 had a PowerShell
+5.1 gotcha (`$ErrorActionPreference = "Stop"` promotes native-command
+stderr into a terminating exception even through `2>$null`) combined with
+a `git` "dubious ownership" error under the SYSTEM task principal,
+silently crashing the whole sync script before any log line was written
+— masked from Task Scheduler by a missing `exit /b` in
+`RUN-ADAPOS-SYNC.bat` (fixed, pushed `aa86d8b`, verified via a real
+`Start-ScheduledTask` trigger: full sync succeeded, 18,531 records).
+
+**Practical effect on the CP4 decision**: every "peak-window failure"
+observed for 003/004 over the last two days was confounded by these bugs,
+not a genuine DB-capacity signal. 001/005 succeeded cleanly at 19:20 on
+the 15th (real, clean data point) but the `products` dataset — the one
+single-writer dataset that actually stresses the DB the most, sent only
+by branch 004 — has **never once been observed succeeding or failing
+under real peak-window conditions** since set-based upsert deployed;
+every attempt so far hit one of these unrelated local bugs first.
+
+**Also surfaced, not yet resolved**: the self-update fix only reached
+branch 004 via a direct on-disk fix — it lives on `main` now, but
+branch 003 (freshly re-registered, evening run at 19:20 tonight) is still
+running the *pre-fix* self-update code and may hit the identical crash if
+it shares 004's `safe.directory` gap, which would produce a false
+negative for tonight's re-registration test. Manual `git pull
+origin main --ff-only` on 003 before 19:20 recommended to decouple the
+two tests. Unverified: whether 001/005/000 have the same `safe.directory`
+gap — if so, self-update isn't actually delivering this fix fleet-wide as
+designed, and every branch may need either a manual pull or a
+`safe.directory` config fix.
+
+**Revised CP4 gate**: do not decide based on tonight's 003 test alone,
+even if clean — it doesn't include `products`. Earliest a genuinely clean,
+complete signal (all 5 branches, all datasets, no local-machine
+confounders) is realistic: **tomorrow 08:20 ICT (2026-07-17)**, contingent
+on 003/004 both being confirmed bug-free by then. Decide CP4 after that
+window, not before.
+
 ## Recommended next step
 
 CP0 is close enough to complete that starting CP1 work which doesn't depend
