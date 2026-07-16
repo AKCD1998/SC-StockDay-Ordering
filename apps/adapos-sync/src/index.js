@@ -19,7 +19,7 @@ import {
   getProductPriceDefaultRows,
   getBranchPriceOverrideRows,
 } from "./queries.js";
-import { postJson, getJson } from "./client.js";
+import { postJson, getJson, setSyncRunId } from "./client.js";
 import { toProductRecords, toSalesRecords, toSalesDetailPayload, chunkPayloadByDoc, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toStockSnapshotRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
 
 const PERIOD_DAYS = 30;
@@ -248,6 +248,23 @@ async function runOnce() {
     const startedAt = new Date().toISOString();
     let totalSent = 0;
 
+    // CP2 (observability): ask the backend to open a run row immediately
+    // (status='running') so a mid-run crash leaves visible evidence instead
+    // of nothing. Best-effort — an older/unreachable backend simply means no
+    // correlation ID gets attached to this run's requests; the sync itself
+    // must never be blocked by this.
+    let syncRunId = null;
+    try {
+      const startResult = await postJson(`${syncConfig.apiBaseUrl}/api/sync/run-start`, {
+        syncType: `adapos_branch_${syncConfig.branchCode}`,
+        branchCode: syncConfig.branchCode,
+      });
+      syncRunId = startResult?.runId || null;
+      if (syncRunId) setSyncRunId(syncRunId);
+    } catch (runStartErr) {
+      console.warn(`  WARN: /run-start failed, continuing without a correlation ID: ${runStartErr.message}`);
+    }
+
     try {
       // Register branch before posting branch-scoped data.
       await postJson(`${syncConfig.apiBaseUrl}/api/sync/ada/branches`, {
@@ -456,6 +473,7 @@ async function runOnce() {
       const finishedAt = new Date().toISOString();
       await postJson(`${syncConfig.apiBaseUrl}/api/sync/run-log`, {
         id: runId,
+        runId: syncRunId,
         syncType: `adapos_branch_${syncConfig.branchCode}`,
         startedAt,
         finishedAt,
@@ -470,6 +488,7 @@ async function runOnce() {
       const failedAt = new Date().toISOString();
       await postJson(`${syncConfig.apiBaseUrl}/api/sync/run-log`, {
         id: runId,
+        runId: syncRunId,
         syncType: `adapos_branch_${syncConfig.branchCode}`,
         startedAt,
         finishedAt: failedAt,

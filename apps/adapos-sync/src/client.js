@@ -8,11 +8,23 @@ import { syncConfig } from "./config.js";
 // success/failure to the run-log.
 const REQUEST_TIMEOUT_MS = Number(process.env.ADAPOS_SYNC_REQUEST_TIMEOUT_MS) || 60_000;
 
+// CP2 (observability): set once per run, right after /run-start returns its
+// ID — every request made afterward (via authHeaders(), below) carries this
+// automatically, so the backend can group per-dataset outcomes under one
+// run without every call site here needing to know about it.
+let currentSyncRunId = null;
+export function setSyncRunId(runId) {
+  currentSyncRunId = runId || null;
+}
+
 function authHeaders() {
   const headers = { "Content-Type": "application/json" };
   if (syncConfig.syncSharedToken) {
     headers.Authorization = `Bearer ${syncConfig.syncSharedToken}`;
     headers["x-api-key"] = syncConfig.syncSharedToken;
+  }
+  if (currentSyncRunId) {
+    headers["x-sync-run-id"] = currentSyncRunId;
   }
   return headers;
 }
