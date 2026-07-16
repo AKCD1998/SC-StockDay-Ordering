@@ -529,6 +529,35 @@ confounders) is realistic: **tomorrow 08:20 ICT (2026-07-17)**, contingent
 on 003/004 both being confirmed bug-free by then. Decide CP4 after that
 window, not before.
 
+## 2026-07-16 mid-morning — movement-analytics fixed (commit `d130069`, deployed, verified)
+
+While CP4 stays gated, worked the "known landmine" flagged in the earlier
+2026-07-15 outage entry: `branch-product-sales`'s `filtered_sales` CTE,
+seen at up to 2h/call (3 occurrences) in `pg_stat_statements`.
+
+**Root cause**: same class of bug as the stock-day outage, different
+mechanism. Postgres cannot estimate selectivity of the JSONB filter
+expressions on `ada.sales_headers` (`COALESCE(NULLIF(raw_payload->>'...',
+'')...)`), so it always guessed ~1-13 matching rows regardless of the real
+count (493,912 with no date filter) and picked a Nested Loop join —
+fine for the guess, catastrophic for reality. Confirmed with
+`EXPLAIN ANALYZE` against production: unbounded case 90s, normal
+(frontend's own 30-day default) case 6-7s.
+
+**Fix, two parts, both measured against production before/after:**
+1. New expression index (`idx_ada_sales_headers_doctype_paid_expr`) on the
+   JSONB filter pattern so `ANALYZE` gives the planner real numbers.
+   Unbounded case: 90s -> 42s, planner switches to Hash Join.
+2. Server-side floor: `date_from` now defaults to 90 days ago if the
+   client sends none — the frontend's 30-day default was never actually
+   enforced server-side, so a cleared filter (or any future client bug)
+   could still trigger the unbounded scan. Worst case now capped at ~14s
+   (90-day floor) instead of 42-90s+, and stays bounded regardless of how
+   much sales history accumulates going forward.
+
+Normal case unaffected (6-7s before and after — no regression). Deployed,
+`/admin/health` and the endpoint both verified responsive post-deploy.
+
 ## Recommended next step
 
 CP0 is close enough to complete that starting CP1 work which doesn't depend
