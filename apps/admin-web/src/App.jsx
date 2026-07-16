@@ -7384,6 +7384,24 @@ function SyncLogMetaCard({ selection, mode }) {
         <span className="sync-log-meta-label">message ล่าสุด</span>
         <div className="sync-log-meta-message-body">{cell?.message?.trim() || "-"}</div>
       </div>
+      {Array.isArray(cell?.datasets) && cell.datasets.length > 0 ? (
+        <div className="sync-log-meta-datasets">
+          <span className="sync-log-meta-label">แยกตามส่วนที่ส่ง (run ล่าสุด)</span>
+          <div className="sync-log-meta-dataset-list">
+            {cell.datasets.map((ds, i) => (
+              <div key={`${ds.dataset}-${i}`} className={`sync-log-meta-dataset-row ${ds.status === "success" ? "ok" : "fail"}`}>
+                <span className="sync-log-meta-dataset-icon">{ds.status === "success" ? "✅" : "❌"}</span>
+                <span className="sync-log-meta-dataset-name">{ds.dataset}</span>
+                {ds.status === "success" ? (
+                  <span className="sync-log-meta-dataset-detail">{formatNumber(ds.recordsSent ?? 0)} รายการ</span>
+                ) : (
+                  <span className="sync-log-meta-dataset-detail error">{ds.error || "ล้มเหลว"}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
