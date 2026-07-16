@@ -48,6 +48,16 @@ function Invoke-SelfUpdate {
   # any reason to be unsure (dirty tree, wrong branch, git missing, pull
   # error) just skips the update and runs the sync with whatever code is
   # already on disk — an update check must never block the actual sync.
+  #
+  # In Windows PowerShell 5.1, $ErrorActionPreference = "Stop" promotes ANY
+  # native command's stderr write into a terminating NativeCommandError, and
+  # 2>$null does NOT prevent that promotion — it only discards the text.
+  # Every $LASTEXITCODE check below is a no-op unless this is scoped to
+  # Continue: a bare git error (e.g. dubious ownership when this runs as
+  # SYSTEM but the repo is owned by a different user) would otherwise kill
+  # the whole script before a single Write-Log call ever fires.
+  $local:ErrorActionPreference = "Continue"
+
   $git = Get-Command git -ErrorAction SilentlyContinue
   if (-not $git) {
     Write-Log "SELF-UPDATE: git not found on PATH, skipping."
@@ -126,7 +136,14 @@ if (-not (Test-Path -LiteralPath ".env")) {
 if ($NoAutoUpdate) {
   Write-Log "SELF-UPDATE: skipped (-NoAutoUpdate passed)."
 } else {
-  Invoke-SelfUpdate
+  try {
+    Invoke-SelfUpdate
+  } catch {
+    # Defense in depth: Invoke-SelfUpdate is scoped to fail safe internally
+    # now, but if anything else in it ever throws, catch it here too rather
+    # than let a self-update problem take down the actual sync.
+    Write-Log "SELF-UPDATE: unexpected error ($($_.Exception.Message)), continuing with existing code."
+  }
 }
 
 if (-not $Branch) {

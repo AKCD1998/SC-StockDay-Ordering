@@ -27,3 +27,10 @@ powershell -ExecutionPolicy Bypass -NoProfile -File "%~dp0show-result.ps1" -Exit
 REM Skip the interactive pause when launched non-interactively (e.g. Task
 REM Scheduler passes "nopause"); otherwise the scheduled run hangs here forever.
 if /i not "%~1"=="nopause" if /i not "%~2"=="nopause" pause >nul
+
+REM Propagate the sync's real exit code (not show-result.ps1's, which
+REM overwrote %ERRORLEVEL% above) as this .bat's own exit code. Without
+REM this, cmd.exe falls through to the no-op "if" above and always returns
+REM 0, so Task Scheduler reports success even when open-adapos-and-sync.ps1
+REM crashed before writing a single log line.
+exit /b %EXIT_CODE%
