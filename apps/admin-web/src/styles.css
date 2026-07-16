@@ -9487,7 +9487,7 @@ input[type="radio"] {
 }
 
 .fp-batch-modal .fp-batch-table-wrap--salesperson {
-  width: min(100%, 900px);
+  width: min(100%, 1080px);
 }
 
 .fp-batch-modal .fp-batch-table--salesperson {
@@ -9497,6 +9497,10 @@ input[type="radio"] {
 .fp-batch-modal .fp-batch-table th,
 .fp-batch-modal .fp-batch-table td {
   padding: 11px 12px;
+}
+
+.fp-batch-modal .fp-batch-table td.fp-batch-unit-cell {
+  vertical-align: middle;
 }
 
 .fp-batch-modal .fp-batch-table th {
