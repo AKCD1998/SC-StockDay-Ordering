@@ -1373,7 +1373,7 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved, sal
         )}
         <div className="fp-field-row fp-batch-publication-row"><label className="fp-field"><span>การเผยแพร่</span><select value={publicationStatus} onChange={(e) => setPublicationStatus(e.target.value)}><option value="draft">บันทึกร่าง</option><option value="published">เผยแพร่ทันที</option><option value="scheduled">ตั้งเวลาเผยแพร่</option></select></label>{publicationStatus === "scheduled" && <label className="fp-field"><span>วันเวลาเผยแพร่</span><input type="datetime-local" value={scheduledPublishAt} onChange={(e) => setScheduledPublishAt(e.target.value)} /></label>}</div>
         {error && <div className="fp-form-error">{error}</div>}
-        <div className="fp-modal-actions"><button type="button" className="fp-btn-secondary" onClick={requestClose} disabled={busy}>ยกเลิก</button><button type="button" className="fp-btn-primary" onClick={requestSubmitBatch} disabled={busy || issues.length > 0}>{busy ? "กำลังบันทึก..." : `สร้าง ${rows.length} รายการ`}</button></div>
+        <div className="fp-modal-actions"><button type="button" className="fp-btn-danger" onClick={requestClose} disabled={busy}>ยกเลิก</button><button type="button" className="fp-btn-primary" onClick={requestSubmitBatch} disabled={busy || issues.length > 0}>{busy ? "กำลังบันทึก..." : `สร้าง ${rows.length} รายการ`}</button></div>
       </div>
     </div>
   );

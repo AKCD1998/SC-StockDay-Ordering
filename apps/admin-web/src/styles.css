@@ -9202,7 +9202,8 @@ input[type="radio"] {
 }
 
 .fp-batch-modal .fp-modal-actions .fp-btn-primary,
-.fp-batch-modal .fp-modal-actions .fp-btn-secondary {
+.fp-batch-modal .fp-modal-actions .fp-btn-secondary,
+.fp-batch-modal .fp-modal-actions .fp-btn-danger {
   min-height: 44px;
   padding: 9px 18px;
   font-size: 0.95rem;
