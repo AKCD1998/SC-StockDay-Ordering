@@ -8850,6 +8850,24 @@ input[type="radio"] {
   width: min(1400px, 100%);
   height: auto;
   max-height: calc(100vh - 48px);
+  font-size: 1rem;
+}
+
+.fp-sales-target-edit-modal .fp-sales-target-modal-header .fp-section-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.fp-sales-target-edit-modal .fp-sales-target-modal-header span {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.fp-sales-target-edit-modal > .fp-table-modal-close {
+  width: 42px;
+  height: 42px;
+  font-size: 1.35rem;
 }
 
 .fp-sales-target-exit-confirm-overlay {
@@ -8933,19 +8951,34 @@ input[type="radio"] {
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 16px 18px;
   border-bottom: 1px solid var(--fp-branch-border);
   background: var(--fp-branch-head);
   color: #29445f;
 }
 
-.fp-sales-target-edit-card-header h4 { margin: 0 0 2px; font-size: 1rem; }
-.fp-sales-target-edit-card-header span { font-size: 0.84rem; font-weight: 650; }
-.fp-sales-target-edit-card-header small { color: #5f7185; text-align: right; }
+.fp-sales-target-edit-card-header h4 {
+  margin: 0 0 5px;
+  font-size: 1.65rem;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.fp-sales-target-edit-card-header span {
+  font-size: 1.05rem;
+  font-weight: 750;
+}
+
+.fp-sales-target-edit-card-header small {
+  color: #5f7185;
+  text-align: right;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
 
 .fp-sales-target-edit-card .fp-sales-target-edit {
   margin: 0;
-  padding: 16px;
+  padding: 18px;
   border-top: 0;
   gap: 12px;
 }
@@ -8961,6 +8994,33 @@ input[type="radio"] {
   width: auto;
 }
 
+.fp-sales-target-edit-card .fp-sales-target-tier-field span {
+  color: #526277;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.fp-sales-target-edit-card .fp-sales-target-tier-field input {
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.fp-sales-target-edit-card .fp-sales-target-edit > .fp-btn-primary {
+  min-height: 48px;
+  padding: 10px 18px;
+  font-size: 1rem;
+  font-weight: 750;
+}
+
+.fp-sales-target-edit-modal .fp-form-error,
+.fp-sales-target-edit-modal .fp-form-success {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
 [data-theme="dark"] .fp-sales-target-edit-card {
   background: #0d1724;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
@@ -8968,6 +9028,7 @@ input[type="radio"] {
 
 [data-theme="dark"] .fp-sales-target-edit-card-header { color: #f2f6ff; }
 [data-theme="dark"] .fp-sales-target-edit-card-header small { color: #a5b5c7; }
+[data-theme="dark"] .fp-sales-target-edit-card .fp-sales-target-tier-field span { color: #b8c7d8; }
 
 @media (max-width: 700px) {
   .fp-sales-target-edit-grid { grid-template-columns: 1fr; }
