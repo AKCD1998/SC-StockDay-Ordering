@@ -1366,9 +1366,24 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved, sal
         {!rows.length && <div className="fp-empty">ยิงบาร์โค้ดเพื่อเพิ่มสินค้าได้ต่อเนื่อง</div>}
         {(issues.length > 0 || coverageReminderList.length > 0 || warningList.length > 0) && (
           <div className="fp-batch-feedback-grid">
-            {issues.length > 0 && <div className="fp-batch-issues"><strong>ยังบันทึกไม่ได้</strong>{issues.map((issue) => <span key={issue}>{issue}</span>)}</div>}
-            {coverageReminderList.length > 0 && <div className="fp-batch-coverage"><strong>เตือนความครอบคลุม (ยังบันทึกได้)</strong><span>ยังไม่ได้ระบุสินค้าโฟกัสให้:</span>{coverageReminderList.map((item) => <span key={item}>{item}</span>)}</div>}
-            {warningList.length > 0 && <div className="fp-batch-warnings"><strong>คำเตือน (ยังบันทึกได้)</strong>{warningList.slice(0, 8).map((warning) => <span key={warning}>{warning}</span>)}</div>}
+            {issues.length > 0 && (
+              <details className="fp-batch-feedback-card fp-batch-issues">
+                <summary><strong>ยังบันทึกไม่ได้</strong><span className="fp-batch-feedback-count">{issues.length}</span><span className="fp-batch-feedback-toggle">ดูรายละเอียด</span></summary>
+                <div className="fp-batch-feedback-body">{issues.map((issue) => <span key={issue}>{issue}</span>)}</div>
+              </details>
+            )}
+            {coverageReminderList.length > 0 && (
+              <details className="fp-batch-feedback-card fp-batch-coverage">
+                <summary><strong>เตือนความครอบคลุม</strong><span className="fp-batch-feedback-count">{coverageReminderList.length}</span><span className="fp-batch-feedback-toggle">ดูรายละเอียด</span></summary>
+                <div className="fp-batch-feedback-body"><span>ยังไม่ได้ระบุสินค้าโฟกัสให้:</span>{coverageReminderList.map((item) => <span key={item}>{item}</span>)}</div>
+              </details>
+            )}
+            {warningList.length > 0 && (
+              <details className="fp-batch-feedback-card fp-batch-warnings">
+                <summary><strong>คำเตือน</strong><span className="fp-batch-feedback-count">{warningList.length}</span><span className="fp-batch-feedback-toggle">ดูรายละเอียด</span></summary>
+                <div className="fp-batch-feedback-body">{warningList.slice(0, 8).map((warning) => <span key={warning}>{warning}</span>)}</div>
+              </details>
+            )}
           </div>
         )}
         <div className="fp-field-row fp-batch-publication-row"><label className="fp-field"><span>การเผยแพร่</span><select value={publicationStatus} onChange={(e) => setPublicationStatus(e.target.value)}><option value="draft">บันทึกร่าง</option><option value="published">เผยแพร่ทันที</option><option value="scheduled">ตั้งเวลาเผยแพร่</option></select></label>{publicationStatus === "scheduled" && <label className="fp-field"><span>วันเวลาเผยแพร่</span><input type="datetime-local" value={scheduledPublishAt} onChange={(e) => setScheduledPublishAt(e.target.value)} /></label>}</div>
