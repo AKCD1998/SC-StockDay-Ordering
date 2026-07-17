@@ -41,6 +41,7 @@ const syncEventLogEnabled = String(import.meta.env.VITE_ENABLE_SYNC_EVENT_LOG ||
 const adminViewStorageKey = "sc-stockday-admin-view";
 const adminThemeStorageKey = "sc-stockday-admin-theme";
 const HQ_BRANCH_CODE = "000";
+const ONLINE_MARKETING_STAFF_USER_ID = "onlinemarketingstaff";
 const defaultAdminView = "receipts";
 const stockCostAuditView = "stock-cost-audit";
 const taxonomyView = "product-taxonomy";
@@ -113,7 +114,7 @@ const CODE39_PATTERNS = {
   "*": "nwnnwnwnn",
 };
 
-function getNavigationGroups(isAdminUser) {
+function getNavigationGroups(isAdminUser, hideDashboard = false) {
   return [
     {
       id: "dashboard",
@@ -156,7 +157,7 @@ function getNavigationGroups(isAdminUser) {
         { label: "Product Master", description: "ทะเบียนสินค้ากลาง", disabled: true },
       ],
     },
-  ].filter((group) => !group.adminOnly || isAdminUser);
+  ].filter((group) => (!group.adminOnly || isAdminUser) && (!hideDashboard || group.id !== "dashboard"));
 }
 
 function statusClass(status) {
@@ -8379,7 +8380,12 @@ export default function App() {
     return filteredStock.slice(startIndex, startIndex + pageSize);
   }, [filteredStock, pageSize, safeCurrentPage]);
   const isAdminUser = session?.user?.role === "admin";
-  const navigationGroups = useMemo(() => getNavigationGroups(isAdminUser), [isAdminUser]);
+  const isOnlineMarketingStaff =
+    String(session?.user?.id || "").trim().toLowerCase() === ONLINE_MARKETING_STAFF_USER_ID;
+  const navigationGroups = useMemo(
+    () => getNavigationGroups(isAdminUser, isOnlineMarketingStaff),
+    [isAdminUser, isOnlineMarketingStaff],
+  );
 
   const focusNavItem = useCallback((groupId, direction) => {
     if (typeof window === "undefined") return;
@@ -8509,6 +8515,12 @@ export default function App() {
       setView("receipts");
     }
   }, [isAdminUser, view]);
+
+  useEffect(() => {
+    if (isOnlineMarketingStaff && view === "focus-products") {
+      setView("receipts");
+    }
+  }, [isOnlineMarketingStaff, view]);
 
   if (loading && !session) {
     return (
