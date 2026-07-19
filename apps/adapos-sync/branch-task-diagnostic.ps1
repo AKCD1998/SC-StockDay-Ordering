@@ -64,7 +64,7 @@ try {
 
 Write-Host ""
 Write-Host "----- 3. ADAPOS_SYNC_BRANCH_CODE currently set in .env (value shown, not a secret) -----" -ForegroundColor Yellow
-$envCandidates = Get-ChildItem -Path "$HOME\Desktop","C:\adapos-sync","$HOME" -Filter ".env" -Recurse -ErrorAction SilentlyContinue -Depth 3
+$envCandidates = Get-ChildItem -Path $PSScriptRoot,(Split-Path -Parent $PSScriptRoot) -Filter ".env" -ErrorAction SilentlyContinue
 if (-not $envCandidates) {
     Write-Host "No .env file found under common locations - search manually if needed."
 } else {
