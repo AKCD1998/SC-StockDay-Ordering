@@ -85,15 +85,60 @@ what each dataset actually sends today:
      001 ≈ 14,900, 003 ≈ 13,700, 004 ≈ 12,800, 005 ≈ 600, 000 ≈ 594,600
      (branch 000 is disproportionately large — worth understanding why
      before assuming its delta volume scales like the others).
-   - **What's NOT yet solved, and needs answering before implementation**:
-     how to turn "here are the movements since the watermark" back into
-     "here is each product's correct current quantity" on the backend side
-     — i.e. whether the backend applies deltas cumulatively to its own
-     stored quantity (risk: any missed/duplicate movement silently drifts
-     the number over time) or whether some periodic full-reconciliation
-     pass against `TCNMPdt`'s snapshot is still needed alongside the delta
-     stream to self-correct drift. This needs its own design pass, not a
-     one-line answer.
+   - **How the value is sent, not computed**: the stock card is used only
+     as a "which products might have changed" pointer. The quantity
+     actually sent is always a fresh read of `TCNMPdt.FCPdtQtyRet` for
+     that shortlist — never a sum of stock-card deltas. This avoids ever
+     accumulating a number ourselves (the risk flagged in the original
+     draft of this doc): every value sent is always the true current
+     value from the authoritative table, just filtered to a smaller set
+     of products instead of all 6,500+.
+   - **CORRECTED 2026-07-19 (empirically, not just theoretically) — do
+     NOT use `FDStkDate` as the watermark column.** Independent read-only
+     verification (Sol, branch 005, 9 consecutive real snapshot windows
+     2026-07-15 to 2026-07-19, 835 real quantity-change events) proved
+     `FDStkDate` is a **document date**, not an insertion timestamp — it
+     can be backdated. At least 7 of 224 real changes in one window would
+     have been silently missed by a "`FDStkDate` within the last 3 days"
+     query, because the row was inserted on 2026-07-18 but dated as far
+     back as 2026-07-10/13. Using the row's actual insertion time instead
+     — `FDDateIns` + `FTTimeIns` combined — caught all 835/835 real
+     changes in the same audit. **Use `FDDateIns`/`FTTimeIns` as the
+     watermark, never `FDStkDate`.**
+   - **New products need a second source, not just the stock card.** The
+     same audit found 5 newly-added products in the window, 2 of which
+     had zero stock-card rows at all (no movement yet, stock = 0) — a
+     stock-card-only delta would never surface these. Combine the stock
+     card's changed-product list with a check against `TCNMPdt` for
+     products that are new/newly-active since the watermark.
+   - **Performance, confirmed not just assumed**: the corrected query
+     (`FDDateIns`/`FTTimeIns`-based) ran in ~48ms over Tailscale against
+     branch 005 and returned ~585 candidate SKUs out of 6,589 active
+     products — a ~91% reduction in what needs sending, not a marginal
+     optimization.
+   - **Full-reconciliation safety net is required, not optional.** No
+     database-level guarantee (trigger, constraint) was found that forces
+     every `TCNMPdt` quantity change to produce a stock-card row — the
+     mechanism is confirmed to *usually* work (835/835 in this audit) but
+     not proven airtight for every code path (manual adjustments,
+     deactivated/deleted products, etc.). Keep a periodic full resync
+     (candidate cadence: weekly, or whenever a reconciliation pass finds
+     drift) as the backstop, not a "nice to have."
+   - **Practical build shape (from the audit's recommended structure)**:
+     1. Query stock card using `FDDateIns`/`FTTimeIns` since the
+        watermark → candidate product codes.
+     2. Union in new/newly-active product codes from `TCNMPdt`.
+     3. Re-read `TCNMPdt.FCPdtQtyRet` fresh for the combined candidate
+        list — this is the value sent, never a computed delta.
+     4. Advance the watermark only after the backend confirms receipt.
+     5. Overlap the query window slightly and de-duplicate by product
+        code — a single timestamp can carry many rows (observed up to 47
+        rows on one timestamp in the audit).
+   - **Rollout plan (proposed, not yet started)**: keep the existing full
+     sync on the morning (08:20) run; trial delta sync on the evening
+     (19:20) run only, logging full-vs-delta comparison counts for
+     several weeks across branches before removing full sync from
+     anywhere. Do not cut over on a single branch/single day's evidence.
 
 2. **`sales_detail`, `sales` (summary), `transfers`/`transfer_lines` —
    lower priority, already partially mitigated.** These already query
@@ -118,10 +163,13 @@ what each dataset actually sends today:
    `branch_stock`'s row count or frequency) — not a meaningful contributor
    to total sync volume today or at higher branch counts.
 
-Estimated effort for `branch_stock` delta sync specifically: moderate-to-
-large — agent-side watermark tracking + a new `TCNTPdtStkCard` query,
-*plus* the unresolved drift-correction design question above, which is the
-part likely to take longest to get right.
+Estimated effort for `branch_stock` delta sync specifically: moderate —
+the drift-correction question that made this "moderate-to-large" is now
+resolved (fresh re-read from `TCNMPdt`, not accumulated deltas, plus a
+full-reconciliation backstop). What's left is agent-side implementation:
+watermark tracking, the corrected `FDDateIns`/`FTTimeIns` stock-card
+query, the new-product union, and the overlap/dedupe logic — all designed
+above, none yet built.
 
 **Step B — Async ingestion (queue + worker).**
 Today, `POST /api/sync/*` does the DB work synchronously inside the HTTP
