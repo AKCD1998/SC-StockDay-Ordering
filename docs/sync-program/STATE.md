@@ -1,5 +1,35 @@
 # Program State
 
+## 2026-07-19 — self-update hardening prepared locally (not deployed; fleet verification pending)
+
+Scope is self-update only; CP4 is being handled separately and is not part of
+this work. Inspection confirmed the unresolved fleet gap recorded below:
+`git rev-parse` itself can fail under the Scheduled Task's SYSTEM principal
+with `dubious ownership`, before the launcher learns the repository root. The
+existing fail-safe then allows sync to continue, but reports only "not inside
+a git repo" and leaves self-update permanently inactive.
+
+A local, uncommitted hardening change now:
+
+- discovers the repository by walking upward from the checked-in launcher,
+  without calling Git first;
+- passes `-c safe.directory=<that exact repo>` to each Git command, scoped to
+  that process only (no permanent/global Git trust change);
+- resolves and validates `ADAPOS_SYNC_BRANCH_CODE` before any update attempt;
+- logs `hostname`, branch code, and resolved repository path for audit;
+- preserves the fail-safe rule: dirty tree, non-`main`, Git/network errors, or
+  non-fast-forward state skip the update but never suppress the actual sync;
+- extends `branch-task-diagnostic.ps1` with a read-only self-update readiness
+  probe that does not fetch, pull, or change Git configuration.
+
+PowerShell parsing and `git diff --check` pass locally. **This does not close
+the fleet gap yet.** Before rollout, the change still needs a controlled local
+test and commit. After rollout, each of 000/001/003/004/005 must be verified
+from a Scheduled Task log (SYSTEM context), with `hostname` + `.env`
+`ADAPOS_SYNC_BRANCH_CODE` checked before treating evidence as belonging to a
+branch. Do not guess paths and do not change Task Scheduler as part of this
+verification.
+
 **Current checkpoint**: CP0 — Baseline, safety, capacity inventory
 **Status**: IN PROGRESS (not complete — 6 open manual actions, see below)
 **Last updated**: 2026-07-14, this session

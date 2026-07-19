@@ -77,4 +77,45 @@ if (-not $envCandidates) {
 }
 
 Write-Host ""
+Write-Host "----- 4. Self-update readiness (read-only; no fetch or pull) -----" -ForegroundColor Yellow
+$repoRoot = $PSScriptRoot
+while ($repoRoot -and -not (Test-Path -LiteralPath (Join-Path $repoRoot ".git"))) {
+    $parent = Split-Path -Parent $repoRoot
+    if (-not $parent -or $parent -eq $repoRoot) { $repoRoot = ""; break }
+    $repoRoot = $parent
+}
+
+$git = Get-Command git -ErrorAction SilentlyContinue
+if (-not $git) {
+    Write-Host "Git is not available on PATH for this account." -ForegroundColor Red
+} elseif (-not $repoRoot) {
+    Write-Host "No .git directory found in the script path or its parents." -ForegroundColor Red
+} else {
+    Write-Host "Repository: $repoRoot"
+    Write-Host "Running account: $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)"
+    $gitArgs = @("-c", "safe.directory=$repoRoot", "-C", $repoRoot)
+    $head = & git @gitArgs rev-parse --short HEAD 2>&1
+    $headExit = $LASTEXITCODE
+    $branch = & git @gitArgs rev-parse --abbrev-ref HEAD 2>&1
+    $branchExit = $LASTEXITCODE
+    $dirty = & git @gitArgs status --porcelain 2>&1
+    $dirtyExit = $LASTEXITCODE
+    Write-Host "Git HEAD: $head (exit $headExit)"
+    Write-Host "Git branch: $branch (exit $branchExit)"
+    if ($dirtyExit -ne 0) {
+        Write-Host "Git status failed (exit $dirtyExit): $dirty" -ForegroundColor Red
+    } elseif ($dirty) {
+        Write-Host "Working tree has local changes; self-update will safely skip:" -ForegroundColor Red
+        $dirty | ForEach-Object { Write-Host "  $_" }
+    } else {
+        Write-Host "Working tree: clean"
+    }
+    if ($headExit -eq 0 -and $branchExit -eq 0 -and $dirtyExit -eq 0) {
+        Write-Host "Per-command safe.directory probe: passed (global Git config was not changed)."
+    } else {
+        Write-Host "Per-command safe.directory probe: failed; inspect the Git errors above." -ForegroundColor Red
+    }
+}
+
+Write-Host ""
 Write-Host "===== END OF REPORT - copy everything above and send back ====="
