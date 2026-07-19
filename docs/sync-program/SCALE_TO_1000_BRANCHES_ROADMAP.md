@@ -42,23 +42,86 @@ linear-in-branch-count (for everything else, via delta sync).
 | 1 | Single-writer product master | **DONE** (2026-07-14) | Product-master load is now O(1) in branch count, not O(N) |
 | 2 | Set-based upsert (fewer queries/batch) | **DRAFTED, not deployed** (`claude/set-based-product-upsert`) | Makes each branch's *remaining* syncs (stock, sales) cheaper per-request; doesn't reduce total volume |
 | 3 | Batch/chunk size mitigation | **DONE** (deployed, all branches) | Bounds transaction size so no single request can outrun a timeout; doesn't reduce total volume |
-| 4 | Delta sync (send only what changed) | **NOT STARTED** | Turns O(N × full-dataset-size) into O(N × changes-since-last-sync) — the next highest-impact lever |
-| 5 | Queue + worker (async ingestion) | **NOT STARTED** | Decouples "how fast can N branches send requests" from "how fast can the DB process them" — the lever that actually removes the *simultaneity* constraint |
+| 4 | Delta sync (send only what changed) | **NOT STARTED** — see dataset-by-dataset priority below | Turns O(N × full-dataset-size) into O(N × changes-since-last-sync) for the datasets that actually need it |
+| 5 | Queue + worker (async ingestion, = CP4) | **BUILT 2026-07-19, tested against real Postgres, NOT deployed** (`PaaSRTSM-project` commit `109f292`) | Decouples "how fast can N branches send requests" from "how fast can the DB process them" — the lever that actually removes the *simultaneity* constraint. See `CP4_ASYNC_INGESTION_DESIGN.md` and `CP4_BASELINE_2026-07-19.md` |
 | 6 | Infra scaling (bigger DB, PgBouncer, read replicas, partitioning) | **NOT STARTED**, data-backed option available any time | Buys headroom; should follow 1-5, not substitute for them |
+
+**Decided 2026-07-19**: simultaneous scheduling (all branches at 08:20/19:20)
+is a hard product requirement, not something to solve by staggering — see
+`DECISIONS.md`. This is *why* lever 5 (CP4) and lever 4 (delta sync) both
+matter: CP4 removes the "must all arrive at the same instant" bottleneck,
+delta sync removes the "same data re-sent in full, every branch, every day"
+bottleneck. They solve different problems (timing vs. volume) and neither
+substitutes for the other at high branch counts.
 
 ### Recommended order for the next phase (when branch count starts growing meaningfully — say, past 15-20)
 
-**Step A — Delta sync for branch_stock and sales.**
-Right now every sync sends the branch's *entire* current state (6,500+
-products' worth of stock rows) even when only a handful of products actually
-sold or moved that day. Have the agent track a local watermark (last
-successful sync's max `updated_at`/rowversion from AdaAcc) and only query/
-send rows changed since then. This is the single highest-impact remaining
-lever for branch-scoped data, mirroring what single-writer already did for
-the shared product catalog. Estimated effort: moderate (agent-side query
-changes + a backend reconciliation strategy for "what if a delta sync is
-missed" — the existing self-healing lookback-window pattern used for
-`sales_detail` is a good template).
+**Step A — Delta sync, but only for the datasets that actually need it.**
+Not every synced dataset carries the same cost, and "just delta-sync
+everything" would be over-building. Priority, from a 2026-07-19 review of
+what each dataset actually sends today:
+
+1. **`branch_stock` — highest priority, do this first.** Every branch sends
+   its *entire* current stock snapshot (6,500+ products' worth of rows)
+   every single sync, with **zero existing mitigation** — no date window, no
+   lookback, nothing. This is the single biggest, least-optimized dataset in
+   the whole pipeline and the one that scales worst as branch count grows.
+   - **Why it's the hard case, technically**: the source table today,
+     `TCNMPdt` (AdaAcc's product master), stores stock as a **denormalized
+     current-value column** (`FCPdtQtyRet`/`FCPdtQtyNow`) that gets
+     overwritten in place on every movement — it carries **no per-row
+     timestamp**, confirmed both by AdaAcc's own documented schema
+     (`docs/adasoft/project_adapos_edmx_parse.md`,
+     `project_adapos_session10_sql_adasmart.md`) and by a comment already in
+     `apps/adapos-sync/src/transform.js:223` ("`TCNMPdt.FCPdtQtyRet` itself
+     has no per-row timestamp to reuse"). A plain "changed since X" query
+     against this table is not possible as-is.
+   - **The way in**: AdaAcc has a separate, confirmed-active stock movement
+     ledger table, `TCNTPdtStkCard` ("stock card"), which *does* carry a
+     real date per row (`FDStkDate`), a document reference (`FTStkDocNo`),
+     a movement type (`FTStkType`: 0=POS sale, 1=stock-in, 2=stock-out/
+     adjustment, 5=physical count), and a quantity delta (`FCStkQty`). Row
+     counts confirmed real and populated per branch (2026-05-18 snapshot):
+     001 ≈ 14,900, 003 ≈ 13,700, 004 ≈ 12,800, 005 ≈ 600, 000 ≈ 594,600
+     (branch 000 is disproportionately large — worth understanding why
+     before assuming its delta volume scales like the others).
+   - **What's NOT yet solved, and needs answering before implementation**:
+     how to turn "here are the movements since the watermark" back into
+     "here is each product's correct current quantity" on the backend side
+     — i.e. whether the backend applies deltas cumulatively to its own
+     stored quantity (risk: any missed/duplicate movement silently drifts
+     the number over time) or whether some periodic full-reconciliation
+     pass against `TCNMPdt`'s snapshot is still needed alongside the delta
+     stream to self-correct drift. This needs its own design pass, not a
+     one-line answer.
+
+2. **`sales_detail`, `sales` (summary), `transfers`/`transfer_lines` —
+   lower priority, already partially mitigated.** These already query
+   AdaAcc with a bounded time window every sync (`sales_detail`: 7-day
+   rolling lookback; `sales`/`transfers`: 30-day `PERIOD_DAYS` window) —
+   not a true delta (still re-sends the whole window's data every time,
+   not just new rows within it), but it already caps the *worst case* per
+   sync regardless of how long the branch has been operating, which
+   `branch_stock` does not. Real delta sync here (send only genuinely new
+   transactions since the last successful sync) is a legitimate future
+   improvement but has much smaller expected payoff than `branch_stock` —
+   revisit only after `branch_stock` is done and if it's still needed.
+
+3. **`products` — do not delta-sync, already solved differently.** Single-
+   writer (lever 1, done 2026-07-14) already made this O(1) in branch count
+   — only branch 004 sends it. Delta sync would still shrink that one
+   branch's payload further, but it's not multiplied by branch count, so
+   it's not a scaling risk the way `branch_stock` is.
+
+4. **`pending_receipts`, `approved_receipts` — not worth it.** Naturally
+   low daily row counts (receiving events don't happen at anywhere near
+   `branch_stock`'s row count or frequency) — not a meaningful contributor
+   to total sync volume today or at higher branch counts.
+
+Estimated effort for `branch_stock` delta sync specifically: moderate-to-
+large — agent-side watermark tracking + a new `TCNTPdtStkCard` query,
+*plus* the unresolved drift-correction design question above, which is the
+part likely to take longest to get right.
 
 **Step B — Async ingestion (queue + worker).**
 Today, `POST /api/sync/*` does the DB work synchronously inside the HTTP
