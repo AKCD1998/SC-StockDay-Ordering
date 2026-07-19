@@ -679,3 +679,55 @@ set-based rewrite (CP3.1) in parallel, since both reduce DB CPU load
 directly — more impactful right now than the Task Scheduler/fleet-version
 cleanup (CP1.1/1.2), which are still needed but don't address the CPU
 ceiling by themselves.
+
+---
+
+## 2026-07-19 — Branch 003 stray pre-schedule sync failures traced to client IP `182.53.106.138` — KNOWN, UNFIXED, NOT BLOCKING
+
+**Status: open, low priority, fix deferred until next on-site visit to branch 003.**
+
+### What was observed
+Three `adapos_branch_003` sync_runs failed today at 08:03, 08:08, 08:12 ICT
+with `400 — "branchCode must be one of 000, 001, 002, 003, 004, 005."`,
+followed by a normal successful run at the real 08:20 schedule.
+
+### Verified NOT the cause
+Ran the new read-only `branch-task-diagnostic.ps1` directly on POSSRV
+(branch 003's real POS machine). Its Task Scheduler operational log shows
+**exactly one** AdaPOS-related trigger today (`08:20:01`, completed with
+return code 0), and exactly one log file (`sync-20260719-082002.log`).
+POSSRV itself is clean — the three failed attempts did not come from it.
+
+### Where the failed requests actually came from
+Pulled raw Render platform request logs (`clientIP` field, which the app
+itself does not log — see gap below) for the failure window. Both `400`
+responses to `/api/branch-stock/sync` came from `182.53.106.138` — the
+**same IP** that later completes the real, successful 08:20 run. Since
+POSSRV's own Task Scheduler proves it only fired once, this means a
+**second device on branch 003's local network** (same public IP via NAT)
+is independently POSTing malformed sync data tagged as branch 003.
+
+### Root cause (per user, high confidence, unverified on-site)
+Branch 003 (and other branches) used to run a **branch notebook** that
+connected to the POS terminal and relayed data to the web server, to avoid
+remoting into the POS machine directly. This was abandoned for stability
+reasons (port changes etc. required checking both machines) in favor of
+running the sync agent directly on the POS terminal, which is the current
+model everywhere. The old notebook was apparently never decommissioned at
+branch 003, and — because it stopped receiving code updates once the team
+moved on ("เราก็อัปเดตโค้ดมาเรื่อยๆ โดยไม่สนโน้ตบุคสาขาเลย") — is still
+running an old Scheduled Task with stale code/config that produces this
+malformed `branchCode` request before POSSRV's real scheduled run fires.
+
+### Fix (deferred, not yet done)
+Needs physical/remote access to the old branch-003 notebook specifically
+(not POSSRV) to find and disable its AdaPOS-related Scheduled Task. Explicit
+decision: **do not block CP4 or other work on this** — revisit next time
+someone is on-site at branch 003 (or can remote into that specific old
+notebook, if it's still identifiable/reachable).
+
+### Side finding: no IP/user-agent logging in the backend
+This whole trace only worked because Render's platform-level logs happen to
+capture `clientIP`. `apps/admin-api/src/routes/sync.js` does not log this
+itself. Not acted on — noted in case a future investigation needs it and
+Render's log retention has since expired.
