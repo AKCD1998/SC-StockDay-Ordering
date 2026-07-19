@@ -1,4 +1,4 @@
-# Read-only diagnostic — does not change any settings or files.
+# Read-only diagnostic - does not change any settings or files.
 # Run this in PowerShell on the branch machine and send back the full output.
 
 Write-Host "===== MACHINE: $env:COMPUTERNAME =====" -ForegroundColor Cyan
@@ -66,7 +66,7 @@ Write-Host ""
 Write-Host "----- 3. ADAPOS_SYNC_BRANCH_CODE currently set in .env (value shown, not a secret) -----" -ForegroundColor Yellow
 $envCandidates = Get-ChildItem -Path "$HOME\Desktop","C:\adapos-sync","$HOME" -Filter ".env" -Recurse -ErrorAction SilentlyContinue -Depth 3
 if (-not $envCandidates) {
-    Write-Host "No .env file found under common locations — search manually if needed."
+    Write-Host "No .env file found under common locations - search manually if needed."
 } else {
     foreach ($f in $envCandidates) {
         $line = Select-String -Path $f.FullName -Pattern "^ADAPOS_SYNC_BRANCH_CODE=" -ErrorAction SilentlyContinue
@@ -77,4 +77,4 @@ if (-not $envCandidates) {
 }
 
 Write-Host ""
-Write-Host "===== END OF REPORT — copy everything above and send back ====="
+Write-Host "===== END OF REPORT - copy everything above and send back ====="
