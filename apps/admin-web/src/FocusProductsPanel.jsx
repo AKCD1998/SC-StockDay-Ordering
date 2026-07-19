@@ -1051,7 +1051,7 @@ function YearCalendar({ year, onYearChange, selectedMonth, onSelectMonth, monthS
 // only ever climbs to 90%. The jump to 100% happens only when `active`
 // genuinely becomes false — never simulated — so the overlay can't visually
 // finish before the real request actually has.
-function LoadingOverlay({ active }) {
+function LoadingOverlay({ active, onNavigateBack }) {
   const [progress, setProgress] = useState(0);
   const [visible, setVisible] = useState(active);
   const intervalRef = useRef(null);
@@ -1095,6 +1095,11 @@ function LoadingOverlay({ active }) {
         <div className="fp-loading-label">
           {progress < 90 ? "กำลังโหลดข้อมูลสินค้าโฟกัส..." : "เกือบเสร็จแล้ว รอสักครู่..."}
         </div>
+        {onNavigateBack && (
+          <button type="button" className="fp-loading-back-button" onClick={onNavigateBack}>
+            กลับหน้าสต๊อกสาขา
+          </button>
+        )}
       </div>
     </div>
   );
@@ -2288,7 +2293,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   );
 }
 
-export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode }) {
+export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode, onNavigateBack }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -2463,7 +2468,7 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode 
         <p>เป้าหมายสินค้าโปรโมชั่นที่ต้องผลักดันการขาย และยอดขายสะสมถึงรอบล่าสุด</p>
       </div>
 
-      <LoadingOverlay active={loading} />
+      <LoadingOverlay active={loading} onNavigateBack={onNavigateBack} />
       {error && <div className="fp-form-error">{error}</div>}
 
       <SalesTargetsSection csrfToken={csrfToken} isAdminUser={isAdminUser} branchCode={branchCode} />

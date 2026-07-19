@@ -7814,6 +7814,21 @@ input[type="radio"] {
 
 .fp-loading-label { font-size: 0.85rem; color: #64748b; }
 
+.fp-loading-back-button {
+  margin-top: 4px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  background: #f97316;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.fp-loading-back-button:hover { background: #ea580c; }
+
 [data-theme="dark"] .fp-loading-box { background: #111e2d; }
 [data-theme="dark"] .fp-loading-percent { color: #f1f5f9; }
 [data-theme="dark"] .fp-loading-bar-track { background: #1e2e42; }
