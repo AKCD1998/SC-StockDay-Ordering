@@ -102,3 +102,27 @@ behind `datasets.includes(...)`, so this requires zero code changes). Per
 program authorization rules, Claude does not edit remote `.env` files
 directly — this goes out as a prompt to each branch's session, same pattern
 as the CP1 rollout.
+
+## 2026-07-19 — CP4 — Simultaneous branch scheduling is a hard requirement, not something to fix by staggering
+
+**Context**: while discussing today's pre-CP4 baseline (all branches firing
+within ~20s of each other at 08:20, DB CPU pinned at its 0.1 cap for the
+whole window), staggering the per-branch Task Scheduler times (CP1.1, listed
+in `STATE.md`'s CP0 verdict as a mitigation option) came up again as one
+lever that would reduce window contention.
+
+**User's explicit decision**: branches must keep syncing at the same
+scheduled time. If that requires more foundation work later (e.g. delta
+sync, per `SCALE_TO_1000_BRANCHES_ROADMAP.md`) to make simultaneous sync
+affordable at higher branch counts, that's acceptable — staggering the
+schedule itself is not the answer.
+
+**Why this matters for future recommendations**: don't propose
+schedule-staggering as a fix or partial fix again, even though it's a valid
+technical lever and was previously listed as one. CP4 (queue + worker) is
+already schedule-agnostic — it decouples "when an agent hands off data" from
+"when the DB actually processes it," so it satisfies this constraint by
+design without needing branches to run at different times. Future capacity
+work (delta sync, DB plan sizing, etc.) should be evaluated against "how do
+we support N branches all syncing in the same window," not "how do we spread
+them out."
