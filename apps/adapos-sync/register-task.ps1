@@ -70,12 +70,22 @@ $EveningAction = New-ScheduledTaskAction `
 
 # Settings:
 #   - StartWhenAvailable: if the trigger was missed (PC was off), run as soon as PC comes back on
+#     (kept on even for -InitiallyDisabled tasks: it only affects a *future*
+#     missed run after they are deliberately enabled, not registration).
 #   - ExecutionTimeLimit: kill the task if it hangs past 1h (sync should finish in ~5 min)
-$Settings = New-ScheduledTaskSettingsSet `
-  -AllowStartIfOnBatteries `
-  -DontStopIfGoingOnBatteries `
-  -StartWhenAvailable `
-  -ExecutionTimeLimit (New-TimeSpan -Hours 1)
+#   - Disable: when -InitiallyDisabled is passed, the task is created already
+#     disabled by Register-ScheduledTask itself. There is no window where it
+#     exists enabled -- a prior version registered enabled and then called
+#     Disable-ScheduledTask as a second step, which left a brief race where a
+#     freshly-registered task could fire before being disabled.
+$SettingsParams = @{
+  AllowStartIfOnBatteries    = $true
+  DontStopIfGoingOnBatteries = $true
+  StartWhenAvailable         = $true
+  ExecutionTimeLimit         = (New-TimeSpan -Hours 1)
+}
+if ($InitiallyDisabled) { $SettingsParams["Disable"] = $true }
+$Settings = New-ScheduledTaskSettingsSet @SettingsParams
 
 # Principal: run as SYSTEM with highest privileges.
 #   - No password to manage / expire
@@ -85,11 +95,22 @@ $Principal = New-ScheduledTaskPrincipal `
   -LogonType ServiceAccount `
   -RunLevel Highest
 
+# First occurrence must be in the future: a StartBoundary already in the past
+# still works (Windows computes the next daily NextRunTime correctly either
+# way), but an already-past StartBoundary on a freshly-registered task is
+# needless ambiguity for anyone reading the task later, and this fixes it for
+# free while addressing the -InitiallyDisabled registration race above.
+$now = Get-Date
+$morningTime = Get-Date -Hour 8 -Minute 20 -Second 0 -Millisecond 0
+if ($now -ge $morningTime) { $morningTime = $morningTime.AddDays(1) }
+$eveningTime = Get-Date -Hour 19 -Minute 20 -Second 0 -Millisecond 0
+if ($now -ge $eveningTime) { $eveningTime = $eveningTime.AddDays(1) }
+
 # --- Register both tasks ------------------------------------------------------
 Register-ScheduledTask `
   -TaskName    $MorningTaskName `
   -Action      $MorningAction `
-  -Trigger     (New-ScheduledTaskTrigger -Daily -At "08:20") `
+  -Trigger     (New-ScheduledTaskTrigger -Daily -At $morningTime) `
   -Settings    $Settings `
   -Principal   $Principal `
   -Description "Runs RUN-ADAPOS-SYNC.bat at 08:20 daily for branch $Branch (normal full sync)." | Out-Null
@@ -97,15 +118,10 @@ Register-ScheduledTask `
 Register-ScheduledTask `
   -TaskName    $EveningTaskName `
   -Action      $EveningAction `
-  -Trigger     (New-ScheduledTaskTrigger -Daily -At "19:20") `
+  -Trigger     (New-ScheduledTaskTrigger -Daily -At $eveningTime) `
   -Settings    $Settings `
   -Principal   $Principal `
   -Description "Runs RUN-ADAPOS-SYNC.bat at 19:20 daily for branch $Branch (skips resync if 08:20 already succeeded)." | Out-Null
-
-if ($InitiallyDisabled) {
-  Disable-ScheduledTask -TaskName $MorningTaskName | Out-Null
-  Disable-ScheduledTask -TaskName $EveningTaskName | Out-Null
-}
 
 Write-Output ""
 Write-Output "Tasks registered:"

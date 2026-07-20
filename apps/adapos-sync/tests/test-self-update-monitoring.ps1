@@ -448,6 +448,58 @@ try {
 }
 
 # ---------------------------------------------------------------------------
+# 13. register-task.ps1 -InitiallyDisabled is atomic (no register-enabled-
+#     then-disable race), and both first-occurrence StartBoundaries are in
+#     the future. Registers REAL, temporary Branch 999 tasks (clearly
+#     distinct from any production "Branch 000"/"Branch 00x" task name),
+#     never enables or starts them, and always unregisters them afterward.
+# ---------------------------------------------------------------------------
+$registerScript = Join-Path $RepoAdaposSyncDir "register-task.ps1"
+$testBranch = "999"
+$testTaskName = "AdaPOS Sync (Branch $testBranch)"
+$morningName = "$testTaskName - Morning"
+$eveningName = "$testTaskName - Evening"
+try {
+  # Source-level guard: -InitiallyDisabled must create the task disabled via
+  # Register-ScheduledTask's own -Settings, not via a second
+  # Disable-ScheduledTask call after the fact.
+  $registerSource = Get-Content -LiteralPath $registerScript -Raw
+  Record "register-task: no post-registration Disable-ScheduledTask call" ($registerSource -notmatch 'Disable-ScheduledTask\s+-TaskName')
+  Record "register-task: Settings carries Disable when -InitiallyDisabled" ($registerSource -match '\$SettingsParams\["Disable"\]\s*=\s*\$true')
+
+  # Clean up any leftover instance from a previous aborted test run.
+  Get-ScheduledTask -TaskName $morningName, $eveningName -ErrorAction SilentlyContinue |
+    ForEach-Object { Unregister-ScheduledTask -TaskName $_.TaskName -Confirm:$false }
+
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $registerScript -Branch $testBranch -InitiallyDisabled *>&1 | Out-Null
+  $registerExit = $LASTEXITCODE
+
+  $morningTask = Get-ScheduledTask -TaskName $morningName -ErrorAction SilentlyContinue
+  $eveningTask = Get-ScheduledTask -TaskName $eveningName -ErrorAction SilentlyContinue
+  $morningInfo = if ($morningTask) { Get-ScheduledTaskInfo -TaskName $morningName } else { $null }
+  $eveningInfo = if ($eveningTask) { Get-ScheduledTaskInfo -TaskName $eveningName } else { $null }
+  $now = Get-Date
+
+  Record "register-task: script exit 0" ($registerExit -eq 0) "exit=$registerExit"
+  Record "register-task: Morning task exists" ($null -ne $morningTask)
+  Record "register-task: Evening task exists" ($null -ne $eveningTask)
+  Record "register-task: Morning is Disabled immediately after register returns" ($morningTask.Settings.Enabled -eq $false) "Enabled=$($morningTask.Settings.Enabled)"
+  Record "register-task: Evening is Disabled immediately after register returns" ($eveningTask.Settings.Enabled -eq $false) "Enabled=$($eveningTask.Settings.Enabled)"
+  Record "register-task: Morning StartBoundary is in the future" ($morningTask.Triggers[0].StartBoundary -and ([datetime]$morningTask.Triggers[0].StartBoundary) -gt $now) "StartBoundary=$($morningTask.Triggers[0].StartBoundary)"
+  Record "register-task: Evening StartBoundary is in the future" ($eveningTask.Triggers[0].StartBoundary -and ([datetime]$eveningTask.Triggers[0].StartBoundary) -gt $now) "StartBoundary=$($eveningTask.Triggers[0].StartBoundary)"
+  Record "register-task: Morning LastRunTime unchanged (never run)" ($morningInfo.LastRunTime.Year -lt 2000) "LastRunTime=$($morningInfo.LastRunTime)"
+  Record "register-task: Evening LastRunTime unchanged (never run)" ($eveningInfo.LastRunTime.Year -lt 2000) "LastRunTime=$($eveningInfo.LastRunTime)"
+  Record "register-task: Morning State is not Running" ($morningTask.State -ne "Running") "State=$($morningTask.State)"
+  Record "register-task: Evening State is not Running" ($eveningTask.State -ne "Running") "State=$($eveningTask.State)"
+} finally {
+  # Never enable or start these -- unregister only.
+  Get-ScheduledTask -TaskName $morningName, $eveningName -ErrorAction SilentlyContinue |
+    ForEach-Object { Unregister-ScheduledTask -TaskName $_.TaskName -Confirm:$false }
+  $stillThere = Get-ScheduledTask -TaskName $morningName, $eveningName -ErrorAction SilentlyContinue
+  Record "register-task: temporary Branch 999 tasks unregistered" ($null -eq $stillThere -or $stillThere.Count -eq 0)
+}
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 Write-Host ""
