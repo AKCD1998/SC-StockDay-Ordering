@@ -16,7 +16,12 @@
 
 param(
   [string]$Branch   = "000",
-  [string]$TaskName = ""
+  [string]$TaskName = "",
+  # Register both tasks disabled and leave them disabled. Intended for
+  # reversible cutover: create the new tasks first, verify them, and only
+  # then flip the old task off and these on as separate, deliberate steps.
+  # Does not change any other behavior when omitted.
+  [switch]$InitiallyDisabled
 )
 
 # --- Sanity checks ----------------------------------------------------------
@@ -97,10 +102,15 @@ Register-ScheduledTask `
   -Principal   $Principal `
   -Description "Runs RUN-ADAPOS-SYNC.bat at 19:20 daily for branch $Branch (skips resync if 08:20 already succeeded)." | Out-Null
 
+if ($InitiallyDisabled) {
+  Disable-ScheduledTask -TaskName $MorningTaskName | Out-Null
+  Disable-ScheduledTask -TaskName $EveningTaskName | Out-Null
+}
+
 Write-Output ""
 Write-Output "Tasks registered:"
 Get-ScheduledTask -TaskName $MorningTaskName, $EveningTaskName |
-  Format-List TaskName, State,
+  Format-List TaskName, State, @{N='Enabled'; E={$_.Settings.Enabled}},
     @{N='NextRun';   E={(Get-ScheduledTaskInfo $_).NextRunTime}},
     @{N='Command';   E={ $_.Actions[0].Execute + ' ' + $_.Actions[0].Arguments }}
 
