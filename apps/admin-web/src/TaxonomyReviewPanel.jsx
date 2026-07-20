@@ -151,6 +151,33 @@ export default function TaxonomyReviewPanel({ csrfToken }) {
     return data;
   }
 
+  const topRow = rows[0] || null;
+
+  useEffect(() => {
+    function onKeyDown(event) {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+      const target = event.target;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+
+      if (!topRow) return;
+      if (busySkuCode || bulkBusy || loading || !csrfToken) return;
+
+      const key = event.key.toLowerCase();
+      if (key === "k") {
+        event.preventDefault();
+        void handleRowStatus(topRow.company_code, "confirmed");
+      } else if (key === "x") {
+        event.preventDefault();
+        void handleRowStatus(topRow.company_code, "needs_review");
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
   async function handleRowStatus(companyCode, nextStatus) {
     const row = rows.find((item) => item.company_code === companyCode);
     if (!row) return;
@@ -329,6 +356,11 @@ export default function TaxonomyReviewPanel({ csrfToken }) {
             ใช้ได้เมื่อเลือก `product_type` และอยู่ในคิว `auto`
           </span>
         </div>
+
+        <div className="taxonomy-review-kbd-hint">
+          <span><kbd>k</kbd> confirm แถวบนสุด</span>
+          <span><kbd>x</kbd> flag แถวบนสุด</span>
+        </div>
       </div>
 
       <div className="table-wrap">
@@ -352,10 +384,11 @@ export default function TaxonomyReviewPanel({ csrfToken }) {
               <tr>
                 <td colSpan={6} className="empty-state">ไม่พบ SKU ที่ตรงกับตัวกรองปัจจุบัน</td>
               </tr>
-            ) : rows.map((row) => {
+            ) : rows.map((row, index) => {
               const isBusy = busySkuCode === row.company_code || bulkBusy;
+              const isTopRow = index === 0;
               return (
-                <tr key={row.company_code}>
+                <tr key={row.company_code} className={isTopRow ? "taxonomy-review-active-row" : ""}>
                   <td><code>{row.company_code}</code></td>
                   <td>{row.display_name || "-"}</td>
                   <td>
@@ -383,7 +416,7 @@ export default function TaxonomyReviewPanel({ csrfToken }) {
                         onClick={() => void handleRowStatus(row.company_code, "confirmed")}
                         disabled={isBusy || !csrfToken}
                       >
-                        Confirm
+                        Confirm{isTopRow ? <kbd>k</kbd> : null}
                       </button>
                       <button
                         type="button"
@@ -391,7 +424,7 @@ export default function TaxonomyReviewPanel({ csrfToken }) {
                         onClick={() => void handleRowStatus(row.company_code, "needs_review")}
                         disabled={isBusy || !csrfToken}
                       >
-                        Flag
+                        Flag{isTopRow ? <kbd>x</kbd> : null}
                       </button>
                     </div>
                   </td>

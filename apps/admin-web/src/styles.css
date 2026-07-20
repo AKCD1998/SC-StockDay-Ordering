@@ -7510,6 +7510,37 @@ input[type="radio"] {
   justify-items: end;
 }
 
+.taxonomy-review-kbd-hint {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.taxonomy-review-kbd-hint kbd,
+.taxonomy-review-actions kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: rgba(148, 163, 184, 0.14);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.taxonomy-review-actions kbd {
+  margin-left: 6px;
+}
+
+.taxonomy-review-active-row {
+  outline: 2px solid #3b82f6;
+  outline-offset: -1px;
+  background: rgba(59, 130, 246, 0.08);
+}
+
 .taxonomy-review-bulk-hint {
   font-size: 0.82rem;
   color: #64748b;
@@ -7622,8 +7653,13 @@ input[type="radio"] {
 
 [data-theme="dark"] .taxonomy-review-stat span,
 [data-theme="dark"] .taxonomy-review-bulk-hint,
+[data-theme="dark"] .taxonomy-review-kbd-hint,
 [data-theme="dark"] .taxonomy-review-pagination {
   color: #cbd5e1;
+}
+
+[data-theme="dark"] .taxonomy-review-active-row {
+  background: rgba(59, 130, 246, 0.14);
 }
 
 [data-theme="dark"] .taxonomy-review-stat strong {
