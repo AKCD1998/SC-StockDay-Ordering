@@ -150,6 +150,71 @@ Used this to independently re-verify (all matched exactly): backend (`srv-d6c0sd
 - Render web-service CPU/RAM, instance type, autoscaling config, plan tier
 - Render Postgres instance type, storage size/limit, connection limit vs `max_connections` seen above, PITR/HA/read-replica status
 - Whether Render workspace plan supports Background Workers / Key Value (Pro-tier features)
-- Branch 000's install path, agent version, schedule, or `.env` — no mapped drive available to this session
+- ~~Branch 000's install path, agent version, schedule, or `.env`~~ — resolved
+  2026-07-20, and **the 2026-07-15 resolution below was itself wrong**: see
+  "Branch 000 production path — corrected 2026-07-20" below
 - ~~`pg_stat_statements` reset history~~ — resolved: `stats_reset = 2026-06-19 12:54:29 UTC`, so all totals above cover **~25 days** (2026-06-19 → 2026-07-14). The 401 calls / 150,014.9s total on the `latest_stock` query average out to ~16 calls/day at ~6.24 min each.
 - Live `pg_locks`/`pg_stat_activity` snapshot *during* an 08:20 contention window (all queries above were run mid-afternoon, off-peak)
+
+## Branch 000 production path — corrected 2026-07-20
+
+**The 2026-07-15 resolution of MA-001 was wrong.** It identified
+`C:\SC-StockDay-Ordering` (local path on the "server" / branch-000 host) as
+the production install because that path exists, is a valid clone on `main`,
+and its `.env` reports `ADAPOS_SYNC_BRANCH_CODE=000`. All true — but that
+checkout is **not what the machine's production Scheduled Task actually
+runs.** It was last synced 2026-06-26 and never touched again; the "first
+successful sync since the 2026-06-26 stall" claimed on 2026-07-15 was a real
+sync, but of a checkout the live task had already stopped using, not a
+recovery of the production path.
+
+**Actual production path, confirmed 2026-07-20 by enumerating every
+Scheduled Task on the host (not filtering by name) and cross-checking each
+candidate's log directory for continuity**:
+`C:\Users\Administrator\Desktop\Stockdays\SC-StockDay-Ordering\apps\adapos-sync`,
+run by the task `AdaPOS-Sync Daily 1920` (SYSTEM, triggers 08:20 and 19:20
+daily) — this path has an unbroken daily log history through 2026-07-20,
+including 2026-07-15, contradicting the "6-week-old, uncommitted stall" story
+built around the other path. The dashboard staying green after 2026-06-26 was
+because of this real, working task — not evidence the other checkout was
+fine.
+
+**Resolution actions, 2026-07-20** (all under a Claude session with real
+console access on the host, elevated Administrator, no full sync run at any
+point):
+- Bootstrapped the production path to `main`@`8e74e934` (fast-forward,
+  working tree already clean), then proved the self-update mechanism itself
+  works under the production task's own SYSTEM account: CURRENT (no-op),
+  Advance B→C (`8e74e93`→`361085c`), CURRENT again, then Advance C→D
+  (`361085c`→`912d984`, this maintenance work) and CURRENT again — all five
+  runs via `verify-self-update.ps1`, all `SELF-UPDATE ACCEPTANCE PASSED`.
+- Replaced the single `AdaPOS-Sync Daily 1920` task (both triggers ran an
+  unconditional full sync) with `AdaPOS Sync (Branch 000) - Morning` (08:20,
+  full sync) and `AdaPOS Sync (Branch 000) - Evening` (19:20,
+  `-SkipIfSyncedToday`) via a disabled-then-verified-then-enabled cutover
+  (see MANUAL-ACTIONS.md MA-006). The old task is kept, disabled, as an
+  immediate rollback path — not deleted.
+- Quarantined the stale `C:\SC-StockDay-Ordering` checkout to
+  `C:\_ADAPOS_LEGACY\SC-StockDay-Ordering-LEGACY-20260720` (moved, not
+  deleted) and left a `DO-NOT-USE.txt` stub at the old path pointing at both
+  the quarantine location and the real production path.
+- Added self-update status monitoring (deterministic
+  `logs/self-update-latest.json`, a post-run checker with a stable exit-code
+  contract, and best-effort `POST /api/sync/heartbeat` events) so a future
+  FAILED or silently-hung self-update on any branch is externally observable
+  instead of only visible in a log file no one is tailing. See
+  MANUAL-ACTIONS.md MA-001 for the full before/after and STATE.md for
+  today's entry. **The central dashboard does not render this yet** — the
+  heartbeat events are being sent, but there is no backend/dashboard
+  consumer deployed for them. Do not treat this as "central self-update
+  monitoring is live" until that consumer ships (tracked as a handoff to a
+  dev-machine session against the backend repo, which has separate CP4 work
+  in progress that branch-000 sessions must not touch).
+
+**Standing question this raises, not yet answered**: whether any of
+001/003/004/005's own "confirmed" install paths were verified the same
+name-filtered way branch 000's was on 2026-07-15 (by finding *a* checkout
+that matches, rather than by enumerating every Scheduled Task and checking
+which one the host actually runs). Worth a narrow re-check before treating
+any of them as settled, using the same method used here: enumerate all
+tasks, don't filter by expected name, cross-check log continuity.

@@ -1,5 +1,44 @@
 # Program State
 
+## 2026-07-20 — MA-001 corrected: branch 000's real production path found, self-update deployed and proven under SYSTEM, task cutover + legacy quarantine complete
+
+The 2026-07-15 resolution of MA-001 (below) identified
+`C:\SC-StockDay-Ordering` as branch 000's production install. **That was
+wrong.** It's a real, `main`-branch checkout with the right `.env` branch
+code, but the host's actual Scheduled Task (`AdaPOS-Sync Daily 1920`)
+targets a different path entirely and had been running there all along —
+the other checkout just went stale after 2026-06-26. Full account of what
+was wrong, how it was found (enumerate every Scheduled Task, don't filter by
+expected name, cross-check log continuity), and what was done about it is in
+EVIDENCE.md ("Branch 000 production path — corrected 2026-07-20") and
+MANUAL-ACTIONS.md (MA-001, MA-006).
+
+Summary of what changed on the real production host today, under an
+explicit, session-scoped user authorization that also covered touching
+Scheduled Tasks (normally out of scope for this program):
+- Bootstrapped the correct production path from its actual state to `main`
+  HEAD, then proved self-update itself works end-to-end under the
+  production Scheduled Task's own SYSTEM account (CURRENT → Advance →
+  CURRENT → Advance → CURRENT across two separate commits).
+- Added deterministic self-update status/monitoring (status JSON, post-run
+  checker, best-effort heartbeat events) — this is the fleet self-update
+  gap flagged in the 2026-07-19 entry below, now implemented and tested (59
+  passing tests against disposable fixtures), though only for branch 000's
+  code so far; 001/003/004/005 still need the same rollout plus SYSTEM-log
+  verification called for below.
+- Replaced the single always-full-sync `AdaPOS-Sync Daily 1920` task with
+  split Morning (full sync) / Evening (`-SkipIfSyncedToday`) tasks, via a
+  reversible register-disabled → verify → enable-and-disable-old cutover.
+  Old task kept disabled, not deleted.
+- Quarantined the stale `C:\SC-StockDay-Ordering` checkout (moved, not
+  deleted) and left a stub file at the old path.
+- **Not done**: the central dashboard has no consumer for the new heartbeat
+  events yet, so self-update health is still only visible per-branch in
+  `logs/self-update-latest.json` and the sync log, not centrally. That is a
+  handoff to a dev-machine session against the backend repo (separate CP4
+  work is in progress there that branch-000 sessions must not touch).
+  001/003/004/005 have not had any of today's changes applied.
+
 ## 2026-07-19 — self-update hardening prepared locally (not deployed; fleet verification pending)
 
 Scope is self-update only; CP4 is being handled separately and is not part of
@@ -40,8 +79,10 @@ verification.
       unexpected finding recorded (PaaSRTSM-project was on a non-`main`
       branch mid-investigation; see DECISIONS.md)
 - [x] Agent fleet inventory: version, dataset, batch, timeout, schedule, path
-      — complete for 001/003/004/005, **incomplete for 000** (MA-001)
-- [ ] Source of branch 000 identified — **BLOCKED on MA-001**
+      — complete for 001/003/004/005, **now also complete for 000**
+      (MA-001, corrected 2026-07-20 — see EVIDENCE.md)
+- [x] Source of branch 000 identified — **RESOLVED 2026-07-20** (MA-001,
+      corrected; the 2026-07-15 answer was wrong — see EVIDENCE.md)
 - [x] Production DB baseline: table sizes, dead tuples, autovacuum timestamps,
       connection count/limit, `pg_stat_statements` top offenders — captured,
       see EVIDENCE.md (note: connection-count sample is off-peak, not an

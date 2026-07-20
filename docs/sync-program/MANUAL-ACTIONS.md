@@ -7,7 +7,7 @@ with physical/dashboard access.
 
 ---
 
-## Action ID: MA-001 — Identify branch 000's agent installation — REOPENED 2026-07-15, cleanup done
+## Action ID: MA-001 — Identify branch 000's agent installation — REOPENED 2026-07-15 (wrong path), REOPENED AND CORRECTED 2026-07-20 (see below)
 
 **Original resolution (2026-07-14)**: found at `Y:\SC-StockDay-Ordering\apps\adapos-sync`
 via a mapped network drive. Turned out to be a **red herring path** — that
@@ -63,12 +63,59 @@ given 7-day window could be entirely normal, unlike it would be alarming
 for an actual storefront branch. Not confirmed against real AdaPos data at
 HQ — flagging the reasoning, not the conclusion.
 
-**Scheduled Task health**: still not separately verified (a PowerShell
-check was handed to the user to run themselves as Administrator, per their
-preference not to have Claude touch Scheduled Tasks) — but this successful
-manual run at minimum proves the SQL Server, network path, and backend
-ingestion all work correctly again for this branch, which was the larger
-unknown.
+**Scheduled Task health**: as of 2026-07-15 this was still not separately
+verified (a PowerShell check was handed to the user to run themselves as
+Administrator, per their preference not to have Claude touch Scheduled
+Tasks) — but this successful manual run at minimum proved the SQL Server,
+network path, and backend ingestion all worked correctly again for **the
+checkout it ran against**, which turned out not to be the one the production
+task actually uses (see REOPENED AND CORRECTED below).
+
+**REOPENED AND CORRECTED 2026-07-20**: the 2026-07-15 resolution above was
+wrong. `C:\SC-StockDay-Ordering` is a real, valid `branch 000` checkout, but
+it is **not** what the host's Scheduled Task runs — it was last synced
+2026-06-26 and never touched again. Confirmed by enumerating every Scheduled
+Task on the host (not filtering by name) and checking each candidate's log
+directory for continuity, with the user's Scheduled-Task authorization
+explicitly extended for this session (see below):
+
+- **Actual production path**:
+  `C:\Users\Administrator\Desktop\Stockdays\SC-StockDay-Ordering\apps\adapos-sync`,
+  run by task `AdaPOS-Sync Daily 1920` (SYSTEM, 08:20 + 19:20 daily), with an
+  unbroken daily log history through 2026-07-20. Full detail, including why
+  the 2026-07-15 sync's "first success since the 06-26 stall" framing was
+  misleading (it synced a checkout the live task had already abandoned, not
+  the production path), is in EVIDENCE.md "Branch 000 production path —
+  corrected 2026-07-20".
+- **Self-update proven under SYSTEM** on the real production path: CURRENT →
+  Advance (`8e74e93`→`361085c`) → CURRENT → Advance (`361085c`→`912d984`) →
+  CURRENT, all via `verify-self-update.ps1`, all
+  `SELF-UPDATE ACCEPTANCE PASSED`.
+- **Scheduled Task health, now actually verified and improved** — this is
+  the resolution to the "handed to the user" note above. With the user's
+  explicit, session-scoped authorization to touch Scheduled Tasks (overriding
+  the general preference noted on 2026-07-15, for this maintenance window
+  only), the single `AdaPOS-Sync Daily 1920` task (both triggers ran an
+  unconditional full sync) was replaced with `AdaPOS Sync (Branch 000) -
+  Morning` (08:20 full sync) and `AdaPOS Sync (Branch 000) - Evening` (19:20,
+  `-SkipIfSyncedToday`), via register-then-verify-then-enable, with the old
+  task kept disabled (not deleted) as an immediate rollback. See MA-006.
+- **Legacy checkout quarantined**, not deleted:
+  `C:\SC-StockDay-Ordering` → `C:\_ADAPOS_LEGACY\SC-StockDay-Ordering-LEGACY-20260720`,
+  with a `DO-NOT-USE.txt` stub left at the old path.
+- **Self-update monitoring added**: deterministic
+  `apps/adapos-sync/logs/self-update-latest.json` per attempt, a post-run
+  checker (`check-self-update-result.ps1`) with a stable exit-code contract
+  that also rejects a stale status file left over from a previous
+  invocation, and best-effort `POST /api/sync/heartbeat` events
+  (`self-update:STARTED|UPDATED|CURRENT|FAILED|MISSING_TERMINAL`). 59
+  automated tests cover this against disposable fixture repos — no
+  production/full-sync calls. **The central dashboard does not render any
+  of this yet** — events are being sent, but no backend/dashboard consumer
+  is deployed. Do not describe central self-update monitoring as complete
+  until that consumer ships; it is a handoff to a dev-machine session
+  against the backend repo (which has its own CP4 work in progress that
+  branch-000 sessions must not touch).
 
 <details><summary>Original request (kept for reference, no longer active)</summary>
 
@@ -189,10 +236,19 @@ XML before every change")
 **Target**: every branch machine whose Scheduled Tasks CP1 will touch (005
 duplicate-task cleanup first, per canary order)
 **Why**: authorization rules forbid this session from touching Scheduled
-Tasks directly. Recording this now so CP1 doesn't start without it queued.
+Tasks directly, except where explicitly and narrowly authorized (see
+branch 000 below). Recording this now so CP1 doesn't start without it queued
+for the remaining branches.
 **Requested**: when ready to start CP1, export (`Export-ScheduledTask`) every
-AdaPOS-related task on 001/003/004/005/000 before any disable/delete, save
+AdaPOS-related task on 001/003/004/005 before any disable/delete, save
 alongside this program's docs folder or hand back to this session to store.
+
+**Branch 000 — DONE 2026-07-20**, under explicit session-scoped user
+authorization (see MA-001): `AdaPOS-Sync Daily 1920` exported to
+`C:\ProgramData\ADAPOS-Diagnostics\AdaPOS-Sync_Daily_1920_precutover_20260720-181945.xml`
+(SHA256 `21B6454DDDFB91A583FBCB07F13923F65615D5FEAAD74BAB69A84E002C15C5B1`)
+immediately before disabling it. The task itself was kept, disabled, as a
+faster rollback than re-importing the XML. 001/003/004/005 remain open.
 
 ---
 
@@ -200,9 +256,9 @@ alongside this program's docs folder or hand back to this session to store.
 
 | Action ID | Status | Blocks |
 |---|---|---|
-| MA-001 | RESOLVED — code current, manual sync confirmed working | Scheduled Task health check handed to user (Administrator-only) |
+| MA-001 | REOPENED then RESOLVED 2026-07-20 — correct production path found, self-update proven under SYSTEM, task cutover + legacy quarantine done, monitoring added (dashboard consumer still pending, separate handoff) | none |
 | MA-002 | MOSTLY RESOLVED (4 narrow sub-items open) | CP5 capacity claims only now — deploy mechanism question fully resolved |
 | MA-003 | OPEN | CP1's stated justification (not the fix itself) |
 | MA-004 | OPEN | CP1 branch-005 task work |
 | MA-005 | OPEN | none (security hygiene, not a program blocker) |
-| MA-006 | OPEN | CP1 start |
+| MA-006 | Branch 000 DONE 2026-07-20; 001/003/004/005 OPEN | CP1 start (remaining branches) |
