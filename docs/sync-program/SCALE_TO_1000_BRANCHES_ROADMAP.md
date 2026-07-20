@@ -317,6 +317,30 @@ covers the same need.
   at higher branch counts — see the version-manifest design immediately
   below, which is the natural next step if a canary gate becomes necessary.
 
+**UPDATE 2026-07-20 — hardened, proven under SYSTEM, and given
+observability, on branch 000 only so far**: the fail-safe self-update path
+described above was implemented locally on 2026-07-19 (see STATE.md) but
+its fleet gap — `git rev-parse` can fail under the Scheduled Task's SYSTEM
+principal with "dubious ownership" before the launcher even learns the repo
+root — was unverified until 2026-07-20, when branch 000's actual production
+Scheduled Task was used to prove the full cycle end-to-end under its own
+SYSTEM account: no-op (CURRENT), advance one commit (UPDATED), no-op again,
+twice more across two further commits. Also added, again on branch 000
+only: a deterministic per-attempt status file
+(`logs/self-update-latest.json`), a post-run checker with a stable
+exit-code contract (including detecting a stale status file left over from
+a previous run — closing exactly the kind of silent-failure gap this
+section warns about), and best-effort heartbeat events. **The central
+dashboard has no consumer for these events yet** — this only makes
+self-update failures observable per-branch (log file + status JSON), not
+centrally, until a backend/dashboard consumer is built and deployed (that
+work depends on the CP4 backend work below, which is not yet wired or
+deployed either). 001/003/004/005 have not had any of this applied; MA-001
+correction in EVIDENCE.md and MANUAL-ACTIONS.md has full detail. This does
+not yet add the canary/staged-rollout mechanism called out immediately
+above — it only proves the existing mechanism actually works under the
+account that matters (SYSTEM) and gives it a machine-readable result.
+
 Original design (superseded in the details above, kept for the version-
 manifest/staged-rollout idea which the simpler implementation above doesn't
 yet have):

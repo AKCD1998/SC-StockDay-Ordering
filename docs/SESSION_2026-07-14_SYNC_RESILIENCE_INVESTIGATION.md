@@ -192,6 +192,26 @@ Key CP0 findings not already covered above:
   completion or failure line, suggesting the machine may have shut down
   mid-run. **User decision: 000 is explicitly out of scope for this
   program** (MA-001, closed) — do not investigate or touch it further.
+
+  **CORRECTION 2026-07-20**: this whole finding was investigating the wrong
+  checkout. `Y:\SC-StockDay-Ordering` (and later, on 2026-07-15,
+  `C:\SC-StockDay-Ordering` on the "server" host) are both real branch-000
+  checkouts, but neither is what the host's Scheduled Task actually runs.
+  The real production path
+  (`C:\Users\Administrator\Desktop\Stockdays\SC-StockDay-Ordering`) has an
+  unbroken daily sync log through 2026-07-20 — branch 000's production sync
+  was never actually stale or unreliable; only this and a later
+  investigation's checkout were. Found by enumerating every Scheduled Task
+  on the host (not filtering by expected name) and cross-checking log
+  continuity. The "out of scope" decision above was later superseded by
+  explicit user authorization on 2026-07-20 to investigate and touch branch
+  000 (self-update deployed and proven under SYSTEM, Scheduled Task cutover
+  to split Morning/Evening tasks, legacy checkouts quarantined not deleted).
+  See `docs/sync-program/EVIDENCE.md` ("Branch 000 production path —
+  corrected 2026-07-20") and `docs/sync-program/MANUAL-ACTIONS.md` (MA-001)
+  for full detail. Not retroactively marking this session's finding
+  "wrong" in spirit — the checkout it found really was stale exactly as
+  described; it just wasn't the one in production.
 - Branch 005 has **duplicate Scheduled Tasks**: a legacy pair
   (`SCstockDay-ADAPOS-SYNC-0815`/`-1920`) alongside the current
   Morning/Evening pair, meaning it syncs up to twice per window. Still open
@@ -306,6 +326,16 @@ this new responsibility interferes with live checkout), explicitly over 000
 (HQ), because 000's own install is unreliable/stale and out of scope (§9),
 and HQ-side issues are harder to observe against real day-to-day sales
 activity than an actual storefront's.
+
+**CORRECTION 2026-07-20**: the "000's own install is unreliable/stale"
+premise was wrong — see the §9 correction above; branch 000's actual
+production sync was fine throughout, only an unrelated stale checkout was
+being observed. The other reasons given (lowest transaction volume among
+storefronts; HQ-side issues harder to observe against real sales activity)
+stand on their own and don't depend on that premise, so this correction
+does not by itself reopen the branch-004 decision — flagging only so the
+now-false "000 is unreliable" reasoning is not carried forward or cited
+elsewhere.
 
 **Rollout**: `products` removed from `ADAPOS_SYNC_DATASETS` on 001/003/005
 (a `.env`-only change — `apps/adapos-sync` already gates every dataset
