@@ -9200,6 +9200,7 @@ input[type="radio"] {
   font-weight: 650;
 }
 
+.mvt-sales-table td.fp-sales-target-cumulative-avg-cell,
 .fp-sales-target-cumulative-avg-cell {
   text-align: center;
   font-size: 1.3rem;
