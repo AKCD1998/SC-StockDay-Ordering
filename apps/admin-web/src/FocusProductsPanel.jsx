@@ -121,9 +121,15 @@ function BranchCloseCountBadge({ row, branchCodes }) {
   const judged = branchCodes.filter((code) => row.branchAchieved?.[code] != null);
   if (judged.length === 0) return <span className="fp-dash">-</span>;
   const closed = judged.filter((code) => row.branchAchieved[code]).length;
+  // Kept short on purpose: this badge is nowrap and sits next to the actions
+  // column in an already-wide per-branch matrix, so a long label overflows on
+  // top of แก้ไข/ลบ. Full wording lives in the tooltip.
   return (
-    <span className={`fp-status-badge ${closed === judged.length ? "ok" : "pending"}`}>
-      ปิดแล้ว {closed}/{judged.length} สาขา
+    <span
+      className={`fp-status-badge ${closed === judged.length ? "ok" : "pending"}`}
+      title={`ปิดเป้าแล้ว ${closed} จาก ${judged.length} สาขา`}
+    >
+      ปิด {closed}/{judged.length}
     </span>
   );
 }
@@ -663,7 +669,7 @@ function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete, restrictT
                 สาขา {code}
               </th>
             ))}
-            <th rowSpan={2}>สถานะ</th>
+            <th rowSpan={2} className="fp-status-col">สถานะ</th>
             {isAdminUser && <th rowSpan={2}>จัดการ</th>}
           </tr>
           <tr>
@@ -696,7 +702,7 @@ function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete, restrictT
                   </Fragment>
                 );
               })}
-              <td>
+              <td className="fp-status-col">
                 {/* Staff see only their own branch, so a single verdict is the
                     honest answer for them; admins see every branch, so a count.
                     Neither reads row.isFrozen — that flag means "the period
