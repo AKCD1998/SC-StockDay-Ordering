@@ -1249,6 +1249,12 @@ function LoadingOverlay({ active, onNavigateBack }) {
   );
 }
 
+// Every product code a batch row covers — the scanned one plus anything merged
+// into it to share its target.
+function batchRowCodes(row) {
+  return [row.productCode, ...(row.extraProducts || []).map((p) => p.productCode)];
+}
+
 function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved, salesStaff }) {
   const [focusType, setFocusType] = useState("salesperson");
   const [dateFrom, setDateFrom] = useState(initialDates.from);
@@ -1334,7 +1340,11 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved, sal
         if (!product) throw new Error(results.length ? "พบหลายสินค้า กรุณายิงบาร์โค้ดหรือกรอกรหัสที่ตรงกัน" : "ไม่พบสินค้า");
         cacheProduct(query, product);
       }
-      if (focusType !== "salesperson" && rows.some((row) => row.productCode === product.productCode)) throw new Error("สินค้านี้อยู่ในรายการแล้ว");
+      // Also checks merged-in products, or a code could end up counted by two
+      // targets once the rows are grouped.
+      if (focusType !== "salesperson" && rows.some((row) => batchRowCodes(row).includes(product.productCode))) {
+        throw new Error("สินค้านี้อยู่ในรายการแล้ว");
+      }
       setRows((prev) => [...prev, {
         productCode: product.productCode,
         productName: product.productName || "",
@@ -1344,6 +1354,7 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved, sal
         targetQty: "",
         assignedPersonName: "",
         assignedStaffId: "",
+        extraProducts: [], // products merged into this row, sharing its target
         branchTargets: Object.fromEntries(BRANCH_CHOICES.map((code) => [code, ""])),
       }]);
       setScanValue("");
@@ -1354,6 +1365,61 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved, sal
       setScanBusy(false);
       setScanningQuery("");
     }
+  }
+
+  // Folds a scanned row into the one above it so both products share that row's
+  // single target — the Vicks honey-lemon + orange case. Scan normally, then
+  // merge, rather than making every scan ask "new target or existing one?".
+  function mergeIntoPrevious(index) {
+    if (index < 1) return;
+    setRows((prev) => {
+      const target = prev[index - 1];
+      const source = prev[index];
+      const merged = {
+        ...target,
+        extraProducts: [
+          ...(target.extraProducts || []),
+          { productCode: source.productCode, productName: source.productName },
+          ...(source.extraProducts || []),
+        ],
+        // Keep the combined group's stock realistic: the warnings compare target
+        // against stock, and any of the grouped products can satisfy the target.
+        stockByBranch: Object.fromEntries(BRANCH_CHOICES.map((code) => [
+          code,
+          Number(target.stockByBranch?.[code] || 0) + Number(source.stockByBranch?.[code] || 0),
+        ])),
+      };
+      return prev.map((row, i) => (i === index - 1 ? merged : row)).filter((_, i) => i !== index);
+    });
+  }
+
+  // Pulls a merged product back out into a row of its own.
+  function splitProduct(rowIndex, productCode) {
+    setRows((prev) => {
+      const row = prev[rowIndex];
+      const removed = (row.extraProducts || []).find((p) => p.productCode === productCode);
+      if (!removed) return prev;
+      const kept = {
+        ...row,
+        extraProducts: (row.extraProducts || []).filter((p) => p.productCode !== productCode),
+      };
+      const restored = {
+        productCode: removed.productCode,
+        productName: removed.productName || "",
+        barcode: "",
+        unit: "",
+        stockByBranch: {}, // unknown once merged; re-scan the code to refresh it
+        targetQty: "",
+        assignedPersonName: "",
+        assignedStaffId: "",
+        extraProducts: [],
+        branchTargets: Object.fromEntries(BRANCH_CHOICES.map((code) => [code, ""])),
+      };
+      const next = [...prev];
+      next[rowIndex] = kept;
+      next.splice(rowIndex + 1, 0, restored);
+      return next;
+    });
   }
 
   function applySameTarget(index) {
@@ -1440,6 +1506,7 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved, sal
           scheduledPublishAt: publicationStatus === "scheduled" ? new Date(scheduledPublishAt).toISOString() : null,
           focusProducts: rows.map((row) => ({
             productCode: row.productCode,
+            productCodes: batchRowCodes(row),
             focusType,
             targetQty: Number(row.targetQty),
             branchCodes: [...BRANCH_CHOICES],
@@ -1511,7 +1578,7 @@ function BatchFocusProductForm({ initialDates, csrfToken, onCancel, onSaved, sal
         </div>
         <label className="fp-field fp-batch-scan-field"><span>ยิงบาร์โค้ดหรือกรอกรหัสสินค้า</span><div className="fp-batch-scan-row"><input ref={scanRef} autoFocus value={scanValue} onChange={(e) => setScanValue(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addScannedProduct(); } }} placeholder="ยิงบาร์โค้ดแล้ว Enter" /><button type="button" className="fp-btn-secondary" onClick={addScannedProduct} disabled={busy}>เพิ่ม</button></div></label>
         {focusType !== "salesperson" && <div className="fp-copy-tools"><span>คัดลอกเป้าทุกแถวจาก</span><select value={copyFromBranch} onChange={(e) => setCopyFromBranch(e.target.value)}>{BRANCH_CHOICES.map((code) => <option key={code}>{code}</option>)}</select><span>ไป</span><select value={copyToBranch} onChange={(e) => setCopyToBranch(e.target.value)}>{BRANCH_CHOICES.map((code) => <option key={code}>{code}</option>)}</select><button type="button" className="fp-btn-secondary" onClick={copyBranchTargets}>คัดลอก</button></div>}
-        <div className={`fp-batch-table-wrap fp-batch-table-wrap--${focusType}`}><table className={`fp-batch-table fp-batch-table--${focusType}`}><thead><tr><th>สินค้า</th><th>หน่วย</th>{focusType === "salesperson" ? <><th>พนักงานขาย</th><th>เป้ารวม</th></> : <><th>เป้าหลัก</th>{BRANCH_CHOICES.map((code) => <th key={code}>{code}<small>stock</small></th>)}</>}<th /></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.productCode}-${index}`}><td><strong>{row.productCode}</strong><span>{row.productName}</span></td><td className="fp-batch-unit-cell">{row.unit || "-"}</td>{focusType === "salesperson" ? <><td><select value={row.assignedStaffId} onChange={(e) => { const staff = salesStaff.find((item) => item.staffId === e.target.value); updateRow(index, (old) => ({ ...old, assignedStaffId: e.target.value, assignedPersonName: staff?.displayName || "" })); }}><option value="">เลือกพนักงานขาย</option>{salesStaff.map((staff) => <option key={staff.staffId} value={staff.staffId}>{staff.displayName} — {staff.branchCode}{staff.isProbationary ? " (ทดลองงาน)" : ""}</option>)}</select></td><td><input type="number" min="1" value={row.targetQty} onChange={(e) => updateRow(index, (old) => ({ ...old, targetQty: e.target.value }))} /></td></> : <><td><input type="number" min="1" value={row.targetQty} onChange={(e) => updateRow(index, (old) => ({ ...old, targetQty: e.target.value }))} /><button type="button" onClick={() => applySameTarget(index)}>ใช้ทุกสาขา</button></td>{BRANCH_CHOICES.map((code) => <td key={code} className={Number(row.stockByBranch?.[code] || 0) <= 0 ? "warning" : ""}><input type="number" min="1" value={row.branchTargets[code]} onChange={(e) => updateRow(index, (old) => ({ ...old, branchTargets: { ...old.branchTargets, [code]: e.target.value } }))} /><small>{Number(row.stockByBranch?.[code] || 0)}</small></td>)}</>}<td><button type="button" className="fp-btn-link danger" onClick={() => setRows((prev) => prev.filter((_, i) => i !== index))}>ลบ</button></td></tr>)}</tbody></table></div>
+        <div className={`fp-batch-table-wrap fp-batch-table-wrap--${focusType}`}><table className={`fp-batch-table fp-batch-table--${focusType}`}><thead><tr><th>สินค้า</th><th>หน่วย</th>{focusType === "salesperson" ? <><th>พนักงานขาย</th><th>เป้ารวม</th></> : <><th>เป้าหลัก</th>{BRANCH_CHOICES.map((code) => <th key={code}>{code}<small>stock</small></th>)}</>}<th /></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.productCode}-${index}`}><td><strong>{row.productCode}</strong><span>{row.productName}</span>{(row.extraProducts || []).map((extra) => <span key={extra.productCode} className="fp-batch-merged-product"><strong>+ {extra.productCode}</strong> {extra.productName}<button type="button" className="fp-btn-link danger" onClick={() => splitProduct(index, extra.productCode)}>แยก</button></span>)}{(row.extraProducts || []).length > 0 && <small className="fp-batch-merged-hint">ใช้เป้าร่วมกัน {batchRowCodes(row).length} รายการ</small>}{index > 0 && <button type="button" className="fp-btn-link fp-batch-merge-btn" title="รวมแถวนี้เข้ากับแถวบน ให้ใช้เป้าเดียวกัน (เช่น วิคส์รสน้ำผึ้งมะนาว + รสส้ม)" onClick={() => mergeIntoPrevious(index)}>🔗 รวมเป้ากับแถวบน</button>}</td><td className="fp-batch-unit-cell">{row.unit || "-"}</td>{focusType === "salesperson" ? <><td><select value={row.assignedStaffId} onChange={(e) => { const staff = salesStaff.find((item) => item.staffId === e.target.value); updateRow(index, (old) => ({ ...old, assignedStaffId: e.target.value, assignedPersonName: staff?.displayName || "" })); }}><option value="">เลือกพนักงานขาย</option>{salesStaff.map((staff) => <option key={staff.staffId} value={staff.staffId}>{staff.displayName} — {staff.branchCode}{staff.isProbationary ? " (ทดลองงาน)" : ""}</option>)}</select></td><td><input type="number" min="1" value={row.targetQty} onChange={(e) => updateRow(index, (old) => ({ ...old, targetQty: e.target.value }))} /></td></> : <><td><input type="number" min="1" value={row.targetQty} onChange={(e) => updateRow(index, (old) => ({ ...old, targetQty: e.target.value }))} /><button type="button" onClick={() => applySameTarget(index)}>ใช้ทุกสาขา</button></td>{BRANCH_CHOICES.map((code) => <td key={code} className={Number(row.stockByBranch?.[code] || 0) <= 0 ? "warning" : ""}><input type="number" min="1" value={row.branchTargets[code]} onChange={(e) => updateRow(index, (old) => ({ ...old, branchTargets: { ...old.branchTargets, [code]: e.target.value } }))} /><small>{Number(row.stockByBranch?.[code] || 0)}</small></td>)}</>}<td><button type="button" className="fp-btn-link danger" onClick={() => setRows((prev) => prev.filter((_, i) => i !== index))}>ลบ</button></td></tr>)}</tbody></table></div>
         {!rows.length && <div className="fp-empty">ยิงบาร์โค้ดเพื่อเพิ่มสินค้าได้ต่อเนื่อง</div>}
         {(issues.length > 0 || coverageReminderList.length > 0 || warningList.length > 0) && (
           <div className="fp-batch-feedback-grid">

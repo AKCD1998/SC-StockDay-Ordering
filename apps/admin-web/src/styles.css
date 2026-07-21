@@ -8117,6 +8117,14 @@ input[type="radio"] {
 .fp-status-badge.ok { background: rgba(34, 197, 94, 0.15); color: #15803d; }
 .fp-status-badge.pending { background: rgba(249, 115, 22, 0.15); color: #c2410c; }
 
+/* Batch (barcode) form: products merged into a row to share its target. */
+.fp-batch-merged-product { display: block; margin-top: 2px; padding-left: 0.5rem; border-left: 2px solid #a78bfa; font-size: 0.72rem; }
+.fp-batch-merged-product .fp-btn-link { margin-left: 0.35rem; font-size: 0.7rem; }
+.fp-batch-merged-hint { display: block; margin-top: 2px; font-size: 0.68rem; font-weight: 600; color: #6d28d9; }
+.fp-batch-merge-btn { display: block; margin-top: 3px; font-size: 0.7rem; }
+[data-theme="dark"] .fp-batch-merged-hint { color: #c4b5fd; }
+[data-theme="dark"] .fp-batch-merged-product { border-left-color: #7c3aed; }
+
 /* Form section for grouping extra products under one shared target. */
 .fp-shared-products { margin: 0.5rem 0 0.75rem; padding: 0.6rem 0.75rem; border: 1px dashed #cbd5e1; border-radius: 0.5rem; }
 .fp-shared-products-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.82rem; font-weight: 600; }
