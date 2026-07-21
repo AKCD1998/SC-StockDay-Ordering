@@ -354,12 +354,21 @@ Vitest unit tests co-located: `lib/requestCart.test.js`, `lib/requestSubmission.
 
 | Service | Repo | Platform | Auto-deploy |
 |---|---|---|---|
-| `sc-stockday-order-web` (static) | SC-StockDay-Ordering | Render static | **No** (`autoDeploy: false`) |
-| `sc-cipdata-lookup-web` (static) | SC-StockDay-Ordering | Render static | **No** (`autoDeploy: false`) |
-| `sc-stockday-ordering` (admin-web static) | SC-StockDay-Ordering | Render static | **Yes** (`autoDeploy: true`) |
-| `sc-stockday-ordering` (SC legacy server) | SC-StockDay-Ordering | Render web | **Yes** (`autoDeploy: true`) ← zombie |
+| `sc-stockday-order-web` (static) | — | — | **NO SUCH SERVICE.** Verified 2026-07-21: no reachable Render service by this name, any state. `apps/order-web` has no known deployment. See open question below. |
+| `sc-cipdata-lookup-web` (static) | **`sc-cipdata-lookup-web` (separate repo)** | Render static | Live as `srv-d8uf1emq1p3s73bi6180`, manual/standalone — **built from its own repo, NOT from this one.** The block in this repo's `render.yaml` is dead config. |
+| `sc-stockday-ordering` (admin-web static) | SC-StockDay-Ordering | Render static | **Yes** (`autoDeploy: true`) — **dashboard-created, NOT in `render.yaml`** (`srv-d87t9sjeo5us738ldfu0`, root `apps/admin-web`, URL `sc-stockday-ordering.onrender.com`) |
 | `paasrtsm-project` (admin-api) | PaaSRTSM-project | Render web | **Manual only** (no render.yaml) |
 | `sc-ai-gen-vid` (static, planned) | SCAiGenVid | Render static | New service — not yet deployed. `render.yaml` in the repo, `VITE_API_BASE_URL` → `paasrtsm-project.onrender.com`. |
+
+**Note on `render.yaml` — it is dead config (verified 2026-07-21):** The repo-root `render.yaml` is **not** the source of truth for anything currently deployed. **No Render Blueprint is connected to this repo** (the workspace's only Blueprint Instance is `exs-d94a0ekvikkc73butoh0`, bound to `AKCD1998/ClaspSCxSeamless`), so nothing consumes this file — its `autoDeploy` values are inert. All three of its declared services were checked:
+
+- `sc-stockday-ordering` (`type: web`, node) — **does not exist** in any reachable workspace, in any state (active, suspended, preview). Either never provisioned or deleted with no trace; Render's API exposes no deletion history. **Removed from `render.yaml`.**
+- `sc-cipdata-lookup-web` — a live service by this name exists (`srv-d8uf1emq1p3s73bi6180`) but is built from its **own separate repo**, not this one. The block here is dead.
+- `sc-stockday-order-web` — **no reachable service exists at all.**
+
+Every live service is manual/standalone, created in the Render dashboard. The live admin site is not represented in this file.
+
+**Open question:** if `apps/order-web` has no Render service, where (if anywhere) are branch staff actually loading the order app from? Unresolved as of 2026-07-21.
 
 **Critical:** After every push to PaaSRTSM-project, a **Manual Deploy must be triggered** from the Render dashboard. GitHub push alone does not deploy. This applies to the new `content.*` video-studio backend code too — merging it does not activate it; `FEATURE_VIDEO_STUDIO=true` must also be set as a Render env var, and a Manual Deploy triggered.
 

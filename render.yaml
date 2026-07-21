@@ -36,26 +36,3 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
-
-  - type: web
-    name: sc-stockday-ordering
-    runtime: node
-    plan: starter
-    rootDir: .
-    buildCommand: npm install && npm run build
-    preDeployCommand: npm run db:migrate
-    startCommand: npm run start -w server
-    autoDeploy: true
-    envVars:
-      - key: NODE_VERSION
-        value: 20
-      - key: VITE_API_BASE_URL
-        sync: false
-      - key: DATA_MODE
-        sync: false
-      - key: DATABASE_URL
-        sync: false
-      - key: PORT
-        sync: false
-      - key: BRANCH_STOCK_SYNC_TOKEN
-        sync: false
