@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import { parseV2Config } from "./sync-v2.js";
 
 dotenv.config();
 
@@ -31,6 +32,11 @@ const cliSkipIfSyncedToday = args.includes("--skip-if-synced-today");
 
 const { server, instanceName } = parseHost(process.env.ADAPOS_SQLSERVER_HOST ?? "");
 
+const datasets = ((cliDatasets || process.env.ADAPOS_SYNC_DATASETS || "products,sales,transfers,transfer_lines,price_defaults,branch_price_overrides"))
+  .split(",")
+  .map((d) => d.trim())
+  .filter(Boolean);
+
 export const syncConfig = {
   sqlServerHost:         server,
   sqlServerInstanceName: instanceName,
@@ -54,10 +60,8 @@ export const syncConfig = {
   // price_defaults / branch_price_overrides are HQ-only (consolidated all-branch DB).
   // They are recognised here so a bare run can include them; the scheduled HQ run
   // enables them via ADAPOS_SYNC_DATASETS in .env.
-  datasets: ((cliDatasets || process.env.ADAPOS_SYNC_DATASETS || "products,sales,transfers,transfer_lines,price_defaults,branch_price_overrides"))
-    .split(",")
-    .map((d) => d.trim())
-    .filter(Boolean),
+  datasets,
+  syncV2: parseV2Config(process.env, datasets),
   // Approved receipts window — default 14 days so missed-day syncs self-heal.
   // Override with --lookback-days=N or env APPROVED_RECEIPTS_LOOKBACK_DAYS.
   approvedReceiptsLookbackDays: Number(cliLookback || process.env.APPROVED_RECEIPTS_LOOKBACK_DAYS || 14),

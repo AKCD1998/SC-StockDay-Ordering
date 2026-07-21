@@ -21,6 +21,7 @@ import {
 } from "./queries.js";
 import { postJson, getJson, setSyncRunId } from "./client.js";
 import { postBatchesWithRetry } from "./batching.js";
+import { finalizeRun, formatCp4Result, handoffBranchStock, startHybridRun, waitForApplied } from "./sync-v2.js";
 import { toProductRecords, toSalesRecords, toSalesDetailPayload, chunkPayloadByDoc, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toStockSnapshotRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
 
 const PERIOD_DAYS = 30;
@@ -163,7 +164,7 @@ async function runOnce() {
   }
   console.log("");
 
-  if (syncConfig.skipIfSyncedToday) {
+  if (syncConfig.skipIfSyncedToday && !syncConfig.dryRun) {
     try {
       const status = await getJson(
         `${syncConfig.apiBaseUrl}/api/sync/today-status?branchCode=${encodeURIComponent(syncConfig.branchCode)}&datasetTag=branch_stock_history`,
@@ -216,27 +217,36 @@ async function runOnce() {
       console.log(`  ${name}: ${count} rows`);
     }
     console.log(`\nTotal records read: ${totalRead}`);
+    const branchStockRecords = syncConfig.datasets.includes("branch_stock")
+      ? toBranchStockRecords(data.branch_stock ?? [], syncConfig.branchCode)
+      : null;
 
     if (syncConfig.dryRun) {
       console.log("\n--- Dry-run: no data sent to API ---");
-      console.log("Sample row per dataset:");
-      for (const [name, rows] of Object.entries(data)) {
-        if (Array.isArray(rows) && rows.length > 0) {
-          console.log(`\n[${name}]`);
-          console.log(JSON.stringify(rows[0], null, 2));
+      if (syncConfig.syncV2.enabled) {
+        const recordCount = branchStockRecords?.length ?? 0;
+        const batchCount = recordCount === 0 ? 0 : Math.ceil(recordCount / syncConfig.syncV2.batchSize);
+        console.log(`Would use CP4 hybrid_v2 for branch_stock: ${recordCount} records in ${batchCount} batch(es).`);
+        console.log("No API request or payload is emitted in dry-run mode.");
+      } else {
+        console.log("Sample row per dataset:");
+        for (const [name, rows] of Object.entries(data)) {
+          if (Array.isArray(rows) && rows.length > 0) {
+            console.log(`\n[${name}]`);
+            console.log(JSON.stringify(rows[0], null, 2));
+          }
         }
-      }
-      // Price datasets ship a *normalized* shape, not the raw row — print a
-      // transformed sample so the payload can be verified before --execute.
-      if (data.price_defaults) {
-        const recs = toProductPriceDefaultRecords(data.price_defaults);
-        console.log(`\n[price_defaults] ${data.price_defaults.length} rows -> ${recs.length} normalized records`);
-        if (recs.length) console.log(JSON.stringify(recs[0], null, 2));
-      }
-      if (data.branch_price_overrides) {
-        const recs = toProductBranchPriceOverrideRecords(data.branch_price_overrides);
-        console.log(`\n[branch_price_overrides] ${data.branch_price_overrides.length} rows -> ${recs.length} normalized records`);
-        if (recs.length) console.log(JSON.stringify(recs[0], null, 2));
+        // Price datasets ship a normalized shape, not the raw row.
+        if (data.price_defaults) {
+          const recs = toProductPriceDefaultRecords(data.price_defaults);
+          console.log(`\n[price_defaults] ${data.price_defaults.length} rows -> ${recs.length} normalized records`);
+          if (recs.length) console.log(JSON.stringify(recs[0], null, 2));
+        }
+        if (data.branch_price_overrides) {
+          const recs = toProductBranchPriceOverrideRecords(data.branch_price_overrides);
+          console.log(`\n[branch_price_overrides] ${data.branch_price_overrides.length} rows -> ${recs.length} normalized records`);
+          if (recs.length) console.log(JSON.stringify(recs[0], null, 2));
+        }
       }
 
       console.log("\nDone. Verify output, then run with --execute to post to API.");
@@ -250,6 +260,8 @@ async function runOnce() {
     const snapshotId = `price-snap-${Date.now()}`;
     const startedAt = new Date().toISOString();
     let totalSent = 0;
+    let branchStockV2Manifest = null;
+    const branchStockV2Enabled = syncConfig.syncV2.datasets.includes("branch_stock");
 
     // CP2 (observability): ask the backend to open a run row immediately
     // (status='running') so a mid-run crash leaves visible evidence instead
@@ -257,14 +269,25 @@ async function runOnce() {
     // correlation ID gets attached to this run's requests; the sync itself
     // must never be blocked by this.
     let syncRunId = null;
+    setSyncRunId(null);
     try {
-      const startResult = await postJson(`${syncConfig.apiBaseUrl}/api/sync/run-start`, {
-        syncType: `adapos_branch_${syncConfig.branchCode}`,
-        branchCode: syncConfig.branchCode,
-      });
-      syncRunId = startResult?.runId || null;
-      if (syncRunId) setSyncRunId(syncRunId);
+      if (branchStockV2Enabled) {
+        syncRunId = await startHybridRun({
+          baseUrl: syncConfig.apiBaseUrl,
+          branchCode: syncConfig.branchCode,
+          postJson,
+          setSyncRunId,
+        });
+      } else {
+        const startResult = await postJson(`${syncConfig.apiBaseUrl}/api/sync/run-start`, {
+          syncType: `adapos_branch_${syncConfig.branchCode}`,
+          branchCode: syncConfig.branchCode,
+        });
+        syncRunId = startResult?.runId || null;
+        if (syncRunId) setSyncRunId(syncRunId);
+      }
     } catch (runStartErr) {
+      if (branchStockV2Enabled) throw new Error(`CP4 hybrid run-start failed: ${runStartErr.message}`);
       console.warn(`  WARN: /run-start failed, continuing without a correlation ID: ${runStartErr.message}`);
     }
 
@@ -350,21 +373,27 @@ async function runOnce() {
         totalSent += result.headersAccepted + result.linesAccepted;
       }
 
-      if (data.branch_stock?.length) {
-        console.log(`Posting ${data.branch_stock.length} branch-stock rows (${syncConfig.branchStockBatchSize}/batch, up to ${BRANCH_STOCK_RETRY_OPTIONS.maxAttempts} attempts)...`);
-        // Single-branch sync: each batch states its branchCode explicitly so the
-        // server updates only this branch's column and never the others.
-        const branchStockRecords = toBranchStockRecords(data.branch_stock, syncConfig.branchCode);
-        const sent = await postBatchesWithRetry({
-          url: `${syncConfig.apiBaseUrl}/api/branch-stock/sync`,
+      if (branchStockRecords) {
+        const handoff = await handoffBranchStock({
+          v2Enabled: branchStockV2Enabled,
+          baseUrl: syncConfig.apiBaseUrl,
+          syncRunId,
+          branchCode: syncConfig.branchCode,
           records: branchStockRecords,
-          batchSize: syncConfig.branchStockBatchSize,
-          extraBody: { branchCode: syncConfig.branchCode },
-          post: postJson,
-          ...BRANCH_STOCK_RETRY_OPTIONS,
+          v2BatchSize: syncConfig.syncV2.batchSize,
+          v1BatchSize: syncConfig.branchStockBatchSize,
+          postJson,
+          postV1Batches: postBatchesWithRetry,
+          retryOptions: BRANCH_STOCK_RETRY_OPTIONS,
         });
-        console.log(`  branch_stock: ${sent} snapshots sent`);
-        totalSent += sent;
+        branchStockV2Manifest = handoff.manifest;
+        if (branchStockV2Enabled) {
+          console.log(`  branch_stock: ${handoff.manifest.recordCount} records staged in ${handoff.manifest.batchCount} batch(es)`);
+        } else if (handoff.sent > 0) {
+          const sent = handoff.sent;
+          console.log(`  branch_stock: ${sent} snapshots sent`);
+          totalSent += sent;
+        }
       }
 
       // Accumulate-mode history — additive to branch_stock above, which stays the
@@ -478,6 +507,27 @@ async function runOnce() {
         totalSent += overridesSent;
       }
 
+      // Finalize only after every v1 dataset above (especially stock history)
+      // has succeeded. Any earlier throw leaves CP4 batches staged and inert.
+      if (branchStockV2Enabled) {
+        if (!branchStockV2Manifest) throw new Error("CP4 branch_stock handoff was not staged.");
+        await finalizeRun({ baseUrl: syncConfig.apiBaseUrl, syncRunId, manifest: branchStockV2Manifest, postJson });
+        console.log(formatCp4Result("QUEUED", {
+          runId: syncRunId,
+          batches: branchStockV2Manifest.batchCount,
+          records: branchStockV2Manifest.recordCount,
+        }));
+        totalSent += branchStockV2Manifest.recordCount;
+        await waitForApplied({
+          baseUrl: syncConfig.apiBaseUrl,
+          syncRunId,
+          getJson,
+          pollIntervalMs: syncConfig.syncV2.pollIntervalMs,
+          waitTimeoutMs: syncConfig.syncV2.waitTimeoutMs,
+        });
+        console.log(formatCp4Result("APPLIED", { runId: syncRunId, records: branchStockV2Manifest.recordCount }));
+      }
+
       const finishedAt = new Date().toISOString();
       await postJson(`${syncConfig.apiBaseUrl}/api/sync/run-log`, {
         id: runId,
@@ -493,6 +543,10 @@ async function runOnce() {
 
       console.log(`\nDone. ${totalSent} records sent to API.`);
     } catch (postErr) {
+      if (branchStockV2Enabled) {
+        const result = postErr.code === "CP4_WAIT_TIMEOUT" ? "WAIT_TIMEOUT" : "FAILED";
+        console.error(formatCp4Result(result, { runId: syncRunId }));
+      }
       const failedAt = new Date().toISOString();
       await postJson(`${syncConfig.apiBaseUrl}/api/sync/run-log`, {
         id: runId,
