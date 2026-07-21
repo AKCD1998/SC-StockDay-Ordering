@@ -1615,7 +1615,7 @@ const SALES_TARGET_TIER_LABELS = { 1: "ขั้นที่ 1", 2: "ขั้�
 const SALES_TARGET_COLUMN_DEFS = [
   { key: "monthlyTarget", label: "เป้าเดือน" },
   { key: "dailyTarget", label: "เป้า/วัน" },
-  { key: "actualAvgPerDay", label: "เฉลี่ย/วัน (สะสม)" },
+  { key: "actualAvgPerDay", label: "เฉลี่ย/วัน" },
   { key: "remainingAmount", label: "คงเหลือ" },
   { key: "remainingAvgPerDay", label: "เฉลี่ย/วัน (คงเหลือ)" },
   { key: "achieved", label: "สถานะ" },
@@ -1984,16 +1984,30 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
                 <td className="fp-sales-target-tier-sticky">{SALES_TARGET_TIER_LABELS[tierNumber]}</td>
                 {selectedBranches.flatMap((code) => {
                   const tier = progressByBranch[code]?.tiers?.find((item) => item.tier === tierNumber);
-                  return columns.map((col, columnIndex) => (
-                    <td
-                      key={`${code}-${tierNumber}-${col.key}`}
-                      className={`fp-sales-target-branch-cell fp-sales-target-branch-tone-${branchToneIndex(code)}${columnIndex === 0 ? " branch-start" : ""}`}
-                    >
-                      {col.key === "achieved"
-                        ? <StatusBadge achieved={tier?.achieved} />
-                        : formatCurrency(tier?.[col.key])}
-                    </td>
-                  ));
+                  return columns.map((col, columnIndex) => {
+                    const cellClass = `fp-sales-target-branch-cell fp-sales-target-branch-tone-${branchToneIndex(code)}${columnIndex === 0 ? " branch-start" : ""}`;
+                    // Same figure on all three tier rows — it belongs to the
+                    // month, not the tier — so span it once per branch.
+                    if (col.key === "actualAvgPerDay") {
+                      if (tierNumber !== 1) return null;
+                      return (
+                        <td
+                          key={`${code}-${col.key}`}
+                          rowSpan={3}
+                          className={`${cellClass} fp-sales-target-merged-avg-cell`}
+                        >
+                          {formatCurrency(tier?.[col.key])}
+                        </td>
+                      );
+                    }
+                    return (
+                      <td key={`${code}-${tierNumber}-${col.key}`} className={cellClass}>
+                        {col.key === "achieved"
+                          ? <StatusBadge achieved={tier?.achieved} />
+                          : formatCurrency(tier?.[col.key])}
+                      </td>
+                    );
+                  });
                 })}
               </tr>
             ))}
@@ -2342,10 +2356,26 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {progress.tiers.map((tier) => (
+                  {progress.tiers.map((tier, tierIndex) => (
                     <tr key={tier.tier}>
                       <td>{SALES_TARGET_TIER_LABELS[tier.tier]}</td>
                       {columns.map((col) => {
+                        // The actual daily average describes the month, not a
+                        // tier, so it is the same figure on every row. Render it
+                        // once spanning all tiers instead of repeating it three
+                        // times, which read as three separate measurements.
+                        if (col.key === "actualAvgPerDay") {
+                          if (tierIndex > 0) return null;
+                          return (
+                            <td
+                              key={col.key}
+                              rowSpan={progress.tiers.length}
+                              className="fp-sales-target-cumulative-avg-cell"
+                            >
+                              {formatCurrency(tier[col.key])}
+                            </td>
+                          );
+                        }
                         if (col.key === "achieved") {
                           return (
                             <td key={col.key}>

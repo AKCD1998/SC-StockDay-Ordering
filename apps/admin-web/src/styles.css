@@ -9370,6 +9370,10 @@ input[type="radio"] {
 .mvt-sales-table td.fp-sales-target-cumulative-avg-cell,
 .fp-sales-target-cumulative-avg-cell {
   text-align: center;
+  /* Spans all three tier rows in the tier-per-row table, so it has to centre
+     vertically as well as horizontally. Harmless in the transposed admin table,
+     where the same cell occupies a single row. */
+  vertical-align: middle;
   font-size: 1.3rem;
   font-weight: 800;
   color: #0f6fde;
@@ -9379,6 +9383,16 @@ input[type="radio"] {
 [data-theme="dark"] .fp-sales-target-cumulative-avg-cell {
   color: #6fb2ff;
   text-shadow: 0 0 12px rgba(111, 178, 255, 0.6);
+}
+
+/* Same merge in the multi-branch comparison table, but without the enlarged
+   glow treatment — that table already carries one column set per branch, and
+   repeating a 1.3rem highlight across all of them would dominate it. */
+.mvt-sales-table td.fp-sales-target-merged-avg-cell,
+.fp-sales-target-merged-avg-cell {
+  text-align: center;
+  vertical-align: middle;
+  font-weight: 700;
 }
 
 [data-theme="dark"] .fp-sales-target-branch-card {
