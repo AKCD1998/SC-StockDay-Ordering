@@ -9200,6 +9200,19 @@ input[type="radio"] {
   font-weight: 650;
 }
 
+.fp-sales-target-cumulative-avg-cell {
+  text-align: center;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #0f6fde;
+  text-shadow: 0 0 10px rgba(15, 111, 222, 0.45);
+}
+
+[data-theme="dark"] .fp-sales-target-cumulative-avg-cell {
+  color: #6fb2ff;
+  text-shadow: 0 0 12px rgba(111, 178, 255, 0.6);
+}
+
 [data-theme="dark"] .fp-sales-target-branch-card {
   background: #0d1724;
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.24);

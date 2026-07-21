@@ -1834,7 +1834,11 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
                     {columns.map((col) => (
                       <tr key={col.key}>
                         <th scope="row">{col.label}</th>
-                        {[1, 2, 3].map((tierNumber) => {
+                        {col.key === "actualAvgPerDay" ? (
+                          <td colSpan={3} className="fp-sales-target-cumulative-avg-cell">
+                            {formatCurrency(tiersByNumber.get(1)?.[col.key])}
+                          </td>
+                        ) : [1, 2, 3].map((tierNumber) => {
                           const tier = tiersByNumber.get(tierNumber);
                           return (
                             <td key={tierNumber}>
