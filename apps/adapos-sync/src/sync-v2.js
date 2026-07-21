@@ -112,9 +112,42 @@ export async function handoffBranchStock({
   return { mode: "v1", manifest: null, sent };
 }
 
-export async function finalizeRun({ baseUrl, syncRunId, manifest, postJson }) {
-  await postJson(`${baseUrl}/api/sync/v2/runs/${encodeURIComponent(syncRunId)}/finalize`, manifest);
+export async function finalizeRun({
+  baseUrl, syncRunId, manifest, postJson, sleep = defaultSleep,
+  random = Math.random, logger = console, maxAttempts = 3,
+}) {
+  const url = `${baseUrl}/api/sync/v2/runs/${encodeURIComponent(syncRunId)}/finalize`;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await postJson(url, manifest);
+      return manifest;
+    } catch (error) {
+      if (attempt >= maxAttempts || !isRetryableV2Error(error)) throw error;
+      const delayMs = Math.min(5_000, 1_000 * 2 ** (attempt - 1) + Math.floor(random() * 250));
+      logger.warn(`CP4: finalize retry attempt=${attempt}/${maxAttempts}`);
+      await sleep(delayMs);
+    }
+  }
   return manifest;
+}
+
+export function assertApprovedReceiptsComplete({ v2Enabled, approvedFailed }) {
+  if (v2Enabled && approvedFailed > 0) {
+    const error = new Error(`CP4 finalize blocked: dataset=approved_receipts failedDocuments=${approvedFailed}.`);
+    error.code = "CP4_V1_DATASET_FAILED";
+    throw error;
+  }
+}
+
+export async function completeSyncRun({
+  v2Enabled, approvedFailed = 0, finalize, poll, writeSuccessRunLog,
+}) {
+  assertApprovedReceiptsComplete({ v2Enabled, approvedFailed });
+  if (v2Enabled) {
+    await finalize();
+    await poll();
+  }
+  return writeSuccessRunLog();
 }
 
 export async function waitForApplied({
@@ -133,6 +166,13 @@ export async function waitForApplied({
       }
     } catch (error) {
       if (error?.code === "CP4_APPLY_FAILED") throw error;
+      if (!isRetryableV2Error(error)) {
+        const pollError = new Error(`CP4 poll failed for run ${syncRunId}${error?.status ? ` (HTTP ${error.status})` : ""}.`);
+        pollError.code = "CP4_POLL_FAILED";
+        pollError.status = error?.status;
+        pollError.cause = error;
+        throw pollError;
+      }
       logger.warn(`CP4: poll warning runId=${syncRunId}`);
     }
     const remainingMs = deadline - now();

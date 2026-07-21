@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  completeSyncRun,
   createDeterministicBatches,
   finalizeRun,
   formatCp4Result,
@@ -121,4 +122,151 @@ test("terminal result formatting contains no payload or secret material", () => 
   const line = formatCp4Result("FAILED", { runId: "7", records: 100, batches: 1 });
   assert.equal(line, "CP4: RESULT=FAILED runId=7 dataset=branch_stock batches=1 records=100");
   assert.doesNotMatch(line, /token|api.?key|password|payload|postgresql:\/\//i);
+});
+
+test("finalize retries response-lost timeout with the exact URL and manifest", async () => {
+  const calls = [];
+  const manifest = { dataset: "branch_stock", batchCount: 2, recordCount: 101 };
+  await finalizeRun({
+    baseUrl: "https://api.test", syncRunId: "run/7", manifest,
+    sleep: async () => {}, random: () => 0, logger: { warn: () => {} },
+    postJson: async (url, body) => {
+      calls.push([url, JSON.stringify(body)]);
+      if (calls.length === 1) throw Object.assign(new Error("response lost"), { code: "REQUEST_TIMEOUT" });
+    },
+  });
+  assert.deepEqual(calls, [
+    ["https://api.test/api/sync/v2/runs/run%2F7/finalize", JSON.stringify(manifest)],
+    ["https://api.test/api/sync/v2/runs/run%2F7/finalize", JSON.stringify(manifest)],
+  ]);
+});
+
+test("finalize retries 429 and 503 but never retries non-idempotent 4xx", async () => {
+  for (const status of [429, 503]) {
+    let calls = 0;
+    await finalizeRun({
+      baseUrl: "x", syncRunId: "1", manifest: {}, sleep: async () => {}, random: () => 0,
+      logger: { warn: () => {} },
+      postJson: async () => { calls += 1; if (calls === 1) throw Object.assign(new Error("transient"), { status }); },
+    });
+    assert.equal(calls, 2, `HTTP ${status} should retry once then succeed`);
+  }
+  for (const status of [400, 401, 409]) {
+    let calls = 0;
+    await assert.rejects(finalizeRun({
+      baseUrl: "x", syncRunId: "1", manifest: {}, sleep: async () => {},
+      postJson: async () => { calls += 1; throw Object.assign(new Error("permanent"), { status }); },
+    }), /permanent/);
+    assert.equal(calls, 1, `HTTP ${status} must not retry`);
+  }
+  let boundedCalls = 0;
+  await assert.rejects(finalizeRun({
+    baseUrl: "x", syncRunId: "1", manifest: {}, sleep: async () => {}, random: () => 0,
+    logger: { warn: () => {} },
+    postJson: async () => { boundedCalls += 1; throw Object.assign(new Error("still down"), { status: 503 }); },
+  }), /still down/);
+  assert.equal(boundedCalls, 3);
+});
+
+test("poll retries timeout, network, 429, and 5xx then recovers", async () => {
+  const failures = [
+    Object.assign(new Error("timeout"), { code: "REQUEST_TIMEOUT" }),
+    new TypeError("network"),
+    Object.assign(new Error("busy"), { status: 429 }),
+    Object.assign(new Error("down"), { status: 503 }),
+  ];
+  let time = 0; let calls = 0; let sleeps = 0;
+  const result = await waitForApplied({
+    baseUrl: "x", syncRunId: "1", pollIntervalMs: 10, waitTimeoutMs: 100,
+    now: () => time, sleep: async (ms) => { time += ms; sleeps += 1; }, logger: { warn: () => {} },
+    getJson: async () => { const failure = failures[calls++]; if (failure) throw failure; return { overallStatus: "success", applyStatus: "applied" }; },
+  });
+  assert.equal(result.applyStatus, "applied");
+  assert.equal(sleeps, 4);
+});
+
+test("poll fails immediately with CP4_POLL_FAILED for permanent HTTP 4xx", async () => {
+  for (const status of [400, 401, 403, 404, 409, 422]) {
+    let sleeps = 0; let calls = 0;
+    await assert.rejects(waitForApplied({
+      baseUrl: "x", syncRunId: "1", pollIntervalMs: 10, waitTimeoutMs: 1_800_000,
+      now: () => 0, sleep: async () => { sleeps += 1; },
+      getJson: async () => { calls += 1; throw Object.assign(new Error("bad request"), { status }); },
+    }), (error) => error.code === "CP4_POLL_FAILED" && error.status === status);
+    assert.equal(calls, 1);
+    assert.equal(sleeps, 0);
+  }
+});
+
+test("hybrid approved partial failure blocks finalize and success log while v1 preserves legacy success", async () => {
+  for (const v2Enabled of [true, false]) {
+    const trace = [];
+    const operation = completeSyncRun({
+      v2Enabled, approvedFailed: 2,
+      finalize: async () => trace.push("finalize"),
+      poll: async () => trace.push("poll"),
+      writeSuccessRunLog: async () => trace.push("success-run-log"),
+    });
+    if (v2Enabled) {
+      await assert.rejects(operation, (error) => error.code === "CP4_V1_DATASET_FAILED" && /dataset=approved_receipts failedDocuments=2/.test(error.message));
+      assert.deepEqual(trace, []);
+    } else {
+      await operation;
+      assert.deepEqual(trace, ["success-run-log"]);
+    }
+  }
+});
+
+test("executable hybrid sequence gates finalize and success on remaining v1 and APPLIED", async () => {
+  const trace = [];
+  const runId = await startHybridRun({
+    baseUrl: "x", branchCode: "005", setSyncRunId: () => {},
+    postJson: async () => { trace.push("run-start"); return { runId: "9" }; },
+  });
+  await handoffBranchStock({
+    v2Enabled: true, baseUrl: "x", syncRunId: runId, branchCode: "005", records: [{ id: 1 }], v2BatchSize: 100,
+    postJson: async () => trace.push("stage"), postV1Batches: async () => assert.fail("no v1 branch_stock"),
+  });
+  trace.push("remaining-v1");
+  await completeSyncRun({
+    v2Enabled: true,
+    finalize: async () => trace.push("finalize"),
+    poll: async () => trace.push("APPLIED"),
+    writeSuccessRunLog: async () => trace.push("success-run-log"),
+  });
+  assert.deepEqual(trace, ["run-start", "stage", "remaining-v1", "finalize", "APPLIED", "success-run-log"]);
+
+  const failedTrace = ["stage"];
+  await assert.rejects((async () => {
+    failedTrace.push("remaining-v1");
+    throw new Error("later v1 failed");
+  })().then(() => completeSyncRun({
+    v2Enabled: true, finalize: async () => failedTrace.push("finalize"),
+    poll: async () => {}, writeSuccessRunLog: async () => failedTrace.push("success-run-log"),
+  })), /later v1 failed/);
+  assert.deepEqual(failedTrace, ["stage", "remaining-v1"]);
+});
+
+test("poll failure or timeout prevents success log and feature-off trace has no v2 endpoint", async () => {
+  for (const code of ["CP4_APPLY_FAILED", "CP4_WAIT_TIMEOUT"]) {
+    const trace = [];
+    await assert.rejects(completeSyncRun({
+      v2Enabled: true, finalize: async () => trace.push("/api/sync/v2/finalize"),
+      poll: async () => { throw Object.assign(new Error(code), { code }); },
+      writeSuccessRunLog: async () => trace.push("success-run-log"),
+    }), (error) => error.code === code);
+    assert.deepEqual(trace, ["/api/sync/v2/finalize"]);
+  }
+
+  const urls = [];
+  await handoffBranchStock({
+    v2Enabled: false, baseUrl: "https://api.test", branchCode: "005", records: [{ id: 1 }], v1BatchSize: 100,
+    postJson: async () => {}, postV1Batches: async ({ url }) => { urls.push(url); return 1; },
+  });
+  await completeSyncRun({
+    v2Enabled: false, finalize: async () => urls.push("/api/sync/v2/finalize"), poll: async () => {},
+    writeSuccessRunLog: async () => urls.push("/api/sync/run-log"),
+  });
+  assert.deepEqual(urls, ["https://api.test/api/branch-stock/sync", "/api/sync/run-log"]);
+  assert.equal(urls.some((url) => url.includes("/api/sync/v2/")), false);
 });

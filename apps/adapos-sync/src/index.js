@@ -21,7 +21,7 @@ import {
 } from "./queries.js";
 import { postJson, getJson, setSyncRunId } from "./client.js";
 import { postBatchesWithRetry } from "./batching.js";
-import { finalizeRun, formatCp4Result, handoffBranchStock, startHybridRun, waitForApplied } from "./sync-v2.js";
+import { completeSyncRun, finalizeRun, formatCp4Result, handoffBranchStock, startHybridRun, waitForApplied } from "./sync-v2.js";
 import { toProductRecords, toSalesRecords, toSalesDetailPayload, chunkPayloadByDoc, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toStockSnapshotRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
 
 const PERIOD_DAYS = 30;
@@ -260,6 +260,7 @@ async function runOnce() {
     const snapshotId = `price-snap-${Date.now()}`;
     const startedAt = new Date().toISOString();
     let totalSent = 0;
+    let approvedFailed = 0;
     let branchStockV2Manifest = null;
     const branchStockV2Enabled = syncConfig.syncV2.datasets.includes("branch_stock");
 
@@ -433,7 +434,6 @@ async function runOnce() {
         console.log(`  Doc nos: ${docNosToPost.join(", ") || "(none)"}`);
 
         let approvedUpserted = 0;
-        let approvedFailed = 0;
         const failedDocNos = [];
 
         for (const record of records) {
@@ -507,38 +507,42 @@ async function runOnce() {
         totalSent += overridesSent;
       }
 
-      // Finalize only after every v1 dataset above (especially stock history)
-      // has succeeded. Any earlier throw leaves CP4 batches staged and inert.
-      if (branchStockV2Enabled) {
-        if (!branchStockV2Manifest) throw new Error("CP4 branch_stock handoff was not staged.");
-        await finalizeRun({ baseUrl: syncConfig.apiBaseUrl, syncRunId, manifest: branchStockV2Manifest, postJson });
-        console.log(formatCp4Result("QUEUED", {
+      // The coordinator gates finalize and the success run-log on all known v1
+      // outcomes and a terminal APPLIED result.
+      await completeSyncRun({
+        v2Enabled: branchStockV2Enabled,
+        approvedFailed,
+        finalize: async () => {
+          if (!branchStockV2Manifest) throw new Error("CP4 branch_stock handoff was not staged.");
+          await finalizeRun({ baseUrl: syncConfig.apiBaseUrl, syncRunId, manifest: branchStockV2Manifest, postJson });
+          console.log(formatCp4Result("QUEUED", {
+            runId: syncRunId,
+            batches: branchStockV2Manifest.batchCount,
+            records: branchStockV2Manifest.recordCount,
+          }));
+          totalSent += branchStockV2Manifest.recordCount;
+        },
+        poll: async () => {
+          await waitForApplied({
+            baseUrl: syncConfig.apiBaseUrl,
+            syncRunId,
+            getJson,
+            pollIntervalMs: syncConfig.syncV2.pollIntervalMs,
+            waitTimeoutMs: syncConfig.syncV2.waitTimeoutMs,
+          });
+          console.log(formatCp4Result("APPLIED", { runId: syncRunId, records: branchStockV2Manifest.recordCount }));
+        },
+        writeSuccessRunLog: async () => postJson(`${syncConfig.apiBaseUrl}/api/sync/run-log`, {
+          id: runId,
           runId: syncRunId,
-          batches: branchStockV2Manifest.batchCount,
-          records: branchStockV2Manifest.recordCount,
-        }));
-        totalSent += branchStockV2Manifest.recordCount;
-        await waitForApplied({
-          baseUrl: syncConfig.apiBaseUrl,
-          syncRunId,
-          getJson,
-          pollIntervalMs: syncConfig.syncV2.pollIntervalMs,
-          waitTimeoutMs: syncConfig.syncV2.waitTimeoutMs,
-        });
-        console.log(formatCp4Result("APPLIED", { runId: syncRunId, records: branchStockV2Manifest.recordCount }));
-      }
-
-      const finishedAt = new Date().toISOString();
-      await postJson(`${syncConfig.apiBaseUrl}/api/sync/run-log`, {
-        id: runId,
-        runId: syncRunId,
-        syncType: `adapos_branch_${syncConfig.branchCode}`,
-        startedAt,
-        finishedAt,
-        status: "success",
-        recordsRead: totalRead,
-        recordsSent: totalSent,
-        message: `datasets=${syncConfig.datasets.join(",")} posted for branch ${syncConfig.branchCode}.`,
+          syncType: `adapos_branch_${syncConfig.branchCode}`,
+          startedAt,
+          finishedAt: new Date().toISOString(),
+          status: "success",
+          recordsRead: totalRead,
+          recordsSent: totalSent,
+          message: `datasets=${syncConfig.datasets.join(",")} posted for branch ${syncConfig.branchCode}.`,
+        }),
       });
 
       console.log(`\nDone. ${totalSent} records sent to API.`);
