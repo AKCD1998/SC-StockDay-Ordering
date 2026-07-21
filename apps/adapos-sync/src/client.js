@@ -71,7 +71,9 @@ export async function postJson(url, payload) {
 export async function getJson(url) {
   const { response, text } = await requestWithTimeout(url, { method: "GET", headers: authHeaders() });
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status} — ${text.slice(0, 300)}`);
+    const requestError = new Error(`Request failed: ${response.status} — ${text.slice(0, 300)}`);
+    requestError.status = response.status;
+    throw requestError;
   }
   return JSON.parse(text);
 }
