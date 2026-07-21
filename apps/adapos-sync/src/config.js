@@ -71,6 +71,10 @@ export const syncConfig = {
   // one-off run — not this rolling window.
   salesDetailLookbackDays: Number(process.env.SALES_DETAIL_LOOKBACK_DAYS || 7),
   productBatchSize: parsePositiveInteger(process.env.ADAPOS_SYNC_PRODUCT_BATCH_SIZE, 100),
+  // Temporary v1 resilience while CP4 queue/worker support for branch_stock
+  // is completed. Smaller transactions are less likely to exceed the bounded
+  // request timeout during the simultaneous 08:20 fleet window.
+  branchStockBatchSize: parsePositiveInteger(process.env.ADAPOS_SYNC_BRANCH_STOCK_BATCH_SIZE, 100),
   // /api/sync/ada/sales has the same one-transaction-per-request shape as
   // products, but the client never chunked it — a busy branch's whole day of
   // sales_detail goes in a single request. Bound it by document count (a

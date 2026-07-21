@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "test": "node --test tests/batching.test.js tests/client.test.js"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

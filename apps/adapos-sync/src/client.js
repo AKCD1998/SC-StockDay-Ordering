@@ -43,7 +43,9 @@ async function requestWithTimeout(url, options) {
     return { response, text };
   } catch (err) {
     if (err.name === "AbortError") {
-      throw new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms: ${url}`);
+      const timeoutError = new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms: ${url}`);
+      timeoutError.code = "REQUEST_TIMEOUT";
+      throw timeoutError;
     }
     throw err;
   } finally {
@@ -59,7 +61,9 @@ export async function postJson(url, payload) {
   });
 
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status} — ${text.slice(0, 300)}`);
+    const requestError = new Error(`Request failed: ${response.status} — ${text.slice(0, 300)}`);
+    requestError.status = response.status;
+    throw requestError;
   }
   return JSON.parse(text);
 }

@@ -20,6 +20,7 @@ import {
   getBranchPriceOverrideRows,
 } from "./queries.js";
 import { postJson, getJson, setSyncRunId } from "./client.js";
+import { postBatchesWithRetry } from "./batching.js";
 import { toProductRecords, toSalesRecords, toSalesDetailPayload, chunkPayloadByDoc, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toStockSnapshotRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
 
 const PERIOD_DAYS = 30;
@@ -123,13 +124,15 @@ async function fetchDatasets(pool) {
 
 // ── Batch poster ──────────────────────────────────────────────────────────────
 async function postBatches(url, records, batchSize = 500, extraBody = {}) {
-  let sent = 0;
-  for (let i = 0; i < records.length; i += batchSize) {
-    await postJson(url, { ...extraBody, records: records.slice(i, i + batchSize) });
-    sent += Math.min(batchSize, records.length - i);
-  }
-  return sent;
+  return postBatchesWithRetry({ url, records, batchSize, extraBody, post: postJson });
 }
+
+const BRANCH_STOCK_RETRY_OPTIONS = Object.freeze({
+  operationName: "branch_stock",
+  maxAttempts: 3,
+  retryBaseDelayMs: 1_000,
+  retryMaxDelayMs: 5_000,
+});
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 async function runOnce() {
@@ -348,16 +351,18 @@ async function runOnce() {
       }
 
       if (data.branch_stock?.length) {
-        console.log(`Posting ${data.branch_stock.length} branch-stock rows...`);
+        console.log(`Posting ${data.branch_stock.length} branch-stock rows (${syncConfig.branchStockBatchSize}/batch, up to ${BRANCH_STOCK_RETRY_OPTIONS.maxAttempts} attempts)...`);
         // Single-branch sync: each batch states its branchCode explicitly so the
         // server updates only this branch's column and never the others.
         const branchStockRecords = toBranchStockRecords(data.branch_stock, syncConfig.branchCode);
-        const sent = await postBatches(
-          `${syncConfig.apiBaseUrl}/api/branch-stock/sync`,
-          branchStockRecords,
-          500,
-          { branchCode: syncConfig.branchCode },
-        );
+        const sent = await postBatchesWithRetry({
+          url: `${syncConfig.apiBaseUrl}/api/branch-stock/sync`,
+          records: branchStockRecords,
+          batchSize: syncConfig.branchStockBatchSize,
+          extraBody: { branchCode: syncConfig.branchCode },
+          post: postJson,
+          ...BRANCH_STOCK_RETRY_OPTIONS,
+        });
         console.log(`  branch_stock: ${sent} snapshots sent`);
         totalSent += sent;
       }
@@ -368,13 +373,16 @@ async function runOnce() {
       // updating one row per product (unbounded growth if run every 10 minutes —
       // intended for the twice-daily 08:20/19:20 schedule, not the routine loop).
       if (syncConfig.datasets.includes("branch_stock_history") && data.branch_stock?.length) {
-        console.log(`Posting ${data.branch_stock.length} stock-history snapshot rows...`);
-        const sent = await postBatches(
-          `${syncConfig.apiBaseUrl}/api/sync/ada/stock-snapshots`,
-          toStockSnapshotRecords(data.branch_stock, syncConfig.branchCode),
-          500,
-          { sourceSyncedAt: startedAt },
-        );
+        console.log(`Posting ${data.branch_stock.length} stock-history snapshot rows (${syncConfig.branchStockBatchSize}/batch, up to ${BRANCH_STOCK_RETRY_OPTIONS.maxAttempts} attempts)...`);
+        const sent = await postBatchesWithRetry({
+          url: `${syncConfig.apiBaseUrl}/api/sync/ada/stock-snapshots`,
+          records: toStockSnapshotRecords(data.branch_stock, syncConfig.branchCode),
+          batchSize: syncConfig.branchStockBatchSize,
+          extraBody: { sourceSyncedAt: startedAt },
+          post: postJson,
+          ...BRANCH_STOCK_RETRY_OPTIONS,
+          operationName: "branch_stock_history",
+        });
         console.log(`  branch_stock_history: ${sent} snapshot rows sent`);
         totalSent += sent;
       }
