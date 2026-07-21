@@ -114,10 +114,16 @@ function StatusBadge({ achieved }) {
   );
 }
 
-function TargetCloseStatusBadge({ isFrozen }) {
+// Admin view of a pharmacist/store_manager row: these types have no single
+// combined verdict (each branch clears its own target), so summarise how many
+// branches have closed rather than forcing one pass/fail for the whole row.
+function BranchCloseCountBadge({ row, branchCodes }) {
+  const judged = branchCodes.filter((code) => row.branchAchieved?.[code] != null);
+  if (judged.length === 0) return <span className="fp-dash">-</span>;
+  const closed = judged.filter((code) => row.branchAchieved[code]).length;
   return (
-    <span className={`fp-status-badge ${isFrozen ? "ok" : "pending"}`}>
-      {isFrozen ? "ปิดเป้าแล้ว" : "ยังไม่ปิดเป้า"}
+    <span className={`fp-status-badge ${closed === judged.length ? "ok" : "pending"}`}>
+      ปิดแล้ว {closed}/{judged.length} สาขา
     </span>
   );
 }
@@ -690,7 +696,20 @@ function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete, restrictT
                   </Fragment>
                 );
               })}
-              <td><TargetCloseStatusBadge isFrozen={row.isFrozen} /></td>
+              <td>
+                {/* Staff see only their own branch, so a single verdict is the
+                    honest answer for them; admins see every branch, so a count.
+                    Neither reads row.isFrozen — that flag means "the period
+                    ended and the numbers were locked", NOT "the target was met". */}
+                {restrictToBranch
+                  ? <StatusBadge achieved={row.branchAchieved?.[restrictToBranch] ?? null} />
+                  : <BranchCloseCountBadge row={row} branchCodes={branchCodes} />}
+                {row.isFrozen && (
+                  <span className="fp-frozen-badge" title="ยอดขายถูกล็อกแล้วเมื่อสิ้นสุดช่วงเวลา">
+                    🔒 ปิดยอด
+                  </span>
+                )}
+              </td>
               {isAdminUser && (
                 <td className="fp-actions-cell">
                   <button
@@ -775,7 +794,7 @@ function GroupManagerFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
         <thead>
           <tr className="fp-excel-banner-row">
             <th
-              colSpan={activeBranch === "all" ? 6 + (branchCodes.length * 2) + (isAdminUser ? 1 : 0) : 6 + (isAdminUser ? 1 : 0)}
+              colSpan={activeBranch === "all" ? 5 + (branchCodes.length * 2) + (isAdminUser ? 1 : 0) : 6 + (isAdminUser ? 1 : 0)}
               className="fp-excel-banner"
             >
               สินค้าโฟกัส ผู้จัดการกลุ่ม {activeBranch === "all" ? "ทุกสาขา" : `สาขา ${activeBranch}`} เดือน {monthLabel}
@@ -796,7 +815,6 @@ function GroupManagerFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
                     สาขา {code}
                   </th>
                 ))}
-                <th rowSpan={2} className="fp-total-target-col">เป้ารวม</th>
                 <th rowSpan={2} className="fp-total-sold-col">ขายรวม</th>
                 <th rowSpan={2}>สถานะ</th>
                 {isAdminUser && <th rowSpan={2}>จัดการ</th>}
@@ -829,7 +847,10 @@ function GroupManagerFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
             let sold;
             let achieved;
             if (activeBranch === "all") {
-              target = rowBranchCodes.reduce((sum, code) => sum + (row.branchTargetsEffective?.[code] || 0), 0);
+              // No combined target column here on purpose: group_manager success
+              // requires every branch to clear its OWN target, so a summed target
+              // is meaningless — one branch selling a lot cannot cover another
+              // branch that missed. Only the combined SOLD figure is shown.
               sold = row.totalSold;
               achieved = row.achieved;
             } else {
@@ -858,7 +879,7 @@ function GroupManagerFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
                     </Fragment>
                   );
                 }) : null}
-                <td className={activeBranch === "all" ? "fp-total-target-col" : ""}>{target != null ? formatNumber(target) : "-"}</td>
+                {activeBranch !== "all" && <td>{target != null ? formatNumber(target) : "-"}</td>}
                 <td className={activeBranch === "all" ? "fp-total-sold-col" : ""}>{formatNumber(sold)}</td>
                 <td>
                   <StatusBadge achieved={achieved} />
