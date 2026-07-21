@@ -108,17 +108,18 @@ export const syncConfig = {
   skipIfSyncedToday: cliSkipIfSyncedToday || String(process.env.ADAPOS_SYNC_SKIP_IF_SYNCED_TODAY ?? "false") === "true",
 };
 
-// ── Safety guards ─────────────────────────────────────────────────────────────
-
-if (!syncConfig.branchCode) {
-  console.error("ERROR: Branch code required. Set ADAPOS_SYNC_BRANCH_CODE in .env or pass --branch=XXX");
-  process.exit(1);
-}
-
-// Block ALL SQL connections when user=sa — including dry-run.
-// Create readonly_pilot in SSMS first, then update .env.
-if (syncConfig.sqlServerUser.toLowerCase() === "sa") {
-  console.error("ERROR: Connections using 'sa' are blocked for all modes.");
-  console.error("       Create readonly_pilot in SSMS, update .env, then retry.");
-  process.exit(1);
+// Kept separate from parsing so the production entrypoint can be executed with
+// injected test configuration without import-time process termination.
+export function validateSyncConfig(config) {
+  if (!config.branchCode) {
+    const error = new Error("Branch code required. Set ADAPOS_SYNC_BRANCH_CODE in .env or pass --branch=XXX.");
+    error.code = "CONFIG_ERROR";
+    throw error;
+  }
+  // Block ALL SQL connections when user=sa — including dry-run.
+  if (String(config.sqlServerUser || "").toLowerCase() === "sa") {
+    const error = new Error("Connections using 'sa' are blocked for all modes; configure a read-only SQL user.");
+    error.code = "CONFIG_ERROR";
+    throw error;
+  }
 }

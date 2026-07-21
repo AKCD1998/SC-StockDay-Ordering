@@ -1,5 +1,6 @@
 import sql from "mssql";
-import { syncConfig } from "./config.js";
+import { pathToFileURL } from "node:url";
+import { syncConfig as defaultSyncConfig, validateSyncConfig } from "./config.js";
 import {
   getProductMasterRows,
   getSalesSummaryRows,
@@ -19,9 +20,16 @@ import {
   getProductPriceDefaultRows,
   getBranchPriceOverrideRows,
 } from "./queries.js";
-import { postJson, getJson, setSyncRunId } from "./client.js";
+import { postJson as clientPostJson, getJson as clientGetJson, setSyncRunId as clientSetSyncRunId } from "./client.js";
 import { postBatchesWithRetry } from "./batching.js";
-import { completeSyncRun, finalizeRun, formatCp4Result, handoffBranchStock, startHybridRun, waitForApplied } from "./sync-v2.js";
+import {
+  completeSyncRun as defaultCompleteSyncRun,
+  finalizeRun as defaultFinalizeRun,
+  formatCp4Result,
+  handoffBranchStock as defaultHandoffBranchStock,
+  startHybridRun as defaultStartHybridRun,
+  waitForApplied as defaultWaitForApplied,
+} from "./sync-v2.js";
 import { toProductRecords, toSalesRecords, toSalesDetailPayload, chunkPayloadByDoc, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toStockSnapshotRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
 
 const PERIOD_DAYS = 30;
@@ -31,26 +39,26 @@ const PERIOD_DAYS = 30;
 // mssql + tedious use SQL Server Browser (UDP 1434) to resolve the actual port.
 // Do NOT set port when instanceName is present — it will be ignored or cause errors.
 const sqlServerConfig = {
-  server:   syncConfig.sqlServerHost,
-  user:     syncConfig.sqlServerUser,
-  password: syncConfig.sqlServerPassword,
-  database: syncConfig.sqlServerDatabase,
+  server:   defaultSyncConfig.sqlServerHost,
+  user:     defaultSyncConfig.sqlServerUser,
+  password: defaultSyncConfig.sqlServerPassword,
+  database: defaultSyncConfig.sqlServerDatabase,
   options: {
     encrypt:                false,  // SQL Server 2008 R2 does not support modern TLS
     trustServerCertificate: true,
     enableArithAbort:       true,
-    ...(syncConfig.sqlServerInstanceName
-      ? { instanceName: syncConfig.sqlServerInstanceName }
+    ...(defaultSyncConfig.sqlServerInstanceName
+      ? { instanceName: defaultSyncConfig.sqlServerInstanceName }
       : {}),
   },
   // Only include port when NOT using a named instance
-  ...(syncConfig.sqlServerInstanceName ? {} : { port: syncConfig.sqlServerPort }),
+  ...(defaultSyncConfig.sqlServerInstanceName ? {} : { port: defaultSyncConfig.sqlServerPort }),
 };
 
 // ── Dataset routing ────────────────────────────────────────────────────────────
-async function fetchDatasets(pool) {
+async function fetchDatasets(pool, config = defaultSyncConfig) {
   const data = {};
-  const { datasets, branchCode, dateCutoff } = syncConfig;
+  const { datasets, branchCode, dateCutoff } = config;
   const wantsSalesDetail = datasets.includes("sales_detail") || datasets.includes("sales");
 
   if (datasets.includes("schema_discovery")) {
@@ -74,10 +82,10 @@ async function fetchDatasets(pool) {
       // 30-day PERIOD_DAYS used by the sales-summary dataset — see
       // syncConfig.salesDetailLookbackDays. An explicit --date-from/--date-to
       // backfill still overrides this entirely (see applySalesDateWindow).
-      periodDays: syncConfig.salesDetailLookbackDays,
+      periodDays: config.salesDetailLookbackDays,
       dateCutoff,
-      fromDate: syncConfig.dateFrom,
-      toDate: syncConfig.dateTo,
+      fromDate: config.dateFrom,
+      toDate: config.dateTo,
     };
     data.sales_detail_headers = await getSalesDetailHeaderRows(pool, branchCode, salesDateOpts);
     data.sales_detail_lines = await getSalesDetailLineRows(pool, branchCode, salesDateOpts);
@@ -97,13 +105,13 @@ async function fetchDatasets(pool) {
   }
   if (datasets.includes("approved_receipts")) {
     const dateOpts = {
-      lookbackDays: syncConfig.approvedReceiptsLookbackDays,
-      fromDate: syncConfig.dateFrom,
-      toDate:   syncConfig.dateTo,
+      lookbackDays: config.approvedReceiptsLookbackDays,
+      fromDate: config.dateFrom,
+      toDate:   config.dateTo,
     };
-    const rangeLabel = syncConfig.dateFrom
-      ? `${syncConfig.dateFrom} → ${syncConfig.dateTo ?? "today"}`
-      : `last ${syncConfig.approvedReceiptsLookbackDays} days`;
+    const rangeLabel = config.dateFrom
+      ? `${config.dateFrom} → ${config.dateTo ?? "today"}`
+      : `last ${config.approvedReceiptsLookbackDays} days`;
     console.log(`  approved_receipts date range: ${rangeLabel}`);
     data.approved_receipt_headers = await getApprovedReceiptHeaderRows(pool, branchCode, dateOpts);
     data.approved_receipt_lines   = await getApprovedReceiptLineRows(pool, branchCode, dateOpts);
@@ -123,11 +131,6 @@ async function fetchDatasets(pool) {
   return data;
 }
 
-// ── Batch poster ──────────────────────────────────────────────────────────────
-async function postBatches(url, records, batchSize = 500, extraBody = {}) {
-  return postBatchesWithRetry({ url, records, batchSize, extraBody, post: postJson });
-}
-
 const BRANCH_STOCK_RETRY_OPTIONS = Object.freeze({
   operationName: "branch_stock",
   maxAttempts: 3,
@@ -136,7 +139,23 @@ const BRANCH_STOCK_RETRY_OPTIONS = Object.freeze({
 });
 
 // ── Main ───────────────────────────────────────────────────────────────────────
-async function runOnce() {
+export async function runOnce(dependencies = {}) {
+  const syncConfig = dependencies.syncConfig ?? defaultSyncConfig;
+  validateSyncConfig(syncConfig);
+  const postJson = dependencies.postJson ?? clientPostJson;
+  const getJson = dependencies.getJson ?? clientGetJson;
+  const setSyncRunId = dependencies.setSyncRunId ?? clientSetSyncRunId;
+  const startHybridRun = dependencies.startHybridRun ?? defaultStartHybridRun;
+  const handoffBranchStock = dependencies.handoffBranchStock ?? defaultHandoffBranchStock;
+  const finalizeRun = dependencies.finalizeRun ?? defaultFinalizeRun;
+  const waitForApplied = dependencies.waitForApplied ?? defaultWaitForApplied;
+  const completeSyncRun = dependencies.completeSyncRun ?? defaultCompleteSyncRun;
+  const connectSql = dependencies.connectSql ?? ((config) => sql.connect(config));
+  const fetchData = dependencies.fetchDatasets ?? fetchDatasets;
+  const connectionConfig = dependencies.sqlServerConfig ?? sqlServerConfig;
+  const postBatchesForRun = dependencies.postBatches ?? ((url, records, batchSize = 500, extraBody = {}) => (
+    postBatchesWithRetry({ url, records, batchSize, extraBody, post: postJson })
+  ));
   console.log("=== AdaPos Sync Agent ===");
   console.log(`Host:          ${syncConfig.sqlServerHost}`);
   if (syncConfig.sqlServerInstanceName) {
@@ -185,10 +204,10 @@ async function runOnce() {
 
   let pool;
   try {
-    pool = await sql.connect(sqlServerConfig);
+    pool = await connectSql(connectionConfig);
     console.log("SQL Server: connected OK\n");
 
-    const data = await fetchDatasets(pool);
+    const data = await fetchData(pool, syncConfig);
 
     // schema_discovery / purchase_schema print columns + sample, then exit
     if (data.schema_discovery || data.purchase_schema || data.product_master_schema) {
@@ -300,7 +319,7 @@ async function runOnce() {
 
       if (data.products?.length) {
         console.log(`Posting ${data.products.length} products (${syncConfig.productBatchSize}/batch)...`);
-        const sent = await postBatches(
+        const sent = await postBatchesForRun(
           `${syncConfig.apiBaseUrl}/api/sync/products`,
           toProductRecords(data.products),
           syncConfig.productBatchSize,
@@ -311,7 +330,7 @@ async function runOnce() {
 
       if (data.sales?.length) {
         console.log(`Posting ${data.sales.length} sales records...`);
-        const sent = await postBatches(
+        const sent = await postBatchesForRun(
           `${syncConfig.apiBaseUrl}/api/sync/sales-summary`,
           toSalesRecords(data.sales, syncConfig.branchCode, PERIOD_DAYS),
         );
@@ -462,7 +481,7 @@ async function runOnce() {
       if (data.price_defaults?.length) {
         const records = toProductPriceDefaultRecords(data.price_defaults);
         console.log(`Posting price defaults: ${data.price_defaults.length} rows -> ${records.length} records...`);
-        const sent = await postBatches(
+        const sent = await postBatchesForRun(
           `${syncConfig.apiBaseUrl}/api/sync/ada/prices/defaults`,
           records,
           500,
@@ -571,10 +590,13 @@ async function runOnce() {
     console.error("\nSync failed:", err.message);
     if (err.code)           console.error("Code:",   err.code);
     if (err.originalError)  console.error("Detail:", err.originalError.message);
-    process.exit(1);
+    throw err;
   } finally {
     if (pool) await pool.close();
   }
 }
 
-runOnce();
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) {
+  runOnce().catch(() => { process.exitCode = 1; });
+}
