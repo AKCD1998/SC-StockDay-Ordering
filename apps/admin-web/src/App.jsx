@@ -6,6 +6,11 @@ import BranchStockHistoryPanel from "./BranchStockHistoryPanel";
 import StockRecommendationsPanel from "./StockRecommendationsPanel";
 import ProductTaxonomyPanel from "./ProductTaxonomyPanel";
 import TaxonomyReviewPanel from "./TaxonomyReviewPanel";
+import {
+  getRegulatedDrugClassification,
+  summarizeRegulatedDrugBatch,
+  summarizeRegulatedDrugLines,
+} from "./lib/regulatedDrugs.js";
 import dkshLogoUrl from "./assets/dksh.svg";
 import hansaLogoUrl from "./assets/hansa-logo.png";
 import tnpHealthcareLogoUrl from "./assets/tnp-healthcare-logo.svg";
@@ -33,6 +38,20 @@ import pacificHealthcareLogoUrl from "./assets/pacific-healthcare-logo.svg";
 import greaterPharmaLogoUrl from "./assets/greater-pharma-logo.svg";
 import siamPharmaceuticalLogoUrl from "./assets/siam-pharmaceutical-logo.svg";
 import rxchumchonLogoUrl from "./assets/rxchumchon-logo.svg";
+
+function RegulatedDrugBadges({ reportGroups, summary = false, count = 0 }) {
+  if (!reportGroups?.length) return null;
+  return (
+    <span className={`srq-regulated-badges${summary ? " summary" : ""}`}>
+      {summary ? <span className="srq-regulated-summary-label">มียาควบคุม{count ? ` ${count} รายการ` : ""}</span> : null}
+      {reportGroups.map((group) => (
+        <span key={group} className={`srq-regulated-badge ${group.toLowerCase()}`}>
+          {group === "KY10" ? "ขย.10" : "ขย.11"}
+        </span>
+      ))}
+    </span>
+  );
+}
 import woothiLogoUrl from "./assets/woothi-logo.svg";
 import orexTradingLogoUrl from "./assets/orex-trading-logo.svg";
 
@@ -4303,10 +4322,15 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted, isAdm
           </div>
         ) : null}
 
-        {(detail.lines || []).map((line) => (
-          <div key={line.lineId} className="srq-detail-line-row">
+        {(detail.lines || []).map((line) => {
+          const classification = getRegulatedDrugClassification(line.productCode);
+          return (
+          <div key={line.lineId} className={`srq-detail-line-row${classification.isRegulated ? " srq-regulated-row" : ""}`}>
             <div className="srq-line-info">
-              <strong>{line.productNameThai || line.productNameEng || line.productCode}</strong>
+              <strong>
+                {line.productNameThai || line.productNameEng || line.productCode}
+                <RegulatedDrugBadges reportGroups={classification.reportGroups} />
+              </strong>
               <span className="meta-line">{line.productCode}</span>
               {isAdmin && line.snapshotQty != null ? (
                 <span className="meta-line srq-snapshot-audit">
@@ -4327,7 +4351,8 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted, isAdm
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
 
         {detail.responseNote ? <p className="meta-line">หมายเหตุล่าสุด: {detail.responseNote}</p> : null}
       </div>
@@ -4466,6 +4491,14 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
   const pagedRecords = filteredRecords.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  const regulatedCandidateKey = pagedRecords.map((record) => record.requestPublicId).join("|");
+  useEffect(() => {
+    if (!regulatedCandidateKey) return;
+    ensureSearchDetails(pagedRecords);
+    // Detail data is required to mark folded accordions; loading is bounded by page size.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regulatedCandidateKey]);
 
   useEffect(() => {
     let active = true;
@@ -4646,6 +4679,8 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
                 : "ยังไม่มีคำขอสินค้าเข้ามา"}
         </p>
       ) : pagedRecords.map((req) => {
+        const regulatedSummary = summarizeRegulatedDrugLines(searchDetailCache[req.requestPublicId]?.lines);
+        const isOpen = expandedId === req.requestPublicId;
         const isPureAlert = req.isAdminAlert && !req.isMixedMode && req.status === "SUBMITTED" && !req.responseResult;
         const isMixedIncoming = req.isAdminAlert && req.isMixedMode && req.status === "SUBMITTED" && !req.responseResult;
         const inCardExtra = isPureAlert ? " srq-batch-card-admin-alert" : isMixedIncoming ? " srq-batch-card-mixed" : "";
@@ -4654,7 +4689,7 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
         return (
         <article
           key={req.requestPublicId}
-          className={`srq-batch-card${inCardExtra}`}
+          className={`srq-batch-card${inCardExtra}${regulatedSummary.count && !isOpen ? " srq-regulated-card" : ""}`}
         >
           <button
             type="button"
@@ -4665,10 +4700,11 @@ function IncomingRequestsTab({ branchCode, isAdmin = false, csrfToken, onIncomin
             <span className="srq-batch-date">{formatDateTime(req.createdAt)}</span>
             <span className="srq-from-label">จาก: <strong>{BRANCH_LABELS[req.requestingBranchCode] ?? `สาขา ${req.requestingBranchCode}`}</strong></span>
             {req.isAdminAlert ? <span className="srq-admin-alert-pill">{alertPillLabel}</span> : null}
+            <RegulatedDrugBadges reportGroups={regulatedSummary.reportGroups} count={regulatedSummary.count} summary />
             <SrqStatusChip status={req.responseResult || req.status} />
-            <span className="srq-chevron">{expandedId === req.requestPublicId ? "▾" : "▸"}</span>
+            <span className="srq-chevron">{isOpen ? "▾" : "▸"}</span>
           </button>
-          {expandedId === req.requestPublicId ? (
+          {isOpen ? (
             <IncomingRequestDetail
               publicId={req.requestPublicId}
               csrfToken={csrfToken}
@@ -4895,6 +4931,13 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
     matchesMyRequestSearch(record, detailCache[record.batchPublicId], normalizedAppliedSearch),
   );
   const searchCandidateKey = baseFilteredRecords.map((record) => record.batchPublicId).join("|");
+
+  useEffect(() => {
+    if (!searchCandidateKey) return;
+    ensureBatchDetails(baseFilteredRecords);
+    // Batch details provide product codes for folded-card regulated-drug indicators.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchCandidateKey]);
 
   const hasActiveDateFilter =
     dateFilterMode === "single"
@@ -5181,13 +5224,14 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
       ) : filteredRecords.map((batch) => {
         const isOpen = expandedId === batch.batchPublicId;
         const detail = detailCache[batch.batchPublicId] || null;
+        const regulatedSummary = summarizeRegulatedDrugBatch(detail);
         const isPureAlert = batch.isAdminAlert && !batch.isMixedMode && batch.status === "SUBMITTED";
         const isMixed = batch.isAdminAlert && batch.isMixedMode && batch.status === "SUBMITTED";
         const cardExtra = isPureAlert ? " srq-batch-card-admin-alert" : isMixed ? " srq-batch-card-mixed" : "";
         const headerExtra = isPureAlert ? " srq-batch-card-header-admin-alert" : isMixed ? " srq-batch-card-header-mixed" : "";
         const pillLabel = batch.isMixedMode ? "📋 แจ้งจัดซื้อ + ขอจากสาขา" : "📋 แจ้งจัดซื้อ";
         return (
-          <article key={batch.batchPublicId} className={`srq-batch-card${cardExtra}`}>
+          <article key={batch.batchPublicId} className={`srq-batch-card${cardExtra}${regulatedSummary.count && !isOpen ? " srq-regulated-card" : ""}`}>
             <button
               type="button"
               className={`srq-batch-card-header${headerExtra}`}
@@ -5196,6 +5240,7 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
               <span className="srq-batch-id">{batch.batchPublicId}</span>
               <span className="srq-batch-date">{formatDateTime(batch.createdAt)}</span>
               {batch.isAdminAlert ? <span className="srq-procurement-pill">{pillLabel}</span> : null}
+              <RegulatedDrugBadges reportGroups={regulatedSummary.reportGroups} count={regulatedSummary.count} summary />
               <SrqStatusChip status={batch.status} />
               <span className="srq-chevron">{isOpen ? "▾" : "▸"}</span>
             </button>
@@ -5225,10 +5270,15 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
                           <div className="srq-lines-head">
                             <span>รหัส</span><span>ชื่อสินค้า</span><span>ขอ</span><span>หน่วย</span><span>ผล</span>
                           </div>
-                          {(req.lines || []).map((line) => (
-                            <div key={line.lineId} className="srq-line-row">
+                          {(req.lines || []).map((line) => {
+                            const classification = getRegulatedDrugClassification(line.productCode);
+                            return (
+                            <div key={line.lineId} className={`srq-line-row${classification.isRegulated ? " srq-regulated-row" : ""}`}>
                               <span className="srq-line-code">{line.productCode}</span>
-                              <span className="srq-line-name">{line.productNameThai || line.productNameEng || "-"}</span>
+                              <span className="srq-line-name">
+                                {line.productNameThai || line.productNameEng || "-"}
+                                <RegulatedDrugBadges reportGroups={classification.reportGroups} />
+                              </span>
                               <span className="srq-line-qty">{formatNumber(line.requestedQty, 0)}</span>
                               <span className="srq-line-unit">{line.unit || "-"}</span>
                               <span className="srq-line-resp">
@@ -5242,7 +5292,8 @@ function MyRequestsTab({ branchCode, csrfToken, requestDraftItems, setRequestDra
                                 ) : <span className="srq-resp-pending">รอตอบ</span>}
                               </span>
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     ))}
