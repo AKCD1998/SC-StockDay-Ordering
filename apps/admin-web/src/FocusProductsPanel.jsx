@@ -1808,9 +1808,11 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
               className={`fp-sales-target-branch-card fp-sales-target-branch-tone-${branchToneIndex(code)}`}
             >
               <header className="fp-sales-target-branch-card-header">
-                <div>
+                <div className="fp-sales-target-branch-card-title-row">
                   <h4>สาขา {code}</h4>
-                  <span>ยอดขายสะสม {formatCurrency(branchProgress?.actualSoFar)}</span>
+                  <span className="fp-sales-target-branch-card-amount">
+                    ยอดขายสะสม {formatCurrency(branchProgress?.actualSoFar)}
+                  </span>
                 </div>
                 <small>
                   {branchProgress

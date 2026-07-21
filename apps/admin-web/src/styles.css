@@ -9155,8 +9155,15 @@ input[type="radio"] {
   color: #29445f;
 }
 
-.fp-sales-target-branch-card-header h4 { margin: 0 0 2px; font-size: 1rem; }
-.fp-sales-target-branch-card-header span { font-size: 0.85rem; font-weight: 650; }
+.fp-sales-target-branch-card-title-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.fp-sales-target-branch-card-header h4 { margin: 0; font-size: 1rem; }
+.fp-sales-target-branch-card-amount { font-size: 1.6rem; font-weight: 800; }
 .fp-sales-target-branch-card-header small { color: #5f7185; text-align: right; }
 
 .fp-table-modal .fp-sales-target-branch-card-table-wrap {
