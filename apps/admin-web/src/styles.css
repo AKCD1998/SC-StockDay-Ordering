@@ -7995,6 +7995,37 @@ input[type="radio"] {
 .fp-status-badge.ok { background: rgba(34, 197, 94, 0.15); color: #15803d; }
 .fp-status-badge.pending { background: rgba(249, 115, 22, 0.15); color: #c2410c; }
 
+/* Form section for grouping extra products under one shared target. */
+.fp-shared-products { margin: 0.5rem 0 0.75rem; padding: 0.6rem 0.75rem; border: 1px dashed #cbd5e1; border-radius: 0.5rem; }
+.fp-shared-products-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.82rem; font-weight: 600; }
+.fp-shared-products-empty,
+.fp-shared-products-hint { display: block; margin-top: 0.35rem; font-size: 0.72rem; color: #64748b; }
+.fp-shared-products-list { list-style: none; margin: 0.4rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.fp-shared-products-list li { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; }
+.fp-shared-products-list li strong { white-space: nowrap; }
+.fp-shared-products-list li .fp-btn-link { margin-left: auto; }
+[data-theme="dark"] .fp-shared-products { border-color: #3b4a60; }
+[data-theme="dark"] .fp-shared-products-empty,
+[data-theme="dark"] .fp-shared-products-hint { color: #94a3b8; }
+
+/* A focus row may group several products under one shared target, so the code
+   and name cells can each hold more than one line. */
+.fp-product-codes,
+.fp-product-names { display: flex; flex-direction: column; gap: 2px; }
+.fp-product-codes span { white-space: nowrap; }
+.fp-shared-target-hint {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  background: rgba(139, 92, 246, 0.16);
+  color: #6d28d9;
+  cursor: help;
+}
+[data-theme="dark"] .fp-shared-target-hint { background: rgba(139, 92, 246, 0.24); color: #c4b5fd; }
+
 /* The status badge is nowrap, so in the wide per-branch matrix it would spill
    over the adjacent จัดการ (แก้ไข/ลบ) column instead of wrapping. Reserve the
    column's own width and keep the badge from being squeezed. */

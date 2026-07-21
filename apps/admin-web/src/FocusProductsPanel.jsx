@@ -60,6 +60,7 @@ const EMPTY_FORM = {
   productName: "",
   productUnit: "",
   productBarcode: "",
+  extraProducts: [], // additional products sharing this row's single target
   focusType: "salesperson",
   targetQty: "",
   dateFrom: "",
@@ -134,6 +135,47 @@ function BranchCloseCountBadge({ row, branchCodes }) {
   );
 }
 
+// A focus row can group several product codes under ONE shared target — staff
+// may sell any mix of them as long as the combined quantity clears it. Rows
+// created before that was supported (or served by an older API) only carry the
+// single legacy field, so fall back to it.
+function focusRowProducts(row) {
+  if (row.products?.length) return row.products;
+  return [{ productCode: row.productCode, productName: row.productName }];
+}
+
+function FocusProductCodes({ row }) {
+  const products = focusRowProducts(row);
+  return (
+    <div className="fp-product-codes">
+      {products.map((product) => (
+        <span key={product.productCode}>{product.productCode}</span>
+      ))}
+    </div>
+  );
+}
+
+function FocusProductNames({ row }) {
+  const products = focusRowProducts(row);
+  return (
+    <div className="fp-product-names">
+      {products.map((product) => (
+        <span key={product.productCode} className="fp-product-name-line">
+          {product.productName || product.productCode}
+        </span>
+      ))}
+      {products.length > 1 && (
+        <span
+          className="fp-shared-target-hint"
+          title="สินค้าเหล่านี้ใช้เป้าร่วมกัน ขายรสไหน/แบบไหนก็ได้ ขอให้ยอดรวมถึงเป้า"
+        >
+          เป้าร่วม {products.length} รายการ
+        </span>
+      )}
+    </div>
+  );
+}
+
 function PublicationBadge({ row }) {
   if (!row) return null;
   const state = row.publicationState || row.publicationStatus || "published";
@@ -170,6 +212,10 @@ function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, 
   const [searchResults, setSearchResults] = useState([]);
   const [barcodeLookupBusy, setBarcodeLookupBusy] = useState(false);
   const [barcodeLookupError, setBarcodeLookupError] = useState(null);
+  // When true the search box adds a product that SHARES this row's target
+  // instead of replacing the main one, so the same lookup UI serves both.
+  const [addingExtra, setAddingExtra] = useState(false);
+  const extraProducts = form.extraProducts || [];
 
   function productFields(product) {
     return {
@@ -182,13 +228,26 @@ function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, 
 
   function chooseProduct(product) {
     const selected = productFields(product);
-    setForm((prev) => ({
-      ...prev,
-      productCode: selected.code,
-      productName: selected.name,
-      productUnit: selected.unit,
-      productBarcode: selected.barcode,
-    }));
+    if (addingExtra) {
+      setForm((prev) => {
+        const already = [prev.productCode, ...(prev.extraProducts || []).map((p) => p.productCode)];
+        // Listing the same code twice would double-count its sales.
+        if (already.some((code) => String(code).toLowerCase() === selected.code.toLowerCase())) return prev;
+        return {
+          ...prev,
+          extraProducts: [...(prev.extraProducts || []), { productCode: selected.code, productName: selected.name }],
+        };
+      });
+      setAddingExtra(false);
+    } else {
+      setForm((prev) => ({
+        ...prev,
+        productCode: selected.code,
+        productName: selected.name,
+        productUnit: selected.unit,
+        productBarcode: selected.barcode,
+      }));
+    }
     setSearchQuery("");
     setSearchResults([]);
     setBarcodeLookupError(null);
@@ -270,11 +329,16 @@ function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, 
         <h3>{form.id ? "แก้ไขสินค้าโฟกัส" : "เพิ่มสินค้าโฟกัส"}</h3>
 
         <label className="fp-field">
-          <span>รหัสสินค้า</span>
+          <span>{addingExtra ? "ค้นหาสินค้าที่ใช้เป้าร่วมกัน" : "รหัสสินค้า"}</span>
           <input
             type="text"
-            value={form.productCode}
+            value={addingExtra ? searchQuery : form.productCode}
             onChange={(e) => {
+              if (addingExtra) {
+                setSearchQuery(e.target.value);
+                setBarcodeLookupError(null);
+                return;
+              }
               update("productCode", e.target.value);
               update("productName", "");
               update("productUnit", "");
@@ -324,6 +388,59 @@ function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, 
                 {form.productBarcode && <span>บาร์โค้ด: {form.productBarcode}</span>}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Several products can share one target — e.g. Vicks Vapodrop honey-lemon
+            and orange against a single 50: any split counts, so their sales are
+            summed before the target is judged. */}
+        {form.productCode && form.productName && (
+          <div className="fp-shared-products">
+            <div className="fp-shared-products-head">
+              <span>สินค้าที่ใช้เป้าร่วมกัน</span>
+              {addingExtra ? (
+                <button type="button" className="fp-btn-link" onClick={() => { setAddingExtra(false); setSearchQuery(""); setSearchResults([]); }}>
+                  ยกเลิก
+                </button>
+              ) : (
+                <button type="button" className="fp-btn-link" onClick={() => { setAddingExtra(true); setSearchQuery(""); setSearchResults([]); }}>
+                  ＋ เพิ่มสินค้า
+                </button>
+              )}
+            </div>
+            {extraProducts.length === 0 ? (
+              <small className="fp-shared-products-empty">
+                ยังไม่มี — เป้านี้นับเฉพาะ {form.productCode} เท่านั้น
+              </small>
+            ) : (
+              <>
+                <ul className="fp-shared-products-list">
+                  {extraProducts.map((product) => (
+                    <li key={product.productCode}>
+                      <strong>{product.productCode}</strong> {product.productName}
+                      <button
+                        type="button"
+                        className="fp-btn-link danger"
+                        onClick={() => setForm((prev) => ({
+                          ...prev,
+                          extraProducts: (prev.extraProducts || []).filter((p) => p.productCode !== product.productCode),
+                        }))}
+                      >
+                        เอาออก
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <small className="fp-shared-products-hint">
+                  ยอดขายของทั้ง {extraProducts.length + 1} รายการจะถูกรวมกันก่อนเทียบเป้า
+                </small>
+              </>
+            )}
+            {addingExtra && (
+              <small className="fp-shared-products-hint">
+                พิมพ์รหัสหรือยิงบาร์โค้ดในช่องด้านบน แล้วเลือกสินค้าที่จะใช้เป้าร่วมกัน
+              </small>
+            )}
           </div>
         )}
 
@@ -509,9 +626,9 @@ function SalespersonFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
             <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
               <td>{index + 1}</td>
               <td>{row.assignedPersonName || "-"}</td>
-              <td>{row.productCode}</td>
+              <td><FocusProductCodes row={row} /></td>
               <td>{formatNumber(row.targetQty)}</td>
-              <td className="fp-col-wide">{row.productName || "-"}{isAdminUser && <PublicationBadge row={row} />}</td>
+              <td className="fp-col-wide"><FocusProductNames row={row} />{isAdminUser && <PublicationBadge row={row} />}</td>
               {branchCodes.map((code) => (
                 <td key={code}>{formatNumber(row.soldByBranch?.[code] || 0)}</td>
               ))}
@@ -585,8 +702,8 @@ function GenericFocusTable({ typeRows, isAdminUser, onEdit, onDelete }) {
         <tbody>
           {typeRows.map((row) => (
             <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
-              <td>{row.productCode}</td>
-              <td className="fp-col-wide">{row.productName || "-"}{isAdminUser && <PublicationBadge row={row} />}</td>
+              <td><FocusProductCodes row={row} /></td>
+              <td className="fp-col-wide"><FocusProductNames row={row} />{isAdminUser && <PublicationBadge row={row} />}</td>
               <td>
                 {toIsoDateOnly(row.dateFrom)} – {toIsoDateOnly(row.dateTo)}
               </td>
@@ -684,8 +801,8 @@ function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete, restrictT
         <tbody>
           {rows.map((row) => (
             <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
-              <td>{row.productCode}</td>
-              <td className="fp-col-wide">{row.productName || "-"}{isAdminUser && <PublicationBadge row={row} />}</td>
+              <td><FocusProductCodes row={row} /></td>
+              <td className="fp-col-wide"><FocusProductNames row={row} />{isAdminUser && <PublicationBadge row={row} />}</td>
               {branchCodes.map((code, branchIndex) => {
                 const target = row.branchTargetsEffective?.[code];
                 const sold = row.soldByBranch?.[code] || 0;
@@ -867,8 +984,8 @@ function GroupManagerFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
             return (
               <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
                 <td>{index + 1}</td>
-                <td>{row.productCode}</td>
-                <td className="fp-col-wide">{row.productName || "-"}{isAdminUser && <PublicationBadge row={row} />}</td>
+                <td><FocusProductCodes row={row} /></td>
+                <td className="fp-col-wide"><FocusProductNames row={row} />{isAdminUser && <PublicationBadge row={row} />}</td>
                 {activeBranch === "all" ? branchCodes.map((code, branchIndex) => {
                   const branchTarget = row.branchTargetsEffective?.[code];
                   const branchSold = row.soldByBranch?.[code] || 0;
@@ -2400,6 +2517,11 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode,
         productName: row.productName || "",
         productUnit: row.productUnit || "",
         productBarcode: row.productBarcode || "",
+        // Everything after the leading code shares this row's target.
+        extraProducts: (row.products || []).slice(1).map((product) => ({
+          productCode: product.productCode,
+          productName: product.productName || "",
+        })),
         focusType: row.focusType,
         targetQty: String(row.targetQty),
         dateFrom: toIsoDateOnly(row.dateFrom),
@@ -2444,6 +2566,11 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode,
     setModalState((prev) => ({ ...prev, submitting: true, submitError: null }));
     const payload = {
       productCode: form.productCode.trim(),
+      // Leading code first; the backend dedupes and keeps productCode == productCodes[0].
+      productCodes: [
+        form.productCode.trim(),
+        ...(form.extraProducts || []).map((product) => product.productCode).filter(Boolean),
+      ],
       focusType: form.focusType,
       targetQty: Number(form.targetQty),
       dateFrom: form.dateFrom,
