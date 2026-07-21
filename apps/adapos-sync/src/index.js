@@ -598,5 +598,11 @@ export async function runOnce(dependencies = {}) {
 
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
-  runOnce().catch(() => { process.exitCode = 1; });
+  runOnce().catch((error) => {
+    // Errors raised inside runOnce are already logged by its catch block.
+    // Configuration validation happens before that block, so preserve the
+    // direct-CLI diagnostic without printing runtime failures twice.
+    if (error?.code === "CONFIG_ERROR") console.error(`ERROR: ${error.message}`);
+    process.exitCode = 1;
+  });
 }

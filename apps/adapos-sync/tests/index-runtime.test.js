@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { runOnce } from "../src/index.js";
+
+const agentRoot = fileURLToPath(new URL("..", import.meta.url));
+const entrypoint = fileURLToPath(new URL("../src/index.js", import.meta.url));
 
 function config(overrides = {}) {
   return {
@@ -31,6 +36,29 @@ test("entrypoint validates branch and read-only SQL identity before connecting",
     connectSql: async () => { connects += 1; },
   }), (error) => error.code === "CONFIG_ERROR");
   assert.equal(connects, 0);
+});
+
+test("direct CLI exits nonzero and explains invalid configuration", () => {
+  const cases = [
+    {
+      env: { ADAPOS_SYNC_BRANCH_CODE: "", ADAPOS_SQLSERVER_USER_READONLY: "readonly", ADAPOS_SQLSERVER_USER: "readonly" },
+      message: /ERROR: Branch code required/,
+    },
+    {
+      env: { ADAPOS_SYNC_BRANCH_CODE: "005", ADAPOS_SQLSERVER_USER_READONLY: "sa", ADAPOS_SQLSERVER_USER: "sa" },
+      message: /ERROR: Connections using 'sa' are blocked/,
+    },
+  ];
+  for (const scenario of cases) {
+    const result = spawnSync(process.execPath, [entrypoint], {
+      cwd: agentRoot,
+      env: { ...process.env, ...scenario.env },
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, scenario.message);
+    assert.doesNotMatch(result.stderr, /Sync failed:/);
+  }
 });
 
 function dependencies({ syncConfig = config(), data = stockData, postOverride, waitForApplied } = {}) {
