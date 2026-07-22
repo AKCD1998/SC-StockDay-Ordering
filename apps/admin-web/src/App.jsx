@@ -176,6 +176,14 @@ function getNavigationGroups(isAdminUser, hideDashboard = false) {
         { label: "Product Master", description: "ทะเบียนสินค้ากลาง", disabled: true },
       ],
     },
+    {
+      id: "customer-relations",
+      label: "ลูกค้าสัมพันธ์",
+      shortLabel: "CR",
+      items: [
+        { label: "พรีออเดอร์", view: "preorder", description: "รับและติดตามคำสั่งจองสินค้าล่วงหน้า" },
+      ],
+    },
   ].filter((group) => (!group.adminOnly || isAdminUser) && (!hideDashboard || group.id !== "dashboard"));
 }
 
@@ -8872,6 +8880,18 @@ export default function App() {
         <TaxonomyReviewPanel csrfToken={session.csrfToken} />
       ) : view === "sync-log" && isAdminUser ? (
         <SyncLogPanel onUnauthorized={handleSyncUnauthorized} />
+      ) : view === "preorder" ? (
+        <section className="panel preorder-panel">
+          <div className="panel-header stacked">
+            <h2>พรีออเดอร์</h2>
+            <p>รับและติดตามคำสั่งจองสินค้าล่วงหน้าจากลูกค้า</p>
+          </div>
+          <div className="preorder-coming-soon">
+            <span className="preorder-coming-soon-emoji" aria-hidden="true">🛠️</span>
+            <strong>กำลังพัฒนา</strong>
+            <p>ฟีเจอร์พรีออเดอร์อยู่ระหว่างจัดทำ เร็วๆ นี้</p>
+          </div>
+        </section>
       ) : (
         <>
           <section className="kpis">

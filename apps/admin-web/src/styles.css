@@ -5624,6 +5624,20 @@ input[type="radio"] {
 
 /* ─── Stock Requests Panel ──────────────────────────────────────── */
 .srq-panel .panel-header { flex-wrap: wrap; gap: 14px; }
+
+.preorder-coming-soon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 64px 24px;
+  text-align: center;
+  color: #64748b;
+}
+.preorder-coming-soon-emoji { font-size: 2.6rem; }
+.preorder-coming-soon strong { font-size: 1.2rem; color: #334155; }
+[data-theme="dark"] .preorder-coming-soon { color: #94a3b8; }
+[data-theme="dark"] .preorder-coming-soon strong { color: #e2e8f0; }
 .srq-subtabs {
   display: flex;
   gap: 8px;
