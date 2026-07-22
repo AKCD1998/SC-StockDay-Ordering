@@ -37,6 +37,22 @@ button {
   padding: 28px 20px 64px;
 }
 
+/* The top bar and the wide branch-stock table break out of the centred 1360px
+   page to use the horizontal space that opens up on a wide window or when the
+   browser is zoomed below 100%, where the fixed cap otherwise leaves large
+   empty side margins. Full-bleed trick: the page is margin:0 auto centred, so
+   calc(50% - 48.5vw) re-centres a 97vw-wide element inside it, leaving a slim
+   gutter each side. Global box-sizing:border-box keeps their own padding intact.
+   97vw (not 100vw) avoids a horizontal scrollbar from the vertical scrollbar's
+   width. */
+.topbar,
+.branch-stock-panel {
+  width: 97vw;
+  max-width: 97vw;
+  margin-left: calc(50% - 48.5vw);
+  margin-right: calc(50% - 48.5vw);
+}
+
 .auth-page {
   min-height: 100vh;
   display: grid;
