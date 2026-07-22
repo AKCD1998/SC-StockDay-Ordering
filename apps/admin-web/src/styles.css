@@ -48,7 +48,8 @@ button {
    width. */
 .topbar,
 .branch-stock-panel,
-.fp-panel {
+.fp-panel,
+.srq-panel {
   width: 97vw;
   max-width: 97vw;
   margin-left: calc(50% - 48.5vw);
