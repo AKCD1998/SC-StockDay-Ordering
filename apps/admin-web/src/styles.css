@@ -5638,6 +5638,7 @@ input[type="radio"] {
 .preorder-coming-soon strong { font-size: 1.2rem; color: #334155; }
 [data-theme="dark"] .preorder-coming-soon { color: #94a3b8; }
 [data-theme="dark"] .preorder-coming-soon strong { color: #e2e8f0; }
+.preorder-heading{display:flex;align-items:center;justify-content:space-between;gap:1rem}.preorder-list{display:grid;gap:.75rem}.preorder-list article{display:grid;grid-template-columns:1fr 1fr auto;gap:1rem;align-items:center;padding:1rem;border:1px solid var(--border-color,#e2e8f0);border-radius:14px}.preorder-empty{padding:3rem;text-align:center;color:#64748b}.preorder-modal-backdrop{position:fixed;inset:0;background:#0f172a99;display:grid;place-items:center;z-index:1000;padding:1rem}.preorder-dialog{width:min(560px,100%);max-height:90vh;overflow:auto;background:var(--panel-bg,#fff);padding:1.5rem;border-radius:18px;display:grid;gap:1rem}.preorder-dialog label{display:grid;gap:.35rem}.preorder-dialog input,.preorder-dialog select,.preorder-dialog textarea{width:100%;padding:.7rem;border:1px solid #cbd5e1;border-radius:9px;background:inherit;color:inherit}.preorder-dialog textarea{min-height:110px}.preorder-actions{display:flex;justify-content:flex-end;gap:.75rem}@media(max-width:700px){.preorder-list article{grid-template-columns:1fr}.preorder-heading{align-items:flex-start;flex-direction:column}}
 .srq-subtabs {
   display: flex;
   gap: 8px;

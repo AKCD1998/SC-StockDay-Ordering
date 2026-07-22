@@ -1,6 +1,6 @@
 # Architecture
 
-> Last revised: 2026-07-14
+> Last revised: 2026-07-22
 
 ---
 
@@ -156,6 +156,11 @@ Monolithic single-file `App.jsx`. Cookie-session auth. Admin role unlocks extra 
 | | `sync-log` | *(admin only)* Sync run history calendar |
 | | `Ingredient Mapping` | *(disabled, planned)* |
 | | `Product Master` | *(disabled, planned)* |
+| ลูกค้าสัมพันธ์ | `preorder` | Customer preorder cases: staff own-branch create/tracking and admin all-branch workflow, quotes, private R2 attachments, receipt/transfer evidence, ETA, and completion |
+
+Customer preorder UI is extracted under `apps/admin-web/src/preorders/` and gated by
+`VITE_FEATURE_CUSTOMER_PREORDERS` (default off). It calls only the live PaaSRTSM backend;
+the legacy SC server has no preorder implementation.
 
 Supplier logos: ~30 pharma/distributor logos as SVG/PNG assets bundled in `src/assets/`.
 
@@ -208,6 +213,7 @@ Code39 barcode renderer built inline (used for packing documents).
 | `auth.js (admin)` | `/api/auth` | — |
 | `video-content.js` | `/api/content` | AI Video Content Studio — job CRUD/submit/retry/cancel/approve/reject, asset upload, signed download proxy. Gated by `FEATURE_VIDEO_STUDIO`. See `docs/AI_VIDEO_CONTENT_STUDIO.md`. |
 | `focus-products.js` | `/api/focus-products`, `/api/admin/focus-products` | Authenticated read + admin-only CRUD for focus-product targets |
+| `customer-preorders.js` | `/api/customer-preorders` | Feature-flagged authenticated customer preorder CRUD, workflow, private attachments, receipt/transfer evidence, ETA, unread/actionable counts |
 
 ### Services
 
@@ -225,6 +231,11 @@ Code39 barcode renderer built inline (used for packing documents).
 | `embedding-sync-jobs.js` | Vector embedding job queue |
 | `sku-embedding-indexer.js` | pgvector upsert |
 | `sku-hybrid-search.js` | Combined text + vector SKU search |
+| `customerPreorders.js` | Branch-scoped case CRUD, search, read cursors, messages, detail DTOs, and counts |
+| `preorderWorkflow.js` | Central optimistic state mutations, quotes, decisions, outcomes, events, and notifications |
+| `preorderReceiptEvidence.js` | Explicit HQ approved-receipt allocation, immutable snapshots, coverage, and versioned ETA |
+| `preorderTransferEvidence.js` | Explicit reconciliation transfer allocation, ambiguity/staleness handling, and arrival evidence |
+| `storage/r2PreorderStorageProvider.js` | Private Cloudflare R2 S3-compatible storage and 300-second presigned GET URLs for preorder images |
 
 ### Categorization engine
 
@@ -262,7 +273,8 @@ Runs on each branch PC via Windows Task Scheduler.
 
 ## 7. Database schemas (PaaSRTSM Postgres)
 
-Migrations run via `npm run db:migrate` from `PaaSRTSM-project/`. 50 migration files as of 2026-07-14.
+Migrations are owned by `PaaSRTSM-project/`. Migration `062_add_customer_preorders.sql`
+is implemented locally but is not claimed here as applied to production.
 
 | Schema | Tables / purpose |
 |---|---|
@@ -276,6 +288,7 @@ Migrations run via `npm run db:migrate` from `PaaSRTSM-project/`. 50 migration f
 | `admin` | Admin-facing audit / log tables |
 | `content` | AI Video Content Studio (migration 043): `video_jobs`, `video_assets`, `video_job_events`. See `docs/AI_VIDEO_CONTENT_STUDIO.md`. |
 | `focus` | `focus_products` — product/date/branch targets plus frozen month-end sales snapshots. See `docs/SESSION_2026-07-12_FOCUS_PRODUCTS_FEATURE.md`. |
+| `customer_relations` | Feature-flagged preorder cases/items, immutable quotes and customer decisions, messages/read cursors/events/notifications, private R2 attachment metadata, procurement outcomes, receipt/transfer evidence snapshots, branch delivery schedules, and versioned ETA projections (migration 062; rollout pending) |
 
 **Pricing (migration 039):** `ada.branch_prices` stores per-branch retail/cost prices synced from AdaPOS. Canonical selling price is `public.sku_unit_prices.retail_price` (per sku + unit + is_active). `public.prices` is written in parallel but `sku_unit_prices` is authoritative.
 

@@ -6,6 +6,7 @@ import BranchStockHistoryPanel from "./BranchStockHistoryPanel";
 import StockRecommendationsPanel from "./StockRecommendationsPanel";
 import ProductTaxonomyPanel from "./ProductTaxonomyPanel";
 import TaxonomyReviewPanel from "./TaxonomyReviewPanel";
+import PreorderPanel from "./preorders/PreorderPanel";
 import {
   getRegulatedDrugClassification,
   summarizeRegulatedDrugBatch,
@@ -57,6 +58,7 @@ import orexTradingLogoUrl from "./assets/orex-trading-logo.svg";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const syncEventLogEnabled = String(import.meta.env.VITE_ENABLE_SYNC_EVENT_LOG || "").toLowerCase() === "true";
+const customerPreordersEnabled = String(import.meta.env.VITE_FEATURE_CUSTOMER_PREORDERS || "").toLowerCase() === "true";
 const adminViewStorageKey = "sc-stockday-admin-view";
 const adminThemeStorageKey = "sc-stockday-admin-theme";
 const HQ_BRANCH_CODE = "000";
@@ -66,7 +68,7 @@ const stockCostAuditView = "stock-cost-audit";
 const taxonomyView = "product-taxonomy";
 const taxonomyReviewView = "taxonomy-review";
 const adminOnlyViews = [stockCostAuditView, "category-review", "ingredient-dictionary", taxonomyView, taxonomyReviewView, "sync-log"];
-const adminViewKeys = [defaultAdminView, "branch-stock", "branch-stock-history", "stock-recommendations", "movement-trace", "stock-requests", "focus-products", ...adminOnlyViews];
+const adminViewKeys = [defaultAdminView, "branch-stock", "branch-stock-history", "stock-recommendations", "movement-trace", "stock-requests", "focus-products", "preorder", ...adminOnlyViews];
 const ADMIN_VIEW_ROUTE_SEGMENTS = {
   receipts: "receipts",
   "branch-stock": "branch-stock",
@@ -75,6 +77,7 @@ const ADMIN_VIEW_ROUTE_SEGMENTS = {
   "movement-trace": "movement-trace",
   "stock-requests": "stock-requests",
   "focus-products": "focus-products",
+  preorder: "preorder",
   [stockCostAuditView]: "stock-cost-audit",
   "category-review": "category-review",
   "ingredient-dictionary": "ingredient-dictionary",
@@ -7824,6 +7827,7 @@ export default function App() {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [openNavGroup, setOpenNavGroup] = useState(null);
   const [incomingRequestBadgeCount, setIncomingRequestBadgeCount] = useState(0);
+  const [preorderBadgeCount, setPreorderBadgeCount] = useState(0);
   const [syncFailureBranches, setSyncFailureBranches] = useState([]);
   const [requestDraftItems, setRequestDraftItems] = useState([]);
   const [requestBatchNote, setRequestBatchNote] = useState("");
@@ -8011,6 +8015,23 @@ export default function App() {
       // silent
     }
   }, [branchCode]);
+
+  const refreshPreorderBadgeCount = useCallback(async () => {
+    if (!session || !customerPreordersEnabled) { setPreorderBadgeCount(0); return; }
+    try {
+      const response = await apiFetch("/api/customer-preorders/unread-count");
+      if (!response.ok) return;
+      const data = await response.json();
+      setPreorderBadgeCount(Math.max(Number(data.unreadCount) || 0, Number(data.actionableCount) || 0));
+    } catch { /* badge polling must not block the page */ }
+  }, [session]);
+
+  useEffect(() => {
+    refreshPreorderBadgeCount();
+    if (!session || !customerPreordersEnabled) return undefined;
+    const timer = setInterval(refreshPreorderBadgeCount, 30_000);
+    return () => clearInterval(timer);
+  }, [session, refreshPreorderBadgeCount]);
 
   useEffect(() => {
     if (!branchCode) { setIncomingRequestBadgeCount(0); return undefined; }
@@ -8625,7 +8646,9 @@ export default function App() {
               ? stockRequestBadgeCount
               : group.items.some((item) => item.view === "sync-log")
                 ? syncFailureBadgeCount
-                : 0;
+                : group.items.some((item) => item.view === "preorder")
+                  ? preorderBadgeCount
+                  : 0;
             const groupHasNotif = groupBadgeCount > 0;
             const triggerClassName = [
               "view-nav-btn",
@@ -8651,6 +8674,7 @@ export default function App() {
                   <span className="hero-nav-mark" aria-hidden="true">{group.shortLabel}</span>
                   <span className="hero-nav-label">{group.label}</span>
                   {item.disabled ? <span className="view-nav-badge">เร็วๆนี้</span> : null}
+                  {item.view === "preorder" && preorderBadgeCount > 0 ? <span className="nav-notif-badge nav-trigger-badge">{preorderBadgeCount > 99 ? "99+" : preorderBadgeCount}</span> : null}
                 </button>
               );
             }
@@ -8715,6 +8739,9 @@ export default function App() {
                           ) : null}
                           {item.view === "sync-log" && syncFailureBadgeCount > 0 ? (
                             <span className="nav-notif-badge">{syncFailureBadgeCount > 99 ? "99+" : syncFailureBadgeCount}</span>
+                          ) : null}
+                          {item.view === "preorder" && preorderBadgeCount > 0 ? (
+                            <span className="nav-notif-badge">{preorderBadgeCount > 99 ? "99+" : preorderBadgeCount}</span>
                           ) : null}
                         </span>
                         <span className="hero-nav-item-desc">{item.description}</span>
@@ -8881,17 +8908,7 @@ export default function App() {
       ) : view === "sync-log" && isAdminUser ? (
         <SyncLogPanel onUnauthorized={handleSyncUnauthorized} />
       ) : view === "preorder" ? (
-        <section className="panel preorder-panel">
-          <div className="panel-header stacked">
-            <h2>พรีออเดอร์</h2>
-            <p>รับและติดตามคำสั่งจองสินค้าล่วงหน้าจากลูกค้า</p>
-          </div>
-          <div className="preorder-coming-soon">
-            <span className="preorder-coming-soon-emoji" aria-hidden="true">🛠️</span>
-            <strong>กำลังพัฒนา</strong>
-            <p>ฟีเจอร์พรีออเดอร์อยู่ระหว่างจัดทำ เร็วๆ นี้</p>
-          </div>
-        </section>
+        <PreorderPanel enabled={customerPreordersEnabled} csrfToken={session.csrfToken} isAdmin={isAdminUser} branchCode={branchCode} apiBaseUrl={apiBaseUrl} onBadgeChanged={refreshPreorderBadgeCount} />
       ) : (
         <>
           <section className="kpis">
