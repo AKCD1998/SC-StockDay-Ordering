@@ -8305,15 +8305,45 @@ input[type="radio"] {
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.07);
 }
 
-.fp-focus-section > .fp-section-title {
+.fp-focus-section > .fp-section-title,
+.fp-focus-section-header {
   margin: 0 -10px 12px;
   padding: 14px 18px 13px;
   border-bottom: 1px solid var(--fp-focus-border);
   background: var(--fp-focus-title-bg);
   color: var(--fp-focus-title-color);
+}
+
+.fp-focus-section > .fp-section-title,
+.fp-focus-section-header .fp-section-title {
+  margin: 0;
   font-size: clamp(1.25rem, 1.4vw, 1.5rem);
   font-weight: 850;
   line-height: 1.45;
+}
+
+.fp-focus-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fp-line-package-button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 7px 13px;
+  border: 1px solid var(--fp-focus-border);
+  border-radius: 8px;
+  color: var(--fp-focus-title-color);
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.fp-line-package-button:hover {
+  border-color: var(--fp-focus-accent);
+  background: #ffffff;
 }
 
 .fp-focus-section.fp-section-clickable:hover {
@@ -8371,8 +8401,14 @@ input[type="radio"] {
 }
 
 [data-theme="dark"] .fp-focus-section > .fp-section-title,
+[data-theme="dark"] .fp-focus-section-header,
 [data-theme="dark"] .fp-focus-table-modal > .fp-section-title {
   color: var(--fp-focus-title-color);
+}
+
+[data-theme="dark"] .fp-line-package-button {
+  color: var(--fp-focus-title-color);
+  background: rgba(15, 24, 36, 0.82);
 }
 
 .fp-table-modal-overlay {
@@ -8492,6 +8528,72 @@ input[type="radio"] {
 }
 
 .fp-modal h3 { margin: 0 0 14px; }
+
+.fp-line-package-modal {
+  position: relative;
+  width: min(980px, 94vw);
+  display: grid;
+  gap: 14px;
+}
+
+.fp-line-package-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(140px, 220px);
+  gap: 12px;
+}
+
+.fp-line-package-message {
+  min-height: 260px;
+  resize: vertical;
+  white-space: pre-wrap;
+  font-family: "Segoe UI", "Noto Sans Thai", Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.fp-line-package-note {
+  padding: 9px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  color: #1e40af;
+  background: #eff6ff;
+  font-size: 0.88rem;
+}
+
+.fp-line-package-preview {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.fp-line-package-preview > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #334155;
+}
+
+.fp-line-package-preview span {
+  color: #64748b;
+}
+
+.fp-line-package-preview img {
+  width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+}
+
+@media (max-width: 720px) {
+  .fp-line-package-controls {
+    grid-template-columns: 1fr;
+  }
+}
 
 .fp-focus-form-overlay.is-edit {
   background: rgba(3, 8, 18, 0.8);
@@ -9481,6 +9583,25 @@ input[type="radio"] {
 [data-theme="dark"] .fp-branch-chip { background: #1e2e42; color: #cbd5e1; }
 [data-theme="dark"] .fp-search-results { background: #111e2d; border-color: #263547; }
 [data-theme="dark"] .fp-search-result:hover { background: #1e2e42; }
+[data-theme="dark"] .fp-line-package-note {
+  color: #bfdbfe;
+  background: #172a42;
+  border-color: #315174;
+}
+[data-theme="dark"] .fp-line-package-preview {
+  background: #0f1824;
+  border-color: #263547;
+}
+[data-theme="dark"] .fp-line-package-preview > div {
+  color: #e2e8f0;
+}
+[data-theme="dark"] .fp-line-package-preview span {
+  color: #94a3b8;
+}
+[data-theme="dark"] .fp-line-package-preview img {
+  background: #ffffff;
+  border-color: #3a4d66;
+}
 
 /* Batch editor is intentionally much larger than the single-item dialog.
    Keep these rules after .fp-modal so the generic 480px width cannot win. */

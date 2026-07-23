@@ -75,6 +75,12 @@ const EMPTY_FORM = {
 };
 
 const BRANCH_CHOICES = ["001", "003", "004", "005"];
+const BRANCH_LABELS = {
+  "001": "สาขา 001",
+  "003": "สาขา 003 วัดช่องลม",
+  "004": "สาขา 004",
+  "005": "สาขา 005",
+};
 const PRODUCT_LOOKUP_CACHE_TTL_MS = 5 * 60 * 1000;
 const PRODUCT_LOOKUP_CACHE_PREFIX = "focus-product-lookup:v2:";
 
@@ -95,6 +101,26 @@ function monthBounds(year, month) {
   const lastDay = new Date(year, month, 0).getDate();
   const to = `${year}-${pad2(month)}-${pad2(lastDay)}`;
   return { from, to };
+}
+
+function toThaiBuddhistYear(year) {
+  const parsed = Number(year);
+  return Number.isFinite(parsed) ? parsed + 543 : year;
+}
+
+function formatThaiDateRange(from, to) {
+  const start = toIsoDateOnly(from);
+  const end = toIsoDateOnly(to);
+  if (!start || !end) return "";
+  const [sy, sm, sd] = start.split("-");
+  const [ey, em, ed] = end.split("-");
+  const thaiYear = toThaiBuddhistYear(ey || sy);
+  if (sy === ey && sm === em) return `${sd}-${ed}/${em}/${thaiYear}`;
+  return `${sd}/${sm}/${toThaiBuddhistYear(sy)}-${ed}/${em}/${thaiYear}`;
+}
+
+function formatBaht(value) {
+  return formatNumber(value, 0);
 }
 
 // A focus product "belongs to" a month if its date range overlaps that month at all.
@@ -586,6 +612,366 @@ function FocusProductForm({ initial, onCancel, onSubmit, csrfToken, submitting, 
   );
 }
 
+function productCodesText(row) {
+  return focusRowProducts(row).map((product) => product.productCode).filter(Boolean).join("\n");
+}
+
+function productNamesText(row) {
+  return focusRowProducts(row).map((product) => product.productName || product.productCode).filter(Boolean).join("\n");
+}
+
+function focusLinePackageRows(rows, type, branchCode) {
+  return rows.map((row, index) => {
+    const target = type === "salesperson"
+      ? row.targetQty
+      : row.branchTargetsEffective?.[branchCode] ?? row.targetQty;
+    const sold = type === "salesperson"
+      ? row.totalSold
+      : row.soldByBranch?.[branchCode] || 0;
+    return {
+      no: index + 1,
+      code: productCodesText(row),
+      name: productNamesText(row),
+      owner: row.assignedPersonName || "",
+      target: Number(target || 0),
+      sold: Number(sold || 0),
+      achieved: type === "salesperson" ? row.achieved : row.branchAchieved?.[branchCode],
+    };
+  });
+}
+
+function buildFocusLineRowFingerprint({ rows, type, branchCode }) {
+  return JSON.stringify(
+    focusLinePackageRows(rows, type, branchCode).map((row) => ({
+      code: row.code,
+      target: row.target,
+      sold: row.sold,
+      achieved: row.achieved,
+      owner: row.owner,
+    })),
+  );
+}
+
+function buildDefaultLineMessage({ branchCode, monthStart, progress, ciCount }) {
+  const tiers = [...(progress?.tiers || [])].sort((a, b) => Number(a.tier) - Number(b.tier));
+  const actualSoFar = progress?.actualSoFar ?? 0;
+  const dateTo = progress?.asOfDate || monthStart;
+  const tier3 = tiers.find((tier) => Number(tier.tier) === 3) || tiers[tiers.length - 1] || null;
+  const targetLines = tiers
+    .filter((tier) => tier.monthlyTarget != null)
+    .map((tier) => `✅ Target เป้า ${tier.tier}= ${formatBaht(tier.monthlyTarget)}`);
+  const averageNeeded = tier3?.remainingAvgPerDay ?? null;
+
+  return [
+    "รายงานยอดขาย",
+    `${BRANCH_LABELS[branchCode] || `สาขา ${branchCode}`}`,
+    `⏩ ยอดขายวันที่ ${formatThaiDateRange(monthStart, dateTo)}`,
+    "",
+    `= ${formatBaht(actualSoFar)} บาท`,
+    "",
+    ...targetLines,
+    "",
+    averageNeeded == null
+      ? "ยังไม่ได้กำหนด Target เป้า 3"
+      : `เฉลี่ยต่อวันต้องทำ ${formatBaht(averageNeeded)} บาท\nเพื่อให้ได้สเต็ป 3 ค่ะ`,
+    "",
+    `⏩ จำนวนยอดผู้ใช้สิทธิ ci = ${Number(ciCount || 0)} คน`,
+  ].join("\n");
+}
+
+function wrapCanvasText(ctx, text, maxWidth) {
+  const words = String(text || "-").split(/(\s+)/).filter(Boolean);
+  const lines = [];
+  let current = "";
+  for (const word of words) {
+    const next = current ? `${current}${word}` : word;
+    if (ctx.measureText(next).width <= maxWidth || !current) {
+      current = next;
+    } else {
+      lines.push(current.trim());
+      current = word.trim();
+    }
+  }
+  if (current) lines.push(current.trim());
+  return lines.length ? lines : ["-"];
+}
+
+function drawCell(ctx, text, x, y, width, height, options = {}) {
+  ctx.fillStyle = options.fill || "#ffffff";
+  ctx.fillRect(x, y, width, height);
+  ctx.strokeStyle = options.stroke || "#6b7280";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, width, height);
+  ctx.fillStyle = options.color || "#111827";
+  ctx.font = options.font || "24px Arial, sans-serif";
+  ctx.textAlign = options.align || "left";
+  ctx.textBaseline = "middle";
+  const padding = 12;
+  const maxWidth = Math.max(20, width - padding * 2);
+  const lines = wrapCanvasText(ctx, text, maxWidth).slice(0, options.maxLines || 3);
+  const lineHeight = options.lineHeight || 28;
+  const totalHeight = lineHeight * lines.length;
+  const startY = y + height / 2 - totalHeight / 2 + lineHeight / 2;
+  const textX = options.align === "center" ? x + width / 2 : options.align === "right" ? x + width - padding : x + padding;
+  lines.forEach((line, index) => {
+    ctx.fillText(line, textX, startY + index * lineHeight, maxWidth);
+  });
+}
+
+function renderFocusLinePackageImage({ rows, type, branchCode, monthStart, monthName, year }) {
+  return new Promise((resolve) => {
+    const dataRows = focusLinePackageRows(rows, type, branchCode);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const columns = type === "salesperson"
+      ? [
+        ["no", "รายการ", 88],
+        ["owner", "เป้ารายคน", 190],
+        ["code", "รหัสสินค้า", 160],
+        ["name", "สินค้าโฟกัส", 520],
+        ["target", "เป้า", 120],
+        ["sold", "ยอดล่าสุด", 130],
+        ["status", "สถานะ", 120],
+      ]
+      : [
+        ["no", "รายการ", 88],
+        ["code", "รหัสสินค้า", 170],
+        ["name", "สินค้าโฟกัส", 560],
+        ["target", `เป้าสาขา ${branchCode}`, 150],
+        ["sold", "ยอดล่าสุด", 130],
+        ["status", "สถานะ", 120],
+      ];
+    const tableWidth = columns.reduce((sum, col) => sum + col[2], 0);
+    const width = tableWidth + 80;
+    const left = Math.floor((width - tableWidth) / 2);
+    const titleHeight = 58;
+    const headHeight = 48;
+    ctx.font = "24px Arial, sans-serif";
+    const rowHeights = dataRows.map((row) => {
+      const nameLines = wrapCanvasText(ctx, row.name, columns.find((col) => col[0] === "name")[2] - 24).slice(0, 3).length;
+      const codeLines = wrapCanvasText(ctx, row.code, columns.find((col) => col[0] === "code")[2] - 24).slice(0, 3).length;
+      return Math.max(58, 22 + Math.max(nameLines, codeLines) * 28);
+    });
+    const footerHeight = 20;
+    canvas.width = width;
+    canvas.height = titleHeight + headHeight + rowHeights.reduce((sum, h) => sum + h, 0) + footerHeight;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    drawCell(
+      ctx,
+      `${BRANCH_LABELS[branchCode] || `สาขา ${branchCode}`} ${FOCUS_TYPE_SHORT_LABELS[type] || ""} เดือน ${monthName} ${toThaiBuddhistYear(year)}`,
+      left,
+      0,
+      tableWidth,
+      titleHeight,
+      { fill: "#2fb7e4", color: "#0f172a", font: "bold 28px Arial, sans-serif", align: "center", maxLines: 1 },
+    );
+
+    let x = left;
+    for (const [, label, colWidth] of columns) {
+      drawCell(ctx, label, x, titleHeight, colWidth, headHeight, {
+        fill: "#9ee7fb",
+        color: "#0f172a",
+        font: "bold 22px Arial, sans-serif",
+        align: "center",
+        maxLines: 1,
+      });
+      x += colWidth;
+    }
+
+    let y = titleHeight + headHeight;
+    dataRows.forEach((row, rowIndex) => {
+      x = left;
+      const rowHeight = rowHeights[rowIndex];
+      for (const [key, , colWidth] of columns) {
+        let value = row[key];
+        let align = "left";
+        let color = "#111827";
+        if (key === "no") {
+          value = row.no;
+          align = "center";
+        } else if (key === "target" || key === "sold") {
+          value = formatNumber(value);
+          align = "center";
+          color = key === "sold" && row.achieved === false ? "#b91c1c" : "#0f172a";
+        } else if (key === "status") {
+          value = row.achieved === true ? "ถึงเป้า" : row.achieved === false ? "ยังไม่ถึง" : "-";
+          align = "center";
+          color = row.achieved === true ? "#047857" : row.achieved === false ? "#b91c1c" : "#64748b";
+        }
+        drawCell(ctx, value, x, y, colWidth, rowHeight, {
+          fill: rowIndex % 2 === 0 ? "#ffffff" : "#f8fafc",
+          color,
+          font: key === "name" ? "22px Arial, sans-serif" : "bold 22px Arial, sans-serif",
+          align,
+        });
+        x += colWidth;
+      }
+      y += rowHeight;
+    });
+
+    resolve(canvas.toDataURL("image/png"));
+  });
+}
+
+function FocusLinePackageModal({ rows, type, selectedMonth, year, csrfToken, restrictToBranch, onClose }) {
+  const monthStart = `${year}-${pad2(selectedMonth)}-01`;
+  const branchOptions = useMemo(() => {
+    const codes = new Set();
+    rows.forEach((row) => (row.branchCodes || []).forEach((code) => codes.add(code)));
+    const all = [...codes].sort();
+    return restrictToBranch ? all.filter((code) => code === restrictToBranch) : all;
+  }, [rows, restrictToBranch]);
+  const [branchCode, setBranchCode] = useState(restrictToBranch || branchOptions[0] || BRANCH_CHOICES[0]);
+  const [ciCount, setCiCount] = useState("");
+  const [progress, setProgress] = useState(null);
+  const [loadingProgress, setLoadingProgress] = useState(false);
+  const [messageText, setMessageText] = useState("");
+  const [messageDirty, setMessageDirty] = useState(false);
+  const [imageDataUrl, setImageDataUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!branchCode) return undefined;
+    let active = true;
+    setLoadingProgress(true);
+    setError(null);
+    apiFetch(`/api/admin/sales-targets/progress?branchCode=${encodeURIComponent(branchCode)}&month=${encodeURIComponent(monthStart)}`)
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.message || body.error || `HTTP ${res.status}`);
+        if (active) setProgress(body);
+      })
+      .catch((err) => {
+        if (active) {
+          setProgress(null);
+          setError(err.message || "โหลดเป้ายอดขายไม่สำเร็จ");
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingProgress(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [branchCode, monthStart]);
+
+  const defaultMessage = useMemo(() => buildDefaultLineMessage({
+    branchCode,
+    monthStart,
+    progress,
+    ciCount: Number(ciCount || 0),
+  }), [branchCode, ciCount, monthStart, progress]);
+
+  useEffect(() => {
+    if (!messageDirty) setMessageText(defaultMessage);
+  }, [defaultMessage, messageDirty]);
+
+  async function copyMessage() {
+    await navigator.clipboard.writeText(messageText);
+    setStatus("คัดลอกข้อความแล้ว");
+  }
+
+  function downloadImage() {
+    if (!imageDataUrl) return;
+    const anchor = document.createElement("a");
+    anchor.href = imageDataUrl;
+    anchor.download = `focus-line-${monthStart}-${branchCode}-${type}.png`;
+    anchor.click();
+  }
+
+  async function handleSaveAndCopy() {
+    setSaving(true);
+    setError(null);
+    setStatus("");
+    try {
+      const rendered = await renderFocusLinePackageImage({
+        rows,
+        type,
+        branchCode,
+        monthStart,
+        monthName: THAI_MONTH_NAMES[selectedMonth - 1],
+        year,
+      });
+      setImageDataUrl(rendered);
+      const response = await apiFetch("/api/admin/focus-products/line-packages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
+        body: JSON.stringify({
+          focusType: type,
+          branchCode,
+          dateFrom: monthStart,
+          dateTo: progress?.asOfDate || monthStart,
+          ciCount: Number(ciCount || 0),
+          messageText,
+          rowFingerprint: buildFocusLineRowFingerprint({ rows, type, branchCode }),
+          imageDataUrl: rendered,
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.message || body.error || `HTTP ${response.status}`);
+      await navigator.clipboard.writeText(messageText);
+      setStatus(body.duplicate ? "ข้อมูลชุดนี้เคยบันทึกแล้ว ระบบคัดลอกข้อความเดิมให้แล้ว" : "บันทึกและคัดลอกข้อความแล้ว");
+    } catch (err) {
+      setError(err.message || "บันทึกชุดส่ง LINE ไม่สำเร็จ");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fp-modal-overlay" onClick={onClose}>
+      <div className="fp-modal fp-line-package-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <button type="button" className="fp-table-modal-close" onClick={onClose} aria-label="ปิด">✕</button>
+        <h3>เตรียมส่ง LINE</h3>
+        <div className="fp-line-package-controls">
+          <label className="fp-field">
+            <span>สาขา</span>
+            <select value={branchCode} onChange={(event) => { setBranchCode(event.target.value); setMessageDirty(false); setImageDataUrl(""); }}>
+              {branchOptions.map((code) => <option key={code} value={code}>{BRANCH_LABELS[code] || `สาขา ${code}`}</option>)}
+            </select>
+          </label>
+          <label className="fp-field">
+            <span>จำนวน CI</span>
+            <input type="number" min="0" step="1" value={ciCount} onChange={(event) => { setCiCount(event.target.value); setMessageDirty(false); }} placeholder="กรอกเอง" />
+          </label>
+        </div>
+        {loadingProgress && <div className="fp-line-package-note">กำลังโหลดเป้ายอดขาย...</div>}
+        <label className="fp-field">
+          <span>ข้อความที่จะคัดลอกไป LINE</span>
+          <textarea
+            className="fp-line-package-message"
+            value={messageText}
+            onChange={(event) => {
+              setMessageText(event.target.value);
+              setMessageDirty(true);
+            }}
+          />
+        </label>
+        <div className="fp-line-package-preview">
+          <div>
+            <strong>รูปตารางสินค้า</strong>
+            <span>{FOCUS_TYPE_SHORT_LABELS[type]} · {BRANCH_LABELS[branchCode] || branchCode}</span>
+          </div>
+          {imageDataUrl ? <img src={imageDataUrl} alt="ตัวอย่างรูปตารางสินค้าโฟกัสสำหรับส่ง LINE" /> : <span>ระบบจะสร้างรูปเมื่อกดบันทึกและคัดลอก</span>}
+        </div>
+        {error && <div className="fp-form-error">{error}</div>}
+        {status && <div className="fp-form-success">{status}</div>}
+        <div className="fp-modal-actions">
+          <button type="button" className="fp-btn-secondary" onClick={copyMessage} disabled={!messageText || saving}>คัดลอกข้อความอย่างเดียว</button>
+          <button type="button" className="fp-btn-secondary" onClick={downloadImage} disabled={!imageDataUrl || saving}>ดาวน์โหลดรูป</button>
+          <button type="button" className="fp-btn-primary" onClick={handleSaveAndCopy} disabled={!messageText || loadingProgress || saving}>
+            {saving ? "กำลังบันทึก..." : "บันทึกและคัดลอก"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Mirrors the source Excel's "สินค้าโฟกัส เดือน ..." layout: one column per
 // branch instead of a combined chip cell, person name and target up front.
 function SalespersonFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
@@ -1066,8 +1452,9 @@ function FocusSectionTable({ type, typeRows, isAdminUser, onEdit, onDelete, rest
   return <GenericFocusTable typeRows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />;
 }
 
-function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBranch }) {
+function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBranch, csrfToken, selectedMonth, year }) {
   const [expandedType, setExpandedType] = useState(null);
+  const [linePackageType, setLinePackageType] = useState(null);
 
   const grouped = useMemo(() => {
     const map = new Map(FOCUS_TYPE_ORDER.map((type) => [type, []]));
@@ -1090,7 +1477,19 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBr
             onClick={() => setExpandedType(type)}
             title="คลิกเพื่อดูแบบเต็มหน้าจอ"
           >
-            <h3 className="fp-section-title">{FOCUS_TYPE_LABELS[type]}</h3>
+            <div className="fp-focus-section-header">
+              <h3 className="fp-section-title">{FOCUS_TYPE_LABELS[type]}</h3>
+              <button
+                type="button"
+                className="fp-line-package-button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setLinePackageType(type);
+                }}
+              >
+                เตรียมส่ง LINE
+              </button>
+            </div>
             <FocusSectionTable
               type={type}
               typeRows={typeRows}
@@ -1123,6 +1522,18 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBr
             />
           </div>
         </div>
+      )}
+
+      {linePackageType && (
+        <FocusLinePackageModal
+          rows={grouped.get(linePackageType) || []}
+          type={linePackageType}
+          selectedMonth={selectedMonth}
+          year={year}
+          csrfToken={csrfToken}
+          restrictToBranch={restrictToBranch}
+          onClose={() => setLinePackageType(null)}
+        />
       )}
     </>
   );
@@ -2760,6 +3171,9 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode,
                   onEdit={openEditModal}
                   onDelete={handleDelete}
                   restrictToBranch={!isAdminUser ? branchCode : null}
+                  csrfToken={csrfToken}
+                  selectedMonth={selectedMonth}
+                  year={year}
                 />
               )}
             </div>
