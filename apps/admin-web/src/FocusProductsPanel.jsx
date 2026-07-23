@@ -833,6 +833,11 @@ function FocusLinePackageModal({ rows, type, selectedMonth, year, csrfToken, res
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState(null);
+  const busyMessage = saving
+    ? "กำลังบันทึกและเตรียมรูปสำหรับส่ง LINE..."
+    : loadingProgress
+      ? `กำลังโหลดข้อมูล${BRANCH_LABELS[branchCode] || `สาขา ${branchCode}`}...`
+      : "";
 
   useEffect(() => {
     if (!branchCode) return undefined;
@@ -925,26 +930,33 @@ function FocusLinePackageModal({ rows, type, selectedMonth, year, csrfToken, res
   return (
     <div className="fp-modal-overlay" onClick={onClose}>
       <div className="fp-modal fp-line-package-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        {busyMessage && (
+          <div className="fp-line-package-loading-overlay" role="status" aria-live="polite">
+            <div className="fp-loading-spinner" />
+            <strong>{busyMessage}</strong>
+            <span>รอสักครู่ ระบบกำลังเตรียมข้อความและข้อมูลล่าสุดของสาขานี้</span>
+          </div>
+        )}
         <button type="button" className="fp-table-modal-close" onClick={onClose} aria-label="ปิด">✕</button>
         <h3>เตรียมส่ง LINE</h3>
         <div className="fp-line-package-controls">
           <label className="fp-field">
             <span>สาขา</span>
-            <select value={branchCode} onChange={(event) => { setBranchCode(event.target.value); setMessageDirty(false); setImageDataUrl(""); }}>
+            <select value={branchCode} disabled={Boolean(busyMessage)} onChange={(event) => { setBranchCode(event.target.value); setMessageDirty(false); setImageDataUrl(""); }}>
               {branchOptions.map((code) => <option key={code} value={code}>{BRANCH_LABELS[code] || `สาขา ${code}`}</option>)}
             </select>
           </label>
           <label className="fp-field">
             <span>จำนวน CI</span>
-            <input type="number" min="0" step="1" value={ciCount} onChange={(event) => { setCiCount(event.target.value); setMessageDirty(false); }} placeholder="กรอกเอง" />
+            <input type="number" min="0" step="1" value={ciCount} disabled={Boolean(busyMessage)} onChange={(event) => { setCiCount(event.target.value); setMessageDirty(false); }} placeholder="กรอกเอง" />
           </label>
         </div>
-        {loadingProgress && <div className="fp-line-package-note">กำลังโหลดเป้ายอดขาย...</div>}
         <label className="fp-field">
           <span>ข้อความที่จะคัดลอกไป LINE</span>
           <textarea
             className="fp-line-package-message"
             value={messageText}
+            disabled={Boolean(busyMessage)}
             onChange={(event) => {
               setMessageText(event.target.value);
               setMessageDirty(true);
