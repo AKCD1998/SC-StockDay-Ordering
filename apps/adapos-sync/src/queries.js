@@ -101,6 +101,7 @@ export async function getSalesDetailHeaderRows(
       h.FTCstCode,
       h.FTShdStaPaid,
       h.FTShdStaRefund,
+      h.FTShdStaDoc,
       h.FTUsrCode,
       h.FTPosCode,
       h.FTShdPosCN,
@@ -149,6 +150,9 @@ export async function getSalesDetailLineRows(
       d.FCSdtSetPrice,
       d.FCSdtDis,
       d.FCSdtNet,
+      d.FCSdtDisAvg,
+      d.FCSdtFootAvg,
+      d.FCSdtRePackAvg,
       d.FTSdtLotNo,
       d.FDSdtExpired
     FROM TPSTSalDT d
@@ -157,9 +161,10 @@ export async function getSalesDetailLineRows(
      AND h.FTShdDocNo = d.FTShdDocNo
     WHERE h.FTBchCode = @branchCode
       -- Include DocType 9 return lines alongside DocType 1 sale lines, to match
-      -- getSalesDetailHeaderRows (see the note there). Line values are not used by
-      -- the sales-target net calc (that reads header FCShdGrand), but the lines are
-      -- kept in sync so return documents are complete for future reporting.
+      -- getSalesDetailHeaderRows (see the note there). The AdaSoft
+      -- "ยอดขายตามช่วงเวลา" report calculates net from detail FCSdtNet minus
+      -- FCSdtDisAvg/FCSdtFootAvg/FCSdtRePackAvg, so those allocation fields must
+      -- remain available to the backend.
       AND h.FTShdDocType IN ('1', '9')
       AND h.FTShdStaPaid = '3'
       ${dateFilter}

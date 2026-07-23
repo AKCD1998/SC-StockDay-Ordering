@@ -276,6 +276,7 @@ export function toSalesDetailPayload(headerRows, lineRows) {
       // Extra source fields preserved in raw_payload for future reporting.
       FTShdDocType: r.FTShdDocType || null,
       FTShdStaRefund: r.FTShdStaRefund || null,
+      FTShdStaDoc: r.FTShdStaDoc || null,
       // Bill-level gross + discount. On AdaAcc the discount lives at the header
       // (FCShdDis); the line discount FCSdtDis is 0. So gross = FCShdTotal,
       // net = FCShdGrand, discount = FCShdTotal − FCShdGrand. Kept so the backend
@@ -305,6 +306,9 @@ export function toSalesDetailPayload(headerRows, lineRows) {
       productNameThai: r.FTPdtName || null,
       unitCode: r.FTPunCode || null,
       unitName: r.FTSdtUnitName || null,
+      FCSdtDisAvg: Number(r.FCSdtDisAvg ?? 0),
+      FCSdtFootAvg: Number(r.FCSdtFootAvg ?? 0),
+      FCSdtRePackAvg: Number(r.FCSdtRePackAvg ?? 0),
     })),
   };
 }

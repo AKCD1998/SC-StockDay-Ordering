@@ -74,3 +74,19 @@ test("sales detail keeps a refunded-original (Refund=2) rather than dropping it"
   assert.equal(h.FTShdStaRefund, "2");
   assert.equal(h.grandAmount, 182);
 });
+
+test("sales detail preserves Crystal hourly-report allocation fields", () => {
+  const payload = toSalesDetailPayload([], [{
+    FTBchCode: "004",
+    FTShdDocNo: "S2607004002-0014534",
+    FNSdtSeqNo: 1,
+    FCSdtNet: 120,
+    FCSdtDisAvg: 20,
+    FCSdtFootAvg: 3,
+    FCSdtRePackAvg: 1,
+  }]);
+  assert.equal(payload.lines[0].lineAmount, 120);
+  assert.equal(payload.lines[0].FCSdtDisAvg, 20);
+  assert.equal(payload.lines[0].FCSdtFootAvg, 3);
+  assert.equal(payload.lines[0].FCSdtRePackAvg, 1);
+});
