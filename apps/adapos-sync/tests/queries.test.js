@@ -37,6 +37,7 @@ test("sales-detail header query syncs both sale (1) and return (9) documents", a
   // Bill-level gross/discount are selected for report reproduction.
   assert.match(sql, /FCShdTotal/);
   assert.match(sql, /FCShdDis/);
+  assert.match(sql, /FTShdStaDoc/);
   assert.equal(inputs.branchCode, "005");
 });
 
@@ -46,4 +47,7 @@ test("sales-detail line query syncs both sale (1) and return (9) lines", async (
   const { sql } = pool.calls[0];
   assert.match(sql, /FTShdDocType\s+IN\s+\('1',\s*'9'\)/);
   assert.doesNotMatch(sql, /FTShdDocType\s*=\s*'1'/);
+  assert.match(sql, /FCSdtDisAvg/);
+  assert.match(sql, /FCSdtFootAvg/);
+  assert.match(sql, /FCSdtRePackAvg/);
 });
