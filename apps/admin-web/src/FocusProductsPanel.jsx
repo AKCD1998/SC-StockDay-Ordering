@@ -1613,9 +1613,8 @@ function FocusSectionTable({ type, typeRows, isAdminUser, onEdit, onDelete, rest
   return <GenericFocusTable typeRows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />;
 }
 
-function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBranch, csrfToken, selectedMonth, year }) {
+function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBranch }) {
   const [expandedType, setExpandedType] = useState(null);
-  const [linePackageType, setLinePackageType] = useState(null);
 
   const grouped = useMemo(() => {
     const map = new Map(FOCUS_TYPE_ORDER.map((type) => [type, []]));
@@ -1625,10 +1624,6 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBr
     }
     return map;
   }, [rows]);
-
-  const linePackageRowsByType = useMemo(() => Object.fromEntries(
-    LINE_PACKAGE_FOCUS_TYPES.map((type) => [type, grouped.get(type) || []]),
-  ), [grouped]);
 
   return (
     <>
@@ -1644,16 +1639,6 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBr
           >
             <div className="fp-focus-section-header">
               <h3 className="fp-section-title">{FOCUS_TYPE_LABELS[type]}</h3>
-              <button
-                type="button"
-                className="fp-line-package-button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setLinePackageType(type);
-                }}
-              >
-                เตรียมส่ง LINE รวม 3 ตาราง
-              </button>
             </div>
             <FocusSectionTable
               type={type}
@@ -1687,17 +1672,6 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBr
             />
           </div>
         </div>
-      )}
-
-      {linePackageType && (
-        <FocusLinePackageModal
-          rowsByType={linePackageRowsByType}
-          selectedMonth={selectedMonth}
-          year={year}
-          csrfToken={csrfToken}
-          restrictToBranch={restrictToBranch}
-          onClose={() => setLinePackageType(null)}
-        />
       )}
     </>
   );
@@ -3125,6 +3099,7 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode,
   const [salesStaff, setSalesStaff] = useState([]);
   const [year, setYear] = useState(2026);
   const [selectedMonth, setSelectedMonth] = useState(null);
+  const [linePackageOpen, setLinePackageOpen] = useState(false);
 
   useEffect(() => {
     if (!isAdminUser) return;
@@ -3172,9 +3147,19 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode,
     return rows.filter((row) => rowOverlapsMonth(row, year, selectedMonth));
   }, [rows, year, selectedMonth]);
 
+  const linePackageRowsByType = useMemo(() => {
+    const map = new Map(FOCUS_TYPE_ORDER.map((type) => [type, []]));
+    for (const row of monthRows) {
+      if (!map.has(row.focusType)) map.set(row.focusType, []);
+      map.get(row.focusType).push(row);
+    }
+    return Object.fromEntries(LINE_PACKAGE_FOCUS_TYPES.map((type) => [type, map.get(type) || []]));
+  }, [monthRows]);
+
   function handleYearChange(nextYear) {
     setYear(nextYear);
     setSelectedMonth(null);
+    setLinePackageOpen(false);
   }
 
   function openCreateModal(prefill = {}) {
@@ -3294,11 +3279,18 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode,
   }
 
   return (
-    <div className="fp-panel">
-      <div className="panel-header stacked">
-        <h2>สินค้าโฟกัส</h2>
-        <p>เป้าหมายสินค้าโปรโมชั่นที่ต้องผลักดันการขาย และยอดขายสะสมถึงรอบล่าสุด</p>
-      </div>
+      <div className="fp-panel">
+        <div className="panel-header stacked">
+          <h2>สินค้าโฟกัส</h2>
+          <button
+            type="button"
+            className="fp-line-package-button fp-line-package-button--panel"
+            onClick={() => setLinePackageOpen(true)}
+            disabled={!selectedMonth || monthRows.length === 0 || loading}
+          >
+            เตรียมส่ง LINE รวม 3 ตาราง
+          </button>
+        </div>
 
       <LoadingOverlay active={loading} onNavigateBack={onNavigateBack} />
       {error && <div className="fp-form-error">{error}</div>}
@@ -3307,13 +3299,16 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode,
 
       {!loading && !error && (
         <>
-          <YearCalendar
-            year={year}
-            onYearChange={handleYearChange}
-            selectedMonth={selectedMonth}
-            onSelectMonth={(month) => setSelectedMonth(month === selectedMonth ? null : month)}
-            monthSummaries={monthSummaries}
-          />
+            <YearCalendar
+              year={year}
+              onYearChange={handleYearChange}
+              selectedMonth={selectedMonth}
+              onSelectMonth={(month) => {
+                setSelectedMonth(month === selectedMonth ? null : month);
+                setLinePackageOpen(false);
+              }}
+              monthSummaries={monthSummaries}
+            />
 
           {selectedMonth && (
             <div className="fp-month-detail">
@@ -3335,14 +3330,22 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode,
                   onEdit={openEditModal}
                   onDelete={handleDelete}
                   restrictToBranch={!isAdminUser ? branchCode : null}
-                  csrfToken={csrfToken}
-                  selectedMonth={selectedMonth}
-                  year={year}
                 />
               )}
             </div>
           )}
         </>
+      )}
+
+      {linePackageOpen && selectedMonth && monthRows.length > 0 && (
+        <FocusLinePackageModal
+          rowsByType={linePackageRowsByType}
+          selectedMonth={selectedMonth}
+          year={year}
+          csrfToken={csrfToken}
+          restrictToBranch={!isAdminUser ? branchCode : null}
+          onClose={() => setLinePackageOpen(false)}
+        />
       )}
 
       {modalState && (
