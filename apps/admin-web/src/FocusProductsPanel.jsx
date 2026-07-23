@@ -923,6 +923,9 @@ function FocusLinePackageModal({ rowsByType, selectedMonth, year, csrfToken, res
   const [imageDataUrl, setImageDataUrl] = useState("");
   const [preparingImage, setPreparingImage] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [packageSaved, setPackageSaved] = useState(false);
+  const [imageDownloaded, setImageDownloaded] = useState(false);
+  const [messageCopied, setMessageCopied] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState(null);
   const busyMessage = saving
@@ -971,6 +974,7 @@ function FocusLinePackageModal({ rowsByType, selectedMonth, year, csrfToken, res
 
   async function copyMessage() {
     await navigator.clipboard.writeText(messageText);
+    setMessageCopied(true);
     setStatus("คัดลอกข้อความแล้ว");
   }
 
@@ -1002,6 +1006,7 @@ function FocusLinePackageModal({ rowsByType, selectedMonth, year, csrfToken, res
     anchor.href = image;
     anchor.download = `focus-line-${monthStart}-${branchCode}.png`;
     anchor.click();
+    setImageDownloaded(true);
     setStatus("ดาวน์โหลดรูปแล้ว");
   }
 
@@ -1028,6 +1033,8 @@ function FocusLinePackageModal({ rowsByType, selectedMonth, year, csrfToken, res
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.message || body.error || `HTTP ${response.status}`);
       await navigator.clipboard.writeText(messageText);
+      setPackageSaved(true);
+      setMessageCopied(true);
       setStatus(body.duplicate ? "ข้อมูลชุดนี้เคยบันทึกแล้ว ระบบคัดลอกข้อความเดิมให้แล้ว" : "บันทึกและคัดลอกข้อความแล้ว");
     } catch (err) {
       setError(err.message || "บันทึกชุดส่ง LINE ไม่สำเร็จ");
@@ -1051,13 +1058,27 @@ function FocusLinePackageModal({ rowsByType, selectedMonth, year, csrfToken, res
         <div className="fp-line-package-controls">
           <label className="fp-field">
             <span>สาขา</span>
-            <select value={branchCode} disabled={Boolean(busyMessage)} onChange={(event) => { setBranchCode(event.target.value); setMessageDirty(false); setImageDataUrl(""); }}>
+            <select value={branchCode} disabled={Boolean(busyMessage)} onChange={(event) => {
+              setBranchCode(event.target.value);
+              setMessageDirty(false);
+              setImageDataUrl("");
+              setPackageSaved(false);
+              setImageDownloaded(false);
+              setMessageCopied(false);
+              setStatus("");
+            }}>
               {branchOptions.map((code) => <option key={code} value={code}>{BRANCH_LABELS[code] || `สาขา ${code}`}</option>)}
             </select>
           </label>
           <label className="fp-field">
             <span>จำนวน CI</span>
-            <input type="number" min="0" step="1" value={ciCount} disabled={Boolean(busyMessage)} onChange={(event) => { setCiCount(event.target.value); setMessageDirty(false); }} placeholder="กรอกเอง" />
+            <input type="number" min="0" step="1" value={ciCount} disabled={Boolean(busyMessage)} onChange={(event) => {
+              setCiCount(event.target.value);
+              setMessageDirty(false);
+              setPackageSaved(false);
+              setMessageCopied(false);
+              setStatus("");
+            }} placeholder="กรอกเอง" />
           </label>
         </div>
         <label className="fp-field">
@@ -1069,6 +1090,8 @@ function FocusLinePackageModal({ rowsByType, selectedMonth, year, csrfToken, res
             onChange={(event) => {
               setMessageText(event.target.value);
               setMessageDirty(true);
+              setPackageSaved(false);
+              setMessageCopied(false);
             }}
           />
         </label>
@@ -1081,14 +1104,29 @@ function FocusLinePackageModal({ rowsByType, selectedMonth, year, csrfToken, res
         </div>
         {error && <div className="fp-form-error">{error}</div>}
         {status && <div className="fp-form-success">{status}</div>}
-        <div className="fp-modal-actions">
-          <button type="button" className="fp-btn-secondary" onClick={copyMessage} disabled={!messageText || Boolean(busyMessage)}>คัดลอกข้อความอย่างเดียว</button>
-          <button type="button" className="fp-btn-secondary" onClick={downloadImage} disabled={loadingProgress || Boolean(busyMessage)}>
-            {preparingImage ? "กำลังสร้างรูป..." : imageDataUrl ? "ดาวน์โหลดรูป" : "สร้างและดาวน์โหลดรูป"}
-          </button>
-          <button type="button" className="fp-btn-primary" onClick={handleSaveAndCopy} disabled={!messageText || loadingProgress || saving}>
-            {saving ? "กำลังบันทึก..." : "บันทึกและคัดลอก"}
-          </button>
+        <div className="fp-line-package-steps" aria-label="ขั้นตอนเตรียมส่ง LINE">
+          <div className="fp-line-package-step">
+            <span className="fp-line-package-step-number">1</span>
+            <button type="button" className="fp-btn-primary fp-line-package-save-button" onClick={handleSaveAndCopy} disabled={!messageText || loadingProgress || saving || packageSaved}>
+              {saving ? "กำลังบันทึก..." : packageSaved ? "บันทึกแล้ว" : "บันทึกและคัดลอก"}
+            </button>
+            <span className={`fp-line-package-status-light${packageSaved ? " is-complete" : ""}`} aria-label={packageSaved ? "บันทึกแล้ว" : "ยังไม่ได้บันทึก"} />
+            <small>{packageSaved ? "บันทึกขึ้น R2 แล้ว" : "ต้องกดบันทึกก่อน"}</small>
+          </div>
+          <div className="fp-line-package-step">
+            <span className="fp-line-package-step-number">2</span>
+            <button type="button" className="fp-btn-secondary" onClick={downloadImage} disabled={!packageSaved || loadingProgress || Boolean(busyMessage)}>
+              {preparingImage ? "กำลังสร้างรูป..." : imageDataUrl ? "ดาวน์โหลดรูป" : "สร้างและดาวน์โหลดรูป"}
+            </button>
+            <span className={`fp-line-package-status-light${imageDownloaded ? " is-complete" : ""}`} aria-label={imageDownloaded ? "ดาวน์โหลดแล้ว" : "ยังไม่ได้ดาวน์โหลด"} />
+            <small>{imageDownloaded ? "ดาวน์โหลดแล้ว กดซ้ำได้" : "ดาวน์โหลดได้หลังบันทึก"}</small>
+          </div>
+          <div className="fp-line-package-step">
+            <span className="fp-line-package-step-number">3</span>
+            <button type="button" className="fp-btn-secondary" onClick={copyMessage} disabled={!packageSaved || !messageText || Boolean(busyMessage)}>คัดลอกข้อความ</button>
+            <span className={`fp-line-package-status-light${messageCopied ? " is-complete" : ""}`} aria-label={messageCopied ? "คัดลอกแล้ว" : "ยังไม่ได้คัดลอก"} />
+            <small>{messageCopied ? "คัดลอกแล้ว กดซ้ำได้" : "คัดลอกได้หลังบันทึก"}</small>
+          </div>
         </div>
       </div>
     </div>

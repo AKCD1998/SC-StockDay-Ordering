@@ -8620,9 +8620,92 @@ input[type="radio"] {
   background: #fff;
 }
 
+.fp-line-package-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  align-items: start;
+  justify-content: center;
+  gap: 14px;
+  max-width: 760px;
+  margin: 18px auto 0;
+}
+
+.fp-line-package-step {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.fp-line-package-step-number {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  color: #ffffff;
+  background: linear-gradient(180deg, #3b82f6, #1d4ed8);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.28);
+  font-weight: 800;
+}
+
+.fp-line-package-step .fp-btn-primary,
+.fp-line-package-step .fp-btn-secondary {
+  width: 100%;
+  min-height: 42px;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+}
+
+.fp-line-package-save-button {
+  background: linear-gradient(180deg, #3345ff, #2028d2);
+}
+
+.fp-line-package-step .fp-btn-secondary {
+  background: #e8eef7;
+  color: #1e293b;
+  border: 1px solid #d1dceb;
+  font-weight: 700;
+}
+
+.fp-line-package-step .fp-btn-secondary:hover:not(:disabled) {
+  background: #dbe7f5;
+}
+
+.fp-line-package-step .fp-btn-primary:disabled,
+.fp-line-package-step .fp-btn-secondary:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.fp-line-package-status-light {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #ef4444;
+  box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.12), 0 0 16px rgba(239, 68, 68, 0.8);
+}
+
+.fp-line-package-status-light.is-complete {
+  background: #22c55e;
+  box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.14), 0 0 18px rgba(34, 197, 94, 0.85);
+}
+
+.fp-line-package-step small {
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
 @media (max-width: 720px) {
   .fp-line-package-controls {
     grid-template-columns: 1fr;
+  }
+
+  .fp-line-package-steps {
+    grid-template-columns: 1fr;
+    max-width: 320px;
   }
 }
 
@@ -9639,6 +9722,29 @@ input[type="radio"] {
 [data-theme="dark"] .fp-line-package-preview img {
   background: #ffffff;
   border-color: #3a4d66;
+}
+
+[data-theme="dark"] .fp-line-package-step-number {
+  background: linear-gradient(180deg, #38bdf8, #2563eb);
+  box-shadow: 0 8px 18px rgba(56, 189, 248, 0.18);
+}
+
+[data-theme="dark"] .fp-line-package-step .fp-btn-secondary {
+  background: #1f3147;
+  color: #e2e8f0;
+  border-color: #33465f;
+}
+
+[data-theme="dark"] .fp-line-package-step .fp-btn-secondary:hover:not(:disabled) {
+  background: #263a54;
+}
+
+[data-theme="dark"] .fp-line-package-save-button {
+  background: linear-gradient(180deg, #3d46ff, #2730d8);
+}
+
+[data-theme="dark"] .fp-line-package-step small {
+  color: #94a3b8;
 }
 
 /* Batch editor is intentionally much larger than the single-item dialog.
