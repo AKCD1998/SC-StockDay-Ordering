@@ -104,12 +104,20 @@ export async function getSalesDetailHeaderRows(
       h.FTUsrCode,
       h.FTPosCode,
       h.FTShdPosCN,
+      h.FCShdTotal,
+      h.FCShdDis,
       h.FCShdAftDisChg,
       h.FCShdVat,
       h.FCShdGrand
     FROM TPSTSalHD h
     WHERE h.FTBchCode = @branchCode
-      AND h.FTShdDocType = '1'
+      -- DocType 1 = sale, DocType 9 = return/refund document. The AdaSoft
+      -- "ยอดขายตามช่วงเวลา" net total = Σ sale grand − Σ return grand, so return
+      -- documents must be synced too (proven to the baht on branch 005,
+      -- 2026-07-23). Refund status (FTShdStaRefund 1/2) is intentionally NOT
+      -- filtered: a partially-refunded original (Refund=2) still contributes its
+      -- residual and is netted by its matching DocType 9 return.
+      AND h.FTShdDocType IN ('1', '9')
       AND h.FTShdStaPaid = '3'
       ${dateFilter}
     ORDER BY h.FDShdDocDate ASC, h.FTShdDocTime ASC, h.FTShdDocNo ASC
@@ -148,7 +156,11 @@ export async function getSalesDetailLineRows(
       ON h.FTBchCode = d.FTBchCode
      AND h.FTShdDocNo = d.FTShdDocNo
     WHERE h.FTBchCode = @branchCode
-      AND h.FTShdDocType = '1'
+      -- Include DocType 9 return lines alongside DocType 1 sale lines, to match
+      -- getSalesDetailHeaderRows (see the note there). Line values are not used by
+      -- the sales-target net calc (that reads header FCShdGrand), but the lines are
+      -- kept in sync so return documents are complete for future reporting.
+      AND h.FTShdDocType IN ('1', '9')
       AND h.FTShdStaPaid = '3'
       ${dateFilter}
     ORDER BY h.FDShdDocDate ASC, h.FTShdDocTime ASC, d.FTShdDocNo ASC, d.FNSdtSeqNo ASC
