@@ -241,6 +241,19 @@ export function toStockSnapshotRecords(rows, branchCode, snapshotAt = new Date()
     }));
 }
 
+function signedSalesQtyBase(qtyRaw, stockFactorRaw, qtyAllRaw) {
+  const qty = Number(qtyRaw ?? 0);
+  const stockFactor = Number(stockFactorRaw ?? 1);
+  const calculated = qty * (Number.isFinite(stockFactor) ? stockFactor : 1);
+  if (qtyAllRaw == null) return calculated;
+
+  const qtyAll = Number(qtyAllRaw);
+  if (!Number.isFinite(qtyAll)) return calculated;
+  if (qty < 0 && qtyAll > 0) return -qtyAll;
+  if (qty > 0 && qtyAll < 0) return Math.abs(qtyAll);
+  return qtyAll;
+}
+
 export function toSalesDetailPayload(headerRows, lineRows) {
   const syncedAt = new Date().toISOString();
   return {
@@ -275,7 +288,9 @@ export function toSalesDetailPayload(headerRows, lineRows) {
       discountAmount: Number(r.FCSdtDis ?? 0),
       lineAmount: Number(r.FCSdtNet ?? 0),
       stockFactor: Number(r.FCSdtStkFac ?? 1),
-      qtyBase: Number(r.FCSdtQtyAll ?? ((r.FCSdtQty ?? 0) * (r.FCSdtStkFac ?? 1))),
+      // AdaSoft may store Void rows with signed FCSdtQty but a positive
+      // FCSdtQtyAll magnitude. Preserve the transaction sign from FCSdtQty.
+      qtyBase: signedSalesQtyBase(r.FCSdtQty, r.FCSdtStkFac, r.FCSdtQtyAll),
       lotNo: r.FTSdtLotNo || null,
       expiryDate: toBangkokDateString(r.FDSdtExpired),
       sourceTable: "TPSTSalDT",
