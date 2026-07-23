@@ -830,11 +830,14 @@ function FocusLinePackageModal({ rows, type, selectedMonth, year, csrfToken, res
   const [messageText, setMessageText] = useState("");
   const [messageDirty, setMessageDirty] = useState(false);
   const [imageDataUrl, setImageDataUrl] = useState("");
+  const [preparingImage, setPreparingImage] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState(null);
   const busyMessage = saving
     ? "กำลังบันทึกและเตรียมรูปสำหรับส่ง LINE..."
+    : preparingImage
+      ? "กำลังสร้างรูปตารางสินค้า..."
     : loadingProgress
       ? `กำลังโหลดข้อมูล${BRANCH_LABELS[branchCode] || `สาขา ${branchCode}`}...`
       : "";
@@ -880,12 +883,37 @@ function FocusLinePackageModal({ rows, type, selectedMonth, year, csrfToken, res
     setStatus("คัดลอกข้อความแล้ว");
   }
 
-  function downloadImage() {
-    if (!imageDataUrl) return;
+  async function buildImagePreview() {
+    const rendered = await renderFocusLinePackageImage({
+      rows,
+      type,
+      branchCode,
+      monthStart,
+      monthName: THAI_MONTH_NAMES[selectedMonth - 1],
+      year,
+    });
+    setImageDataUrl(rendered);
+    return rendered;
+  }
+
+  async function downloadImage() {
+    setPreparingImage(true);
+    setError(null);
+    setStatus("");
+    let image = imageDataUrl;
+    try {
+      if (!image) image = await buildImagePreview();
+    } catch (err) {
+      setError(err.message || "สร้างรูปไม่สำเร็จ");
+      return;
+    } finally {
+      setPreparingImage(false);
+    }
     const anchor = document.createElement("a");
-    anchor.href = imageDataUrl;
+    anchor.href = image;
     anchor.download = `focus-line-${monthStart}-${branchCode}-${type}.png`;
     anchor.click();
+    setStatus("ดาวน์โหลดรูปแล้ว");
   }
 
   async function handleSaveAndCopy() {
@@ -893,15 +921,7 @@ function FocusLinePackageModal({ rows, type, selectedMonth, year, csrfToken, res
     setError(null);
     setStatus("");
     try {
-      const rendered = await renderFocusLinePackageImage({
-        rows,
-        type,
-        branchCode,
-        monthStart,
-        monthName: THAI_MONTH_NAMES[selectedMonth - 1],
-        year,
-      });
-      setImageDataUrl(rendered);
+      const rendered = imageDataUrl || await buildImagePreview();
       const response = await apiFetch("/api/admin/focus-products/line-packages", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
@@ -968,13 +988,15 @@ function FocusLinePackageModal({ rows, type, selectedMonth, year, csrfToken, res
             <strong>รูปตารางสินค้า</strong>
             <span>{FOCUS_TYPE_SHORT_LABELS[type]} · {BRANCH_LABELS[branchCode] || branchCode}</span>
           </div>
-          {imageDataUrl ? <img src={imageDataUrl} alt="ตัวอย่างรูปตารางสินค้าโฟกัสสำหรับส่ง LINE" /> : <span>ระบบจะสร้างรูปเมื่อกดบันทึกและคัดลอก</span>}
+          {imageDataUrl ? <img src={imageDataUrl} alt="ตัวอย่างรูปตารางสินค้าโฟกัสสำหรับส่ง LINE" /> : <span>กดดาวน์โหลดรูป หรือ บันทึกและคัดลอก เพื่อสร้างรูปตารางสินค้า</span>}
         </div>
         {error && <div className="fp-form-error">{error}</div>}
         {status && <div className="fp-form-success">{status}</div>}
         <div className="fp-modal-actions">
-          <button type="button" className="fp-btn-secondary" onClick={copyMessage} disabled={!messageText || saving}>คัดลอกข้อความอย่างเดียว</button>
-          <button type="button" className="fp-btn-secondary" onClick={downloadImage} disabled={!imageDataUrl || saving}>ดาวน์โหลดรูป</button>
+          <button type="button" className="fp-btn-secondary" onClick={copyMessage} disabled={!messageText || Boolean(busyMessage)}>คัดลอกข้อความอย่างเดียว</button>
+          <button type="button" className="fp-btn-secondary" onClick={downloadImage} disabled={loadingProgress || Boolean(busyMessage)}>
+            {preparingImage ? "กำลังสร้างรูป..." : imageDataUrl ? "ดาวน์โหลดรูป" : "สร้างและดาวน์โหลดรูป"}
+          </button>
           <button type="button" className="fp-btn-primary" onClick={handleSaveAndCopy} disabled={!messageText || loadingProgress || saving}>
             {saving ? "กำลังบันทึก..." : "บันทึกและคัดลอก"}
           </button>
