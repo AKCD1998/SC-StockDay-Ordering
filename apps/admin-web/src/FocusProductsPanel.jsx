@@ -3291,11 +3291,19 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode,
           <h2>สินค้าโฟกัส</h2>
           <button
             type="button"
-            className="fp-line-package-button fp-line-package-button--panel"
+            className={`fp-line-package-button fp-line-package-button--panel${loading ? " is-loading" : ""}`}
             onClick={() => setLinePackageOpen(true)}
             disabled={!selectedMonth || monthRows.length === 0 || loading}
+            aria-busy={loading ? "true" : "false"}
           >
-            เตรียมส่ง LINE รวม 3 ตาราง
+            <span className="fp-line-package-button-label">
+              {loading ? "กำลังโหลดข้อมูล..." : "เตรียมส่ง LINE รวม 3 ตาราง"}
+            </span>
+            {loading && (
+              <span className="fp-line-package-button-overlay" aria-hidden="true">
+                <span className="fp-line-package-button-spinner" />
+              </span>
+            )}
           </button>
         </div>
 
