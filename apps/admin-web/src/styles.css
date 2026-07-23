@@ -8593,6 +8593,19 @@ input[type="radio"] {
   line-height: 1.6;
 }
 
+.fp-line-package-branch-lock {
+  padding: 10px 12px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.fp-line-package-branch-lock strong {
+  display: block;
+  color: #0f172a;
+  font-size: 0.98rem;
+}
+
 .fp-line-package-note {
   padding: 9px 12px;
   border: 1px solid #bfdbfe;
@@ -9755,6 +9768,16 @@ input[type="radio"] {
   background: #0f1824;
   border-color: #263547;
 }
+
+[data-theme="dark"] .fp-line-package-branch-lock {
+  background: #0f1824;
+  border-color: #263547;
+}
+
+[data-theme="dark"] .fp-line-package-branch-lock strong {
+  color: #e2e8f0;
+}
+
 [data-theme="dark"] .fp-line-package-preview > div {
   color: #e2e8f0;
 }

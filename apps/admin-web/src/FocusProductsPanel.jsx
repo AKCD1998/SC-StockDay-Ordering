@@ -1056,20 +1056,27 @@ function FocusLinePackageModal({ rowsByType, selectedMonth, year, csrfToken, res
         <button type="button" className="fp-table-modal-close" onClick={onClose} aria-label="ปิด">✕</button>
         <h3>เตรียมส่ง LINE รวม 3 ตาราง</h3>
         <div className="fp-line-package-controls">
-          <label className="fp-field">
-            <span>สาขา</span>
-            <select value={branchCode} disabled={Boolean(busyMessage)} onChange={(event) => {
-              setBranchCode(event.target.value);
-              setMessageDirty(false);
-              setImageDataUrl("");
-              setPackageSaved(false);
-              setImageDownloaded(false);
-              setMessageCopied(false);
-              setStatus("");
-            }}>
-              {branchOptions.map((code) => <option key={code} value={code}>{BRANCH_LABELS[code] || `สาขา ${code}`}</option>)}
-            </select>
-          </label>
+          {restrictToBranch ? (
+            <div className="fp-field fp-line-package-branch-lock">
+              <span>สาขา</span>
+              <strong>{BRANCH_LABELS[branchCode] || `สาขา ${branchCode}`}</strong>
+            </div>
+          ) : (
+            <label className="fp-field">
+              <span>สาขา</span>
+              <select value={branchCode} disabled={Boolean(busyMessage)} onChange={(event) => {
+                setBranchCode(event.target.value);
+                setMessageDirty(false);
+                setImageDataUrl("");
+                setPackageSaved(false);
+                setImageDownloaded(false);
+                setMessageCopied(false);
+                setStatus("");
+              }}>
+                {branchOptions.map((code) => <option key={code} value={code}>{BRANCH_LABELS[code] || `สาขา ${code}`}</option>)}
+              </select>
+            </label>
+          )}
           <label className="fp-field">
             <span>จำนวน CI</span>
             <input type="number" min="0" step="1" value={ciCount} disabled={Boolean(busyMessage)} onChange={(event) => {
