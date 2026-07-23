@@ -276,6 +276,13 @@ export function toSalesDetailPayload(headerRows, lineRows) {
       // Extra source fields preserved in raw_payload for future reporting.
       FTShdDocType: r.FTShdDocType || null,
       FTShdStaRefund: r.FTShdStaRefund || null,
+      // Bill-level gross + discount. On AdaAcc the discount lives at the header
+      // (FCShdDis); the line discount FCSdtDis is 0. So gross = FCShdTotal,
+      // net = FCShdGrand, discount = FCShdTotal − FCShdGrand. Kept so the backend
+      // can reproduce the report's gross/discount columns, not just net, and so
+      // the CRM mirror's gross_total is no longer 0. (branch 005, 2026-07-23)
+      FCShdTotal: r.FCShdTotal == null ? null : Number(r.FCShdTotal),
+      FCShdDis: r.FCShdDis == null ? null : Number(r.FCShdDis),
     })),
     lines: lineRows.map((r) => ({
       branchCode: String(r.FTBchCode || "").trim(),
