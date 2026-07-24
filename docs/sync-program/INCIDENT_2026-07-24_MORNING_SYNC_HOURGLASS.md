@@ -1,11 +1,11 @@
 # Incident — 2026-07-24 morning sync: all branches hourglass, pg-pool timeout, Render restart
 
 **Status: root cause understood with high confidence from production logs,
-branch logs, and production DB read-only verification. Two fixes are prepared
-locally (not committed/deployed): release the `/sales` DB connection before the
-CRM mirror call, and render old interrupted runs as `stale` instead of a
-permanent hourglass. Manual reruns recovered all five branches (`000`, `001`,
-`003`, `004`, and `005`).**
+branch logs, and production DB read-only verification. Two fixes were committed
+and deployed on 2026-07-24: release the `/sales` DB connection before the CRM
+mirror call, and render old interrupted runs as `stale` instead of a permanent
+hourglass. Manual reruns recovered all five branches (`000`, `001`, `003`,
+`004`, and `005`).**
 
 ## Timeline (from facts already reported; times ICT)
 
@@ -93,7 +93,7 @@ new DB load, but it directly shrinks the effective size of the 10-connection
 pool exactly during the window where every connection matters most — a
 multiplier on root cause #1, not a separate root cause.
 
-**Fixed this session** (not yet deployed): moved `client.release()` to
+**Fixed and deployed this session**: moved `client.release()` to
 immediately after `COMMIT`, before the CRM mirror try/catch. Verified with
 tests that the connection is released before the mirror call runs (see
 `apps/admin-api/src/routes/sync-ada.test.js`, new file — this route file had
@@ -126,7 +126,7 @@ part is unchanged by today's fix — it's a data-hygiene/observability gap, not
 a user-facing bug, and lower priority than the "still stuck right now"
 symptom.)
 
-**Fixed this session** (not yet deployed): both queries now classify a
+**Fixed and deployed this session**: both queries now classify a
 `status='running'` row as `'stale'` instead of `'running'` once it has been
 running for more than `STALE_RUN_MINUTES` (60, chosen because the worst
 real peak-window run observed to date — 2026-07-15, branch 001 — took
@@ -269,7 +269,7 @@ Roughly in priority order:
    that CP4 is live on one branch and total daily sync volume has grown
    since that commit.
 
-## What changed in this repo this session (not committed/deployed)
+## What changed in this repo this session (committed/deployed)
 
 **PaaSRTSM-project:**
 - `apps/admin-api/src/routes/sync-ada.js` — release the pool connection

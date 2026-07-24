@@ -1,6 +1,6 @@
 # Program State
 
-## 2026-07-24 — Morning sync incident: pg-pool timeout + Render restart, hourglass-forever UI bug found and fixed (not deployed)
+## 2026-07-24 — Morning sync incident: pg-pool timeout + Render restart, hourglass-forever UI bug fixed and deployed
 
 Full account: `INCIDENT_2026-07-24_MORNING_SYNC_HOURGLASS.md`. Short version:
 the 08:20 simultaneous-branch burst hit the same DB-CPU-saturation pattern as
@@ -17,7 +17,7 @@ succeeded with `records_sent=16390` after local log
 `C:\Users\Administrator\Desktop\RxAuu`; branch `000`'s actual path is
 `C:\Users\Administrator\Desktop\Stockdays\SC-StockDay-Ordering`.
 
-Two real, tested, not-yet-deployed fixes came out of the code review:
+Two real, tested fixes came out of the code review and were deployed:
 1. **`sync-ada.js` `/sales` was holding a pool connection open for the full
    duration of the CRM mirror HTTP call**, after its own DB transaction had
    already committed — a multiplier on the pool-exhaustion pattern during
@@ -38,6 +38,16 @@ branch-stock) and confirming the clean rerun (`1826`) is the expected recovery
 shape. This was already an explicit "do not do without an operator decision"
 gate (see the 2026-07-22 canary entry below) — today's incident is evidence
 for revisiting that decision, not a reason to do it unilaterally.
+
+Deployment completed:
+- Backend `PaaSRTSM-project` commit `b69087f`, Render deploy
+  `dep-d9hfblrtqb8s739fp5c0`, status `live`.
+- Admin web `SC-StockDay-Ordering` commit `cc319dc`, Render deploy
+  `dep-d9hfarj7uimc73dllcpg`, status `live`.
+- Post-deploy smoke: `/admin/health` returned 200, `/api/sync/nightly-log`
+  returned the expected authenticated 401 from a no-cookie terminal request,
+  frontend live bundle contains `sl-stale`, and production DB still shows
+  success rows for all five branches.
 
 ## 2026-07-20 — MA-001 corrected: branch 000's real production path found, self-update deployed and proven under SYSTEM, task cutover + legacy quarantine complete
 
