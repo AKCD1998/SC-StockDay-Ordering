@@ -7261,6 +7261,7 @@ function syncLogStatusIcon(status) {
   if (status === "success") return { icon: "✅", label: "สำเร็จ",              cls: "sl-success" };
   if (status === "failed")  return { icon: "❌", label: "ล้มเหลว",             cls: "sl-failed"  };
   if (status === "running") return { icon: "⏳", label: "กำลังรัน",            cls: "sl-running" };
+  if (status === "stale")   return { icon: "⚠️", label: "ค้าง (ไม่จบใน 1 ชม.)", cls: "sl-stale"   };
   if (status === "pending") return { icon: "🌙", label: "รอคืนนี้",            cls: "sl-pending" };
   if (status === "waiting") return { icon: "🕐", label: "รอ sync ชั่วโมงนี้",  cls: "sl-pending" };
   if (status === "offline") return { icon: "💤", label: "ปิดเครื่อง",          cls: "sl-offline" };
@@ -7563,6 +7564,7 @@ function NightlySyncGrid({ days, refreshKey, onUnauthorized }) {
         {[
           { icon: "✅", label: "สำเร็จ" },
           { icon: "❌", label: "ล้มเหลว (laptop เปิด แต่ sync error)" },
+          { icon: "⚠️", label: "ค้าง (เริ่มมากกว่า 1 ชม. ที่แล้ว ไม่จบ — น่าจะถูกขัดจังหวะ)" },
           { icon: "💤", label: "ปิดเครื่อง (ไม่มี heartbeat)" },
           { icon: "🌙", label: "วันนี้ — รอ sync คืนนี้" },
         ].map(({ icon, label }) => (

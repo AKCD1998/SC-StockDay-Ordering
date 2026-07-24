@@ -1,5 +1,44 @@
 # Program State
 
+## 2026-07-24 — Morning sync incident: pg-pool timeout + Render restart, hourglass-forever UI bug found and fixed (not deployed)
+
+Full account: `INCIDENT_2026-07-24_MORNING_SYNC_HOURGLASS.md`. Short version:
+the 08:20 simultaneous-branch burst hit the same DB-CPU-saturation pattern as
+the 2026-07-15 outage (`pg-pool` `connectionTimeoutMillis` exceeded, Render
+restarted the API instance, and several runs were orphaned at
+`status='running'`). Production DB was queried read-only after manual
+recovery: `001` rerun `1824` succeeded with `records_sent=23158`, `003`
+rerun `1823` succeeded with `records_sent=22098`, `004` rerun `1826`
+succeeded with `records_sent=25271` and 67/67 CP4 batches applied, `005`
+rerun `1825` succeeded with `records_sent=17944`, and `000` rerun `1827`
+succeeded with `records_sent=16390` after local log
+`sync-20260724-115332.log` ended with `Sync succeeded` at `11:57:03`. Branch
+`004`'s actual SERVER004 repo path is
+`C:\Users\Administrator\Desktop\RxAuu`; branch `000`'s actual path is
+`C:\Users\Administrator\Desktop\Stockdays\SC-StockDay-Ordering`.
+
+Two real, tested, not-yet-deployed fixes came out of the code review:
+1. **`sync-ada.js` `/sales` was holding a pool connection open for the full
+   duration of the CRM mirror HTTP call**, after its own DB transaction had
+   already committed — a multiplier on the pool-exhaustion pattern during
+   exactly the burst window that matters. Fixed: release before the mirror
+   call. 3 new tests (this route file had zero prior coverage).
+2. **`nightly-log`/`hourly-log` showed a perpetual hourglass for any run
+   stuck at `status='running'`**, indistinguishable from a run genuinely
+   still in progress. Fixed: a run past `STALE_RUN_MINUTES` (60) with no
+   success/failure yet that day now shows a distinct `'stale'` status (⚠️ in
+   admin-web) instead. Verified against a real throwaway local Postgres 18
+   cluster with fixture rows shaped like today's incident (no test harness
+   exists yet for raw-SQL route logic, so this wasn't an automated test — see
+   the incident doc).
+
+**Not done, flagged as the real structural fix**: expand async ingestion only
+after reviewing branch `004`'s first failed CP4 run (`1820`, HTTP 502 during
+branch-stock) and confirming the clean rerun (`1826`) is the expected recovery
+shape. This was already an explicit "do not do without an operator decision"
+gate (see the 2026-07-22 canary entry below) — today's incident is evidence
+for revisiting that decision, not a reason to do it unilaterally.
+
 ## 2026-07-20 — MA-001 corrected: branch 000's real production path found, self-update deployed and proven under SYSTEM, task cutover + legacy quarantine complete
 
 The 2026-07-15 resolution of MA-001 (below) identified
@@ -750,6 +789,34 @@ set-based rewrite (CP3.1) in parallel, since both reduce DB CPU load
 directly — more impactful right now than the Task Scheduler/fleet-version
 cleanup (CP1.1/1.2), which are still needed but don't address the CPU
 ceiling by themselves.
+
+---
+
+## 2026-07-22 — CP4 peak canary on branch 004 passed; all Morning branches succeeded
+
+Durable restart note: see
+[`SESSION_2026-07-22_CP4_PEAK_CANARY.md`](./SESSION_2026-07-22_CP4_PEAK_CANARY.md).
+
+Production DB was queried read-only at approximately 08:50 ICT. Branches
+`000`, `001`, `003`, `004`, and `005` all reached terminal success. Branch
+`004` run `1792` was the first observed CP4 run under the normal simultaneous
+Morning peak: 18,666 records end to end, 6,603 branch-stock records, 67/67
+batches applied, zero retry, zero pending/dead-letter, and 10m47s total versus
+15m20s for the near-equal-volume v1 Morning run on 2026-07-21. Treat this as a
+passed peak canary with a one-day causality caveat; the v1 peers were also
+roughly 10–13% faster that day.
+
+CP4 is production-active on branch `004` and was merged via agent commit
+`afcfdd8` and backend commit `063b5be`; older notes describing CP4 as
+local-only are stale. Do not expand CP4 to another branch without an explicit
+rollout decision.
+
+Separate unresolved issue: `001`, `003`, and `004` omit
+`branch_stock_history`, while the Evening skip endpoint specifically requires
+a successful run message containing that tag. This caused/causes redundant
+19:20 full syncs and is not a CP4 failure. Changing `.env` after Morning does
+not retroactively tag that Morning run. See the session note for remediation
+options and the branch-004 rollback procedure.
 
 ---
 

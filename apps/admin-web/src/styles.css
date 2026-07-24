@@ -5223,6 +5223,7 @@ input[type="radio"] {
 .sl-success { background: rgba(0,  180, 100, 0.08); }
 .sl-failed  { background: rgba(220, 40,  60,  0.08); }
 .sl-running { background: rgba(240,160,  20,  0.10); }
+.sl-stale   { background: rgba(220, 90,  20,  0.14); }
 .sl-pending { background: rgba(100,140, 200, 0.07); }
 .sl-offline { background: transparent; opacity: 0.5; }
 .sl-unknown { background: transparent; opacity: 0.3; }
@@ -5255,6 +5256,7 @@ input[type="radio"] {
 [data-theme="dark"] .sl-success { background: rgba(0,  200, 120, 0.10); }
 [data-theme="dark"] .sl-failed  { background: rgba(240, 50,  70,  0.12); }
 [data-theme="dark"] .sl-running { background: rgba(240,175,  30,  0.12); }
+[data-theme="dark"] .sl-stale   { background: rgba(230,110,  30,  0.16); }
 [data-theme="dark"] .sl-pending { background: rgba(100,160, 240, 0.08); }
 
 /* Hourly grid — narrower hour columns */
