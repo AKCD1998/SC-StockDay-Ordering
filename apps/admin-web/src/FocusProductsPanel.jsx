@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, Fragment } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from "react";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
@@ -1142,7 +1142,7 @@ function FocusLinePackageModal({ rowsByType, selectedMonth, year, csrfToken, res
 
 // Mirrors the source Excel's "สินค้าโฟกัส เดือน ..." layout: one column per
 // branch instead of a combined chip cell, person name and target up front.
-function SalespersonFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
+function SalespersonFocusTable({ rows, isAdminUser, onEdit, onDelete, staffHireDateByStaffId }) {
   const branchCodes = useMemo(() => {
     const codes = new Set();
     for (const row of rows) {
@@ -1150,6 +1150,21 @@ function SalespersonFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
     }
     return [...codes].sort();
   }, [rows]);
+
+  // Seniority order: earliest hire_date first. Staff with no hire_date on
+  // record yet (never entered, or the row has no assignedStaffId) sort last
+  // rather than being mistaken for the earliest hire.
+  const sortedRows = useMemo(() => {
+    const hireDateFor = (row) => (row.assignedStaffId && staffHireDateByStaffId?.get(row.assignedStaffId)) || null;
+    return [...rows].sort((a, b) => {
+      const dateA = hireDateFor(a);
+      const dateB = hireDateFor(b);
+      if (dateA && dateB) return dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
+      if (dateA) return -1;
+      if (dateB) return 1;
+      return 0;
+    });
+  }, [rows, staffHireDateByStaffId]);
 
   return (
     <div className="mvt-sales-table-wrap">
@@ -1176,7 +1191,7 @@ function SalespersonFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
+          {sortedRows.map((row, index) => (
             <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
               <td>{index + 1}</td>
               <td>{row.assignedPersonName || "-"}</td>
@@ -1626,9 +1641,17 @@ function GroupManagerFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
   );
 }
 
-function FocusSectionTable({ type, typeRows, isAdminUser, onEdit, onDelete, restrictToBranch }) {
+function FocusSectionTable({ type, typeRows, isAdminUser, onEdit, onDelete, restrictToBranch, staffHireDateByStaffId }) {
   if (type === "salesperson") {
-    return <SalespersonFocusTable rows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />;
+    return (
+      <SalespersonFocusTable
+        rows={typeRows}
+        isAdminUser={isAdminUser}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        staffHireDateByStaffId={staffHireDateByStaffId}
+      />
+    );
   }
   if (type === "pharmacist" || type === "store_manager") {
     return (
@@ -1647,7 +1670,7 @@ function FocusSectionTable({ type, typeRows, isAdminUser, onEdit, onDelete, rest
   return <GenericFocusTable typeRows={typeRows} isAdminUser={isAdminUser} onEdit={onEdit} onDelete={onDelete} />;
 }
 
-function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBranch }) {
+function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBranch, staffHireDateByStaffId }) {
   const [expandedType, setExpandedType] = useState(null);
 
   const grouped = useMemo(() => {
@@ -1681,6 +1704,7 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBr
               onEdit={onEdit}
               onDelete={onDelete}
               restrictToBranch={restrictToBranch}
+              staffHireDateByStaffId={staffHireDateByStaffId}
             />
           </section>
         );
@@ -1703,6 +1727,7 @@ function FocusProductsTables({ rows, isAdminUser, onEdit, onDelete, restrictToBr
               onEdit={onEdit}
               onDelete={onDelete}
               restrictToBranch={restrictToBranch}
+              staffHireDateByStaffId={staffHireDateByStaffId}
             />
           </div>
         </div>
@@ -3123,6 +3148,115 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   );
 }
 
+// Lets admins record each staff member's hire date, which drives the
+// โฟกัสรายคน table's seniority ordering (earliest hire first) instead of a
+// hardcoded order — next time someone new joins, entering their date here is
+// enough for them to slot into the right place automatically.
+function StaffManagementModal({ staff, csrfToken, onClose, onSaved }) {
+  const [drafts, setDrafts] = useState(() => {
+    const map = {};
+    for (const person of staff) map[person.staffId] = person.hireDate || "";
+    return map;
+  });
+  const [savingId, setSavingId] = useState(null);
+  const [savedId, setSavedId] = useState(null);
+  const [errorByStaffId, setErrorByStaffId] = useState({});
+
+  const staffByBranch = useMemo(() => {
+    const map = new Map();
+    for (const person of staff) {
+      if (!map.has(person.branchCode)) map.set(person.branchCode, []);
+      map.get(person.branchCode).push(person);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => (a.hireDate || "9999-99-99").localeCompare(b.hireDate || "9999-99-99") || a.displayName.localeCompare(b.displayName));
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [staff]);
+
+  async function saveHireDate(person) {
+    setSavingId(person.staffId);
+    setSavedId(null);
+    setErrorByStaffId((prev) => ({ ...prev, [person.staffId]: null }));
+    try {
+      const res = await apiFetch(`/api/admin/branch-staff/${person.staffId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
+        body: JSON.stringify({ hireDate: drafts[person.staffId] || null }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || body.message || `HTTP ${res.status}`);
+      setSavedId(person.staffId);
+      onSaved();
+    } catch (error) {
+      setErrorByStaffId((prev) => ({ ...prev, [person.staffId]: error.message || "บันทึกไม่สำเร็จ" }));
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  return (
+    <div className="fp-modal-overlay" onClick={onClose}>
+      <div className="fp-modal fp-staff-manager-modal" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="fp-table-modal-close" onClick={onClose} aria-label="ปิด">✕</button>
+        <h3>จัดการพนักงาน — วันที่เข้างาน</h3>
+        <p className="fp-staff-manager-hint">
+          ตารางโฟกัสรายคนจะเรียงลำดับจากคนที่เข้างานก่อนไปหลังตามวันที่นี้ ใครยังไม่กรอกจะอยู่ท้ายสุด
+        </p>
+        {staffByBranch.length === 0 && <div className="fp-empty">ยังไม่มีข้อมูลพนักงาน</div>}
+        {staffByBranch.map(([branch, people]) => (
+          <div key={branch} className="fp-staff-manager-branch">
+            <h4>{BRANCH_LABELS[branch] || `สาขา ${branch}`}</h4>
+            <table className="fp-staff-manager-table">
+              <thead>
+                <tr>
+                  <th>ชื่อ</th>
+                  <th>ตำแหน่ง</th>
+                  <th>วันที่เข้างาน</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {people.map((person) => (
+                  <tr key={person.staffId}>
+                    <td>
+                      {person.displayName}
+                      {person.isProbationary && <span className="fp-staff-manager-badge">ทดลองงาน</span>}
+                      {!person.isActive && <span className="fp-staff-manager-badge inactive">ปิดใช้งาน</span>}
+                    </td>
+                    <td>{person.role === "sales" ? "พนักงานขาย" : "ผู้จัดการ"}</td>
+                    <td>
+                      <input
+                        type="date"
+                        value={drafts[person.staffId] || ""}
+                        onChange={(e) => setDrafts((prev) => ({ ...prev, [person.staffId]: e.target.value }))}
+                      />
+                    </td>
+                    <td className="fp-staff-manager-actions">
+                      <button
+                        type="button"
+                        className="fp-btn-link"
+                        disabled={savingId === person.staffId}
+                        onClick={() => saveHireDate(person)}
+                      >
+                        {savingId === person.staffId ? "กำลังบันทึก..." : "บันทึก"}
+                      </button>
+                      {savedId === person.staffId && <span className="fp-staff-manager-saved">บันทึกแล้ว</span>}
+                      {errorByStaffId[person.staffId] && (
+                        <span className="fp-staff-manager-error">{errorByStaffId[person.staffId]}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode, onNavigateBack }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -3130,17 +3264,34 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode,
   const [refreshKey, setRefreshKey] = useState(0);
   const [modalState, setModalState] = useState(null); // null | { form, submitting, submitError }
   const [batchModalOpen, setBatchModalOpen] = useState(false);
-  const [salesStaff, setSalesStaff] = useState([]);
+  const [allStaff, setAllStaff] = useState([]);
   const [year, setYear] = useState(2026);
   const [selectedMonth, setSelectedMonth] = useState(null);
   const [linePackageOpen, setLinePackageOpen] = useState(false);
+  const [staffManagerOpen, setStaffManagerOpen] = useState(false);
 
-  useEffect(() => {
+  const reloadStaff = useCallback(() => {
     if (!isAdminUser) return;
     apiFetch("/api/admin/branch-staff").then((response) => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))).then((body) => {
-      setSalesStaff((body.staff || []).filter((staff) => staff.role === "sales" && staff.isActive && BRANCH_CHOICES.includes(staff.branchCode)));
-    }).catch(() => setSalesStaff([]));
+      setAllStaff(body.staff || []);
+    }).catch(() => setAllStaff([]));
   }, [isAdminUser]);
+
+  useEffect(() => {
+    reloadStaff();
+  }, [reloadStaff]);
+
+  // The create/edit form only offers active sales staff in a focus-eligible
+  // branch; the staff management panel and hire-date sort need everyone.
+  const salesStaff = useMemo(
+    () => allStaff.filter((staff) => staff.role === "sales" && staff.isActive && BRANCH_CHOICES.includes(staff.branchCode)),
+    [allStaff],
+  );
+  const staffHireDateByStaffId = useMemo(() => {
+    const map = new Map();
+    for (const staff of allStaff) map.set(staff.staffId, staff.hireDate || null);
+    return map;
+  }, [allStaff]);
 
   useEffect(() => {
     let active = true;
@@ -3359,7 +3510,11 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode,
                   สินค้าโฟกัสเดือน{THAI_MONTH_NAMES[selectedMonth - 1]} {year}
                 </h3>
                 {isAdminUser && (
-                  <div className="fp-month-actions"><button type="button" className="fp-btn-secondary" onClick={openCreateModalForSelectedMonth}>+ เพิ่มทีละสินค้า</button><button type="button" className="fp-btn-primary" onClick={() => setBatchModalOpen(true)}>▦ เพิ่มหลายสินค้าด้วยบาร์โค้ด</button></div>
+                  <div className="fp-month-actions">
+                    <button type="button" className="fp-btn-secondary" onClick={openCreateModalForSelectedMonth}>+ เพิ่มทีละสินค้า</button>
+                    <button type="button" className="fp-btn-primary" onClick={() => setBatchModalOpen(true)}>▦ เพิ่มหลายสินค้าด้วยบาร์โค้ด</button>
+                    <button type="button" className="fp-btn-secondary" onClick={() => setStaffManagerOpen(true)}>👤 จัดการพนักงาน</button>
+                  </div>
                 )}
               </div>
 
@@ -3372,6 +3527,7 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode,
                   onEdit={openEditModal}
                   onDelete={handleDelete}
                   restrictToBranch={!isAdminUser ? branchCode : null}
+                  staffHireDateByStaffId={staffHireDateByStaffId}
                 />
               )}
             </div>
@@ -3408,6 +3564,14 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode,
           salesStaff={salesStaff}
           onCancel={() => setBatchModalOpen(false)}
           onSaved={(count) => { setBatchModalOpen(false); setRefreshKey((value) => value + 1); window.alert(`สร้างสินค้าโฟกัสสำเร็จ ${count} รายการ`); }}
+        />
+      )}
+      {staffManagerOpen && (
+        <StaffManagementModal
+          staff={allStaff}
+          csrfToken={csrfToken}
+          onClose={() => setStaffManagerOpen(false)}
+          onSaved={reloadStaff}
         />
       )}
     </div>

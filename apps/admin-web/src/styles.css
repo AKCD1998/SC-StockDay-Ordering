@@ -8621,6 +8621,64 @@ input[type="radio"] {
   gap: 14px;
 }
 
+.fp-staff-manager-modal {
+  position: relative;
+  width: min(720px, 94vw);
+}
+
+.fp-staff-manager-hint {
+  margin: 0 0 16px;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.fp-staff-manager-branch { margin-bottom: 20px; }
+.fp-staff-manager-branch h4 { margin: 0 0 8px; font-size: 0.95rem; color: #334155; }
+
+.fp-staff-manager-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.fp-staff-manager-table th,
+.fp-staff-manager-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: middle;
+  font-size: 0.9rem;
+}
+
+.fp-staff-manager-table input[type="date"] {
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 3px 6px;
+}
+
+.fp-staff-manager-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  background: #fef3c7;
+  color: #92400e;
+}
+.fp-staff-manager-badge.inactive { background: #fee2e2; color: #991b1b; }
+
+.fp-staff-manager-actions { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.fp-staff-manager-saved { color: #15803d; font-size: 0.82rem; }
+.fp-staff-manager-error { color: #b42318; font-size: 0.82rem; }
+
+[data-theme="dark"] .fp-staff-manager-hint { color: #94a3b8; }
+[data-theme="dark"] .fp-staff-manager-branch h4 { color: #cbd5e1; }
+[data-theme="dark"] .fp-staff-manager-table th,
+[data-theme="dark"] .fp-staff-manager-table td { border-bottom-color: #1e293b; }
+[data-theme="dark"] .fp-staff-manager-badge { background: #4a3413; color: #fde68a; }
+[data-theme="dark"] .fp-staff-manager-badge.inactive { background: #4a1d1d; color: #fda29b; }
+[data-theme="dark"] .fp-staff-manager-saved { color: #6ee7a0; }
+[data-theme="dark"] .fp-staff-manager-error { color: #fda29b; }
+
 .fp-line-package-controls {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(140px, 220px);
