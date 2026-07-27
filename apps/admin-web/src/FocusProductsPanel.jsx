@@ -1353,66 +1353,91 @@ function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete, restrictT
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
-              <td><FocusProductCodes row={row} /></td>
-              <td className="fp-col-wide"><FocusProductNames row={row} />{isAdminUser && <PublicationBadge row={row} />}</td>
-              {branchCodes.map((code, branchIndex) => {
-                const target = row.branchTargetsEffective?.[code];
-                const sold = row.soldByBranch?.[code] || 0;
-                const pass = row.branchAchieved ? row.branchAchieved[code] : null;
-                const cls = pass === null || pass === undefined ? "" : pass ? "fp-cell-ok" : "fp-cell-fail";
-                return (
-                  <Fragment key={code}>
-                    <td className={`fp-target-col fp-branch-group-${branchIndex % 2 === 0 ? "a" : "b"}`}>
-                      {target != null ? formatNumber(target) : "-"}
-                    </td>
-                    <td className={`fp-sold-col fp-branch-group-${branchIndex % 2 === 0 ? "a" : "b"} ${cls}`}>
-                      {formatNumber(sold)}
-                    </td>
-                  </Fragment>
-                );
-              })}
-              <td className="fp-status-col">
-                {/* Staff see only their own branch, so a single verdict is the
-                    honest answer for them; admins see every branch, so a count.
-                    Neither reads row.isFrozen — that flag means "the period
-                    ended and the numbers were locked", NOT "the target was met". */}
-                {restrictToBranch
-                  ? <StatusBadge achieved={row.branchAchieved?.[restrictToBranch] ?? null} />
-                  : <BranchCloseCountBadge row={row} branchCodes={branchCodes} />}
-                {row.isFrozen && (
-                  <span className="fp-frozen-badge" title="ยอดขายถูกล็อกแล้วเมื่อสิ้นสุดช่วงเวลา">
-                    🔒 ปิดยอด
-                  </span>
-                )}
-              </td>
-              {isAdminUser && (
-                <td className="fp-actions-cell">
-                  <button
-                    type="button"
-                    className="fp-btn-link"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit(row);
-                    }}
-                  >
-                    แก้ไข
-                  </button>
-                  <button
-                    type="button"
-                    className="fp-btn-link danger"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(row);
-                    }}
-                  >
-                    ลบ
-                  </button>
+          {rows.map((row) => {
+            // A shared-target group only splits into one row per product when
+            // every product actually carries its own sold-by-branch breakdown.
+            // Rows frozen before that breakdown existed (migration 064) only
+            // have the group's combined total, so they fall back to one merged
+            // row rather than showing wrong/blank per-product numbers.
+            const groupProducts = focusRowProducts(row);
+            const canSplit = groupProducts.length > 1 && groupProducts.every((p) => p.soldByBranch);
+            const productRows = canSplit ? groupProducts : [null];
+            const spanCount = productRows.length;
+
+            return productRows.map((product, productIndex) => (
+              <tr key={product ? `${row.id}-${product.productCode}` : row.id} className={row.isActive === false ? "fp-inactive-row" : ""}>
+                <td>{product ? product.productCode : <FocusProductCodes row={row} />}</td>
+                <td className="fp-col-wide">
+                  {product ? (product.productName || product.productCode) : <FocusProductNames row={row} />}
+                  {isAdminUser && productIndex === 0 && <PublicationBadge row={row} />}
+                  {productIndex === 0 && groupProducts.length > 1 && (
+                    <span
+                      className="fp-shared-target-hint"
+                      title="สินค้าเหล่านี้ใช้เป้าร่วมกัน ขายรสไหน/แบบไหนก็ได้ ขอให้ยอดรวมถึงเป้า"
+                    >
+                      เป้าร่วม {groupProducts.length} รายการ
+                    </span>
+                  )}
                 </td>
-              )}
-            </tr>
-          ))}
+                {branchCodes.map((code, branchIndex) => {
+                  const target = row.branchTargetsEffective?.[code];
+                  const sold = product ? (product.soldByBranch?.[code] || 0) : (row.soldByBranch?.[code] || 0);
+                  const pass = row.branchAchieved ? row.branchAchieved[code] : null;
+                  const cls = pass === null || pass === undefined ? "" : pass ? "fp-cell-ok" : "fp-cell-fail";
+                  return (
+                    <Fragment key={code}>
+                      <td className={`fp-target-col fp-branch-group-${branchIndex % 2 === 0 ? "a" : "b"}`}>
+                        {target != null ? formatNumber(target) : "-"}
+                      </td>
+                      <td className={`fp-sold-col fp-branch-group-${branchIndex % 2 === 0 ? "a" : "b"} ${cls}`}>
+                        {formatNumber(sold)}
+                      </td>
+                    </Fragment>
+                  );
+                })}
+                {productIndex === 0 && (
+                  <td className="fp-status-col" rowSpan={spanCount}>
+                    {/* Staff see only their own branch, so a single verdict is the
+                        honest answer for them; admins see every branch, so a count.
+                        Neither reads row.isFrozen — that flag means "the period
+                        ended and the numbers were locked", NOT "the target was met". */}
+                    {restrictToBranch
+                      ? <StatusBadge achieved={row.branchAchieved?.[restrictToBranch] ?? null} />
+                      : <BranchCloseCountBadge row={row} branchCodes={branchCodes} />}
+                    {row.isFrozen && (
+                      <span className="fp-frozen-badge" title="ยอดขายถูกล็อกแล้วเมื่อสิ้นสุดช่วงเวลา">
+                        🔒 ปิดยอด
+                      </span>
+                    )}
+                  </td>
+                )}
+                {isAdminUser && productIndex === 0 && (
+                  <td className="fp-actions-cell" rowSpan={spanCount}>
+                    <button
+                      type="button"
+                      className="fp-btn-link"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit(row);
+                      }}
+                    >
+                      แก้ไข
+                    </button>
+                    <button
+                      type="button"
+                      className="fp-btn-link danger"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(row);
+                      }}
+                    >
+                      ลบ
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ));
+          })}
         </tbody>
       </table>
     </div>
