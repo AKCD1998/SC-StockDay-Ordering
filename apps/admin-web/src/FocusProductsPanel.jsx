@@ -1155,7 +1155,9 @@ function SalespersonFocusTable({ rows, isAdminUser, onEdit, onDelete, staffHireD
   // record yet (never entered, or the row has no assignedStaffId) sort last
   // rather than being mistaken for the earliest hire.
   const sortedRows = useMemo(() => {
-    const hireDateFor = (row) => (row.assignedStaffId && staffHireDateByStaffId?.get(row.assignedStaffId)) || null;
+    const hireDateFor = (row) => row.assignedStaffHireDate
+      || (row.assignedStaffId && staffHireDateByStaffId?.get(row.assignedStaffId))
+      || null;
     return [...rows].sort((a, b) => {
       const dateA = hireDateFor(a);
       const dateB = hireDateFor(b);
