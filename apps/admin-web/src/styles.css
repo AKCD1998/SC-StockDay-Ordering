@@ -8065,6 +8065,12 @@ input[type="radio"] {
   font-variant-numeric: tabular-nums;
 }
 
+/* Shared-target IC rows merge this cell with rowSpan — center it in the
+   merged block instead of inheriting the table's default top alignment. */
+.fp-branch-matrix td.fp-target-col[rowspan] {
+  vertical-align: middle;
+}
+
 .fp-branch-matrix .fp-sold-col {
   text-align: center;
   color: #172554;
