@@ -49,7 +49,8 @@ button {
 .topbar,
 .branch-stock-panel,
 .fp-panel,
-.srq-panel {
+.srq-panel,
+.stock-recommendations-panel {
   width: 97vw;
   max-width: 97vw;
   margin-left: calc(50% - 48.5vw);
