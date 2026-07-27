@@ -1386,9 +1386,11 @@ function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete, restrictT
                   const cls = pass === null || pass === undefined ? "" : pass ? "fp-cell-ok" : "fp-cell-fail";
                   return (
                     <Fragment key={code}>
-                      <td className={`fp-target-col fp-branch-group-${branchIndex % 2 === 0 ? "a" : "b"}`}>
-                        {target != null ? formatNumber(target) : "-"}
-                      </td>
+                      {productIndex === 0 && (
+                        <td className={`fp-target-col fp-branch-group-${branchIndex % 2 === 0 ? "a" : "b"}`} rowSpan={spanCount}>
+                          {target != null ? formatNumber(target) : "-"}
+                        </td>
+                      )}
                       <td className={`fp-sold-col fp-branch-group-${branchIndex % 2 === 0 ? "a" : "b"} ${cls}`}>
                         {formatNumber(sold)}
                       </td>
