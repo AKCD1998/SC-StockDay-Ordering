@@ -1185,15 +1185,15 @@ function LoginScreen({ authError, busy, username, password, onUsernameChange, on
   return (
     <div className="page auth-page">
       <section className="auth-shell">
-        <div className="auth-copy">
+        <div className="auth-hero">
           <div className="auth-logo-lockup">
             <AuthLogoMark />
             <span className="auth-logo-text">SC StockDay</span>
           </div>
           <span className="auth-headline-accent" aria-hidden="true" />
           <h1>ศูนย์ควบคุม Stock Day</h1>
-          <p>
-            เข้าสู่ระบบด้วยบัญชีผู้ดูแลเพื่อติดตาม KPI สต็อก
+          <p className="auth-hero-body">
+            เข้าสู่ระบบด้วยบัญชีผู้ดูแลเพื่อดูสถานะการจัดทำ KPI สต็อก
             และคำแนะนำสินค้า จากสาขา ผ่าน backend กลาง
           </p>
         </div>
@@ -1246,10 +1246,11 @@ function LoginScreen({ authError, busy, username, password, onUsernameChange, on
           <label className="auth-remember">
             <input
               type="checkbox"
+              className="auth-checkbox"
               checked={rememberMe}
               onChange={(event) => setRememberMe(event.target.checked)}
             />
-            จำการเข้าสู่ระบบ
+            จดจำการเข้าสู่ระบบ
           </label>
 
           {authError && <div className="notice error compact">{authError}</div>}
@@ -1258,7 +1259,10 @@ function LoginScreen({ authError, busy, username, password, onUsernameChange, on
             {busy ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
           </button>
 
-          <div className="auth-footer">© SC StockDay {new Date().getFullYear()}</div>
+          <div className="auth-footer">
+            <span className="auth-divider" aria-hidden="true" />
+            <span className="auth-copyright">© SC StockDay 2024</span>
+          </div>
         </form>
       </section>
     </div>
