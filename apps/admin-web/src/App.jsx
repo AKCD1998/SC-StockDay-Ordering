@@ -1183,7 +1183,7 @@ function LoginScreen({ authError, busy, username, password, onUsernameChange, on
   const [rememberMe, setRememberMe] = useState(false);
 
   return (
-    <div className="page auth-page">
+    <div className="auth-page">
       <section className="auth-shell">
         <div className="auth-hero">
           <div className="auth-logo-lockup">

@@ -114,10 +114,13 @@ button {
 
 .auth-shell {
   width: 100%;
-  max-width: 1373px;
+  /* Scale with the viewport instead of freezing at the spec's measured
+     1373px — on large monitors a hard cap left the whole login screen
+     stranded as a small block in a sea of empty background. */
+  max-width: min(1760px, 92vw);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 521px;
-  column-gap: 64px;
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 620px);
+  column-gap: clamp(40px, 5vw, 96px);
   align-items: center;
   justify-content: center;
   animation: auth-fade-in 300ms ease-out;
@@ -177,7 +180,7 @@ button {
 
 .auth-hero-body {
   margin: 0;
-  max-width: 450px;
+  max-width: min(560px, 90%);
   font-size: 16px;
   font-weight: 400;
   line-height: 1.6;
@@ -187,7 +190,7 @@ button {
 /* ---------------- Right panel — LoginCard ----------------------------- */
 .auth-card {
   width: 100%;
-  max-width: 521px;
+  max-width: 620px;
   margin: 0 auto;
   padding: var(--auth-space-5);
   display: grid;
