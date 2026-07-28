@@ -387,6 +387,84 @@ button {
   min-height: 42px;
 }
 
+.stockrec-generated-at {
+  margin-top: 8px;
+  color: #7c8a9a;
+  font-size: 0.85rem;
+}
+
+/* Branch-stock-style pivoted table: one row per product, one quantity column
+   per branch, with a subtle tint per cell showing that branch's recommended
+   action — matches the real branch-stock table's plain <table> look (shared
+   base `table`/`th`/`td` rule) while layering the recommendation signal on
+   top, so the two pages stay visually comparable. */
+.stockrec-row {
+  cursor: pointer;
+}
+
+.stockrec-row:hover {
+  background: #f5f9fe;
+}
+
+.stockrec-row.expanded {
+  background: #eef6ff;
+}
+
+.stockrec-branch-cell {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.stockrec-branch-cell.tone-transfer {
+  background: #d8e9ff;
+  color: #1d4f91;
+}
+
+.stockrec-branch-cell.tone-purchase {
+  background: #ffe2cc;
+  color: #9a4a15;
+}
+
+.stockrec-branch-cell.tone-slow,
+.stockrec-branch-cell.tone-neutral {
+  background: #e9eef3;
+  color: #496175;
+}
+
+.stockrec-total-cell {
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.stockrec-expand-row td {
+  background: #fbfdff;
+  white-space: normal;
+  cursor: default;
+}
+
+.stockrec-expand-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+  padding: 6px 0;
+}
+
+.stockrec-expand-branch {
+  border: 1px solid #e6ebf2;
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: #ffffff;
+}
+
+.stockrec-expand-branch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
 .movement-panel {
   display: grid;
   gap: 18px;
@@ -4997,6 +5075,43 @@ input[type="radio"] {
 
 [data-theme="dark"] .stock-recommendation-detail-grid > div,
 [data-theme="dark"] .stock-recommendation-donor-list {
+  border-color: #223549;
+  background: #101b2a;
+}
+
+[data-theme="dark"] .stockrec-generated-at {
+  color: #7c8a9a;
+}
+
+[data-theme="dark"] .stockrec-row:hover {
+  background: #14202f;
+}
+
+[data-theme="dark"] .stockrec-row.expanded {
+  background: #16283d;
+}
+
+[data-theme="dark"] .stockrec-branch-cell.tone-transfer {
+  background: rgba(62, 115, 204, 0.2);
+  color: #9ac2ff;
+}
+
+[data-theme="dark"] .stockrec-branch-cell.tone-purchase {
+  background: rgba(182, 94, 23, 0.22);
+  color: #ffc48a;
+}
+
+[data-theme="dark"] .stockrec-branch-cell.tone-slow,
+[data-theme="dark"] .stockrec-branch-cell.tone-neutral {
+  background: rgba(70, 88, 108, 0.28);
+  color: #a8bbcf;
+}
+
+[data-theme="dark"] .stockrec-expand-row td {
+  background: #0d1623;
+}
+
+[data-theme="dark"] .stockrec-expand-branch {
   border-color: #223549;
   background: #101b2a;
 }

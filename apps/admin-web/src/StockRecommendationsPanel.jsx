@@ -102,6 +102,45 @@ function getScopeLabel(scopeBranchCode, isAdminUser, branchCode) {
   return `สาขา ${scopeBranchCode}`;
 }
 
+// One branch's full recommendation detail, reused for every branch that
+// actually needs attention inside an expanded product row.
+function BranchRecommendationDetail({ branch }) {
+  return (
+    <div className="stockrec-expand-branch">
+      <div className="stockrec-expand-branch-header">
+        <strong>สาขา {branch.branchCode}</strong>
+        <span className={`stock-recommendation-badge tone-${actionTone(branch.action)}`}>
+          {ACTION_LABELS[branch.action] || branch.action}
+        </span>
+      </div>
+      <div className="stock-recommendation-detail-grid">
+        <div><span>มีอยู่</span><strong>{formatNumber(branch.currentStock)}</strong></div>
+        <div><span>incoming</span><strong>{formatNumber(branch.incomingPoAllocationQty)}</strong></div>
+        <div><span>เป้าหมาย</span><strong>{formatNumber(branch.targetQty)}</strong></div>
+        <div><span>effective cover</span><strong>{formatNumber(branch.effectiveDaysCover, 1)}</strong></div>
+        <div><span>ยอดขาย 30 วัน</span><strong>{formatNumber(branch.soldQty30d)}</strong></div>
+        <div><span>ยอดขาย 90 วัน</span><strong>{formatNumber(branch.soldQty90d)}</strong></div>
+        <div><span>แนะนำขอ</span><strong>{formatNumber(branch.transferPlanQty)}</strong></div>
+        <div><span>แนะนำซื้อ</span><strong>{formatNumber(branch.purchaseQty)}</strong></div>
+      </div>
+      <p><strong>เหตุผล:</strong> {branch.reason || "-"}</p>
+      {Array.isArray(branch.donors) && branch.donors.length > 0 ? (
+        <div className="stock-recommendation-donor-list">
+          <strong>donor ที่ระบบเสนอ</strong>
+          {branch.donors.map((donor) => (
+            <div key={`${donor.branchCode}-${donor.qty ?? donor.availableQty}`} className="stock-recommendation-donor-item">
+              <span>{donor.branchName || `สาขา ${donor.branchCode}`}</span>
+              <span>{formatNumber(donor.qty ?? donor.availableQty)} หน่วย</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p><strong>donor หลัก:</strong> {branch.primarySuggestedDonorBranchCode || "-"}</p>
+      )}
+    </div>
+  );
+}
+
 export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
   const [scopeBranchCode, setScopeBranchCode] = useState(isAdminUser ? "all" : branchCode || "");
   const [searchInput, setSearchInput] = useState("");
@@ -113,9 +152,9 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
   const [loading, setLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedRow, setSelectedRow] = useState(null);
-  const [detail, setDetail] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
+  const [expandedProductCode, setExpandedProductCode] = useState(null);
+  const [generatedAt, setGeneratedAt] = useState(null);
+  const [targetDays, setTargetDays] = useState(90);
   const [pagination, setPagination] = useState({
     page: 1,
     pageSize: DEFAULT_PAGE_SIZE,
@@ -148,12 +187,14 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
         if (search.trim()) params.set("search", search.trim());
         if (action) params.set("action", action);
 
-        const listRes = await apiFetch(`/api/admin/stock-recommendations?${params.toString()}`);
+        const listRes = await apiFetch(`/api/admin/stock-recommendations/by-product?${params.toString()}`);
 
         const listData = await listRes.json().catch(() => ({}));
         if (!listRes.ok) throw new Error(listData.error || listData.message || `HTTP ${listRes.status}`);
         if (!active) return;
         setRows(Array.isArray(listData.rows) ? listData.rows : []);
+        setGeneratedAt(listData.generatedAt || null);
+        setTargetDays(Number(listData.targetDays || 90));
         setPagination({
           page: Number(listData.pagination?.page || pagination.page || 1),
           pageSize: Number(listData.pagination?.pageSize || pagination.pageSize || DEFAULT_PAGE_SIZE),
@@ -198,53 +239,23 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
     };
   }, [branchCode, isAdminUser, scopeBranchCode]);
 
-  useEffect(() => {
-    if (!selectedRow) {
-      setDetail(null);
-      return undefined;
-    }
-    let active = true;
-    async function loadDetail() {
-      try {
-        setDetailLoading(true);
-        const response = await apiFetch(
-          `/api/admin/stock-recommendations/${encodeURIComponent(selectedRow.branchCode)}/${encodeURIComponent(selectedRow.productCode)}`,
-        );
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.error || data.message || `HTTP ${response.status}`);
-        if (!active) return;
-        setDetail(data.recommendation || null);
-      } catch (_error) {
-        if (!active) return;
-        setDetail(null);
-      } finally {
-        if (active) setDetailLoading(false);
-      }
-    }
-    loadDetail();
-    return () => {
-      active = false;
-    };
-  }, [selectedRow]);
-
+  // The product row's branches[] already carries every field an expanded
+  // section needs (reason, donors, etc.) — no per-row detail fetch, unlike
+  // the old per-(branch,product) card view.
   useEffect(() => {
     if (!rows.length) {
-      setSelectedRow(null);
+      setExpandedProductCode(null);
       return;
     }
+    if (expandedProductCode && !rows.some((row) => row.productCode === expandedProductCode)) {
+      setExpandedProductCode(null);
+    }
+  }, [rows, expandedProductCode]);
 
-    setSelectedRow((current) => {
-      if (!current) return rows[0];
-      const matched = rows.find(
-        (row) => row.branchCode === current.branchCode && row.productCode === current.productCode,
-      );
-      return matched || rows[0];
-    });
-  }, [rows]);
+  const branchColumns = useMemo(() => (isAdminUser ? BRANCH_OPTIONS : BRANCH_OPTIONS.filter((code) => code === branchCode)), [branchCode, isAdminUser]);
+  const columnCount = 4 + branchColumns.length + 2; // name, code, barcode, unit + branches + total + eng name
 
   const scopeLabel = getScopeLabel(scopeBranchCode, isAdminUser, branchCode);
-  const targetDays = detail?.targetDays || rows[0]?.targetDays || 90;
-  const selectedRecommendation = detail || selectedRow;
   const totalPages = Math.max(1, Math.ceil((pagination.total || 0) / (pagination.pageSize || DEFAULT_PAGE_SIZE)));
   const currentPage = Math.min(totalPages, Math.max(1, pagination.page || 1));
   const rangeStart = pagination.total === 0 ? 0 : (currentPage - 1) * (pagination.pageSize || DEFAULT_PAGE_SIZE) + 1;
@@ -254,6 +265,10 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
   function handleSearchSubmit(event) {
     event.preventDefault();
     setSearch(searchInput.trim());
+  }
+
+  function toggleExpanded(productCode) {
+    setExpandedProductCode((current) => (current === productCode ? null : productCode));
   }
 
   return (
@@ -355,98 +370,69 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
         ) : null}
 
         {(rows.length > 0 || loading) ? (
-          <div className="stock-recommendations-layout">
-            <div className="stock-recommendations-list">
-              {rows.map((row) => {
-                const isSelected =
-                  selectedRow?.branchCode === row.branchCode &&
-                  selectedRow?.productCode === row.productCode;
-                return (
-                  <button
-                    type="button"
-                    key={`${row.branchCode}-${row.productCode}`}
-                    className={`stock-recommendation-row-card${isSelected ? " selected" : ""}`}
-                    onClick={() => setSelectedRow(row)}
-                    disabled={loading}
-                  >
-                    <div className="stock-recommendation-row-top">
-                      <div>
-                        <strong>{row.productNameThai || row.productNameEng || row.productCode}</strong>
-                        <div className="meta-line">{row.productCode} · {scopeBranchCode === "all" ? `สาขา ${row.branchCode}` : scopeLabel}</div>
-                      </div>
-                      <span className={`stock-recommendation-badge tone-${actionTone(row.action)}`}>
-                        {ACTION_LABELS[row.action] || row.action}
-                      </span>
-                    </div>
-                    <div className="stock-recommendation-row-metrics">
-                      <span>มี {formatNumber(row.currentStock)}</span>
-                      <span>เป้า {formatNumber(row.targetQty)}</span>
-                      <span>cover {formatNumber(row.currentDaysCover, 1)} วัน</span>
-                      <span>priority {formatNumber(row.priorityScore, 0)}</span>
-                    </div>
-                    <div className="stock-recommendation-row-plan">
-                      <span>ขอจากสาขาอื่น {formatNumber(row.transferPlanQty)}</span>
-                      <span>ซื้อเพิ่ม {formatNumber(row.purchaseQty)}</span>
-                      {row.primarySuggestedDonorBranchCode ? (
-                        <span>donor หลัก {row.primarySuggestedDonorBranchCode}</span>
-                      ) : (
-                        <span>donor หลัก -</span>
-                      )}
-                    </div>
-                    <p className="stock-recommendation-row-reason">
-                      {row.recommendationReason || row.reason || "-"}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-
-            <aside className="stock-recommendation-detail-card">
-              {!selectedRow ? (
-                <p className="subtle">เลือก SKU จากคิวด้านซ้ายเพื่อดูรายละเอียด recommendation และ donor plan</p>
-              ) : detailLoading ? (
-                <p className="subtle">กำลังโหลดรายละเอียด...</p>
-              ) : selectedRecommendation ? (
-                <>
-                  <div className="stock-recommendation-detail-header">
-                    <div>
-                      <h3>{selectedRecommendation.productNameThai || selectedRecommendation.productNameEng || selectedRecommendation.productCode}</h3>
-                      <p className="subtle">{selectedRecommendation.productCode} · สาขา {selectedRecommendation.branchCode}</p>
-                    </div>
-                    <span className={`stock-recommendation-badge tone-${actionTone(selectedRecommendation.action)}`}>
-                      {ACTION_LABELS[selectedRecommendation.action] || selectedRecommendation.action}
-                    </span>
-                  </div>
-                  <div className="stock-recommendation-detail-grid">
-                    <div><span>มีอยู่</span><strong>{formatNumber(selectedRecommendation.currentStock)}</strong></div>
-                    <div><span>incoming</span><strong>{formatNumber(selectedRecommendation.incomingPoAllocationQty)}</strong></div>
-                    <div><span>เป้าหมาย</span><strong>{formatNumber(selectedRecommendation.targetQty)}</strong></div>
-                    <div><span>effective cover</span><strong>{formatNumber(selectedRecommendation.effectiveDaysCover, 1)}</strong></div>
-                    <div><span>ยอดขาย 30 วัน</span><strong>{formatNumber(selectedRecommendation.soldQty30d)}</strong></div>
-                    <div><span>ยอดขาย 90 วัน</span><strong>{formatNumber(selectedRecommendation.soldQty90d)}</strong></div>
-                    <div><span>แนะนำขอ</span><strong>{formatNumber(selectedRecommendation.transferPlanQty)}</strong></div>
-                    <div><span>แนะนำซื้อ</span><strong>{formatNumber(selectedRecommendation.purchaseQty)}</strong></div>
-                  </div>
-                  <p><strong>เหตุผล:</strong> {selectedRecommendation.recommendationReason || selectedRecommendation.reason || "-"}</p>
-                  {Array.isArray(detail?.donors) && detail.donors.length > 0 ? (
-                    <div className="stock-recommendation-donor-list">
-                      <strong>donor ที่ระบบเสนอ</strong>
-                      {detail.donors.map((donor) => (
-                        <div key={`${donor.branchCode}-${donor.qty || donor.availableQty}`} className="stock-recommendation-donor-item">
-                          <span>{donor.branchName || `สาขา ${donor.branchCode}`}</span>
-                          <span>{formatNumber(donor.qty ?? donor.availableQty)} หน่วย</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p><strong>donor หลัก:</strong> {selectedRecommendation.primarySuggestedDonorBranchCode || "-"}</p>
-                  )}
-                  <p><strong>อัปเดตจาก backend:</strong> {formatDateTime(selectedRecommendation.generatedAt || selectedRow.generatedAt)}</p>
-                </>
-              ) : (
-                <p className="subtle">ไม่มีรายละเอียดเพิ่มเติม</p>
-              )}
-            </aside>
+          <div className="table-wrap stockrec-table-wrap">
+            <table className="stockrec-table">
+              <thead>
+                <tr>
+                  <th>ชื่อสินค้าไทย</th>
+                  <th>รหัสสินค้า</th>
+                  <th>รหัสบาร์โค้ด</th>
+                  <th>หน่วย</th>
+                  {branchColumns.map((code) => (
+                    <th key={code}>สาขา {code}</th>
+                  ))}
+                  <th>รวม</th>
+                  <th>ชื่อภาษาอังกฤษ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const isExpanded = expandedProductCode === row.productCode;
+                  const branchByCode = new Map(row.branches.map((branch) => [branch.branchCode, branch]));
+                  const actionableBranches = row.branches.filter((branch) => branch.action !== "NO_ACTION");
+                  return [
+                    <tr
+                      key={row.productCode}
+                      className={`stockrec-row${isExpanded ? " expanded" : ""}`}
+                      onClick={() => toggleExpanded(row.productCode)}
+                    >
+                      <td>{row.productNameThai}</td>
+                      <td>{row.productCode}</td>
+                      <td>{row.barcode || "-"}</td>
+                      <td>{row.unit || "-"}</td>
+                      {branchColumns.map((code) => {
+                        const branch = branchByCode.get(code);
+                        return (
+                          <td
+                            key={code}
+                            className={branch ? `stockrec-branch-cell tone-${actionTone(branch.action)}` : "stockrec-branch-cell"}
+                          >
+                            {branch ? formatNumber(branch.currentStock) : "-"}
+                          </td>
+                        );
+                      })}
+                      <td className="stockrec-total-cell">{formatNumber(row.totalCurrentStock)}</td>
+                      <td>{row.productNameEng}</td>
+                    </tr>,
+                    isExpanded ? (
+                      <tr key={`${row.productCode}-detail`} className="stockrec-expand-row">
+                        <td colSpan={columnCount}>
+                          {actionableBranches.length === 0 ? (
+                            <p className="subtle">ทุกสาขาไม่ต้องดำเนินการสำหรับสินค้านี้</p>
+                          ) : (
+                            <div className="stockrec-expand-grid">
+                              {actionableBranches.map((branch) => (
+                                <BranchRecommendationDetail key={branch.branchCode} branch={branch} />
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ) : null,
+                  ];
+                })}
+              </tbody>
+            </table>
           </div>
         ) : null}
       </div>
@@ -479,6 +465,7 @@ export default function StockRecommendationsPanel({ branchCode, isAdminUser }) {
           </button>
         </div>
       </div>
+      {generatedAt ? <p className="subtle stockrec-generated-at">อัปเดตจาก backend: {formatDateTime(generatedAt)}</p> : null}
     </section>
   );
 }
