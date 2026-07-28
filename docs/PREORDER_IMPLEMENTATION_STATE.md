@@ -1,6 +1,40 @@
 # Customer Preorder Implementation State
 
-Last updated: 2026-07-22
+Last updated: 2026-07-28
+
+## Production status (2026-07-28)
+
+**Live in production for all branches.** Verified directly, not just claimed:
+
+- Migration `062_add_customer_preorders.sql` confirmed applied in production (read-only query
+  against `public.schema_migrations` and `information_schema.tables`): recorded
+  2026-07-22T12:51:04Z, all 16 `customer_relations.*` tables exist. This section of the doc
+  previously said migration 062 was "not applied to any production database" — that was wrong;
+  it had already been applied, just never re-verified or recorded here.
+- R2 bucket `sc-stockdays-images` confirmed live and correct (5 objects present); a
+  separately-created bucket `fadapreorderimage` exists but is unused — Render still points at
+  `sc-stockdays-images`, which is intentional (least disruptive, already has data).
+- `FEATURE_CUSTOMER_PREORDERS=true` on `paasrtsm-project` (backend) and
+  `VITE_FEATURE_CUSTOMER_PREORDERS=true` on `sc-stockday-ordering` (admin-web), both set via
+  single-key Render API updates, confirmed live: `GET /api/customer-preorders/unread-count`
+  returns `401 Unauthorized` (auth-gated, feature on) rather than `404 Not Found` (what it
+  returns when the flag is off).
+- Rollout scope: user explicitly chose **all branches at once**, not the staged
+  admin+branch-003-then-005 pilot originally planned in this doc and in
+  `docs/CUSTOMER_PREORDER_SYSTEM_DESIGN.md` §16. Reasoning: branch staff normally take preorders
+  through a LINE chat app on their phones and won't use this web feature unless specifically told
+  it's ready, so wider exposure carries little practical risk.
+- **Known, deliberately deferred security item:** the R2 API token in
+  `R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY` is account-wide (Admin Read & Write across the whole
+  Cloudflare account, confirmed via HeadBucket against unrelated buckets), not scoped to
+  `sc-stockdays-images` alone, and is shared with another workspace. User is aware and chose not
+  to fix this now. Should be rotated to a bucket-scoped token before this feature sees meaningful
+  real customer traffic.
+- One operational gotcha hit during this rollout: flipping `FEATURE_CUSTOMER_PREORDERS` via the
+  Render API and then restarting the service was **not enough** — the running process only
+  re-reads env vars on an actual redeploy, not a plain restart. Needed one more redeploy (same
+  commit, no code change) before the flag took effect. Worth remembering for any future flag
+  flips on this backend service.
 
 ## Safety and scope
 
