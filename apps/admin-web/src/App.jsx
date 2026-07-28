@@ -1193,7 +1193,7 @@ function LoginScreen({ authError, busy, username, password, onUsernameChange, on
           <span className="auth-headline-accent" aria-hidden="true" />
           <h1>ศูนย์ควบคุม Stock Day</h1>
           <p>
-            เข้าสู่ระบบด้วยบัญชีผู้ดูแลเพื่อดูสถานะการจัดทำ KPI สต็อก
+            เข้าสู่ระบบด้วยบัญชีผู้ดูแลเพื่อติดตาม KPI สต็อก
             และคำแนะนำสินค้า จากสาขา ผ่าน backend กลาง
           </p>
         </div>
@@ -1249,7 +1249,7 @@ function LoginScreen({ authError, busy, username, password, onUsernameChange, on
               checked={rememberMe}
               onChange={(event) => setRememberMe(event.target.checked)}
             />
-            จดจำการเข้าสู่ระบบ
+            จำการเข้าสู่ระบบ
           </label>
 
           {authError && <div className="notice error compact">{authError}</div>}
