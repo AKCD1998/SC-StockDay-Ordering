@@ -3322,6 +3322,7 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode,
     for (let month = 1; month <= 12; month += 1) {
       const typesPresent = new Set();
       for (const row of rows) {
+        if (row.isActive === false) continue;
         if (rowOverlapsMonth(row, year, month)) typesPresent.add(row.focusType);
       }
       summaries[month] = FOCUS_TYPE_ORDER.filter((type) => typesPresent.has(type));
@@ -3331,7 +3332,7 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode,
 
   const monthRows = useMemo(() => {
     if (!selectedMonth) return [];
-    return rows.filter((row) => rowOverlapsMonth(row, year, selectedMonth));
+    return rows.filter((row) => row.isActive !== false && rowOverlapsMonth(row, year, selectedMonth));
   }, [rows, year, selectedMonth]);
 
   const linePackageRowsByType = useMemo(() => {
