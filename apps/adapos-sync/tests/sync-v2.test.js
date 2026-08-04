@@ -56,7 +56,8 @@ test("hybrid run-start clears stale identity, sends contract body, and requires 
 test("feature off uses exact v1 endpoint/body and never calls v2", async () => {
   const calls = [];
   const result = await handoffBranchStock({
-    v2Enabled: false, baseUrl: "https://api.test", branchCode: "000", records: [{ id: 1 }],
+    v2Enabled: false, baseUrl: "https://api.test", branchCode: "000",
+    records: [{ productCode: "P1", qty: 1, syncedAt: "2026-07-29T00:00:00Z" }],
     v1BatchSize: 100, postJson: async () => assert.fail("postJson is delegated, not called directly"),
     postV1Batches: async (options) => { calls.push(options); return 1; },
   });
@@ -66,15 +67,47 @@ test("feature off uses exact v1 endpoint/body and never calls v2", async () => {
   assert.equal(calls[0].batchSize, 100);
 });
 
+test("v1 registers reconciliation after all writes and registration failure remains shadow-only", async () => {
+  const records = [{ productCode: "P1", qty: 2, syncedAt: "2026-07-29T00:00:00Z" }];
+  const trace = [];
+  const result = await handoffBranchStock({
+    v2Enabled: false, baseUrl: "https://api.test", syncRunId: "7", branchCode: "000",
+    records, v1BatchSize: 100,
+    postV1Batches: async () => { trace.push("stock-committed"); return 1; },
+    postJson: async (url, body) => { trace.push(url); assert.equal(body.reconciliation.recordCount, 1); },
+  });
+  assert.deepEqual(trace, [
+    "stock-committed",
+    "https://api.test/api/sync/v1/runs/7/reconcile-branch-stock",
+  ]);
+  assert.equal(result.reconciliationRegistered, true);
+
+  const warnings = [];
+  const nonBlocking = await handoffBranchStock({
+    v2Enabled: false, baseUrl: "https://api.test", syncRunId: "8", branchCode: "000",
+    records, v1BatchSize: 100, postV1Batches: async () => 1,
+    postJson: async () => { throw new Error("offline"); },
+    logger: { warn: (line) => warnings.push(line) },
+  });
+  assert.equal(nonBlocking.sent, 1);
+  assert.equal(nonBlocking.reconciliationRegistered, false);
+  assert.match(warnings[0], /REGISTRATION_FAILED runId=8 branch=000/);
+});
+
 test("feature on uses v2 only with deterministic payload and no v1 fallback", async () => {
   const posts = []; let v1Calls = 0;
-  const records = [{ id: 1 }, { id: 2 }, { id: 3 }];
+  const records = [1, 2, 3].map((id) => ({ productCode: `P${id}`, qty: id, syncedAt: "2026-07-29T00:00:00Z" }));
   const result = await handoffBranchStock({
     v2Enabled: true, baseUrl: "https://api.test", syncRunId: "9", branchCode: "000", records,
     v2BatchSize: 2, postJson: async (url, body) => posts.push({ url, body }),
     postV1Batches: async () => { v1Calls += 1; },
   });
-  assert.equal(v1Calls, 0); assert.deepEqual(result.manifest, { dataset: "branch_stock", batchCount: 2, recordCount: 3 });
+  assert.equal(v1Calls, 0);
+  assert.deepEqual(
+    { dataset: result.manifest.dataset, batchCount: result.manifest.batchCount, recordCount: result.manifest.recordCount },
+    { dataset: "branch_stock", batchCount: 2, recordCount: 3 },
+  );
+  assert.equal(result.manifest.reconciliation.recordCount, 3);
   assert.deepEqual(posts.map((call) => call.body.batchSeq), [1, 2]);
   assert.deepEqual(posts.flatMap((call) => call.body.records), records);
 });
@@ -82,18 +115,21 @@ test("feature on uses v2 only with deterministic payload and no v1 fallback", as
 test("v2 upload retries only transient failures with byte-equivalent payload and counts once", async () => {
   let calls = 0; const serialized = [];
   const manifest = await uploadStagedBatches({
-    baseUrl: "x", syncRunId: "1", records: [{ id: 1 }], batchSize: 100,
+    baseUrl: "x", syncRunId: "1", records: [{ productCode: "P1", qty: 1, syncedAt: "2026-07-29T00:00:00Z" }], batchSize: 100,
     sleep: async () => {}, random: () => 0, logger: { warn: () => {} },
     postJson: async (_url, body) => { calls += 1; serialized.push(JSON.stringify(body)); if (calls < 3) throw Object.assign(new Error("timeout"), { code: "REQUEST_TIMEOUT" }); },
   });
   assert.equal(calls, 3); assert.equal(new Set(serialized).size, 1);
-  assert.deepEqual(manifest, { dataset: "branch_stock", batchCount: 1, recordCount: 1 });
+  assert.deepEqual(
+    { dataset: manifest.dataset, batchCount: manifest.batchCount, recordCount: manifest.recordCount },
+    { dataset: "branch_stock", batchCount: 1, recordCount: 1 },
+  );
   assert.equal(isRetryableV2Error(new TypeError("network")), true);
   assert.equal(isRetryableV2Error(Object.assign(new Error(), { status: 429 })), true);
   assert.equal(isRetryableV2Error(Object.assign(new Error(), { status: 503 })), true);
   assert.equal(isRetryableV2Error(Object.assign(new Error(), { status: 400 })), false);
   let badCalls = 0;
-  await assert.rejects(uploadStagedBatches({ baseUrl: "x", syncRunId: "1", records: [{ id: 1 }], batchSize: 100, sleep: async () => {}, postJson: async () => { badCalls += 1; throw Object.assign(new Error("bad"), { status: 422 }); } }), /bad/);
+  await assert.rejects(uploadStagedBatches({ baseUrl: "x", syncRunId: "1", records: [{ productCode: "P1", qty: 1, syncedAt: "2026-07-29T00:00:00Z" }], batchSize: 100, sleep: async () => {}, postJson: async () => { badCalls += 1; throw Object.assign(new Error("bad"), { status: 422 }); } }), /bad/);
   assert.equal(badCalls, 1);
 });
 
@@ -224,7 +260,8 @@ test("executable hybrid sequence gates finalize and success on remaining v1 and 
     postJson: async () => { trace.push("run-start"); return { runId: "9" }; },
   });
   await handoffBranchStock({
-    v2Enabled: true, baseUrl: "x", syncRunId: runId, branchCode: "005", records: [{ id: 1 }], v2BatchSize: 100,
+    v2Enabled: true, baseUrl: "x", syncRunId: runId, branchCode: "005",
+    records: [{ productCode: "P1", qty: 1, syncedAt: "2026-07-29T00:00:00Z" }], v2BatchSize: 100,
     postJson: async () => trace.push("stage"), postV1Batches: async () => assert.fail("no v1 branch_stock"),
   });
   trace.push("remaining-v1");
@@ -260,7 +297,8 @@ test("poll failure or timeout prevents success log and feature-off trace has no 
 
   const urls = [];
   await handoffBranchStock({
-    v2Enabled: false, baseUrl: "https://api.test", branchCode: "005", records: [{ id: 1 }], v1BatchSize: 100,
+    v2Enabled: false, baseUrl: "https://api.test", branchCode: "005",
+    records: [{ productCode: "P1", qty: 1, syncedAt: "2026-07-29T00:00:00Z" }], v1BatchSize: 100,
     postJson: async () => {}, postV1Batches: async ({ url }) => { urls.push(url); return 1; },
   });
   await completeSyncRun({

@@ -7,6 +7,7 @@ const { spawn } = require("child_process");
 const bcrypt = require("bcryptjs");
 const cfg = require("./config.cjs");
 const { provisionDatabase } = require("./db.cjs");
+const { checkMigrationChainCoverage, formatGuardFailureMessage } = require("./migrationChainGuard.cjs");
 
 function hash(pw) {
   return bcrypt.hashSync(pw, 10);
@@ -74,6 +75,22 @@ function withTimeout(promise, ms, label) {
 
 module.exports = async () => {
   const t0 = Date.now();
+
+  // Fail fast, before paying for DB provisioning + admin-api boot + web
+  // build: if the curated migration list has drifted from the real chain
+  // without the gap being explicitly documented, every spec that touches the
+  // affected schema will fail anyway (this is exactly what happened with
+  // migration 037's request_mode column — see _ledger/claude.md CLAIM-C-033).
+  const path = require("path");
+  const coverage = checkMigrationChainCoverage({
+    migrationsDir: path.join(cfg.PAASRTSM_REPO, "migrations"),
+    curatedMigrationFiles: cfg.MIGRATION_FILES,
+    intentionallyExcluded: cfg.MIGRATION_CHAIN_INTENTIONALLY_EXCLUDED || [],
+  });
+  if (!coverage.ok) {
+    throw new Error(formatGuardFailureMessage(coverage));
+  }
+
   console.log("[e2e] provisioning database...");
   await withTimeout(provisionDatabase(), 90000, "database provisioning");
   console.log(`[e2e] database ready in ${Date.now() - t0}ms`);

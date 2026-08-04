@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "test": "node --test tests/batching.test.js tests/client.test.js tests/sync-v2.test.js tests/index-wiring.test.js tests/index-runtime.test.js tests/transform.test.js tests/queries.test.js"
+    "test": "node --test tests/batching.test.js tests/branch-stock-reconciliation.test.js tests/client.test.js tests/sync-v2.test.js tests/index-wiring.test.js tests/index-runtime.test.js tests/transform.test.js tests/queries.test.js"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

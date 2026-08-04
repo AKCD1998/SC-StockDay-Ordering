@@ -1,3 +1,5 @@
+import { buildBranchStockReconciliationManifest } from "./branch-stock-reconciliation.js";
+
 const RELEASE_V2_DATASETS = new Set(["branch_stock"]);
 
 function parseCsv(raw) {
@@ -91,12 +93,18 @@ export async function uploadStagedBatches({
       }
     }
   }
-  return { dataset: "branch_stock", batchCount: batches.length, recordCount: records.length };
+  return {
+    dataset: "branch_stock",
+    batchCount: batches.length,
+    recordCount: records.length,
+    reconciliation: buildBranchStockReconciliationManifest(records),
+  };
 }
 
 export async function handoffBranchStock({
   v2Enabled, baseUrl, syncRunId, branchCode, records, v2BatchSize,
   v1BatchSize, postJson, postV1Batches, retryOptions = {}, dependencies = {},
+  logger = console,
 }) {
   if (v2Enabled) {
     const manifest = await uploadStagedBatches({
@@ -105,11 +113,35 @@ export async function handoffBranchStock({
     return { mode: "hybrid_v2", manifest, sent: 0 };
   }
   if (records.length === 0) return { mode: "v1", manifest: null, sent: 0 };
+  // Branch-stock generation round (PaaSRTSM-project _ledger/claude.md
+  // CLAIM-C-046): thread the run-start syncRunId into every v1 upload batch
+  // so the backend can stamp which full-snapshot generation touched each row.
+  // Without this, the backend's wide-table freshness/generation columns stay
+  // permanently NULL for v1 branches and reconciliation can never reach PASS.
+  const v1ExtraBody = { branchCode };
+  if (syncRunId != null && String(syncRunId).trim() !== "") {
+    v1ExtraBody.syncRunId = syncRunId;
+  }
   const sent = await postV1Batches({
     url: `${baseUrl}/api/branch-stock/sync`, records, batchSize: v1BatchSize,
-    extraBody: { branchCode }, post: postJson, ...retryOptions,
+    extraBody: v1ExtraBody, post: postJson, ...retryOptions,
   });
-  return { mode: "v1", manifest: null, sent };
+  const reconciliation = buildBranchStockReconciliationManifest(records);
+  let reconciliationRegistered = false;
+  if (syncRunId != null && String(syncRunId).trim() !== "") {
+    try {
+      await postJson(
+        `${baseUrl}/api/sync/v1/runs/${encodeURIComponent(syncRunId)}/reconcile-branch-stock`,
+        { branchCode, reconciliation },
+      );
+      reconciliationRegistered = true;
+    } catch (error) {
+      // Shadow evidence must not turn a successful legacy stock write into a
+      // failed sync. This warning is deliberately structured and payload-free.
+      logger.warn(`RECONCILIATION: REGISTRATION_FAILED runId=${syncRunId} branch=${branchCode} error=${error.message}`);
+    }
+  }
+  return { mode: "v1", manifest: { reconciliation }, sent, reconciliationRegistered };
 }
 
 export async function finalizeRun({
