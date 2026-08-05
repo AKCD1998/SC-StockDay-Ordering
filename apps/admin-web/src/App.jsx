@@ -1059,31 +1059,6 @@ function buildAdminViewHash(viewKey) {
   return `#/${segment}`;
 }
 
-function parsePastedProductCodes(value) {
-  const seen = new Set();
-  const duplicates = [];
-  const skipped = [];
-  const productCodes = [];
-
-  String(value || "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .forEach((code) => {
-      if (!code || code.toUpperCase() === "#N/A") {
-        if (code) skipped.push(code);
-        return;
-      }
-      if (seen.has(code)) {
-        duplicates.push(code);
-        return;
-      }
-      seen.add(code);
-      productCodes.push(code);
-    });
-
-  return { productCodes, duplicates, skipped };
-}
-
 function movementTypeLabel(type) {
   if (type === "transfer_in") return "รับโอนเข้า";
   if (type === "transfer_out") return "โอนออก";
@@ -1098,14 +1073,6 @@ function movementTypeClass(type) {
   if (type === "supplier_receipt") return "muted";
   if (type === "sales_summary") return "danger";
   return "muted";
-}
-
-function formatBranchOptionLabel(branch) {
-  const code = String(branch?.branchCode || "").trim();
-  const name = String(branch?.branchName || "").trim();
-  if (!code) return name || "-";
-  if (!name || name === code) return `สาขา ${code}`;
-  return `${code} - ${name}`;
 }
 
 function todayIsoDate() {

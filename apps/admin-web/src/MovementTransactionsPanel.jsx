@@ -1,6 +1,11 @@
 import { useState, useEffect, useMemo, Fragment } from "react";
 
-// ── Utilities (mirror of App.jsx helpers; kept local to avoid App.jsx exports) ──
+import {
+  formatBranchOptionLabel,
+  parsePastedProductCodes,
+} from "./lib/adminUiHelpers.js";
+
+// ── Utilities ──
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
@@ -46,34 +51,6 @@ function formatSaleDate(value) {
   if (parts.length !== 3) return isoDate;
   const [year, month, day] = parts;
   return `${day}/${month}/${year}`;
-}
-
-function formatBranchOptionLabel(branch) {
-  const code = String(branch?.branchCode || "").trim();
-  const name = String(branch?.branchName || "").trim();
-  if (!code) return name || "-";
-  if (!name || name === code) return `สาขา ${code}`;
-  return `${code} - ${name}`;
-}
-
-function parsePastedProductCodes(value) {
-  const seen = new Set();
-  const duplicates = [];
-  const skipped = [];
-  const productCodes = [];
-  String(value || "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .forEach((code) => {
-      if (!code || code.toUpperCase() === "#N/A") {
-        if (code) skipped.push(code);
-        return;
-      }
-      if (seen.has(code)) { duplicates.push(code); return; }
-      seen.add(code);
-      productCodes.push(code);
-    });
-  return { productCodes, duplicates, skipped };
 }
 
 // Extended to handle both summary and transaction-level types
