@@ -1075,16 +1075,6 @@ function movementTypeClass(type) {
   return "muted";
 }
 
-function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function daysAgoIsoDate(days) {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date.toISOString().slice(0, 10);
-}
-
 // ProductMovementTracePanel was replaced by MovementAndTransactionsPanel (imported from MovementTransactionsPanel.jsx)
 
 

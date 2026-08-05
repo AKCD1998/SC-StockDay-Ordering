@@ -30,3 +30,13 @@ export function formatBranchOptionLabel(branch) {
   if (!name || name === code) return `สาขา ${code}`;
   return `${code} - ${name}`;
 }
+
+export function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function daysAgoIsoDate(days) {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().slice(0, 10);
+}

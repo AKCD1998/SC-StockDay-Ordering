@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo, Fragment } from "react";
 
 import {
+  daysAgoIsoDate,
   formatBranchOptionLabel,
   parsePastedProductCodes,
+  todayIsoDate,
 } from "./lib/adminUiHelpers.js";
 
 // ── Utilities ──
@@ -28,16 +30,6 @@ function formatNumber(value, digits = 0) {
 function formatQty(value) {
   const number = Number(value || 0);
   return formatNumber(number, Number.isInteger(number) ? 0 : 2);
-}
-
-function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function daysAgoIsoDate(days) {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date.toISOString().slice(0, 10);
 }
 
 // bill.sale_date comes over the wire as a DATE column serialized to
