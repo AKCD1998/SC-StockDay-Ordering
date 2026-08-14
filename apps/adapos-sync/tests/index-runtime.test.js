@@ -142,3 +142,98 @@ test("entrypoint feature-off trace keeps exact v1 branch-stock endpoint and has 
   assert.equal(urls.some((url) => url.includes("/api/sync/v2/")), false);
   assert.deepEqual(runtime.runLogs.map((entry) => entry.status), ["success"]);
 });
+
+// C: v1 runtime failure -- one failed run-log sent, runOnce rejects, CLI would
+// exit nonzero (existing catch(error) => process.exitCode = 1 in index.js,
+// covered generically by the "direct CLI exits nonzero" test above).
+test("entrypoint v1 approved-receipts failure writes exactly one failed run-log and rejects with the new v1 code", async () => {
+  const data = {
+    ...stockData,
+    approved_receipt_headers: [{ FTXihDocNo: "RCPT-1", FTBchCode: "005" }],
+    approved_receipt_lines: [],
+  };
+  const runtime = dependencies({
+    syncConfig: config({
+      datasets: ["branch_stock", "approved_receipts"],
+      syncV2: { enabled: false, datasets: [], batchSize: 100, pollIntervalMs: 1, waitTimeoutMs: 10 },
+    }),
+    data,
+    postOverride: async (url) => {
+      if (url.endsWith("/approved-receipts")) throw Object.assign(new Error("rejected"), { status: 400 });
+      return {};
+    },
+  });
+  await assert.rejects(runOnce(runtime.values), (error) => error.code === "V1_APPROVED_RECEIPTS_FAILED"
+    && !/CP4/.test(error.message));
+  const urls = runtime.trace.filter(([kind]) => kind === "POST" || kind === "GET").map(([, url]) => url);
+  assert.ok(urls.includes("https://api.test/api/branch-stock/sync"), "v1 branch-stock write must still have happened before the approved-receipts gate");
+  assert.equal(urls.some((url) => url.includes("/api/sync/v2/")), false);
+  assert.deepEqual(runtime.runLogs.map((entry) => entry.status), ["failed"]);
+  assert.equal(runtime.runLogs.length, 1, "exactly one run-log, not a success log followed by a failed one");
+});
+
+// F: one document fails, the next document in the same payload is still attempted.
+test("entrypoint approved-receipts loop still attempts every remaining document after one fails", async () => {
+  const data = {
+    ...stockData,
+    approved_receipt_headers: [
+      { FTXihDocNo: "RCPT-FAIL", FTBchCode: "005" },
+      { FTXihDocNo: "RCPT-OK", FTBchCode: "005" },
+    ],
+    approved_receipt_lines: [],
+  };
+  const posted = [];
+  const runtime = dependencies({
+    syncConfig: config({
+      datasets: ["branch_stock", "approved_receipts"],
+      syncV2: { enabled: false, datasets: [], batchSize: 100, pollIntervalMs: 1, waitTimeoutMs: 10 },
+    }),
+    data,
+    postOverride: async (url, body) => {
+      if (url.endsWith("/approved-receipts")) {
+        const docNo = body.records[0].docNo;
+        posted.push(docNo);
+        if (docNo === "RCPT-FAIL") throw Object.assign(new Error("rejected"), { status: 400 });
+        return { upserted: 1 };
+      }
+      return {};
+    },
+  });
+  await assert.rejects(runOnce(runtime.values), (error) => error.code === "V1_APPROVED_RECEIPTS_FAILED");
+  assert.deepEqual(posted, ["RCPT-FAIL", "RCPT-OK"], "both documents must have been attempted, not just the first");
+});
+
+// H: the outer catch's own attempt to write a failed run-log can itself fail
+// (index.js:574-584 already swallows that secondary error via .catch(()=>{}))
+// -- the original approved-receipts error must remain the one that propagates.
+// This bypasses the shared dependencies() helper (which auto-succeeds every
+// /api/sync/run-log call) to simulate the run-log write itself throwing.
+test("entrypoint: if writing the failed run-log itself fails, the original approved-receipts error still propagates", async () => {
+  const data = {
+    ...stockData,
+    approved_receipt_headers: [{ FTXihDocNo: "RCPT-1", FTBchCode: "005" }],
+    approved_receipt_lines: [],
+  };
+  const trace = [];
+  const values = {
+    syncConfig: config({
+      datasets: ["branch_stock", "approved_receipts"],
+      syncV2: { enabled: false, datasets: [], batchSize: 100, pollIntervalMs: 1, waitTimeoutMs: 10 },
+    }),
+    connectSql: async () => ({ close: async () => trace.push(["SQL_CLOSE"]) }),
+    fetchDatasets: async () => data,
+    postJson: async (url, body) => {
+      trace.push(["POST", url, body]);
+      if (url.endsWith("/api/sync/run-start")) return { runId: "9" };
+      if (url.endsWith("/approved-receipts")) throw Object.assign(new Error("rejected"), { status: 400 });
+      if (url.endsWith("/api/sync/run-log")) throw new Error("run-log endpoint unreachable");
+      return {};
+    },
+    getJson: async (url) => { trace.push(["GET", url]); return { overallStatus: "success", applyStatus: "applied" }; },
+    setSyncRunId: (runId) => trace.push(["SET_RUN", runId]),
+  };
+  await assert.rejects(runOnce(values), (error) => error.code === "V1_APPROVED_RECEIPTS_FAILED"
+    && !/run-log endpoint unreachable/.test(error.message));
+  const runLogAttempts = trace.filter(([kind, url]) => kind === "POST" && url.endsWith("/api/sync/run-log"));
+  assert.equal(runLogAttempts.length, 1, "exactly one run-log write was attempted (and it failed)");
+});

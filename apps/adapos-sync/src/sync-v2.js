@@ -164,9 +164,24 @@ export async function finalizeRun({
 }
 
 export function assertApprovedReceiptsComplete({ v2Enabled, approvedFailed }) {
-  if (v2Enabled && approvedFailed > 0) {
-    const error = new Error(`CP4 finalize blocked: dataset=approved_receipts failedDocuments=${approvedFailed}.`);
-    error.code = "CP4_V1_DATASET_FAILED";
+  if (approvedFailed > 0) {
+    if (v2Enabled) {
+      const error = new Error(`CP4 finalize blocked: dataset=approved_receipts failedDocuments=${approvedFailed}.`);
+      error.code = "CP4_V1_DATASET_FAILED";
+      throw error;
+    }
+    // V1 approved-receipts correctness/fail-loud (2026-08-14): legacy v1 branches used to fall through
+    // to writeSuccessRunLog() below even when one or more approved-receipt
+    // documents failed to post -- a "green" run-log with silently dropped
+    // documents. This is a distinct, non-CP4 failure: no retry is added here,
+    // it only stops the false success report. The remaining documents in the
+    // payload were already attempted by the caller's per-document loop
+    // (apps/adapos-sync/src/index.js) before this function runs -- that loop
+    // is unchanged.
+    const error = new Error(
+      `Sync run cannot report success: dataset=approved_receipts failedDocuments=${approvedFailed}.`,
+    );
+    error.code = "V1_APPROVED_RECEIPTS_FAILED";
     throw error;
   }
 }

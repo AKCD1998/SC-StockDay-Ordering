@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  assertApprovedReceiptsComplete,
   completeSyncRun,
   createDeterministicBatches,
   finalizeRun,
@@ -234,23 +235,94 @@ test("poll fails immediately with CP4_POLL_FAILED for permanent HTTP 4xx", async
   }
 });
 
-test("hybrid approved partial failure blocks finalize and success log while v1 preserves legacy success", async () => {
+// Track C next-slice (2026-08-14): this test used to assert v2Enabled=false
+// ("v1 preserves legacy success") reached writeSuccessRunLog() despite
+// approvedFailed=2. That was the bug -- a v1 branch could report a green run
+// with silently dropped approved-receipt documents. Split into explicit
+// per-mode tests (matrix D/E for v2, B/C-adjacent for v1) so each mode's
+// contract is unambiguous and the v2 branch is provably byte-for-byte
+// unchanged (same error code/message/order as before).
+
+// D: v2 + approvedFailed>0 -- unchanged CP4 behavior: blocks finalize/poll/success.
+test("v2 + approved-receipts failure blocks finalize/poll/success with unchanged CP4 error", async () => {
+  const trace = [];
+  const operation = completeSyncRun({
+    v2Enabled: true, approvedFailed: 2,
+    finalize: async () => trace.push("finalize"),
+    poll: async () => trace.push("poll"),
+    writeSuccessRunLog: async () => trace.push("success-run-log"),
+  });
+  await assert.rejects(operation, (error) => error.code === "CP4_V1_DATASET_FAILED" && /dataset=approved_receipts failedDocuments=2/.test(error.message));
+  assert.deepEqual(trace, []);
+});
+
+// E: v2 + approvedFailed=0 -- unchanged order: finalize -> poll -> success.
+test("v2 + no approved-receipts failure runs finalize, poll, success in order", async () => {
+  const trace = [];
+  await completeSyncRun({
+    v2Enabled: true, approvedFailed: 0,
+    finalize: async () => trace.push("finalize"),
+    poll: async () => trace.push("poll"),
+    writeSuccessRunLog: async () => trace.push("success-run-log"),
+  });
+  assert.deepEqual(trace, ["finalize", "poll", "success-run-log"]);
+});
+
+// B: v1 + approvedFailed>0 -- NEW behavior: reject, never call success run-log.
+test("v1 + approved-receipts failure now rejects and never writes success run-log", async () => {
+  const trace = [];
+  const operation = completeSyncRun({
+    v2Enabled: false, approvedFailed: 2,
+    finalize: async () => trace.push("finalize"),
+    poll: async () => trace.push("poll"),
+    writeSuccessRunLog: async () => trace.push("success-run-log"),
+  });
+  await assert.rejects(operation, (error) => error.code === "V1_APPROVED_RECEIPTS_FAILED"
+    && /dataset=approved_receipts failedDocuments=2/.test(error.message)
+    && !/CP4/.test(error.message));
+  assert.deepEqual(trace, []);
+});
+
+// A: v1 + approvedFailed=0 -- unchanged: success run-log still written.
+test("v1 + no approved-receipts failure still writes success run-log", async () => {
+  const trace = [];
+  await completeSyncRun({
+    v2Enabled: false, approvedFailed: 0,
+    finalize: async () => trace.push("finalize"),
+    poll: async () => trace.push("poll"),
+    writeSuccessRunLog: async () => trace.push("success-run-log"),
+  });
+  assert.deepEqual(trace, ["success-run-log"]);
+});
+
+// G: no approved-receipts dataset at all -- default approvedFailed=0, unaffected.
+test("completeSyncRun default approvedFailed=0 leaves both modes unaffected", async () => {
   for (const v2Enabled of [true, false]) {
     const trace = [];
-    const operation = completeSyncRun({
-      v2Enabled, approvedFailed: 2,
+    await completeSyncRun({
+      v2Enabled,
       finalize: async () => trace.push("finalize"),
       poll: async () => trace.push("poll"),
       writeSuccessRunLog: async () => trace.push("success-run-log"),
     });
-    if (v2Enabled) {
-      await assert.rejects(operation, (error) => error.code === "CP4_V1_DATASET_FAILED" && /dataset=approved_receipts failedDocuments=2/.test(error.message));
-      assert.deepEqual(trace, []);
-    } else {
-      await operation;
-      assert.deepEqual(trace, ["success-run-log"]);
-    }
+    assert.deepEqual(trace, v2Enabled ? ["finalize", "poll", "success-run-log"] : ["success-run-log"]);
   }
+});
+
+test("assertApprovedReceiptsComplete: v2 error code/message exactly match the pre-existing CP4 contract", () => {
+  assert.throws(
+    () => assertApprovedReceiptsComplete({ v2Enabled: true, approvedFailed: 3 }),
+    (error) => error.code === "CP4_V1_DATASET_FAILED" && error.message === "CP4 finalize blocked: dataset=approved_receipts failedDocuments=3.",
+  );
+});
+
+test("assertApprovedReceiptsComplete: v1 error is a distinct code and does not claim CP4", () => {
+  assert.throws(
+    () => assertApprovedReceiptsComplete({ v2Enabled: false, approvedFailed: 1 }),
+    (error) => error.code === "V1_APPROVED_RECEIPTS_FAILED"
+      && error.message === "Sync run cannot report success: dataset=approved_receipts failedDocuments=1."
+      && !/CP4/.test(error.message),
+  );
 });
 
 test("executable hybrid sequence gates finalize and success on remaining v1 and APPLIED", async () => {
