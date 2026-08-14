@@ -12,3 +12,10 @@ output/
 SESSION_SUMMARY_*.md
 .claude/
 apps/adapos-sync/logs/
+# Delta Sync shadow-candidate local cache. Defaults OUTSIDE the repo
+# (ProgramData/os.tmpdir(), see config.js), but ignored here too as
+# defense-in-depth in case ADAPOS_DELTA_SHADOW_CACHE_DIR is ever pointed
+# at a path inside a checkout — never let this become an untracked file
+# the branch-PC self-update sees as a dirty worktree.
+.delta-shadow-cache/
+apps/adapos-sync/.delta-shadow-cache/
