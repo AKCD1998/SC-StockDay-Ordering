@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "test": "node --test tests/batching.test.js tests/branch-stock-reconciliation.test.js tests/client.test.js tests/sync-v2.test.js tests/index-wiring.test.js tests/index-runtime.test.js tests/transform.test.js tests/queries.test.js tests/delta-sales-fingerprint.test.js tests/delta-sales-shadow.test.js tests/delta-shadow-cache-location.test.js tests/delta-sales-shadow-wiring.test.js tests/delta-document-identity.test.js tests/delta-sales-shadow-projection.test.js",
+    "test": "node --test tests/batching.test.js tests/branch-stock-reconciliation.test.js tests/client.test.js tests/sync-v2.test.js tests/index-wiring.test.js tests/index-runtime.test.js tests/transform.test.js tests/queries.test.js tests/delta-sales-fingerprint.test.js tests/delta-sales-shadow.test.js tests/delta-shadow-cache-location.test.js tests/delta-sales-shadow-wiring.test.js tests/delta-document-identity.test.js tests/delta-sales-shadow-projection.test.js tests/delta-sales-shadow-content-capture.test.js",
     "test:delta-projection-real-postgres": "node --test tests/delta-sales-shadow-projection-real-postgres.test.js"
   },
   "dependencies": {

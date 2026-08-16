@@ -133,6 +133,18 @@ export const syncConfig = {
     enabled: String(process.env.ADAPOS_DELTA_SHADOW_SALES ?? "false") === "true",
     // Default is OUTSIDE the repository on purpose — see defaultDeltaShadowCacheDir above.
     cacheDir: process.env.ADAPOS_DELTA_SHADOW_CACHE_DIR || defaultDeltaShadowCacheDir(),
+    // Temporary, branch-scoped, opt-in-only content-capture mode — see
+    // salesShadow.js's own header comment for the full tradeoff and
+    // graduation criteria. Empty by default: setting this does nothing
+    // unless the branch code it names ALSO matches this Agent's own
+    // ADAPOS_SYNC_BRANCH_CODE and `enabled` above is also true. Comma-
+    // separated branch codes, e.g. "004" or "004,005".
+    contentCaptureBranches: new Set(
+      String(process.env.ADAPOS_DELTA_SHADOW_CONTENT_CAPTURE_BRANCHES ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
   },
 };
 
