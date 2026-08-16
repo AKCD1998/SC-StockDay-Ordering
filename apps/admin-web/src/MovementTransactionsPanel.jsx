@@ -1,6 +1,13 @@
 import { useState, useEffect, useMemo, Fragment } from "react";
 
-// ── Utilities (mirror of App.jsx helpers; kept local to avoid App.jsx exports) ──
+import {
+  daysAgoIsoDate,
+  formatBranchOptionLabel,
+  parsePastedProductCodes,
+  todayIsoDate,
+} from "./lib/adminUiHelpers.js";
+
+// ── Utilities ──
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
@@ -25,16 +32,6 @@ function formatQty(value) {
   return formatNumber(number, Number.isInteger(number) ? 0 : 2);
 }
 
-function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function daysAgoIsoDate(days) {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date.toISOString().slice(0, 10);
-}
-
 // bill.sale_date comes over the wire as a DATE column serialized to
 // "YYYY-MM-DDT00:00:00.000Z" — there's no real time component, so slicing the
 // YYYY-MM-DD prefix directly avoids any timezone re-interpretation risk that
@@ -46,34 +43,6 @@ function formatSaleDate(value) {
   if (parts.length !== 3) return isoDate;
   const [year, month, day] = parts;
   return `${day}/${month}/${year}`;
-}
-
-function formatBranchOptionLabel(branch) {
-  const code = String(branch?.branchCode || "").trim();
-  const name = String(branch?.branchName || "").trim();
-  if (!code) return name || "-";
-  if (!name || name === code) return `สาขา ${code}`;
-  return `${code} - ${name}`;
-}
-
-function parsePastedProductCodes(value) {
-  const seen = new Set();
-  const duplicates = [];
-  const skipped = [];
-  const productCodes = [];
-  String(value || "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .forEach((code) => {
-      if (!code || code.toUpperCase() === "#N/A") {
-        if (code) skipped.push(code);
-        return;
-      }
-      if (seen.has(code)) { duplicates.push(code); return; }
-      seen.add(code);
-      productCodes.push(code);
-    });
-  return { productCodes, duplicates, skipped };
 }
 
 // Extended to handle both summary and transaction-level types

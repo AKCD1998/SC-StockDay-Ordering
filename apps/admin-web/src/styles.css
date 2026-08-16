@@ -2861,13 +2861,6 @@ button {
   background: var(--category-group-bg, rgba(124, 141, 168, 0.08));
 }
 
-.category-metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
-  margin-bottom: 18px;
-}
-
 /* ── Review Queue ───────────────────────────────────────────────────────────── */
 .rq-panel { max-width: 680px; margin: 0 auto; }
 
@@ -3548,83 +3541,6 @@ button {
 }
 
 /* ───────────────────────────────────────────────────────────────────────────── */
-.category-metric,
-.category-review-card {
-  border: 1px solid #d6deea;
-  border-radius: 8px;
-  background: #fbfcfe;
-}
-
-.category-metric {
-  padding: 14px 16px;
-  display: grid;
-  gap: 6px;
-}
-
-.category-metric span {
-  color: #6f7f91;
-  font-size: 0.9rem;
-}
-
-.category-metric strong {
-  font-size: 1.2rem;
-  color: #16344d;
-}
-
-.category-review-list {
-  display: grid;
-  gap: 14px;
-}
-
-.category-review-card {
-  padding: 16px 18px;
-}
-
-.category-review-main,
-.category-review-actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: start;
-}
-
-.category-review-grid {
-  display: grid;
-  grid-template-columns: minmax(220px, 2fr) minmax(90px, 120px) auto;
-  gap: 12px;
-  margin: 14px 0;
-  align-items: end;
-}
-
-.category-review-grid label,
-.checkbox-field {
-  display: grid;
-  gap: 8px;
-  color: #526578;
-  font-size: 0.92rem;
-}
-
-.checkbox-field {
-  grid-auto-flow: column;
-  justify-content: start;
-  align-items: center;
-}
-
-.category-review-grid input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-}
-
-.category-review-meta {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-  color: #526578;
-  font-size: 0.92rem;
-}
-
 .pagination {
   display: flex;
   justify-content: space-between;
@@ -3793,9 +3709,8 @@ select {
 /* Checkboxes/radios must not inherit the text-input sizing above (width:
    100%, heavy padding) — that inflated them into giant rounded boxes,
    squeezing their label text into a narrow wrapped column. Reset to
-   sensible native checkbox sizing everywhere at once, instead of the
-   per-component overrides this had before (see e.g. .category-review-grid
-   input[type="checkbox"], which is now redundant but harmless).
+   sensible native checkbox sizing everywhere at once, instead of
+   per-component overrides.
    IMPORTANT: this relies on `input[type="checkbox"]` (element+attribute)
    naturally outranking the plain `input` above via specificity + source
    order — do NOT "fix" the rule above with `:not([type="checkbox"])`
@@ -3857,10 +3772,7 @@ input[type="radio"] {
   .account-actions,
   .view-nav,
   .receipt-tabs-row,
-  .taxonomy-report-header,
-  .category-review-grid,
-  .category-review-main,
-  .category-review-actions {
+  .taxonomy-report-header {
     grid-template-columns: 1fr;
     display: grid;
   }
@@ -4961,8 +4873,6 @@ input[type="radio"] {
 [data-theme="dark"] .panel,
 [data-theme="dark"] .kpi,
 [data-theme="dark"] .notice,
-[data-theme="dark"] .category-metric,
-[data-theme="dark"] .category-review-card,
 [data-theme="dark"] .spotlight-card,
 [data-theme="dark"] .request-card,
 [data-theme="dark"] .stock-cost-branch-card,
@@ -5004,7 +4914,6 @@ input[type="radio"] {
 [data-theme="dark"] .empty-state,
 [data-theme="dark"] .brand-copy span,
 [data-theme="dark"] .account-copy span,
-[data-theme="dark"] .category-metric span,
 [data-theme="dark"] .date-label,
 [data-theme="dark"] .receipt-tab,
 [data-theme="dark"] .view-nav-btn,
@@ -5088,7 +4997,6 @@ input[type="radio"] {
 [data-theme="dark"] .taxonomy-report-metric strong,
 [data-theme="dark"] .taxonomy-report-section summary,
 [data-theme="dark"] .stock-cost-branch-head strong,
-[data-theme="dark"] .category-metric strong,
 [data-theme="dark"] .receipt-grand,
 [data-theme="dark"] .receipt-doc-no,
 [data-theme="dark"] .view-nav-btn.active,
