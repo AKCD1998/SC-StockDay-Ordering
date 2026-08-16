@@ -31,6 +31,7 @@ import {
   waitForApplied as defaultWaitForApplied,
 } from "./sync-v2.js";
 import { toProductRecords, toSalesRecords, toSalesDetailPayload, chunkPayloadByDoc, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toStockSnapshotRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
+import { runSalesShadow as defaultRunSalesShadow } from "./delta/salesShadow.js";
 
 const PERIOD_DAYS = 30;
 
@@ -150,6 +151,7 @@ export async function runOnce(dependencies = {}) {
   const finalizeRun = dependencies.finalizeRun ?? defaultFinalizeRun;
   const waitForApplied = dependencies.waitForApplied ?? defaultWaitForApplied;
   const completeSyncRun = dependencies.completeSyncRun ?? defaultCompleteSyncRun;
+  const runSalesShadow = dependencies.runSalesShadow ?? defaultRunSalesShadow;
   const connectSql = dependencies.connectSql ?? ((config) => sql.connect(config));
   const fetchData = dependencies.fetchDatasets ?? fetchDatasets;
   const connectionConfig = dependencies.sqlServerConfig ?? sqlServerConfig;
@@ -355,6 +357,30 @@ export async function runOnce(dependencies = {}) {
         }
         console.log(`  sales_detail: ${hAccepted} headers, ${lAccepted} lines accepted`);
         totalSent += hAccepted + lAccepted;
+
+        // ── Delta Sync Slice 1 — sales headers/lines SHADOW candidate ──────────
+        // Runs only after the real POSTs above have already completed, using
+        // the exact same rows already fetched this run (no extra source
+        // query). It never sends anything to the Backend, never advances any
+        // checkpoint, and can never fail this sync run — any error here is
+        // caught and logged only. Off by default (ADAPOS_DELTA_SHADOW_SALES).
+        // This runs BEFORE any later dataset (e.g. approved_receipts) is
+        // attempted, so a later dataset's failure never affects whether the
+        // sales shadow's own comparison/cache-write already happened — see
+        // the Candidate Report for the explicit tradeoff this locks in.
+        if (syncConfig.deltaShadowSales?.enabled) {
+          try {
+            const shadow = runSalesShadow({
+              branchCode: syncConfig.branchCode,
+              headerRows: data.sales_detail_headers ?? [],
+              lineRows: data.sales_detail_lines ?? [],
+              cacheDir: syncConfig.deltaShadowSales.cacheDir,
+            });
+            console.log(`  [delta-shadow:sales] ${JSON.stringify(shadow)}`);
+          } catch (shadowErr) {
+            console.warn(`  WARN: delta shadow (sales) failed, ignored — Full Sync is unaffected: ${shadowErr.message}`);
+          }
+        }
       }
 
       if (data.transfers?.length || data.transfer_lines?.length) {

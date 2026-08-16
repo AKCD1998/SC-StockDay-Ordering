@@ -1,7 +1,23 @@
 import dotenv from "dotenv";
+import os from "node:os";
+import path from "node:path";
 import { parseV2Config } from "./sync-v2.js";
 
 dotenv.config();
+
+// Delta shadow cache MUST default to a location outside this git repository.
+// A branch-PC agent checkout is a working tree the self-update mechanism
+// diffs against; a cache file written inside it would show up as an
+// untracked/dirty file and could make self-update refuse to update
+// (dirty_worktree) — the same class of failure previously found (and fixed)
+// in the frozen Slice 1 candidate. PROGRAMDATA is the standard per-machine
+// persistent-data location on the Windows branch PCs this agent runs on;
+// os.tmpdir() is only a fallback for non-Windows/test environments where
+// PROGRAMDATA is unset.
+function defaultDeltaShadowCacheDir() {
+  const root = process.env.PROGRAMDATA || os.tmpdir();
+  return path.join(root, "SC-StockDay-Ordering", "delta-shadow-cache");
+}
 
 // Parse "HOST\INSTANCE" into separate fields.
 // mssql expects server (hostname only) + options.instanceName separately.
@@ -106,6 +122,18 @@ export const syncConfig = {
   // If the check fails or says "not yet", it falls through to a normal full run,
   // which self-heals a missed morning sync.
   skipIfSyncedToday: cliSkipIfSyncedToday || String(process.env.ADAPOS_SYNC_SKIP_IF_SYNCED_TODAY ?? "false") === "true",
+  // ── Delta Sync Slice 1 (shadow-only candidate) ──────────────────────────
+  // Off by default. When enabled, computes local sales headers/lines document
+  // fingerprints AFTER the normal sales_detail POST completes and writes only
+  // a local, isolated comparison cache — it never sends anything to the
+  // Backend, never affects what Full Sync sends, and a failure here is always
+  // caught and logged, never allowed to fail the run. See
+  // docs/sync-program/DELTA_SYNC_DESIGN.md.
+  deltaShadowSales: {
+    enabled: String(process.env.ADAPOS_DELTA_SHADOW_SALES ?? "false") === "true",
+    // Default is OUTSIDE the repository on purpose — see defaultDeltaShadowCacheDir above.
+    cacheDir: process.env.ADAPOS_DELTA_SHADOW_CACHE_DIR || defaultDeltaShadowCacheDir(),
+  },
 };
 
 // Kept separate from parsing so the production entrypoint can be executed with
