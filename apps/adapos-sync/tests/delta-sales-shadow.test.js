@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from "no
 import os from "node:os";
 import path from "node:path";
 import { runSalesShadow } from "../src/delta/salesShadow.js";
-import { shadowCachePath, readShadowCache } from "../src/delta/salesShadowCache.js";
+import { shadowCachePath, readShadowCache, SHADOW_CACHE_STORAGE_VERSION } from "../src/delta/salesShadowCache.js";
 import { FINGERPRINT_CONTRACT_VERSION } from "../src/delta/salesFingerprint.js";
 
 function header(overrides = {}) {
@@ -167,7 +167,12 @@ test("21. a cache file belonging to a different branch rebuilds cleanly rather t
   withTempCacheDir((cacheDir) => {
     writeFileSync(
       shadowCachePath(cacheDir, "004"),
-      JSON.stringify({ contractVersion: FINGERPRINT_CONTRACT_VERSION, branchCode: "999-wrong-branch", documents: { x: "y" } }),
+      JSON.stringify({
+        contractVersion: FINGERPRINT_CONTRACT_VERSION,
+        cacheStorageVersion: SHADOW_CACHE_STORAGE_VERSION,
+        branchCode: "999-wrong-branch",
+        documents: { x: { fingerprint: "y", content: null } },
+      }),
       "utf8",
     );
     const result = runSalesShadow({ branchCode: "004", headerRows: [header()], lineRows: [line()], cacheDir });
@@ -252,6 +257,9 @@ test("31. the shadow result object (what gets logged) contains only counts/perce
       "cacheState",
       "cacheWriteOk",
       "changedCount",
+      "contentCaptureActive",
+      "contentComparisonSkippedReason",
+      "contentMismatchCount",
       "contractVersion",
       "datasetTag",
       "disappearedCount",
@@ -262,6 +270,12 @@ test("31. the shadow result object (what gets logged) contains only counts/perce
       "wouldSendCount",
     ]);
     assert.equal(result.contractVersion, FINGERPRINT_CONTRACT_VERSION);
+    // No contentCaptureBranches was passed, so content capture must be
+    // inactive for this branch — the new fields must reflect "didn't check",
+    // never a false "checked and found 0".
+    assert.equal(result.contentCaptureActive, false);
+    assert.equal(result.contentMismatchCount, null);
+    assert.equal(result.contentComparisonSkippedReason, null);
   });
 });
 

@@ -151,7 +151,7 @@ test("35/36. delta shadow never issues a network request of its own", async () =
       shadowCalled = true;
       // Structural proof of 36: the shadow function receives only rows
       // already fetched this run and a cache directory — no pool/connection.
-      assert.deepEqual(Object.keys(args).sort(), ["branchCode", "cacheDir", "headerRows", "lineRows"]);
+      assert.deepEqual(Object.keys(args).sort(), ["branchCode", "cacheDir", "contentCaptureBranches", "headerRows", "lineRows"]);
       return { scannedDocuments: 1 };
     },
   });

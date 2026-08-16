@@ -375,6 +375,7 @@ export async function runOnce(dependencies = {}) {
               headerRows: data.sales_detail_headers ?? [],
               lineRows: data.sales_detail_lines ?? [],
               cacheDir: syncConfig.deltaShadowSales.cacheDir,
+              contentCaptureBranches: syncConfig.deltaShadowSales.contentCaptureBranches,
             });
             console.log(`  [delta-shadow:sales] ${JSON.stringify(shadow)}`);
           } catch (shadowErr) {
