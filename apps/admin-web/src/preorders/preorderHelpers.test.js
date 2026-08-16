@@ -1,4 +1,4 @@
-import test from "node:test";import assert from "node:assert/strict";import {adminActions,clampQuantity,etaDescription,mergeCatalogItem,receiptCoverage,staffActions,statusLabel,summarizeStatuses,validateDraft,validateImages} from "./preorderHelpers.js";
+import { test } from "vitest";import assert from "node:assert/strict";import {adminActions,clampQuantity,etaDescription,mergeCatalogItem,receiptCoverage,staffActions,statusLabel,summarizeStatuses,validateDraft,validateImages} from "./preorderHelpers.js";
 test("status labels never expose raw enum",()=>assert.equal(statusLabel("SUBMITTED"),"รอฝ่ายจัดซื้อเปิดอ่าน"));
 test("draft validation requires customer and at least one item",()=>{const errors=validateDraft({customerName:"",customerPhone:"12",items:[]});assert.ok(errors.customerName&&errors.customerPhone&&errors.items);});
 test("catalog selections with the same SKU and unit merge quantities",()=>{const suggestion={sku_id:7,product_code:"IC-7",display_name:"สินค้า",unit:"BOX"};const first=mergeCatalogItem([],suggestion);const second=mergeCatalogItem(first,suggestion);assert.equal(second.length,1);assert.equal(second[0].quantity,2);});
