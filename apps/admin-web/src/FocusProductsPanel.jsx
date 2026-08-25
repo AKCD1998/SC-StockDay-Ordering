@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from "react";
+import { summarizeBranchSales } from "./lib/salesTargetHelpers";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
@@ -2503,6 +2504,13 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
   const branchPickerLabel = selectedBranches.length === BRANCH_CHOICES.length
     ? "ทุกสาขา"
     : `สาขา ${selectedBranches.join(", ")}`;
+  const allBranchSalesSummary = useMemo(
+    () => summarizeBranchSales(progressByBranch, BRANCH_CHOICES),
+    [progressByBranch],
+  );
+  const allBranchTimeline = BRANCH_CHOICES
+    .map((code) => progressByBranch[code])
+    .find(Boolean);
   const adminDailyRows = useMemo(() => {
     if (!isAdminUser) return [];
     const rowsByDate = new Map();
@@ -2911,7 +2919,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
           </div>
 
           {isAdminUser ? (
-            <div className="fp-sales-target-branch-summaries">
+            <div className={`fp-sales-target-branch-summaries fp-sales-target-branch-summaries-${selectedBranches.length}`}>
               {selectedBranches.map((code) => {
                 const branchProgress = progressByBranch[code];
                 return (
@@ -2932,6 +2940,21 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
                   </article>
                 );
               })}
+              <article
+                className="fp-sales-target-branch-summary fp-sales-target-all-branches-summary"
+                aria-label="ยอดขายรวมทุกสาขา"
+              >
+                <strong className="fp-sales-target-branch-summary-title">รวมทุกสาขา</strong>
+                <div className="fp-sales-target-branch-summary-total">
+                  <span>ยอดขายสะสม</span>
+                  <strong>{formatCurrency(allBranchSalesSummary.actualSoFar)}</strong>
+                </div>
+                <small>
+                  {allBranchSalesSummary.isComplete && allBranchTimeline
+                    ? `รวม ${allBranchSalesSummary.branchCount} สาขา · ผ่านไป ${allBranchTimeline.daysElapsed}/${allBranchTimeline.totalDaysInMonth} วัน · เหลือ ${allBranchTimeline.daysRemaining} วัน`
+                    : `โหลดข้อมูลได้ ${allBranchSalesSummary.availableBranchCount}/${allBranchSalesSummary.branchCount} สาขา · ยังไม่แสดงยอดรวม`}
+                </small>
+              </article>
             </div>
           ) : (
             <div className="fp-sales-target-summary">
