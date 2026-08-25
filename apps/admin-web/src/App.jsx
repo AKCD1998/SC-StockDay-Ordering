@@ -14,10 +14,11 @@ import {
   summarizeRegulatedDrugLines,
 } from "./lib/regulatedDrugs.js";
 import {
-  BRANCH_STOCK_SCOPE_OPTIONS,
-  DEFAULT_ONLINE_MARKETING_STOCK_SCOPE,
   createBranchStockScopeWorkbook,
+  getBranchStockScopeOptions,
+  getDefaultBranchStockScopeId,
   getVisibleBranchStockColumns,
+  normalizeBranchStockScopeBranchCode,
   projectBranchStockRows,
 } from "./lib/branchStockScope.js";
 import dkshLogoUrl from "./assets/dksh.svg";
@@ -1766,7 +1767,16 @@ export function BranchStockPanel({
   const [applyMessage, setApplyMessage] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [taxonomyOpen, setTaxonomyOpen] = useState(false);
-  const [selectedBranchScope, setSelectedBranchScope] = useState(DEFAULT_ONLINE_MARKETING_STOCK_SCOPE);
+  const scopedBranchCode = normalizeBranchStockScopeBranchCode(
+    branchCode || (isOnlineMarketingStaff ? "000" : ""),
+  );
+  const isBranchStockScopeUser = !isAdminUser && Boolean(scopedBranchCode);
+  const branchStockScopeOptions = useMemo(
+    () => getBranchStockScopeOptions(scopedBranchCode),
+    [scopedBranchCode],
+  );
+  const defaultBranchStockScope = getDefaultBranchStockScopeId(scopedBranchCode);
+  const [selectedBranchScope, setSelectedBranchScope] = useState(defaultBranchStockScope);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [selectedExportBranch, setSelectedExportBranch] = useState("001");
   const [exporting, setExporting] = useState(false);
@@ -1782,6 +1792,13 @@ export function BranchStockPanel({
   const [filterMenuAnchor, setFilterMenuAnchor] = useState(null);
   const requestButtonRef = useRef(null);
   const [flyDots, setFlyDots] = useState([]);
+
+  useEffect(() => {
+    setSelectedBranchScope(defaultBranchStockScope);
+    setOffset(0);
+    setOpenFilterKey("");
+    setColumnFilters({});
+  }, [defaultBranchStockScope]);
 
   useEffect(() => {
     if (!loading) return undefined;
@@ -2073,11 +2090,12 @@ export function BranchStockPanel({
     setExporting(true);
     setExportError("");
     try {
-      if (isOnlineMarketingStaff) {
+      if (isBranchStockScopeUser) {
         const { blob, fileName } = await createBranchStockScopeWorkbook({
           records: visibleRecords,
           columns: visibleBranchStockColumns,
           scopeId: selectedBranchScope,
+          branchCode: scopedBranchCode,
           getColumnValue: getBranchStockColumnValue,
         });
         downloadBranchStockBlob(blob, fileName);
@@ -2128,18 +2146,20 @@ export function BranchStockPanel({
 
   const visibleBranchStockColumns = useMemo(
     () => getVisibleBranchStockColumns(BRANCH_STOCK_COLUMNS, {
-      isOnlineMarketingStaff,
+      isBranchStockScopeUser,
       scopeId: selectedBranchScope,
+      branchCode: scopedBranchCode,
     }),
-    [isOnlineMarketingStaff, selectedBranchScope],
+    [isBranchStockScopeUser, scopedBranchCode, selectedBranchScope],
   );
 
   const scopedRecords = useMemo(
     () => projectBranchStockRows(records, {
-      isOnlineMarketingStaff,
+      isBranchStockScopeUser,
       scopeId: selectedBranchScope,
+      branchCode: scopedBranchCode,
     }),
-    [records, isOnlineMarketingStaff, selectedBranchScope],
+    [records, isBranchStockScopeUser, scopedBranchCode, selectedBranchScope],
   );
 
   const columnOptions = useMemo(() => {
@@ -2422,11 +2442,11 @@ export function BranchStockPanel({
           <p>ข้อมูล snapshot ล่าสุดที่ Mother PC ส่งเข้า Render สำหรับการติดตามยอดแต่ละสาขา</p>
         </div>
 
-        {isOnlineMarketingStaff ? (
+        {isBranchStockScopeUser ? (
           <div className="branch-stock-scope-bar">
             <span className="branch-stock-scope-label">ขอบเขตสต็อก</span>
             <div className="branch-stock-scope-segments" role="group" aria-label="เลือกขอบเขตสต็อกที่แสดง">
-              {BRANCH_STOCK_SCOPE_OPTIONS.map((option) => {
+              {branchStockScopeOptions.map((option) => {
                 const isSelected = selectedBranchScope === option.id;
                 return (
                   <button
@@ -2459,16 +2479,16 @@ export function BranchStockPanel({
           <button
             type="button"
             className="excel-export-button"
-            aria-label={isOnlineMarketingStaff ? "ส่งออก Excel ตามขอบเขตสต็อกที่เลือก" : "เปิดตัวเลือกส่งออก Excel แยกตามสาขา"}
-            onClick={isOnlineMarketingStaff
+            aria-label={isBranchStockScopeUser ? "ส่งออก Excel ตามขอบเขตสต็อกที่เลือก" : "เปิดตัวเลือกส่งออก Excel แยกตามสาขา"}
+            onClick={isBranchStockScopeUser
               ? handleExportExcel
               : () => {
                   setExportError("");
                   setExportModalOpen(true);
                 }}
-            disabled={isOnlineMarketingStaff && exporting}
+            disabled={isBranchStockScopeUser && exporting}
           >
-            {isOnlineMarketingStaff && exporting ? "กำลังสร้างไฟล์..." : "ส่งออก Excel"}
+            {isBranchStockScopeUser && exporting ? "กำลังสร้างไฟล์..." : "ส่งออก Excel"}
           </button>
           <button type="submit" className="ghost-button branch-stock-search-button">
             ค้นหา
@@ -2490,7 +2510,7 @@ export function BranchStockPanel({
             {requestMode ? "ปิดโหมดขอสินค้า" : "ขอสินค้า"}
           </button>
         </form>
-        {isOnlineMarketingStaff && exportError ? (
+        {isBranchStockScopeUser && exportError ? (
           <p
             className="notice error compact branch-stock-export-error"
             role="alert"

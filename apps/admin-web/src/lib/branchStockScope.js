@@ -1,31 +1,49 @@
-export const BRANCH_STOCK_SCOPE_OPTIONS = [
-  {
-    id: "branch-000",
-    label: "สาขา 000",
-    ariaLabel: "แสดงสต็อกเฉพาะสาขา 000",
-    branchCodes: ["000"],
-  },
-  {
-    id: "samut-songkhram",
-    label: "สมุทรสงคราม",
-    ariaLabel: "แสดงสต็อกสมุทรสงคราม สาขา 000 001 003 และ 004",
-    branchCodes: ["000", "001", "003", "004"],
-  },
-  {
-    id: "all",
-    label: "ทุกสาขา",
-    ariaLabel: "แสดงสต็อกทุกสาขา",
-    branchCodes: ["000", "001", "003", "004", "005"],
-  },
-];
+export const BRANCH_STOCK_SCOPE_BRANCH_CODES = ["000", "001", "003", "004", "005"];
 
-export const DEFAULT_ONLINE_MARKETING_STOCK_SCOPE = "branch-000";
+const SAMUT_SONGKHRAM_SCOPE = {
+  id: "samut-songkhram",
+  label: "สมุทรสงคราม",
+  ariaLabel: "แสดงสต็อกสมุทรสงคราม สาขา 000 001 003 และ 004",
+  branchCodes: ["000", "001", "003", "004"],
+};
+
+const ALL_BRANCHES_SCOPE = {
+  id: "all",
+  label: "ทุกสาขา",
+  ariaLabel: "แสดงสต็อกทุกสาขา",
+  branchCodes: BRANCH_STOCK_SCOPE_BRANCH_CODES,
+};
 
 const BRANCH_QTY_COLUMN_PATTERN = /^qtyBranch(\d{3})$/;
 
-export function getBranchStockScope(scopeId) {
-  return BRANCH_STOCK_SCOPE_OPTIONS.find((option) => option.id === scopeId)
-    || BRANCH_STOCK_SCOPE_OPTIONS[0];
+export function normalizeBranchStockScopeBranchCode(branchCode) {
+  const normalized = String(branchCode || "").trim();
+  return BRANCH_STOCK_SCOPE_BRANCH_CODES.includes(normalized) ? normalized : "";
+}
+
+export function getDefaultBranchStockScopeId(branchCode) {
+  const normalized = normalizeBranchStockScopeBranchCode(branchCode);
+  return normalized ? `branch-${normalized}` : "";
+}
+
+export function getBranchStockScopeOptions(branchCode) {
+  const normalized = normalizeBranchStockScopeBranchCode(branchCode);
+  if (!normalized) return [];
+  return [
+    {
+      id: `branch-${normalized}`,
+      label: `สาขา ${normalized}`,
+      ariaLabel: `แสดงสต็อกเฉพาะสาขา ${normalized}`,
+      branchCodes: [normalized],
+    },
+    SAMUT_SONGKHRAM_SCOPE,
+    ALL_BRANCHES_SCOPE,
+  ];
+}
+
+export function getBranchStockScope(scopeId, branchCode) {
+  const options = getBranchStockScopeOptions(branchCode);
+  return options.find((option) => option.id === scopeId) || options[0] || null;
 }
 
 export function isBranchQtyColumn(column) {
@@ -33,12 +51,15 @@ export function isBranchQtyColumn(column) {
 }
 
 export function getVisibleBranchStockColumns(columns, {
-  isOnlineMarketingStaff = false,
-  scopeId = DEFAULT_ONLINE_MARKETING_STOCK_SCOPE,
+  isBranchStockScopeUser = false,
+  scopeId = "",
+  branchCode = "",
 } = {}) {
-  if (!isOnlineMarketingStaff) return columns;
+  if (!isBranchStockScopeUser) return columns;
 
-  const visibleBranchCodes = new Set(getBranchStockScope(scopeId).branchCodes);
+  const scope = getBranchStockScope(scopeId, branchCode);
+  if (!scope) return columns;
+  const visibleBranchCodes = new Set(scope.branchCodes);
   return columns.filter((column) => {
     const match = String(column?.key || "").match(BRANCH_QTY_COLUMN_PATTERN);
     return !match || visibleBranchCodes.has(match[1]);
@@ -50,23 +71,27 @@ export function getSafeBranchStockQty(row, branchCode) {
   return Number.isFinite(value) ? value : 0;
 }
 
-export function calculateBranchStockScopeTotal(row, scopeId) {
-  return getBranchStockScope(scopeId).branchCodes.reduce(
+export function calculateBranchStockScopeTotal(row, scopeId, branchCode) {
+  const scope = getBranchStockScope(scopeId, branchCode);
+  if (!scope) return 0;
+  return scope.branchCodes.reduce(
     (total, branchCode) => total + getSafeBranchStockQty(row, branchCode),
     0,
   );
 }
 
 export function projectBranchStockRows(records, {
-  isOnlineMarketingStaff = false,
-  scopeId = DEFAULT_ONLINE_MARKETING_STOCK_SCOPE,
+  isBranchStockScopeUser = false,
+  scopeId = "",
+  branchCode = "",
 } = {}) {
-  if (!isOnlineMarketingStaff) return records;
-  const scope = getBranchStockScope(scopeId);
+  if (!isBranchStockScopeUser) return records;
+  const scope = getBranchStockScope(scopeId, branchCode);
+  if (!scope) return records;
   return records.map((row) => {
     const projectedRow = {
       ...row,
-      qtyTotalAllBranches: calculateBranchStockScopeTotal(row, scopeId),
+      qtyTotalAllBranches: calculateBranchStockScopeTotal(row, scopeId, branchCode),
     };
     scope.branchCodes.forEach((branchCode) => {
       projectedRow[`qtyBranch${branchCode}`] = getSafeBranchStockQty(row, branchCode);
@@ -91,11 +116,15 @@ export async function createBranchStockScopeWorkbook({
   records,
   columns,
   scopeId,
+  branchCode,
   getColumnValue,
   dateStamp = new Date().toISOString().slice(0, 10),
 }) {
   const xlsx = await import("xlsx");
-  const scope = getBranchStockScope(scopeId);
+  const scope = getBranchStockScope(scopeId, branchCode);
+  if (!scope) {
+    throw new Error("ไม่พบขอบเขตสต็อกสำหรับบัญชีนี้");
+  }
   const matrix = buildBranchStockExportMatrix(records, columns, getColumnValue);
   const worksheet = xlsx.utils.aoa_to_sheet(matrix);
   worksheet["!cols"] = columns.map((column) => ({
