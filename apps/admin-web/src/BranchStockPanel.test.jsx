@@ -140,14 +140,14 @@ describe("BranchStockPanel branch scope", () => {
     expect(headerKeys()).not.toEqual(expect.arrayContaining(["qtyBranch001", "qtyBranch003", "qtyBranch004", "qtyBranch005"]));
   });
 
-  it("shows only 000, 001, and 003 for the Samut Sakhon scope", async () => {
+  it("shows only 000, 001, 003, and 004 for the Samut Songkhram scope", async () => {
     const user = userEvent.setup();
     renderPanel();
     await screen.findByText("A001");
-    await user.click(screen.getByRole("button", { name: "แสดงสต็อกสมุทรสาคร สาขา 000 001 และ 003" }));
+    await user.click(screen.getByRole("button", { name: "แสดงสต็อกสมุทรสงคราม สาขา 000 001 003 และ 004" }));
 
-    expect(headerKeys()).toEqual(expect.arrayContaining(["qtyBranch000", "qtyBranch001", "qtyBranch003"]));
-    expect(headerKeys()).not.toEqual(expect.arrayContaining(["qtyBranch004", "qtyBranch005"]));
+    expect(headerKeys()).toEqual(expect.arrayContaining(["qtyBranch000", "qtyBranch001", "qtyBranch003", "qtyBranch004"]));
+    expect(headerKeys()).not.toContain("qtyBranch005");
   });
 
   it("shows every current branch column for the all-branches scope", async () => {
@@ -171,8 +171,8 @@ describe("BranchStockPanel branch scope", () => {
     await screen.findByText("A001");
 
     expect(scopedTotal("A001")).toBe("1.00");
-    await user.click(screen.getByRole("button", { name: "แสดงสต็อกสมุทรสาคร สาขา 000 001 และ 003" }));
-    expect(scopedTotal("A001")).toBe("6.00");
+    await user.click(screen.getByRole("button", { name: "แสดงสต็อกสมุทรสงคราม สาขา 000 001 003 และ 004" }));
+    expect(scopedTotal("A001")).toBe("10.00");
     await user.click(screen.getByRole("button", { name: "แสดงสต็อกทุกสาขา" }));
     expect(scopedTotal("A001")).toBe("15.00");
   });
@@ -181,16 +181,18 @@ describe("BranchStockPanel branch scope", () => {
     const user = userEvent.setup();
     renderPanel();
     await screen.findByText("A001");
-    await user.click(screen.getByRole("button", { name: "แสดงสต็อกสมุทรสาคร สาขา 000 001 และ 003" }));
+    await user.click(screen.getByRole("button", { name: "แสดงสต็อกสมุทรสงคราม สาขา 000 001 003 และ 004" }));
     await user.click(screen.getByRole("button", { name: "ส่งออก Excel ตามขอบเขตสต็อกที่เลือก" }));
 
     await waitFor(() => expect(xlsxMock.aoaToSheet).toHaveBeenCalledOnce());
     const matrix = xlsxMock.aoaToSheet.mock.calls[0][0];
-    expect(matrix[0]).toEqual(expect.arrayContaining(["สาขา 000", "สาขา 001", "สาขา 003", "รวม"]));
-    expect(matrix[0]).not.toEqual(expect.arrayContaining(["สาขา 004", "สาขา 005"]));
+    expect(matrix[0]).toEqual(expect.arrayContaining(["สาขา 000", "สาขา 001", "สาขา 003", "สาขา 004", "รวม"]));
+    expect(matrix[0]).not.toContain("สาขา 005");
     const totalIndex = matrix[0].indexOf("รวม");
-    expect(matrix[1][totalIndex]).toBe(6);
+    expect(matrix[1][totalIndex]).toBe(10);
     expect(Number(scopedTotal("A001"))).toBe(matrix[1][totalIndex]);
+    const clickedAnchor = HTMLAnchorElement.prototype.click.mock.instances.at(-1);
+    expect(clickedAnchor.download).toMatch(/^branch-stock-samut-songkhram-\d{4}-\d{2}-\d{2}\.xlsx$/);
   });
 
   it("announces an export failure and clears the error after a successful retry", async () => {
@@ -257,7 +259,7 @@ describe("BranchStockPanel branch scope", () => {
     expect([...document.querySelectorAll('tbody td[data-column-key="productCode"] strong')].map((node) => node.textContent)).toEqual(["B002", "A001"]);
 
     await user.click(screen.getByRole("button", { name: "แสดงสต็อกทุกสาขา" }));
-    await user.click(screen.getByRole("button", { name: "แสดงสต็อกสมุทรสาคร สาขา 000 001 และ 003" }));
+    await user.click(screen.getByRole("button", { name: "แสดงสต็อกสมุทรสงคราม สาขา 000 001 003 และ 004" }));
     expect([...document.querySelectorAll('tbody td[data-column-key="productCode"] strong')].map((node) => node.textContent)).toEqual(["B002", "A001"]);
 
     await user.type(screen.getByRole("searchbox", { name: "" }), "Alpha");
