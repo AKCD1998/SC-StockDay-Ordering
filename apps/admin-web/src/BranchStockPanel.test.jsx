@@ -83,7 +83,9 @@ function makeJsonResponse(records) {
 }
 
 function renderPanel({
+  isAdminUser = false,
   isOnlineMarketingStaff = true,
+  branchCode = "000",
   records = STOCK_RECORDS,
   fetchImplementation,
 } = {}) {
@@ -91,10 +93,10 @@ function renderPanel({
   return render(
     <BranchStockPanel
       csrfToken="test-csrf"
-      isAdminUser={false}
+      isAdminUser={isAdminUser}
       isOnlineMarketingStaff={isOnlineMarketingStaff}
-      branchCode="000"
-      branchName="สำนักงานใหญ่"
+      branchCode={branchCode}
+      branchName={`สาขา ${branchCode}`}
       onNavigate={vi.fn()}
       requestDraftItems={[]}
       setRequestDraftItems={vi.fn()}
@@ -132,12 +134,56 @@ describe("BranchStockPanel branch scope", () => {
   });
 
   it("defaults Online Marketing to branch 000 only", async () => {
-    renderPanel();
+    renderPanel({ branchCode: "" });
     await screen.findByText("A001");
 
     expect(screen.getByRole("button", { name: "แสดงสต็อกเฉพาะสาขา 000" })).toHaveAttribute("aria-pressed", "true");
     expect(headerKeys()).toContain("qtyBranch000");
     expect(headerKeys()).not.toEqual(expect.arrayContaining(["qtyBranch001", "qtyBranch003", "qtyBranch004", "qtyBranch005"]));
+  });
+
+  it.each([
+    ["001", "2.00"],
+    ["003", "3.00"],
+    ["004", "4.00"],
+    ["005", "5.00"],
+  ])("defaults branch %s staff to their own branch", async (branchCode, expectedTotal) => {
+    renderPanel({ isOnlineMarketingStaff: false, branchCode });
+    await screen.findByText("A001");
+
+    expect(screen.getByRole("button", { name: `แสดงสต็อกเฉพาะสาขา ${branchCode}` })).toHaveAttribute("aria-pressed", "true");
+    expect(headerKeys()).toContain(`qtyBranch${branchCode}`);
+    expect(headerKeys().filter((key) => key.startsWith("qtyBranch"))).toEqual([`qtyBranch${branchCode}`]);
+    expect(scopedTotal("A001")).toBe(expectedTotal);
+    expect(screen.getByRole("button", { name: "แสดงสต็อกสมุทรสงคราม สาขา 000 001 003 และ 004" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "แสดงสต็อกทุกสาขา" })).toBeInTheDocument();
+  });
+
+  it("lets branch 005 inspect Samut Songkhram without leaking branch 005 into that regional total", async () => {
+    const user = userEvent.setup();
+    renderPanel({ isOnlineMarketingStaff: false, branchCode: "005" });
+    await screen.findByText("A001");
+    await user.click(screen.getByRole("button", { name: "แสดงสต็อกสมุทรสงคราม สาขา 000 001 003 และ 004" }));
+
+    expect(headerKeys()).toEqual(expect.arrayContaining(["qtyBranch000", "qtyBranch001", "qtyBranch003", "qtyBranch004"]));
+    expect(headerKeys()).not.toContain("qtyBranch005");
+    expect(scopedTotal("A001")).toBe("10.00");
+  });
+
+  it("exports a branch account's selected own-branch scope without opening the admin modal", async () => {
+    const user = userEvent.setup();
+    renderPanel({ isOnlineMarketingStaff: false, branchCode: "004" });
+    await screen.findByText("A001");
+    await user.click(screen.getByRole("button", { name: "ส่งออก Excel ตามขอบเขตสต็อกที่เลือก" }));
+
+    await waitFor(() => expect(xlsxMock.aoaToSheet).toHaveBeenCalledOnce());
+    const matrix = xlsxMock.aoaToSheet.mock.calls[0][0];
+    expect(matrix[0]).toContain("สาขา 004");
+    expect(matrix[0]).not.toEqual(expect.arrayContaining(["สาขา 000", "สาขา 001", "สาขา 003", "สาขา 005"]));
+    expect(matrix[1][matrix[0].indexOf("รวม")]).toBe(4);
+    expect(screen.queryByRole("dialog", { name: "ส่งออก Excel แยกตามสาขา" })).not.toBeInTheDocument();
+    const clickedAnchor = HTMLAnchorElement.prototype.click.mock.instances.at(-1);
+    expect(clickedAnchor.download).toMatch(/^branch-stock-branch-004-\d{4}-\d{2}-\d{2}\.xlsx$/);
   });
 
   it("shows only 000, 001, 003, and 004 for the Samut Songkhram scope", async () => {
@@ -214,9 +260,9 @@ describe("BranchStockPanel branch scope", () => {
     expect(window.URL.createObjectURL).toHaveBeenCalledOnce();
   });
 
-  it("preserves the original all-column and server-export flow for other users", async () => {
+  it("preserves the original all-column and server-export flow for admin users", async () => {
     const user = userEvent.setup();
-    renderPanel({ isOnlineMarketingStaff: false });
+    renderPanel({ isAdminUser: true, isOnlineMarketingStaff: false });
     await screen.findByText("A001");
 
     expect(screen.queryByRole("group", { name: "เลือกขอบเขตสต็อกที่แสดง" })).not.toBeInTheDocument();
