@@ -1777,6 +1777,97 @@ button {
   min-width: min(420px, 100%);
 }
 
+.branch-stock-export-error {
+  width: 100%;
+  margin: 0;
+  text-align: left;
+}
+
+.branch-stock-scope-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.branch-stock-scope-label {
+  color: #38506b;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.branch-stock-scope-segments {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid #c8d3e2;
+  border-radius: 15px;
+  background: #f4f7fb;
+}
+
+.branch-stock-scope-button {
+  min-height: 42px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: #38506b;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.branch-stock-scope-button:hover:not(.selected) {
+  background: #e5edf7;
+  color: #16344d;
+}
+
+.branch-stock-scope-button.selected {
+  background: #2c6ee8;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(44, 110, 232, 0.26);
+}
+
+.branch-stock-scope-button:focus-visible {
+  outline: 3px solid rgba(44, 110, 232, 0.35);
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .branch-stock-scope-bar {
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .branch-stock-scope-label {
+    width: 100%;
+  }
+
+  .branch-stock-scope-segments {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .branch-stock-scope-button {
+    min-width: 0;
+    padding: 9px 5px;
+    white-space: normal;
+  }
+
+  .branch-stock-toolbar {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .branch-stock-toolbar input {
+    width: 100%;
+  }
+}
+
 .stock-cost-toolbar {
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -5189,6 +5280,29 @@ input[type="radio"] {
 
 [data-theme="dark"] .branch-context-current.warning {
   color: #ffce88;
+}
+
+[data-theme="dark"] .branch-stock-scope-label {
+  color: #aabbd0;
+}
+
+[data-theme="dark"] .branch-stock-scope-segments {
+  border-color: #3b4d63;
+  background: #111c2a;
+}
+
+[data-theme="dark"] .branch-stock-scope-button {
+  color: #aabbd0;
+}
+
+[data-theme="dark"] .branch-stock-scope-button:hover:not(.selected) {
+  background: #1e2e42;
+  color: #f4f7fb;
+}
+
+[data-theme="dark"] .branch-stock-scope-button.selected {
+  background: #4f8dff;
+  color: #fff;
 }
 
 [data-theme="dark"] .receipt-refresh-button {

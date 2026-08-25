@@ -13,6 +13,13 @@ import {
   summarizeRegulatedDrugBatch,
   summarizeRegulatedDrugLines,
 } from "./lib/regulatedDrugs.js";
+import {
+  BRANCH_STOCK_SCOPE_OPTIONS,
+  DEFAULT_ONLINE_MARKETING_STOCK_SCOPE,
+  createBranchStockScopeWorkbook,
+  getVisibleBranchStockColumns,
+  projectBranchStockRows,
+} from "./lib/branchStockScope.js";
 import dkshLogoUrl from "./assets/dksh.svg";
 import hansaLogoUrl from "./assets/hansa-logo.png";
 import tnpHealthcareLogoUrl from "./assets/tnp-healthcare-logo.svg";
@@ -1712,7 +1719,17 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
   );
 }
 
-function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNavigate, requestDraftItems, setRequestDraftItems, onClearDraft }) {
+export function BranchStockPanel({
+  csrfToken,
+  isAdminUser,
+  isOnlineMarketingStaff = false,
+  branchCode,
+  branchName,
+  onNavigate,
+  requestDraftItems,
+  setRequestDraftItems,
+  onClearDraft,
+}) {
   const pageSize = 25;
   const pageFetchLimit = 10000;
   const branchExportOptions = [
@@ -1749,6 +1766,7 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
   const [applyMessage, setApplyMessage] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [taxonomyOpen, setTaxonomyOpen] = useState(false);
+  const [selectedBranchScope, setSelectedBranchScope] = useState(DEFAULT_ONLINE_MARKETING_STOCK_SCOPE);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [selectedExportBranch, setSelectedExportBranch] = useState("001");
   const [exporting, setExporting] = useState(false);
@@ -2040,10 +2058,32 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
     }
   }
 
+  function downloadBranchStockBlob(blob, fileName) {
+    const objectUrl = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(objectUrl);
+  }
+
   async function handleExportExcel() {
     setExporting(true);
     setExportError("");
     try {
+      if (isOnlineMarketingStaff) {
+        const { blob, fileName } = await createBranchStockScopeWorkbook({
+          records: visibleRecords,
+          columns: visibleBranchStockColumns,
+          scopeId: selectedBranchScope,
+          getColumnValue: getBranchStockColumnValue,
+        });
+        downloadBranchStockBlob(blob, fileName);
+        return;
+      }
+
       const params = new URLSearchParams({
         branchCode: selectedExportBranch,
       });
@@ -2086,20 +2126,36 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
     }
   }
 
+  const visibleBranchStockColumns = useMemo(
+    () => getVisibleBranchStockColumns(BRANCH_STOCK_COLUMNS, {
+      isOnlineMarketingStaff,
+      scopeId: selectedBranchScope,
+    }),
+    [isOnlineMarketingStaff, selectedBranchScope],
+  );
+
+  const scopedRecords = useMemo(
+    () => projectBranchStockRows(records, {
+      isOnlineMarketingStaff,
+      scopeId: selectedBranchScope,
+    }),
+    [records, isOnlineMarketingStaff, selectedBranchScope],
+  );
+
   const columnOptions = useMemo(() => {
     return Object.fromEntries(
-      BRANCH_STOCK_COLUMNS.map((column) => {
-        const values = [...new Set(records.map((row) => normalizeFilterValue(getBranchStockColumnValue(row, column.key))))].sort(
+      visibleBranchStockColumns.map((column) => {
+        const values = [...new Set(scopedRecords.map((row) => normalizeFilterValue(getBranchStockColumnValue(row, column.key))))].sort(
           (left, right) => left.localeCompare(right, "th", { numeric: true, sensitivity: "base" }),
         );
         return [column.key, values];
       }),
     );
-  }, [records]);
+  }, [scopedRecords, visibleBranchStockColumns]);
 
   const visibleRecords = useMemo(() => {
-    const filtered = records.filter((row) => {
-      return BRANCH_STOCK_COLUMNS.every((column) => {
+    const filtered = scopedRecords.filter((row) => {
+      return visibleBranchStockColumns.every((column) => {
         const activeValues = columnFilters[column.key];
         if (!activeValues) {
           return true;
@@ -2112,7 +2168,9 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
       });
     });
 
-    const sortColumn = BRANCH_STOCK_COLUMNS.find((column) => column.key === sortConfig.key) || BRANCH_STOCK_COLUMNS[0];
+    const sortColumn = visibleBranchStockColumns.find((column) => column.key === sortConfig.key)
+      || visibleBranchStockColumns.find((column) => column.key === "productCode")
+      || visibleBranchStockColumns[0];
     return [...filtered].sort((left, right) =>
       compareBranchStockValues(
         getBranchStockColumnValue(left, sortColumn.key),
@@ -2121,7 +2179,7 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
         sortConfig.direction,
       ),
     );
-  }, [records, columnFilters, sortConfig]);
+  }, [scopedRecords, visibleBranchStockColumns, columnFilters, sortConfig]);
 
   const total = visibleRecords.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -2364,6 +2422,33 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
           <p>ข้อมูล snapshot ล่าสุดที่ Mother PC ส่งเข้า Render สำหรับการติดตามยอดแต่ละสาขา</p>
         </div>
 
+        {isOnlineMarketingStaff ? (
+          <div className="branch-stock-scope-bar">
+            <span className="branch-stock-scope-label">ขอบเขตสต็อก</span>
+            <div className="branch-stock-scope-segments" role="group" aria-label="เลือกขอบเขตสต็อกที่แสดง">
+              {BRANCH_STOCK_SCOPE_OPTIONS.map((option) => {
+                const isSelected = selectedBranchScope === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={`branch-stock-scope-button${isSelected ? " selected" : ""}`}
+                    aria-label={option.ariaLabel}
+                    aria-pressed={isSelected}
+                    onClick={() => {
+                      setSelectedBranchScope(option.id);
+                      setOffset(0);
+                      setOpenFilterKey("");
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
         <form className="toolbar branch-stock-toolbar" onSubmit={handleSearchSubmit}>
           <input
             type="search"
@@ -2374,12 +2459,16 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
           <button
             type="button"
             className="excel-export-button"
-            onClick={() => {
-              setExportError("");
-              setExportModalOpen(true);
-            }}
+            aria-label={isOnlineMarketingStaff ? "ส่งออก Excel ตามขอบเขตสต็อกที่เลือก" : "เปิดตัวเลือกส่งออก Excel แยกตามสาขา"}
+            onClick={isOnlineMarketingStaff
+              ? handleExportExcel
+              : () => {
+                  setExportError("");
+                  setExportModalOpen(true);
+                }}
+            disabled={isOnlineMarketingStaff && exporting}
           >
-            ส่งออก Excel
+            {isOnlineMarketingStaff && exporting ? "กำลังสร้างไฟล์..." : "ส่งออก Excel"}
           </button>
           <button type="submit" className="ghost-button branch-stock-search-button">
             ค้นหา
@@ -2401,6 +2490,16 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
             {requestMode ? "ปิดโหมดขอสินค้า" : "ขอสินค้า"}
           </button>
         </form>
+        {isOnlineMarketingStaff && exportError ? (
+          <p
+            className="notice error compact branch-stock-export-error"
+            role="alert"
+            aria-live="assertive"
+            aria-atomic="true"
+          >
+            ส่งออก Excel ไม่สำเร็จ: {exportError}
+          </p>
+        ) : null}
       </div>
 
       {!branchCode && !isAdminUser ? (
@@ -2724,7 +2823,7 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
           <thead>
             <tr>
               {requestMode ? <th className="branch-stock-request-column">#</th> : null}
-              {BRANCH_STOCK_COLUMNS.map((column) => {
+              {visibleBranchStockColumns.map((column) => {
                 const optionValues = columnOptions[column.key] || [];
                 const appliedValues = columnFilters[column.key] ? [...columnFilters[column.key]] : optionValues;
                 const activeValues =
@@ -2736,7 +2835,7 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
                 );
 
                 return (
-                  <th key={column.key}>
+                  <th key={column.key} data-column-key={column.key}>
                     <div className="branch-stock-header-cell">
                       <span>{column.label}</span>
                       <button
@@ -2858,8 +2957,10 @@ function BranchStockPanel({ csrfToken, isAdminUser, branchCode, branchName, onNa
                     )}
                   </td>
                 ) : null}
-                {BRANCH_STOCK_COLUMNS.map((column) => (
-                  <td key={`${row.productCode}-${column.key}`}>{renderBranchStockCell(row, column)}</td>
+                {visibleBranchStockColumns.map((column) => (
+                  <td key={`${row.productCode}-${column.key}`} data-column-key={column.key}>
+                    {renderBranchStockCell(row, column)}
+                  </td>
                 ))}
               </tr>
             ))}
@@ -8384,6 +8485,7 @@ export default function App() {
         <BranchStockPanel
           csrfToken={session.csrfToken}
           isAdminUser={isAdminUser}
+          isOnlineMarketingStaff={isOnlineMarketingStaff}
           branchCode={branchCode}
           branchName={activeBranchName}
           onNavigate={() => setView("stock-requests")}
