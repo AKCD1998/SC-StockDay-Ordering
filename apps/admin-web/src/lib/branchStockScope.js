@@ -6,10 +6,10 @@ export const BRANCH_STOCK_SCOPE_OPTIONS = [
     branchCodes: ["000"],
   },
   {
-    id: "samut-sakhon",
-    label: "สมุทรสาคร",
-    ariaLabel: "แสดงสต็อกสมุทรสาคร สาขา 000 001 และ 003",
-    branchCodes: ["000", "001", "003"],
+    id: "samut-songkhram",
+    label: "สมุทรสงคราม",
+    ariaLabel: "แสดงสต็อกสมุทรสงคราม สาขา 000 001 003 และ 004",
+    branchCodes: ["000", "001", "003", "004"],
   },
   {
     id: "all",
