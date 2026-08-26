@@ -173,6 +173,21 @@ function focusRowProducts(row) {
   return [{ productCode: row.productCode, productName: row.productName }];
 }
 
+function sumSoldByBranch(soldByBranch) {
+  return Object.values(soldByBranch || {}).reduce((total, value) => total + (Number(value) || 0), 0);
+}
+
+// Shared-target rows may be split into one visual row per product. In that
+// case the row-level total belongs to the whole shared group, so each product
+// must sum its own branch breakdown instead. Legacy/unsplit rows keep using
+// the backend's authoritative totalSold, with a breakdown fallback for older
+// API responses.
+export function focusProductTotalSold(row, product = null) {
+  if (product?.soldByBranch) return sumSoldByBranch(product.soldByBranch);
+  if (row?.totalSold != null && Number.isFinite(Number(row.totalSold))) return Number(row.totalSold);
+  return sumSoldByBranch(row?.soldByBranch);
+}
+
 function FocusProductCodes({ row }) {
   const products = focusRowProducts(row);
   return (
@@ -1327,8 +1342,9 @@ function GenericFocusTable({ typeRows, isAdminUser, onEdit, onDelete }) {
 // pharmacist / store_manager: each branch can have its own target for the
 // same product (branchTargets override), judged independently — no combined
 // verdict. One pair of columns (เป้า/ขาย) per branch instead of a squished
-// chip cell, matching the source Excel's per-branch layout.
-function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete, restrictToBranch }) {
+// chip cell, matching the source Excel's per-branch layout. Admins also get an
+// informational all-branch sold total; it never changes the per-branch verdict.
+export function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete, restrictToBranch }) {
   const branchCodes = useMemo(() => {
     const codes = new Set();
     for (const row of rows) {
@@ -1358,6 +1374,7 @@ function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete, restrictT
                 สาขา {code}
               </th>
             ))}
+            {!restrictToBranch && <th rowSpan={2} className="fp-total-sold-col">รวมทุกสาขา</th>}
             <th rowSpan={2} className="fp-status-col">สถานะ</th>
             {isAdminUser && <th rowSpan={2}>จัดการ</th>}
           </tr>
@@ -1415,6 +1432,11 @@ function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete, restrictT
                     </Fragment>
                   );
                 })}
+                {!restrictToBranch && (
+                  <td className="fp-total-sold-col">
+                    {formatNumber(focusProductTotalSold(row, product))}
+                  </td>
+                )}
                 {productIndex === 0 && (
                   <td className="fp-status-col" rowSpan={spanCount}>
                     {/* Staff see only their own branch, so a single verdict is the
@@ -1468,7 +1490,8 @@ function BranchTargetFocusTable({ rows, isAdminUser, onEdit, onDelete, restrictT
 // but with a branch switcher — target/sold/status are dynamic based on which
 // branch (or "ทุกสาขา" combined) is selected, since each branch can have its
 // own target and only "ทุกสาขา" reflects the true all-must-succeed verdict.
-function GroupManagerFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
+// The all-branch sold total remains visible in every tab as context only.
+export function GroupManagerFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
   const branchCodes = useMemo(() => {
     const codes = new Set();
     for (const row of rows) {
@@ -1516,7 +1539,7 @@ function GroupManagerFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
         <thead>
           <tr className="fp-excel-banner-row">
             <th
-              colSpan={activeBranch === "all" ? 5 + (branchCodes.length * 2) + (isAdminUser ? 1 : 0) : 6 + (isAdminUser ? 1 : 0)}
+              colSpan={activeBranch === "all" ? 5 + (branchCodes.length * 2) + (isAdminUser ? 1 : 0) : 7 + (isAdminUser ? 1 : 0)}
               className="fp-excel-banner"
             >
               สินค้าโฟกัส ผู้จัดการกลุ่ม {activeBranch === "all" ? "ทุกสาขา" : `สาขา ${activeBranch}`} เดือน {monthLabel}
@@ -1537,7 +1560,7 @@ function GroupManagerFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
                     สาขา {code}
                   </th>
                 ))}
-                <th rowSpan={2} className="fp-total-sold-col">ขายรวม</th>
+                <th rowSpan={2} className="fp-total-sold-col">รวมทุกสาขา</th>
                 <th rowSpan={2}>สถานะ</th>
                 {isAdminUser && <th rowSpan={2}>จัดการ</th>}
               </tr>
@@ -1557,6 +1580,7 @@ function GroupManagerFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
               <th className="fp-col-wide">ชื่อสินค้า</th>
               <th>เป้าสินค้า {activeBranch}</th>
               <th>ยอดล่าสุด</th>
+              <th className="fp-total-sold-col">รวมทุกสาขา</th>
               <th>สถานะ</th>
               {isAdminUser && <th>จัดการ</th>}
             </tr>
@@ -1603,6 +1627,9 @@ function GroupManagerFocusTable({ rows, isAdminUser, onEdit, onDelete }) {
                 }) : null}
                 {activeBranch !== "all" && <td>{target != null ? formatNumber(target) : "-"}</td>}
                 <td className={activeBranch === "all" ? "fp-total-sold-col" : ""}>{formatNumber(sold)}</td>
+                {activeBranch !== "all" && (
+                  <td className="fp-total-sold-col">{formatNumber(focusProductTotalSold(row))}</td>
+                )}
                 <td>
                   <StatusBadge achieved={achieved} />
                   {row.isFrozen && (
