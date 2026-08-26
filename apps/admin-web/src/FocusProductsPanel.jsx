@@ -2226,7 +2226,7 @@ const SALES_TARGET_TIER_LABELS = { 1: "ขั้นที่ 1", 2: "ขั้�
 const SALES_TARGET_COLUMN_DEFS = [
   { key: "monthlyTarget", label: "เป้าเดือน" },
   { key: "dailyTarget", label: "เป้า/วัน" },
-  { key: "actualAvgPerDay", label: "เฉลี่ย/วัน" },
+  { key: "actualAvgPerDay", label: "เฉลี่ย/วัน (ข้อมูลที่ปิดแล้ว)" },
   { key: "remainingAmount", label: "คงเหลือ" },
   { key: "remainingAvgPerDay", label: "เฉลี่ย/วัน (คงเหลือ)" },
   { key: "achieved", label: "สถานะ" },
@@ -2260,6 +2260,15 @@ function formatDailyDateLabel(iso) {
   const [, month, day] = iso.split("-");
   const weekday = THAI_WEEKDAY_SHORT[new Date(`${iso}T00:00:00Z`).getUTCDay()];
   return `${day}/${month} (${weekday})`;
+}
+
+export function formatSalesProgressWindow(progress) {
+  if (!progress) return "ไม่มีข้อมูล";
+  const dataThroughDate = progress.dataThroughDate || progress.asOfDate;
+  const coverage = dataThroughDate
+    ? `ข้อมูลยอดขายถึง ${formatDailyDateLabel(dataThroughDate)}`
+    : "ยังไม่มีข้อมูลยอดขายที่ปิดวัน";
+  return `${coverage} · นับ ${progress.daysElapsed}/${progress.totalDaysInMonth} วัน · เหลือ ${progress.daysRemaining} วัน`;
 }
 
 function dailyWeekdayClass(iso) {
@@ -2658,9 +2667,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
                   </span>
                 </div>
                 <small>
-                  {branchProgress
-                    ? `ผ่านไป ${branchProgress.daysElapsed}/${branchProgress.totalDaysInMonth} วัน · เหลือ ${branchProgress.daysRemaining} วัน`
-                    : "ไม่มีข้อมูล"}
+                  {formatSalesProgressWindow(branchProgress)}
                 </small>
               </header>
               <div className="mvt-sales-table-wrap fp-sales-target-branch-card-table-wrap">
@@ -2933,9 +2940,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
                       <strong>{formatCurrency(branchProgress?.actualSoFar)}</strong>
                     </div>
                     <small>
-                      {branchProgress
-                        ? `ผ่านไป ${branchProgress.daysElapsed}/${branchProgress.totalDaysInMonth} วัน · เหลือ ${branchProgress.daysRemaining} วัน`
-                        : "ไม่มีข้อมูล"}
+                      {formatSalesProgressWindow(branchProgress)}
                     </small>
                   </article>
                 );
@@ -2951,7 +2956,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
                 </div>
                 <small>
                   {allBranchSalesSummary.isComplete && allBranchTimeline
-                    ? `รวม ${allBranchSalesSummary.branchCount} สาขา · ผ่านไป ${allBranchTimeline.daysElapsed}/${allBranchTimeline.totalDaysInMonth} วัน · เหลือ ${allBranchTimeline.daysRemaining} วัน`
+                    ? `รวม ${allBranchSalesSummary.branchCount} สาขา · ${formatSalesProgressWindow(allBranchTimeline)}`
                     : `โหลดข้อมูลได้ ${allBranchSalesSummary.availableBranchCount}/${allBranchSalesSummary.branchCount} สาขา · ยังไม่แสดงยอดรวม`}
                 </small>
               </article>
@@ -2962,7 +2967,7 @@ function SalesTargetsSection({ csrfToken, isAdminUser, branchCode }) {
                 ยอดขายสะสมเดือนนี้: <strong>{formatCurrency(progress.actualSoFar)}</strong>
               </span>
               <span>
-                วันที่ผ่านไป {progress.daysElapsed}/{progress.totalDaysInMonth} วัน (เหลือ {progress.daysRemaining} วัน)
+                {formatSalesProgressWindow(progress)}
               </span>
             </div>
           )}
