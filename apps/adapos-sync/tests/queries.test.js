@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getSalesDetailHeaderRows, getSalesDetailLineRows } from "../src/queries.js";
+import { getSalesDetailHeaderRows, getSalesDetailLineRows, getTransferLineRows } from "../src/queries.js";
 
 // Minimal fake mssql pool that records the SQL text (and bound inputs) of every
 // query, so we can assert the sales-detail queries sync return documents too.
@@ -50,4 +50,14 @@ test("sales-detail line query syncs both sale (1) and return (9) lines", async (
   assert.match(sql, /FCSdtDisAvg/);
   assert.match(sql, /FCSdtFootAvg/);
   assert.match(sql, /FCSdtRePackAvg/);
+});
+
+test("transfer line query preserves the complete backend document identity", async () => {
+  const pool = fakePool();
+  await getTransferLineRows(pool, "005", 30);
+  const { sql, inputs } = pool.calls[0];
+  assert.match(sql, /FTBchCode/);
+  assert.match(sql, /FTPthDocNo/);
+  assert.match(sql, /FTPthDocType/);
+  assert.equal(inputs.branchCode, "005");
 });

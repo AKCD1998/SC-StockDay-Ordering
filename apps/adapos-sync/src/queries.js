@@ -352,7 +352,9 @@ export async function getTransferHeaderRows(pool, branchCode, periodDays) {
 
 // ── Transfer lines ─────────────────────────────────────────────────────────────
 // Returns one row per product line. The DT table denormalises FTPthBchFrm/To
-// so we can filter without a join. Join to header on FTBchCode + FTPthDocNo.
+// so we can filter without a join. Preserve the source composite identity
+// FTBchCode + FTPthDocType + FTPthDocNo on every line; the transformer then
+// projects the backward-compatible persistence branch key.
 export async function getTransferLineRows(pool, branchCode, periodDays) {
   const req = pool.request();
   req.input("branchCode", sql.VarChar(3), branchCode);
@@ -361,6 +363,7 @@ export async function getTransferLineRows(pool, branchCode, periodDays) {
     SELECT
       FTBchCode,
       FTPthDocNo,
+      FTPthDocType,
       FNPtdSeqNo,
       FTPdtCode,
       FTPunCode,
