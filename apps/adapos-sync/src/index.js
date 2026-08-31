@@ -99,7 +99,12 @@ async function fetchDatasets(pool, config = defaultSyncConfig) {
     data.transfers = await getTransferHeaderRows(pool, branchCode, PERIOD_DAYS);
   }
   if (datasets.includes("transfer_lines")) {
-    data.transfer_lines = await getTransferLineRows(pool, branchCode, PERIOD_DAYS);
+    data.transfer_lines = await getTransferLineRows(
+      pool,
+      branchCode,
+      PERIOD_DAYS,
+      config.deltaShadowTransfers?.enabled === true,
+    );
   }
   if (datasets.includes("pending_receipts")) {
     data.pending_receipt_headers = await getPendingReceiptHeaderRows(pool, branchCode);

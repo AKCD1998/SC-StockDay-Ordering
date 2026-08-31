@@ -52,9 +52,30 @@ test("sales-detail line query syncs both sale (1) and return (9) lines", async (
   assert.match(sql, /FCSdtRePackAvg/);
 });
 
-test("transfer line query preserves the complete backend document identity", async () => {
+test("transfer line query defaults to the legacy field list", async () => {
+  const defaultPool = fakePool();
+  const explicitOffPool = fakePool();
+  await getTransferLineRows(defaultPool, "005", 30);
+  await getTransferLineRows(explicitOffPool, "005", 30, false);
+  const { sql, inputs } = defaultPool.calls[0];
+  assert.equal(sql, explicitOffPool.calls[0].sql);
+  const selectColumns = sql
+    .match(/SELECT\s+([\s\S]+?)\s+FROM/)[1]
+    .split(",")
+    .map((field) => field.trim());
+  assert.deepEqual(selectColumns, [
+    "FTBchCode", "FTPthDocNo", "FNPtdSeqNo", "FTPdtCode", "FTPunCode",
+    "FTPtdUnitName", "FCPtdFactor", "FCPtdQty", "FCPtdQtyAll", "FCPtdCost",
+    "FCPtdCostIn", "FCPtdNet", "FCPtdVat", "FTPthBchFrm", "FTPthBchTo",
+    "FTPthWhFrm", "FTPthWhTo", "FDPthDocDate",
+  ]);
+  assert.doesNotMatch(sql, /FTPthDocType/);
+  assert.equal(inputs.branchCode, "005");
+});
+
+test("transfer line query includes document type when composite identity is enabled", async () => {
   const pool = fakePool();
-  await getTransferLineRows(pool, "005", 30);
+  await getTransferLineRows(pool, "005", 30, true);
   const { sql, inputs } = pool.calls[0];
   assert.match(sql, /FTBchCode/);
   assert.match(sql, /FTPthDocNo/);

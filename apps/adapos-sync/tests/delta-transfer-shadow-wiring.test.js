@@ -70,6 +70,40 @@ function runtime({ cacheDir, enabled, data, postTransfer, runTransferShadow, tra
   };
 }
 
+async function captureTransferLineQuery(enabled) {
+  const queries = [];
+  const pool = {
+    request() {
+      const req = {
+        input() { return req; },
+        async query(sql) {
+          queries.push(sql);
+          return { recordset: [] };
+        },
+      };
+      return req;
+    },
+    async close() {},
+  };
+  await runOnce({
+    syncConfig: {
+      ...config("unused", enabled),
+      datasets: ["transfer_lines"],
+      dryRun: true,
+    },
+    connectSql: async () => pool,
+  });
+  assert.equal(queries.length, 1);
+  return queries[0];
+}
+
+test("sync config routes the Transfer flag to the line query", async () => {
+  const offSql = await captureTransferLineQuery(false);
+  const onSql = await captureTransferLineQuery(true);
+  assert.doesNotMatch(offSql, /FTPthDocType/);
+  assert.match(onSql, /FTPthDocType/);
+});
+
 test("feature OFF preserves Full transfer behavior and never calls the shadow", async () => {
   const candidate = runtime({
     cacheDir: "unused",

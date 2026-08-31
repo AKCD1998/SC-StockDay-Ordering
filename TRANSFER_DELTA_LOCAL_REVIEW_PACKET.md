@@ -2,13 +2,23 @@
 
 ## Status and isolation
 
-- Status: **RELEASE CANDIDATE — AUTHORIZED FOR COMMIT AND PR REVIEW**
+- Status: **READY FOR TECH LEAD REVIEW — LOCAL-ONLY BLOCKER FIX**
 - Worktree: `C:\Users\scgro\Desktop\Webapp training project\SC-StockDay-Ordering.transfer-delta-local-2026-08-28`
 - Branch: `codex/transfer-delta-local-2026-08-28`
-- Candidate baseline: `2432890753a4e506ade9b602dd637c674ce6fe84`
-- Intended release state: committed to the candidate branch and submitted by PR; unmerged and undeployed
+- Starting HEAD / existing PR commit: `78b8f34e51821421c99d839838fb527380980fc4`
+- Base before PR #24: `2432890753a4e506ade9b602dd637c674ce6fe84`
+- Current blocker correction: uncommitted local tracked changes for Tech Lead review; PR #24 was not updated
 - Production/config impact: none; no branch environment, schedule, Render setting, or feature flag was changed
 - Backend: `PaaSRTSM-project` was inspected read-only and received no candidate edit
+
+## PR #24 query-gating blocker and disposition
+
+- Root cause: `fetchDatasets()` always called `getTransferLineRows()` without the Transfer flag, while that query always selected `FTPthDocType`. This exposed every flag-OFF branch to the new AdaAcc field requirement.
+- `getTransferLineRows()` now accepts `includeCompositeIdentity`, defaulting to `false` for legacy callers.
+- `fetchDatasets()` passes the strict boolean `config.deltaShadowTransfers?.enabled === true` into the query.
+- Flag OFF/default: the runtime SQL is the legacy Transfer-line query and does not select `FTPthDocType`; query predicates, parameters, ordering, and every other selected field remain unchanged.
+- Flag ON: the same query additionally selects `FTPthDocType`, enabling composite `(branchCode, docType, docNo)` processing.
+- Regression coverage uses a fake SQL pool through the real `runOnce()`/`fetchDatasets()` route to prove the config-to-query OFF/ON behavior; it does not rely only on source-text inspection.
 
 ## Round-2 blockers and disposition
 
@@ -17,7 +27,7 @@
 3. **Full chunk acknowledgements:** every Transfer chunk must acknowledge exactly the header/line counts sent; missing, partial, non-integer, or excessive counts fail before Shadow/cache advancement; regression coverage added.
 4. **Adversarial Full-vs-Delta:** added a forged-unchanged fingerprint test that changes both header and line content and proves the content comparison reports a mismatch.
 5. **Review packet / CLAIM-X-236:** updated to the observed round-2 results below.
-6. **Fleet-wide Full-transfer isolation:** fixed after final Tech Lead review. With Transfer Shadow OFF, the Agent keeps the deployed Full payload, `docNo` chunking, and acknowledgement behavior. Composite identity, strict header ownership, and exact acknowledgements activate only when `ADAPOS_DELTA_SHADOW_TRANSFERS=true`.
+6. **Fleet-wide Full-transfer isolation:** payload, `docNo` chunking, acknowledgement behavior, and now the Transfer-line SQL field list all stay on the deployed legacy path while Transfer Shadow is OFF. Composite line-field selection, composite identity, strict header ownership, and exact acknowledgements activate only when `ADAPOS_DELTA_SHADOW_TRANSFERS=true`.
 
 ## Read-only evidence: AdaAcc branch 004
 
@@ -121,7 +131,7 @@ This order is deliberate:
 
 The line is matched to a source header first (using `FTBchCode` when present), then receives the header's persistence branch projection. Header, line, chunk, fingerprint, and Full projection therefore share the same tuple.
 
-When Transfer Shadow is OFF, `toTransferPayload` and document chunking keep the deployed Full-transfer body and `docNo` grouping. They do not add line `docType`/`branchCode`, do not add header `branchCode`, and do not run the new composite validation. A wiring regression test captures the outbound body and locks this isolation behavior.
+When Transfer Shadow is OFF, the line query omits `FTPthDocType`, and `toTransferPayload` plus document chunking keep the deployed Full-transfer body and `docNo` grouping. They do not add line `docType`/`branchCode`, do not add header `branchCode`, and do not run the new composite validation. Wiring regression tests capture both the generated SQL and outbound body to lock this isolation behavior.
 
 ## Fail-closed orphan handling
 
@@ -160,8 +170,10 @@ When Transfer Shadow is OFF, the Agent retains the deployed acknowledgement fall
 ```text
 AdaAcc HD/DT rows
   (unchanged Full query scope; branch 004 observed type 4/7/8 only)
-  -> Transfer flag OFF: deployed Full payload/chunk/ack path; stop
+  -> Transfer flag OFF: legacy DT field list without FTPthDocType;
+                        deployed Full payload/chunk/ack path; stop
   -> Transfer flag ON:
+       DT query additionally selects FTPthDocType
        Full transformer validates header-owned composite identity
        strict composite chunking
        authoritative Full POST(s)
@@ -190,7 +202,7 @@ cd apps/adapos-sync
 node --test tests/delta-transfer-shadow.test.js tests/delta-transfer-shadow-wiring.test.js tests/queries.test.js
 ```
 
-Observed: **26/26 passed**.
+Observed: **28/28 passed**.
 
 Full Agent regression suite:
 
@@ -199,8 +211,10 @@ cd apps/adapos-sync
 npm test
 ```
 
-Observed: **165 tests, 165 passed, 0 failed**. Coverage includes the six round-2 regressions plus final flag-isolation assertions:
+Observed: **167 tests, 167 passed, 0 failed**. Coverage includes the six round-2 regressions plus final flag-isolation assertions:
 
+- default and explicit-OFF Transfer-line queries omit `FTPthDocType`, while ON includes it,
+- the real sync config route carries OFF/ON through `fetchDatasets()` to a fake SQL pool correctly,
 - persistence key keeps `branchFrm` and falls back to `FTBchCode` only when blank,
 - complete orphan composite fails in transformer/chunker,
 - orphan cannot be counted/cached by Shadow,
@@ -219,6 +233,16 @@ Additional observed checks:
 - Transfer shadow default is false and the Transfer Content Capture allowlist is empty.
 
 ## Files changed
+
+Current uncommitted local blocker correction:
+
+- `apps/adapos-sync/src/queries.js`
+- `apps/adapos-sync/src/index.js`
+- `apps/adapos-sync/tests/queries.test.js`
+- `apps/adapos-sync/tests/delta-transfer-shadow-wiring.test.js`
+- `TRANSFER_DELTA_LOCAL_REVIEW_PACKET.md`
+
+Existing PR #24 candidate:
 
 Client/runtime:
 
@@ -278,4 +302,4 @@ Before the encoded read-only query was run, an overly broad repository text sear
 4. docType 2/3 query coverage requires a separate future authorization and review.
 5. Future Content Capture scope/retention and any dormant-code release remain separate decisions.
 
-The Tech Lead round-2 verdict and final fleet-isolation correction are recorded here. Commit, push, and PR creation were authorized on 2026-08-31; this packet does not authorize merge, deployment, configuration changes, or production enablement.
+The Tech Lead round-2 verdict and this local query-gating correction are recorded here. The existing PR commit predates this correction. This review round made no commit, push, PR update, merge, deployment, configuration change, or production enablement.
