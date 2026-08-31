@@ -38,26 +38,145 @@ export function toProductRecords(rows) {
   }));
 }
 
-export function toTransferPayload(headerRows, lineRows) {
-  return {
-    headers: headerRows.map((h) => ({
-      docNo:     h.FTPthDocNo,
-      docType:   h.FTPthDocType   || null,
-      docDate:   toBangkokDateString(h.FDPthDocDate),
-      tnfDate:   toBangkokDateString(h.FDPthTnfDate),
-      branchFrm: h.FTPthBchFrm,
-      branchTo:  h.FTPthBchTo,
-      whFrm:     h.FTPthWhFrm     || null,
-      whTo:      h.FTPthWhTo      || null,
-      type:      h.FTPthType      || null,
-      total:     Number(h.FCPthTotal  || 0),
-      vat:       Number(h.FCPthVat    || 0),
-      grand:     Number(h.FCPthGrand  || 0),
-      deptCode:  h.FTDptCode      || null,
-      usrCode:   h.FTUsrCode      || null,
-    })),
-    lines: lineRows.map((l) => ({
+function transferSourceIdentity(value) {
+  return value == null ? "" : String(value).trim();
+}
+
+function transferSourceBranchIdentity(record) {
+  return transferSourceIdentity(record.FTBchCode) || transferSourceIdentity(record.FTPthBchFrm);
+}
+
+function transferPersistenceBranchIdentity(record) {
+  // Preserve the key older Full payloads established through the backend's
+  // branchFrm fallback. FTBchCode fills only source rows (observed types 2/3)
+  // where branchFrm is empty and no valid Postgres key previously existed.
+  return transferSourceIdentity(record.FTPthBchFrm) || transferSourceIdentity(record.FTBchCode);
+}
+
+function indexTransferHeadersByDocNo(headerRows) {
+  const byDocNo = new Map();
+  for (const header of headerRows) {
+    const docNo = transferSourceIdentity(header.FTPthDocNo);
+    if (!byDocNo.has(docNo)) byDocNo.set(docNo, []);
+    byDocNo.get(docNo).push(header);
+  }
+  return byDocNo;
+}
+
+function transferHeaderCandidates(headersByDocNo, line) {
+  const docNo = transferSourceIdentity(line.FTPthDocNo);
+  const docType = transferSourceIdentity(line.FTPthDocType);
+  const sourceBranchCode = transferSourceIdentity(line.FTBchCode);
+  const persistenceBranchCode = transferSourceIdentity(line.FTPthBchFrm);
+
+  return (headersByDocNo.get(docNo) ?? []).filter((header) => {
+    if (docType && transferSourceIdentity(header.FTPthDocType) !== docType) return false;
+    if (sourceBranchCode && transferSourceBranchIdentity(header) !== sourceBranchCode) return false;
+    if (!sourceBranchCode && persistenceBranchCode && transferPersistenceBranchIdentity(header) !== persistenceBranchCode) return false;
+    return true;
+  });
+}
+
+function resolveTransferLineIdentity(headersByDocNo, line) {
+  const candidates = transferHeaderCandidates(headersByDocNo, line);
+  const identities = new Map(candidates.map((candidate) => {
+    const identity = {
+      docType: transferSourceIdentity(candidate.FTPthDocType),
+      branchCode: transferPersistenceBranchIdentity(candidate),
+    };
+    return [JSON.stringify([identity.branchCode, identity.docType]), identity];
+  }));
+
+  if (identities.size === 0 &&
+      transferSourceIdentity(line.FTPthDocNo) &&
+      transferSourceIdentity(line.FTPthDocType) &&
+      transferSourceBranchIdentity(line)) {
+    throw new Error(
+      "Transfer line has no matching header for composite identity (branchCode, docType, docNo).",
+    );
+  }
+
+  if (identities.size !== 1) {
+    throw new Error("Transfer line identity requires an unambiguous branch code and document type.");
+  }
+
+  const [identity] = identities.values();
+  if (!identity.docType || !identity.branchCode) {
+    throw new Error("Transfer line identity requires an unambiguous branch code and document type.");
+  }
+  return identity;
+}
+
+export function toTransferPayload(headerRows, lineRows, { compositeIdentity = false } = {}) {
+  // Preserve the deployed Full-transfer contract unless Transfer Shadow is
+  // explicitly enabled. This keeps the new identity validation from changing
+  // branches that are not participating in the Transfer acceptance window.
+  if (!compositeIdentity) {
+    return {
+      headers: headerRows.map((h) => ({
+        docNo:     h.FTPthDocNo,
+        docType:   h.FTPthDocType   || null,
+        docDate:   toBangkokDateString(h.FDPthDocDate),
+        tnfDate:   toBangkokDateString(h.FDPthTnfDate),
+        branchFrm: h.FTPthBchFrm,
+        branchTo:  h.FTPthBchTo,
+        whFrm:     h.FTPthWhFrm     || null,
+        whTo:      h.FTPthWhTo      || null,
+        type:      h.FTPthType      || null,
+        total:     Number(h.FCPthTotal  || 0),
+        vat:       Number(h.FCPthVat    || 0),
+        grand:     Number(h.FCPthGrand  || 0),
+        deptCode:  h.FTDptCode      || null,
+        usrCode:   h.FTUsrCode      || null,
+      })),
+      lines: lineRows.map((l) => ({
+        docNo:       l.FTPthDocNo,
+        seqNo:       Number(l.FNPtdSeqNo),
+        productCode: l.FTPdtCode      || null,
+        unitCode:    l.FTPunCode      || null,
+        unitName:    l.FTPtdUnitName  || null,
+        factor:      Number(l.FCPtdFactor  ?? 1),
+        qty:         Number(l.FCPtdQty     || 0),
+        qtyBase:     Number(l.FCPtdQtyAll  || 0),
+        cost:        Number(l.FCPtdCost    || 0),
+        costIn:      Number(l.FCPtdCostIn  || 0),
+        net:         Number(l.FCPtdNet     || 0),
+        vat:         Number(l.FCPtdVat     || 0),
+        branchFrm:   l.FTPthBchFrm    || null,
+        branchTo:    l.FTPthBchTo     || null,
+        whFrm:       l.FTPthWhFrm     || null,
+        whTo:        l.FTPthWhTo      || null,
+        docDate:     toBangkokDateString(l.FDPthDocDate),
+      })),
+    };
+  }
+
+  // Avoid an O(headers × lines) orphan check on real branch-sized scans.
+  // Sparse matching only examines headers sharing the same document number.
+  const headersByDocNo = indexTransferHeadersByDocNo(headerRows);
+  const headers = headerRows.map((h) => ({
+    docNo:     h.FTPthDocNo,
+    docType:   h.FTPthDocType   || null,
+    branchCode: transferPersistenceBranchIdentity(h) || null,
+    docDate:   toBangkokDateString(h.FDPthDocDate),
+    tnfDate:   toBangkokDateString(h.FDPthTnfDate),
+    branchFrm: h.FTPthBchFrm,
+    branchTo:  h.FTPthBchTo,
+    whFrm:     h.FTPthWhFrm     || null,
+    whTo:      h.FTPthWhTo      || null,
+    type:      h.FTPthType      || null,
+    total:     Number(h.FCPthTotal  || 0),
+    vat:       Number(h.FCPthVat    || 0),
+    grand:     Number(h.FCPthGrand  || 0),
+    deptCode:  h.FTDptCode      || null,
+    usrCode:   h.FTUsrCode      || null,
+  }));
+  const lines = lineRows.map((l) => {
+    const identity = resolveTransferLineIdentity(headersByDocNo, l);
+    return {
       docNo:       l.FTPthDocNo,
+      docType:     identity.docType,
+      branchCode:  identity.branchCode,
       seqNo:       Number(l.FNPtdSeqNo),
       productCode: l.FTPdtCode      || null,
       unitCode:    l.FTPunCode      || null,
@@ -74,8 +193,23 @@ export function toTransferPayload(headerRows, lineRows) {
       whFrm:       l.FTPthWhFrm     || null,
       whTo:        l.FTPthWhTo      || null,
       docDate:     toBangkokDateString(l.FDPthDocDate),
-    })),
-  };
+    };
+  });
+
+  // Full transfer ingestion is header-owned. A line-only tuple would be
+  // ignored by document chunking and cannot be safely upserted as a child of
+  // some other document. Refuse the whole run before POSTing or shadow-cache
+  // advancement instead of silently dropping/counting different row sets.
+  const headerKeys = new Set(headers.map(payloadDocumentKey));
+  for (const line of lines) {
+    if (!headerKeys.has(payloadDocumentKey(line))) {
+      throw new Error(
+        "Transfer line has no matching header for composite identity (branchCode, docType, docNo).",
+      );
+    }
+  }
+
+  return { headers, lines };
 }
 
 // ── Pending purchase receipts ──────────────────────────────────────────────────
@@ -323,15 +457,38 @@ export function toSalesDetailPayload(headerRows, lineRows) {
 // queries, so a branch with a big day can build a payload that takes longer
 // to commit than the client's request timeout. Chunking by document count
 // bounds each request/transaction to a predictable size.
-export function chunkPayloadByDoc(payload, maxDocsPerChunk) {
+function payloadDocumentKey(record) {
+  return JSON.stringify([
+    String(record.branchCode ?? "").trim(),
+    String(record.docType ?? "").trim(),
+    String(record.docNo ?? "").trim(),
+  ]);
+}
+
+export function chunkPayloadByDoc(payload, maxDocsPerChunk, { requireMatchingHeaders = false } = {}) {
   const { headers, lines, ...rest } = payload;
+  const documentKey = requireMatchingHeaders
+    ? payloadDocumentKey
+    : (record) => record.docNo;
+
+  if (requireMatchingHeaders) {
+    const headerKeys = new Set(headers.map(payloadDocumentKey));
+    for (const line of lines) {
+      if (!headerKeys.has(payloadDocumentKey(line))) {
+        throw new Error(
+          "Document chunking refused a line without a matching composite header identity.",
+        );
+      }
+    }
+  }
+
   if (headers.length === 0) {
     return lines.length > 0 ? [{ ...rest, headers: [], lines }] : [];
   }
 
   const linesByDoc = new Map();
   for (const line of lines) {
-    const key = line.docNo;
+    const key = documentKey(line);
     if (!linesByDoc.has(key)) linesByDoc.set(key, []);
     linesByDoc.get(key).push(line);
   }
@@ -339,7 +496,7 @@ export function chunkPayloadByDoc(payload, maxDocsPerChunk) {
   const chunks = [];
   for (let i = 0; i < headers.length; i += maxDocsPerChunk) {
     const headerChunk = headers.slice(i, i + maxDocsPerChunk);
-    const lineChunk = headerChunk.flatMap((h) => linesByDoc.get(h.docNo) ?? []);
+    const lineChunk = headerChunk.flatMap((h) => linesByDoc.get(documentKey(h)) ?? []);
     chunks.push({ ...rest, headers: headerChunk, lines: lineChunk });
   }
   return chunks;

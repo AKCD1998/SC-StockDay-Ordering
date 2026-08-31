@@ -146,6 +146,19 @@ export const syncConfig = {
         .filter(Boolean),
     ),
   },
+  // Transfer Delta + Content Capture candidate. Fully independent from the
+  // sales flags/cache file and off unless explicitly enabled. Enabling it
+  // activates composite Full-transfer validation before the local shadow.
+  deltaShadowTransfers: {
+    enabled: String(process.env.ADAPOS_DELTA_SHADOW_TRANSFERS ?? "false") === "true",
+    cacheDir: process.env.ADAPOS_DELTA_SHADOW_CACHE_DIR || defaultDeltaShadowCacheDir(),
+    contentCaptureBranches: new Set(
+      String(process.env.ADAPOS_DELTA_SHADOW_TRANSFER_CONTENT_CAPTURE_BRANCHES ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  },
 };
 
 // Kept separate from parsing so the production entrypoint can be executed with

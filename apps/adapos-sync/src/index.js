@@ -32,6 +32,7 @@ import {
 } from "./sync-v2.js";
 import { toProductRecords, toSalesRecords, toSalesDetailPayload, chunkPayloadByDoc, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toStockSnapshotRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
 import { runSalesShadow as defaultRunSalesShadow } from "./delta/salesShadow.js";
+import { runTransferShadow as defaultRunTransferShadow } from "./delta/transferShadow.js";
 
 const PERIOD_DAYS = 30;
 
@@ -98,7 +99,12 @@ async function fetchDatasets(pool, config = defaultSyncConfig) {
     data.transfers = await getTransferHeaderRows(pool, branchCode, PERIOD_DAYS);
   }
   if (datasets.includes("transfer_lines")) {
-    data.transfer_lines = await getTransferLineRows(pool, branchCode, PERIOD_DAYS);
+    data.transfer_lines = await getTransferLineRows(
+      pool,
+      branchCode,
+      PERIOD_DAYS,
+      config.deltaShadowTransfers?.enabled === true,
+    );
   }
   if (datasets.includes("pending_receipts")) {
     data.pending_receipt_headers = await getPendingReceiptHeaderRows(pool, branchCode);
@@ -152,6 +158,7 @@ export async function runOnce(dependencies = {}) {
   const waitForApplied = dependencies.waitForApplied ?? defaultWaitForApplied;
   const completeSyncRun = dependencies.completeSyncRun ?? defaultCompleteSyncRun;
   const runSalesShadow = dependencies.runSalesShadow ?? defaultRunSalesShadow;
+  const runTransferShadow = dependencies.runTransferShadow ?? defaultRunTransferShadow;
   const connectSql = dependencies.connectSql ?? ((config) => sql.connect(config));
   const fetchData = dependencies.fetchDatasets ?? fetchDatasets;
   const connectionConfig = dependencies.sqlServerConfig ?? sqlServerConfig;
@@ -387,22 +394,75 @@ export async function runOnce(dependencies = {}) {
       if (data.transfers?.length || data.transfer_lines?.length) {
         const hCount = data.transfers?.length ?? 0;
         const lCount = data.transfer_lines?.length ?? 0;
-        const transferPayload = toTransferPayload(data.transfers ?? [], data.transfer_lines ?? []);
-        const transferChunks = chunkPayloadByDoc(transferPayload, syncConfig.transferChunkDocs);
+        const transferShadowEnabled = syncConfig.deltaShadowTransfers?.enabled === true;
+        const transferPayload = toTransferPayload(
+          data.transfers ?? [],
+          data.transfer_lines ?? [],
+          { compositeIdentity: transferShadowEnabled },
+        );
+        const transferChunks = chunkPayloadByDoc(
+          transferPayload,
+          syncConfig.transferChunkDocs,
+          { requireMatchingHeaders: transferShadowEnabled },
+        );
         console.log(`Posting ${hCount} transfer headers, ${lCount} lines in ${transferChunks.length} chunk(s) of up to ${syncConfig.transferChunkDocs} docs...`);
         let hAccepted = 0;
         let lAccepted = 0;
         for (const [chunkIndex, chunk] of transferChunks.entries()) {
           // eslint-disable-next-line no-await-in-loop
           const result = await postJson(`${syncConfig.apiBaseUrl}/api/sync/ada/transfers`, chunk);
-          const chunkHAccepted = result.acceptedHeaders ?? result.headersAccepted ?? 0;
-          const chunkLAccepted = result.acceptedLines   ?? result.linesAccepted   ?? 0;
+          const reportedHAccepted = transferShadowEnabled
+            ? (result?.acceptedHeaders ?? result?.headersAccepted)
+            : (result.acceptedHeaders ?? result.headersAccepted ?? 0);
+          const reportedLAccepted = transferShadowEnabled
+            ? (result?.acceptedLines ?? result?.linesAccepted)
+            : (result.acceptedLines ?? result.linesAccepted ?? 0);
+          const chunkHAccepted = reportedHAccepted;
+          const chunkLAccepted = reportedLAccepted;
+          const acknowledgementIsExact =
+            Number.isSafeInteger(chunkHAccepted) &&
+            Number.isSafeInteger(chunkLAccepted) &&
+            chunkHAccepted === chunk.headers.length &&
+            chunkLAccepted === chunk.lines.length;
+          if (transferShadowEnabled && !acknowledgementIsExact) {
+            const receivedHeaders = chunkHAccepted === undefined ? "missing" : String(chunkHAccepted);
+            const receivedLines = chunkLAccepted === undefined ? "missing" : String(chunkLAccepted);
+            throw new Error(
+              `Transfer chunk ${chunkIndex + 1}/${transferChunks.length} acknowledgement mismatch: ` +
+              `expected ${chunk.headers.length} headers and ${chunk.lines.length} lines; ` +
+              `received ${receivedHeaders} headers and ${receivedLines} lines.`,
+            );
+          }
           hAccepted += chunkHAccepted;
           lAccepted += chunkLAccepted;
           console.log(`  chunk ${chunkIndex + 1}/${transferChunks.length}: ${chunkHAccepted} headers, ${chunkLAccepted} lines accepted`);
         }
+        if (transferShadowEnabled && (hAccepted !== hCount || lAccepted !== lCount)) {
+          throw new Error(
+            `Transfer acknowledgement total mismatch: expected ${hCount} headers and ${lCount} lines; ` +
+            `received ${hAccepted} headers and ${lAccepted} lines.`,
+          );
+        }
         console.log(`  transfers: ${hAccepted} headers, ${lAccepted} lines accepted`);
         totalSent += hAccepted + lAccepted;
+
+        // Transfer Delta is shadow-only and intentionally runs after every
+        // authoritative Full transfer chunk has succeeded. A POST failure
+        // exits above, so the transfer cache can never advance first.
+        if (transferShadowEnabled) {
+          try {
+            const shadow = runTransferShadow({
+              branchCode: syncConfig.branchCode,
+              headerRows: data.transfers ?? [],
+              lineRows: data.transfer_lines ?? [],
+              cacheDir: syncConfig.deltaShadowTransfers.cacheDir,
+              contentCaptureBranches: syncConfig.deltaShadowTransfers.contentCaptureBranches,
+            });
+            console.log(`  [delta-shadow:transfers] ${JSON.stringify(shadow)}`);
+          } catch (shadowErr) {
+            console.warn(`  WARN: delta shadow (transfers) failed, ignored — Full Sync is unaffected: ${shadowErr.message}`);
+          }
+        }
       }
 
       if (data.pending_receipt_headers?.length || data.pending_receipt_lines?.length) {

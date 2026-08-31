@@ -352,15 +352,17 @@ export async function getTransferHeaderRows(pool, branchCode, periodDays) {
 
 // ── Transfer lines ─────────────────────────────────────────────────────────────
 // Returns one row per product line. The DT table denormalises FTPthBchFrm/To
-// so we can filter without a join. Join to header on FTBchCode + FTPthDocNo.
-export async function getTransferLineRows(pool, branchCode, periodDays) {
+// so we can filter without a join. The legacy query omits FTPthDocType; only
+// Transfer Delta needs that extra field for its composite source identity.
+export async function getTransferLineRows(pool, branchCode, periodDays, includeCompositeIdentity = false) {
   const req = pool.request();
   req.input("branchCode", sql.VarChar(3), branchCode);
   req.input("periodDays", sql.Int, periodDays);
+  const docTypeSelect = includeCompositeIdentity ? "\n      FTPthDocType," : "";
   const result = await req.query(`
     SELECT
       FTBchCode,
-      FTPthDocNo,
+      FTPthDocNo,${docTypeSelect}
       FNPtdSeqNo,
       FTPdtCode,
       FTPunCode,
