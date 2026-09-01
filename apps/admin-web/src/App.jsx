@@ -3103,7 +3103,7 @@ export function BranchStockPanel({
               </div>
               <button
                 type="button"
-                className="ghost-button dialog-close-button"
+                className="ghost-button dialog-close-button branch-stock-column-close-button"
                 onClick={() => setColumnEditorOpen(false)}
                 disabled={Boolean(columnEditorBusyAction)}
               >
@@ -3156,7 +3156,7 @@ export function BranchStockPanel({
             <div className="dialog-actions branch-stock-column-editor-actions">
               <button
                 type="button"
-                className="ghost-button"
+                className="ghost-button branch-stock-column-reset-button"
                 onClick={resetColumnEditorToDefault}
                 disabled={Boolean(columnEditorBusyAction)}
               >
@@ -3165,7 +3165,7 @@ export function BranchStockPanel({
               <div>
                 <button
                   type="button"
-                  className="ghost-button"
+                  className="ghost-button branch-stock-column-cancel-button"
                   onClick={() => setColumnEditorOpen(false)}
                   disabled={Boolean(columnEditorBusyAction)}
                 >
