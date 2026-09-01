@@ -3822,7 +3822,7 @@ th {
   grid-template-columns: 26px 34px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  min-height: 48px;
+  min-height: 56px;
   padding: 8px 10px;
   border: 1px solid #d6deea;
   border-radius: 12px;
