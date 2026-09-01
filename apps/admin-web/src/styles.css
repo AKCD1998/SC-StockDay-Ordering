@@ -3895,16 +3895,16 @@ th {
 }
 
 .branch-stock-column-cancel-button {
-  border-color: #93c5fd;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-color: #c62828;
+  background: linear-gradient(180deg, #ef5350 0%, #d32f2f 100%);
+  color: #fff;
 }
 
 .branch-stock-column-cancel-button:hover:not(:disabled),
 .branch-stock-column-cancel-button:focus-visible:not(:disabled) {
-  border-color: #60a5fa;
-  background: #dbeafe;
-  color: #1e40af;
+  border-color: #b91c1c;
+  background: linear-gradient(180deg, #f16663 0%, #dc2f2f 100%);
+  color: #fff;
 }
 
 .branch-stock-column-loading-overlay {
@@ -3977,16 +3977,16 @@ th {
 }
 
 [data-theme="dark"] .branch-stock-column-cancel-button {
-  border-color: #3b82f6;
-  background: rgba(29, 78, 216, 0.24);
-  color: #dbeafe;
+  border-color: #ef4444;
+  background: linear-gradient(180deg, #ef5350 0%, #b91c1c 100%);
+  color: #fff;
 }
 
 [data-theme="dark"] .branch-stock-column-cancel-button:hover:not(:disabled),
 [data-theme="dark"] .branch-stock-column-cancel-button:focus-visible:not(:disabled) {
-  border-color: #60a5fa;
-  background: rgba(29, 78, 216, 0.38);
-  color: #eff6ff;
+  border-color: #f87171;
+  background: linear-gradient(180deg, #f87171 0%, #c62828 100%);
+  color: #fff;
 }
 
 [data-theme="dark"] .branch-stock-column-loading-overlay {
