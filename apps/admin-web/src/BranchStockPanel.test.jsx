@@ -310,6 +310,9 @@ describe("BranchStockPanel branch scope", () => {
     await screen.findByText("A001");
 
     await user.click(screen.getByRole("button", { name: "จัดคอลัมน์" }));
+    expect(screen.getByRole("button", { name: "ปิด" })).toHaveClass("branch-stock-column-close-button");
+    expect(screen.getByRole("button", { name: "คืนค่าเริ่มต้น" })).toHaveClass("branch-stock-column-reset-button");
+    expect(screen.getByRole("button", { name: "ยกเลิก" })).toHaveClass("branch-stock-column-cancel-button");
     await user.click(screen.getByRole("button", { name: "คืนค่าเริ่มต้น" }));
     expect(screen.getByRole("status")).toHaveTextContent("กำลังคืนค่าลำดับเริ่มต้น");
     expect(screen.getByRole("button", { name: "บันทึกลำดับ" })).toBeDisabled();

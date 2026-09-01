@@ -3868,6 +3868,45 @@ th {
   align-items: center;
 }
 
+.branch-stock-column-close-button {
+  border-color: #fda4af;
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.branch-stock-column-close-button:hover:not(:disabled),
+.branch-stock-column-close-button:focus-visible:not(:disabled) {
+  border-color: #fb7185;
+  background: #ffe4e6;
+  color: #9f1239;
+}
+
+.branch-stock-column-reset-button {
+  border-color: #fdba74;
+  background: #fff7ed;
+  color: #b45309;
+}
+
+.branch-stock-column-reset-button:hover:not(:disabled),
+.branch-stock-column-reset-button:focus-visible:not(:disabled) {
+  border-color: #fb923c;
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.branch-stock-column-cancel-button {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.branch-stock-column-cancel-button:hover:not(:disabled),
+.branch-stock-column-cancel-button:focus-visible:not(:disabled) {
+  border-color: #60a5fa;
+  background: #dbeafe;
+  color: #1e40af;
+}
+
 .branch-stock-column-loading-overlay {
   position: absolute;
   inset: 0;
@@ -3909,6 +3948,45 @@ th {
 [data-theme="dark"] .branch-stock-column-position {
   background: #223753;
   color: #d5e7f8;
+}
+
+[data-theme="dark"] .branch-stock-column-close-button {
+  border-color: #be123c;
+  background: rgba(190, 18, 60, 0.2);
+  color: #fecdd3;
+}
+
+[data-theme="dark"] .branch-stock-column-close-button:hover:not(:disabled),
+[data-theme="dark"] .branch-stock-column-close-button:focus-visible:not(:disabled) {
+  border-color: #fb7185;
+  background: rgba(190, 18, 60, 0.34);
+  color: #fff1f2;
+}
+
+[data-theme="dark"] .branch-stock-column-reset-button {
+  border-color: #c2410c;
+  background: rgba(180, 83, 9, 0.24);
+  color: #fed7aa;
+}
+
+[data-theme="dark"] .branch-stock-column-reset-button:hover:not(:disabled),
+[data-theme="dark"] .branch-stock-column-reset-button:focus-visible:not(:disabled) {
+  border-color: #fb923c;
+  background: rgba(194, 65, 12, 0.38);
+  color: #fff7ed;
+}
+
+[data-theme="dark"] .branch-stock-column-cancel-button {
+  border-color: #3b82f6;
+  background: rgba(29, 78, 216, 0.24);
+  color: #dbeafe;
+}
+
+[data-theme="dark"] .branch-stock-column-cancel-button:hover:not(:disabled),
+[data-theme="dark"] .branch-stock-column-cancel-button:focus-visible:not(:disabled) {
+  border-color: #60a5fa;
+  background: rgba(29, 78, 216, 0.38);
+  color: #eff6ff;
 }
 
 [data-theme="dark"] .branch-stock-column-loading-overlay {
