@@ -84,6 +84,7 @@ function makeJsonResponse(records) {
 
 function renderPanel({
   isAdminUser = false,
+  userId = isAdminUser ? "admin-test" : "staff-test",
   isOnlineMarketingStaff = true,
   branchCode = "000",
   records = STOCK_RECORDS,
@@ -94,6 +95,7 @@ function renderPanel({
     <BranchStockPanel
       csrfToken="test-csrf"
       isAdminUser={isAdminUser}
+      userId={userId}
       isOnlineMarketingStaff={isOnlineMarketingStaff}
       branchCode={branchCode}
       branchName={`สาขา ${branchCode}`}
@@ -119,6 +121,7 @@ function scopedTotal(productCode) {
 
 describe("BranchStockPanel branch scope", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     xlsxMock.aoaToSheet.mockClear();
     xlsxMock.appendSheet.mockClear();
     xlsxMock.write.mockReset();
@@ -277,6 +280,33 @@ describe("BranchStockPanel branch scope", () => {
     await user.click(screen.getByRole("button", { name: "เปิดตัวเลือกส่งออก Excel แยกตามสาขา" }));
     expect(screen.getByRole("dialog", { name: "ส่งออก Excel แยกตามสาขา" })).toBeInTheDocument();
     expect(xlsxMock.aoaToSheet).not.toHaveBeenCalled();
+  });
+
+  it("lets an admin save a private column order without changing another account", async () => {
+    const user = userEvent.setup();
+    renderPanel({ isAdminUser: true, isOnlineMarketingStaff: false, userId: "admin-a" });
+    await screen.findByText("A001");
+
+    await user.click(screen.getByRole("button", { name: "จัดคอลัมน์" }));
+    await user.click(screen.getByRole("button", { name: "ย้าย รหัสสินค้า ขึ้น" }));
+    await user.click(screen.getByRole("button", { name: "บันทึกลำดับ" }));
+    expect(headerKeys().slice(0, 2)).toEqual(["productCode", "productNameThai"]);
+
+    cleanup();
+    renderPanel({ isAdminUser: true, isOnlineMarketingStaff: false, userId: "admin-a" });
+    await screen.findByText("A001");
+    expect(headerKeys().slice(0, 2)).toEqual(["productCode", "productNameThai"]);
+
+    cleanup();
+    renderPanel({ isAdminUser: true, isOnlineMarketingStaff: false, userId: "admin-b" });
+    await screen.findByText("A001");
+    expect(headerKeys().slice(0, 2)).toEqual(["productNameThai", "productCode"]);
+  });
+
+  it("does not expose the column editor to non-admin branch accounts", async () => {
+    renderPanel({ isAdminUser: false, isOnlineMarketingStaff: false, branchCode: "001" });
+    await screen.findByText("A001");
+    expect(screen.queryByRole("button", { name: "จัดคอลัมน์" })).not.toBeInTheDocument();
   });
 
   it("treats missing, invalid, and unknown branch data as zero without crashing", async () => {

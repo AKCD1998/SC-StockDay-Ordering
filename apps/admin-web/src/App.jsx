@@ -21,6 +21,14 @@ import {
   normalizeBranchStockScopeBranchCode,
   projectBranchStockRows,
 } from "./lib/branchStockScope.js";
+import {
+  clearBranchStockColumnOrder,
+  loadBranchStockColumnOrder,
+  moveBranchStockColumn,
+  normalizeBranchStockColumnOrder,
+  reorderBranchStockColumn,
+  saveBranchStockColumnOrder,
+} from "./lib/branchStockColumnPreferences.js";
 import dkshLogoUrl from "./assets/dksh.svg";
 import hansaLogoUrl from "./assets/hansa-logo.png";
 import tnpHealthcareLogoUrl from "./assets/tnp-healthcare-logo.svg";
@@ -1723,6 +1731,7 @@ function PurchaseReceiptsPanel({ branchCode, canViewPrices, canEditLogos, csrfTo
 export function BranchStockPanel({
   csrfToken,
   isAdminUser,
+  userId,
   isOnlineMarketingStaff = false,
   branchCode,
   branchName,
@@ -1788,10 +1797,62 @@ export function BranchStockPanel({
   const [requestDialogError, setRequestDialogError] = useState("");
   const [procurementQty, setProcurementQty] = useState("");
   const [procurementRowOpen, setProcurementRowOpen] = useState(false);
+  const [columnEditorOpen, setColumnEditorOpen] = useState(false);
+  const [columnOrder, setColumnOrder] = useState(() =>
+    loadBranchStockColumnOrder(typeof window === "undefined" ? null : window.localStorage, userId, BRANCH_STOCK_COLUMNS),
+  );
+  const [draftColumnOrder, setDraftColumnOrder] = useState(columnOrder);
+  const [draggedColumnKey, setDraggedColumnKey] = useState("");
   const filterMenuRef = useRef(null);
   const [filterMenuAnchor, setFilterMenuAnchor] = useState(null);
   const requestButtonRef = useRef(null);
   const [flyDots, setFlyDots] = useState([]);
+
+  useEffect(() => {
+    const nextOrder = isAdminUser
+      ? loadBranchStockColumnOrder(
+          typeof window === "undefined" ? null : window.localStorage,
+          userId,
+          BRANCH_STOCK_COLUMNS,
+        )
+      : BRANCH_STOCK_COLUMNS.map((column) => column.key);
+    setColumnOrder(nextOrder);
+    setDraftColumnOrder(nextOrder);
+    setColumnEditorOpen(false);
+  }, [isAdminUser, userId]);
+
+  const draftBranchStockColumns = useMemo(() => {
+    const columnsByKey = new Map(BRANCH_STOCK_COLUMNS.map((column) => [column.key, column]));
+    return normalizeBranchStockColumnOrder(draftColumnOrder, BRANCH_STOCK_COLUMNS).map((key) => columnsByKey.get(key));
+  }, [draftColumnOrder]);
+
+  function openColumnEditor() {
+    setDraftColumnOrder(columnOrder);
+    setDraggedColumnKey("");
+    setColumnEditorOpen(true);
+  }
+
+  function saveColumnEditor() {
+    const nextOrder = normalizeBranchStockColumnOrder(draftColumnOrder, BRANCH_STOCK_COLUMNS);
+    setColumnOrder(nextOrder);
+    saveBranchStockColumnOrder(
+      typeof window === "undefined" ? null : window.localStorage,
+      userId,
+      nextOrder,
+      BRANCH_STOCK_COLUMNS,
+    );
+    setColumnEditorOpen(false);
+    setDraggedColumnKey("");
+  }
+
+  function resetColumnEditorToDefault() {
+    const defaultOrder = BRANCH_STOCK_COLUMNS.map((column) => column.key);
+    setDraftColumnOrder(defaultOrder);
+    setColumnOrder(defaultOrder);
+    clearBranchStockColumnOrder(typeof window === "undefined" ? null : window.localStorage, userId);
+    setColumnEditorOpen(false);
+    setDraggedColumnKey("");
+  }
 
   useEffect(() => {
     setSelectedBranchScope(defaultBranchStockScope);
@@ -2144,7 +2205,7 @@ export function BranchStockPanel({
     }
   }
 
-  const visibleBranchStockColumns = useMemo(
+  const scopedBranchStockColumns = useMemo(
     () => getVisibleBranchStockColumns(BRANCH_STOCK_COLUMNS, {
       isBranchStockScopeUser,
       scopeId: selectedBranchScope,
@@ -2152,6 +2213,12 @@ export function BranchStockPanel({
     }),
     [isBranchStockScopeUser, scopedBranchCode, selectedBranchScope],
   );
+
+  const visibleBranchStockColumns = useMemo(() => {
+    if (!isAdminUser) return scopedBranchStockColumns;
+    const columnsByKey = new Map(scopedBranchStockColumns.map((column) => [column.key, column]));
+    return normalizeBranchStockColumnOrder(columnOrder, scopedBranchStockColumns).map((key) => columnsByKey.get(key));
+  }, [columnOrder, isAdminUser, scopedBranchStockColumns]);
 
   const scopedRecords = useMemo(
     () => projectBranchStockRows(records, {
@@ -2501,6 +2568,15 @@ export function BranchStockPanel({
           >
             รีเฟรช
           </button>
+          {isAdminUser ? (
+            <button
+              type="button"
+              className="ghost-button branch-stock-column-editor-button"
+              onClick={openColumnEditor}
+            >
+              จัดคอลัมน์
+            </button>
+          ) : null}
           <button
             ref={requestButtonRef}
             type="button"
@@ -2989,6 +3065,84 @@ export function BranchStockPanel({
       </div>
 
       </div>
+
+      {isAdminUser && columnEditorOpen ? (
+        <div className="dialog-overlay" onClick={() => setColumnEditorOpen(false)}>
+          <div
+            className="dialog-card branch-stock-column-editor"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="branch-stock-column-editor-title"
+          >
+            <div className="dialog-header">
+              <div>
+                <h3 id="branch-stock-column-editor-title">จัดลำดับคอลัมน์</h3>
+                <p>ลากรายการ หรือใช้ปุ่มขึ้น/ลง แล้วกดบันทึก ลำดับนี้ใช้เฉพาะบัญชี {userId}</p>
+              </div>
+              <button type="button" className="ghost-button dialog-close-button" onClick={() => setColumnEditorOpen(false)}>
+                ปิด
+              </button>
+            </div>
+
+            <ol className="branch-stock-column-list">
+              {draftBranchStockColumns.map((column, index) => (
+                <li
+                  key={column.key}
+                  className={draggedColumnKey === column.key ? "dragging" : ""}
+                  draggable
+                  onDragStart={() => setDraggedColumnKey(column.key)}
+                  onDragEnd={() => setDraggedColumnKey("")}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={() => {
+                    if (!draggedColumnKey) return;
+                    setDraftColumnOrder((current) => reorderBranchStockColumn(current, draggedColumnKey, column.key));
+                    setDraggedColumnKey("");
+                  }}
+                >
+                  <span className="branch-stock-column-drag" aria-hidden="true">⋮⋮</span>
+                  <span className="branch-stock-column-position">{index + 1}</span>
+                  <strong>{column.label}</strong>
+                  <div className="branch-stock-column-move-actions">
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() => setDraftColumnOrder((current) => moveBranchStockColumn(current, column.key, -1))}
+                      disabled={index === 0}
+                      aria-label={`ย้าย ${column.label} ขึ้น`}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() => setDraftColumnOrder((current) => moveBranchStockColumn(current, column.key, 1))}
+                      disabled={index === draftBranchStockColumns.length - 1}
+                      aria-label={`ย้าย ${column.label} ลง`}
+                    >
+                      ↓
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            <div className="dialog-actions branch-stock-column-editor-actions">
+              <button type="button" className="ghost-button" onClick={resetColumnEditorToDefault}>
+                คืนค่าเริ่มต้น
+              </button>
+              <div>
+                <button type="button" className="ghost-button" onClick={() => setColumnEditorOpen(false)}>
+                  ยกเลิก
+                </button>
+                <button type="button" className="primary-button" onClick={saveColumnEditor}>
+                  บันทึกลำดับ
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {!loading && !error && records.length > 0 && pagedRecords.length === 0 && (
         <p className="empty-state">ไม่พบข้อมูลหลังใช้ตัวกรองที่หัวตาราง</p>
@@ -8505,6 +8659,7 @@ export default function App() {
         <BranchStockPanel
           csrfToken={session.csrfToken}
           isAdminUser={isAdminUser}
+          userId={session.user.id}
           isOnlineMarketingStaff={isOnlineMarketingStaff}
           branchCode={branchCode}
           branchName={activeBranchName}
