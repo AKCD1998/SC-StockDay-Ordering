@@ -1,4 +1,4 @@
-﻿import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import MovementAndTransactionsPanel from "./MovementTransactionsPanel";
 import FocusProductsPanel from "./FocusProductsPanel";
@@ -1805,6 +1805,8 @@ export function BranchStockPanel({
   );
   const [draftColumnOrder, setDraftColumnOrder] = useState(columnOrder);
   const [draggedColumnKey, setDraggedColumnKey] = useState("");
+  const columnEditorRowRefs = useRef(new Map());
+  const previousColumnEditorRowPositions = useRef(null);
   const filterMenuRef = useRef(null);
   const [filterMenuAnchor, setFilterMenuAnchor] = useState(null);
   const requestButtonRef = useRef(null);
@@ -1829,11 +1831,50 @@ export function BranchStockPanel({
     return normalizeBranchStockColumnOrder(draftColumnOrder, BRANCH_STOCK_COLUMNS).map((key) => columnsByKey.get(key));
   }, [draftColumnOrder]);
 
+  useLayoutEffect(() => {
+    const previousPositions = previousColumnEditorRowPositions.current;
+    if (!previousPositions) return;
+    previousColumnEditorRowPositions.current = null;
+
+    const prefersReducedMotion = typeof window !== "undefined"
+      && typeof window.matchMedia === "function"
+      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReducedMotion) return;
+
+    columnEditorRowRefs.current.forEach((row, columnKey) => {
+      const previousTop = previousPositions.get(columnKey);
+      if (!row || typeof previousTop !== "number") return;
+      const verticalOffset = previousTop - row.getBoundingClientRect().top;
+      if (Math.abs(verticalOffset) < 1 || typeof row.animate !== "function") return;
+
+      if (typeof row.getAnimations === "function") {
+        row.getAnimations().forEach((animation) => animation.cancel());
+      }
+      row.animate(
+        [
+          { transform: `translateY(${verticalOffset}px)` },
+          { transform: "translateY(0)" },
+        ],
+        {
+          duration: 320,
+          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        },
+      );
+    });
+  }, [draftBranchStockColumns]);
+
   function openColumnEditor() {
     setDraftColumnOrder(columnOrder);
     setDraggedColumnKey("");
     setColumnEditorBusyAction("");
     setColumnEditorOpen(true);
+  }
+
+  function moveColumnEditorRow(columnKey, direction) {
+    previousColumnEditorRowPositions.current = new Map(
+      [...columnEditorRowRefs.current.entries()].map(([key, row]) => [key, row.getBoundingClientRect().top]),
+    );
+    setDraftColumnOrder((current) => moveBranchStockColumn(current, columnKey, direction));
   }
 
   async function waitForColumnEditorFeedback() {
@@ -3115,6 +3156,10 @@ export function BranchStockPanel({
               {draftBranchStockColumns.map((column, index) => (
                 <li
                   key={column.key}
+                  ref={(row) => {
+                    if (row) columnEditorRowRefs.current.set(column.key, row);
+                    else columnEditorRowRefs.current.delete(column.key);
+                  }}
                   className={draggedColumnKey === column.key ? "dragging" : ""}
                   draggable={!columnEditorBusyAction}
                   onDragStart={() => setDraggedColumnKey(column.key)}
@@ -3133,7 +3178,7 @@ export function BranchStockPanel({
                     <button
                       type="button"
                       className="ghost-button"
-                      onClick={() => setDraftColumnOrder((current) => moveBranchStockColumn(current, column.key, -1))}
+                      onClick={() => moveColumnEditorRow(column.key, -1)}
                       disabled={Boolean(columnEditorBusyAction) || index === 0}
                       aria-label={`ย้าย ${column.label} ขึ้น`}
                     >
@@ -3142,7 +3187,7 @@ export function BranchStockPanel({
                     <button
                       type="button"
                       className="ghost-button"
-                      onClick={() => setDraftColumnOrder((current) => moveBranchStockColumn(current, column.key, 1))}
+                      onClick={() => moveColumnEditorRow(column.key, 1)}
                       disabled={Boolean(columnEditorBusyAction) || index === draftBranchStockColumns.length - 1}
                       aria-label={`ย้าย ${column.label} ลง`}
                     >
