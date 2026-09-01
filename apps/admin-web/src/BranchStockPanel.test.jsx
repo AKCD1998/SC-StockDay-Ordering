@@ -290,7 +290,8 @@ describe("BranchStockPanel branch scope", () => {
     await user.click(screen.getByRole("button", { name: "จัดคอลัมน์" }));
     await user.click(screen.getByRole("button", { name: "ย้าย รหัสสินค้า ขึ้น" }));
     await user.click(screen.getByRole("button", { name: "บันทึกลำดับ" }));
-    expect(headerKeys().slice(0, 2)).toEqual(["productCode", "productNameThai"]);
+    expect(screen.getByRole("status")).toHaveTextContent("กำลังบันทึกลำดับคอลัมน์");
+    await waitFor(() => expect(headerKeys().slice(0, 2)).toEqual(["productCode", "productNameThai"]));
 
     cleanup();
     renderPanel({ isAdminUser: true, isOnlineMarketingStaff: false, userId: "admin-a" });
@@ -301,6 +302,18 @@ describe("BranchStockPanel branch scope", () => {
     renderPanel({ isAdminUser: true, isOnlineMarketingStaff: false, userId: "admin-b" });
     await screen.findByText("A001");
     expect(headerKeys().slice(0, 2)).toEqual(["productNameThai", "productCode"]);
+  });
+
+  it("shows progress feedback before restoring the default column order", async () => {
+    const user = userEvent.setup();
+    renderPanel({ isAdminUser: true, isOnlineMarketingStaff: false, userId: "admin-reset" });
+    await screen.findByText("A001");
+
+    await user.click(screen.getByRole("button", { name: "จัดคอลัมน์" }));
+    await user.click(screen.getByRole("button", { name: "คืนค่าเริ่มต้น" }));
+    expect(screen.getByRole("status")).toHaveTextContent("กำลังคืนค่าลำดับเริ่มต้น");
+    expect(screen.getByRole("button", { name: "บันทึกลำดับ" })).toBeDisabled();
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "จัดลำดับคอลัมน์" })).not.toBeInTheDocument());
   });
 
   it("does not expose the column editor to non-admin branch accounts", async () => {

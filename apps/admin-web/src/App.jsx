@@ -78,6 +78,7 @@ const syncEventLogEnabled = String(import.meta.env.VITE_ENABLE_SYNC_EVENT_LOG ||
 const customerPreordersEnabled = String(import.meta.env.VITE_FEATURE_CUSTOMER_PREORDERS || "").toLowerCase() === "true";
 const adminViewStorageKey = "sc-stockday-admin-view";
 const adminThemeStorageKey = "sc-stockday-admin-theme";
+const BRANCH_STOCK_COLUMN_FEEDBACK_MS = 600;
 const HQ_BRANCH_CODE = "000";
 const ONLINE_MARKETING_STAFF_USER_ID = "onlinemarketingstaff";
 const defaultAdminView = "receipts";
@@ -1798,6 +1799,7 @@ export function BranchStockPanel({
   const [procurementQty, setProcurementQty] = useState("");
   const [procurementRowOpen, setProcurementRowOpen] = useState(false);
   const [columnEditorOpen, setColumnEditorOpen] = useState(false);
+  const [columnEditorBusyAction, setColumnEditorBusyAction] = useState("");
   const [columnOrder, setColumnOrder] = useState(() =>
     loadBranchStockColumnOrder(typeof window === "undefined" ? null : window.localStorage, userId, BRANCH_STOCK_COLUMNS),
   );
@@ -1819,6 +1821,7 @@ export function BranchStockPanel({
     setColumnOrder(nextOrder);
     setDraftColumnOrder(nextOrder);
     setColumnEditorOpen(false);
+    setColumnEditorBusyAction("");
   }, [isAdminUser, userId]);
 
   const draftBranchStockColumns = useMemo(() => {
@@ -1829,10 +1832,18 @@ export function BranchStockPanel({
   function openColumnEditor() {
     setDraftColumnOrder(columnOrder);
     setDraggedColumnKey("");
+    setColumnEditorBusyAction("");
     setColumnEditorOpen(true);
   }
 
-  function saveColumnEditor() {
+  async function waitForColumnEditorFeedback() {
+    await new Promise((resolve) => window.setTimeout(resolve, BRANCH_STOCK_COLUMN_FEEDBACK_MS));
+  }
+
+  async function saveColumnEditor() {
+    if (columnEditorBusyAction) return;
+    setColumnEditorBusyAction("saving");
+    await waitForColumnEditorFeedback();
     const nextOrder = normalizeBranchStockColumnOrder(draftColumnOrder, BRANCH_STOCK_COLUMNS);
     setColumnOrder(nextOrder);
     saveBranchStockColumnOrder(
@@ -1842,15 +1853,20 @@ export function BranchStockPanel({
       BRANCH_STOCK_COLUMNS,
     );
     setColumnEditorOpen(false);
+    setColumnEditorBusyAction("");
     setDraggedColumnKey("");
   }
 
-  function resetColumnEditorToDefault() {
+  async function resetColumnEditorToDefault() {
+    if (columnEditorBusyAction) return;
+    setColumnEditorBusyAction("resetting");
+    await waitForColumnEditorFeedback();
     const defaultOrder = BRANCH_STOCK_COLUMNS.map((column) => column.key);
     setDraftColumnOrder(defaultOrder);
     setColumnOrder(defaultOrder);
     clearBranchStockColumnOrder(typeof window === "undefined" ? null : window.localStorage, userId);
     setColumnEditorOpen(false);
+    setColumnEditorBusyAction("");
     setDraggedColumnKey("");
   }
 
@@ -3067,7 +3083,12 @@ export function BranchStockPanel({
       </div>
 
       {isAdminUser && columnEditorOpen ? (
-        <div className="dialog-overlay" onClick={() => setColumnEditorOpen(false)}>
+        <div
+          className="dialog-overlay"
+          onClick={() => {
+            if (!columnEditorBusyAction) setColumnEditorOpen(false);
+          }}
+        >
           <div
             className="dialog-card branch-stock-column-editor"
             onClick={(event) => event.stopPropagation()}
@@ -3080,7 +3101,12 @@ export function BranchStockPanel({
                 <h3 id="branch-stock-column-editor-title">จัดลำดับคอลัมน์</h3>
                 <p>ลากรายการ หรือใช้ปุ่มขึ้น/ลง แล้วกดบันทึก ลำดับนี้ใช้เฉพาะบัญชี {userId}</p>
               </div>
-              <button type="button" className="ghost-button dialog-close-button" onClick={() => setColumnEditorOpen(false)}>
+              <button
+                type="button"
+                className="ghost-button dialog-close-button"
+                onClick={() => setColumnEditorOpen(false)}
+                disabled={Boolean(columnEditorBusyAction)}
+              >
                 ปิด
               </button>
             </div>
@@ -3090,7 +3116,7 @@ export function BranchStockPanel({
                 <li
                   key={column.key}
                   className={draggedColumnKey === column.key ? "dragging" : ""}
-                  draggable
+                  draggable={!columnEditorBusyAction}
                   onDragStart={() => setDraggedColumnKey(column.key)}
                   onDragEnd={() => setDraggedColumnKey("")}
                   onDragOver={(event) => event.preventDefault()}
@@ -3108,7 +3134,7 @@ export function BranchStockPanel({
                       type="button"
                       className="ghost-button"
                       onClick={() => setDraftColumnOrder((current) => moveBranchStockColumn(current, column.key, -1))}
-                      disabled={index === 0}
+                      disabled={Boolean(columnEditorBusyAction) || index === 0}
                       aria-label={`ย้าย ${column.label} ขึ้น`}
                     >
                       ↑
@@ -3117,7 +3143,7 @@ export function BranchStockPanel({
                       type="button"
                       className="ghost-button"
                       onClick={() => setDraftColumnOrder((current) => moveBranchStockColumn(current, column.key, 1))}
-                      disabled={index === draftBranchStockColumns.length - 1}
+                      disabled={Boolean(columnEditorBusyAction) || index === draftBranchStockColumns.length - 1}
                       aria-label={`ย้าย ${column.label} ลง`}
                     >
                       ↓
@@ -3128,18 +3154,45 @@ export function BranchStockPanel({
             </ol>
 
             <div className="dialog-actions branch-stock-column-editor-actions">
-              <button type="button" className="ghost-button" onClick={resetColumnEditorToDefault}>
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={resetColumnEditorToDefault}
+                disabled={Boolean(columnEditorBusyAction)}
+              >
                 คืนค่าเริ่มต้น
               </button>
               <div>
-                <button type="button" className="ghost-button" onClick={() => setColumnEditorOpen(false)}>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={() => setColumnEditorOpen(false)}
+                  disabled={Boolean(columnEditorBusyAction)}
+                >
                   ยกเลิก
                 </button>
-                <button type="button" className="primary-button" onClick={saveColumnEditor}>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={saveColumnEditor}
+                  disabled={Boolean(columnEditorBusyAction)}
+                >
                   บันทึกลำดับ
                 </button>
               </div>
             </div>
+
+            {columnEditorBusyAction ? (
+              <div className="branch-stock-column-loading-overlay" role="status" aria-live="polite" aria-atomic="true">
+                <span className="branch-stock-column-loading-spinner" aria-hidden="true" />
+                <strong>
+                  {columnEditorBusyAction === "resetting"
+                    ? "กำลังคืนค่าลำดับเริ่มต้น..."
+                    : "กำลังบันทึกลำดับคอลัมน์..."}
+                </strong>
+                <span>โปรดรอสักครู่</span>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
