@@ -1807,6 +1807,7 @@ export function BranchStockPanel({
   const [draggedColumnKey, setDraggedColumnKey] = useState("");
   const columnEditorRowRefs = useRef(new Map());
   const previousColumnEditorRowPositions = useRef(null);
+  const columnEditorRowAnimationCleanups = useRef(new Map());
   const filterMenuRef = useRef(null);
   const [filterMenuAnchor, setFilterMenuAnchor] = useState(null);
   const requestButtonRef = useRef(null);
@@ -1839,29 +1840,56 @@ export function BranchStockPanel({
     const prefersReducedMotion = typeof window !== "undefined"
       && typeof window.matchMedia === "function"
       && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (prefersReducedMotion) return;
+    if (prefersReducedMotion) {
+      [...columnEditorRowAnimationCleanups.current.values()].forEach((cleanupAnimation) => cleanupAnimation());
+      return;
+    }
 
     columnEditorRowRefs.current.forEach((row, columnKey) => {
       const previousTop = previousPositions.get(columnKey);
       if (!row || typeof previousTop !== "number") return;
+      columnEditorRowAnimationCleanups.current.get(columnKey)?.();
       const verticalOffset = previousTop - row.getBoundingClientRect().top;
-      if (Math.abs(verticalOffset) < 1 || typeof row.animate !== "function") return;
+      if (Math.abs(verticalOffset) < 1) return;
 
-      if (typeof row.getAnimations === "function") {
-        row.getAnimations().forEach((animation) => animation.cancel());
-      }
-      row.animate(
-        [
-          { transform: `translateY(${verticalOffset}px)` },
-          { transform: "translateY(0)" },
-        ],
-        {
-          duration: 320,
-          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-        },
-      );
+      let animationFrameId = 0;
+      let cleanupTimeoutId = 0;
+      let animationFinished = false;
+      const handleTransitionEnd = (event) => {
+        if (event.target === row && event.propertyName === "transform") cleanupAnimation();
+      };
+      const cleanupAnimation = () => {
+        if (animationFinished) return;
+        animationFinished = true;
+        window.cancelAnimationFrame(animationFrameId);
+        window.clearTimeout(cleanupTimeoutId);
+        row.removeEventListener("transitionend", handleTransitionEnd);
+        row.style.removeProperty("transition");
+        row.style.removeProperty("transform");
+        row.style.removeProperty("z-index");
+        if (columnEditorRowAnimationCleanups.current.get(columnKey) === cleanupAnimation) {
+          columnEditorRowAnimationCleanups.current.delete(columnKey);
+        }
+      };
+
+      row.style.transition = "none";
+      row.style.transform = `translateY(${verticalOffset}px)`;
+      row.style.zIndex = "1";
+      void row.offsetHeight;
+      columnEditorRowAnimationCleanups.current.set(columnKey, cleanupAnimation);
+      animationFrameId = window.requestAnimationFrame(() => {
+        if (animationFinished) return;
+        row.addEventListener("transitionend", handleTransitionEnd);
+        row.style.transition = "transform 320ms cubic-bezier(0.22, 1, 0.36, 1)";
+        row.style.transform = "translateY(0)";
+        cleanupTimeoutId = window.setTimeout(cleanupAnimation, 400);
+      });
     });
   }, [draftBranchStockColumns]);
+
+  useEffect(() => () => {
+    [...columnEditorRowAnimationCleanups.current.values()].forEach((cleanupAnimation) => cleanupAnimation());
+  }, []);
 
   function openColumnEditor() {
     setDraftColumnOrder(columnOrder);

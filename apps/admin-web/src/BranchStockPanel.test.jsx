@@ -306,13 +306,12 @@ describe("BranchStockPanel branch scope", () => {
 
   it("animates both rows when an admin moves a column with the arrow buttons", async () => {
     const user = userEvent.setup();
-    const animateMock = vi.fn(() => ({}));
-    const originalAnimate = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "animate");
-    Object.defineProperty(HTMLElement.prototype, "animate", {
-      configurable: true,
-      writable: true,
-      value: animateMock,
+    const animationFrames = [];
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      animationFrames.push(callback);
+      return animationFrames.length;
     });
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function getMockRect() {
       const isColumnRow = this.parentElement?.classList.contains("branch-stock-column-list");
       const rowIndex = isColumnRow ? [...this.parentElement.children].indexOf(this) : 0;
@@ -322,34 +321,37 @@ describe("BranchStockPanel branch scope", () => {
         y: top,
         top,
         right: 400,
-        bottom: top + 48,
+        bottom: top + 56,
         left: 0,
         width: 400,
-        height: 48,
+        height: 56,
         toJSON: () => ({}),
       };
     });
 
-    try {
-      renderPanel({ isAdminUser: true, isOnlineMarketingStaff: false, userId: "admin-animation" });
-      await screen.findByText("A001");
-      await user.click(screen.getByRole("button", { name: "จัดคอลัมน์" }));
-      await user.click(screen.getByRole("button", { name: "ย้าย รหัสสินค้า ขึ้น" }));
+    renderPanel({ isAdminUser: true, isOnlineMarketingStaff: false, userId: "admin-animation" });
+    await screen.findByText("A001");
+    await user.click(screen.getByRole("button", { name: "จัดคอลัมน์" }));
+    await user.click(screen.getByRole("button", { name: "ย้าย รหัสสินค้า ขึ้น" }));
 
-      expect([...document.querySelectorAll(".branch-stock-column-list li strong")].slice(0, 2).map((node) => node.textContent))
-        .toEqual(["รหัสสินค้า", "ชื่อสินค้าไทย"]);
-      expect(animateMock).toHaveBeenCalledTimes(2);
-      expect(animateMock.mock.calls.map(([frames]) => frames[0].transform)).toEqual(
-        expect.arrayContaining(["translateY(64px)", "translateY(-64px)"]),
-      );
-      expect(animateMock.mock.calls[0][1]).toMatchObject({
-        duration: 320,
-        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-      });
-    } finally {
-      if (originalAnimate) Object.defineProperty(HTMLElement.prototype, "animate", originalAnimate);
-      else delete HTMLElement.prototype.animate;
-    }
+    const firstTwoRows = [...document.querySelectorAll(".branch-stock-column-list li")].slice(0, 2);
+    expect(firstTwoRows.map((row) => row.querySelector("strong").textContent))
+      .toEqual(["รหัสสินค้า", "ชื่อสินค้าไทย"]);
+    expect(firstTwoRows.map((row) => row.style.transform)).toEqual(
+      expect.arrayContaining(["translateY(64px)", "translateY(-64px)"]),
+    );
+    expect(animationFrames).toHaveLength(2);
+
+    animationFrames.forEach((runAnimationFrame) => runAnimationFrame(0));
+    firstTwoRows.forEach((row) => {
+      expect(row.style.transition).toContain("transform 320ms");
+      expect(row.style.transform).toBe("translateY(0)");
+      const transitionEnd = new Event("transitionend", { bubbles: true });
+      Object.defineProperty(transitionEnd, "propertyName", { value: "transform" });
+      row.dispatchEvent(transitionEnd);
+      expect(row.style.transition).toBe("");
+      expect(row.style.transform).toBe("");
+    });
   });
 
   it("shows progress feedback before restoring the default column order", async () => {
