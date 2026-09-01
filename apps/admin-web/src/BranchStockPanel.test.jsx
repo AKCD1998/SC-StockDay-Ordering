@@ -304,6 +304,54 @@ describe("BranchStockPanel branch scope", () => {
     expect(headerKeys().slice(0, 2)).toEqual(["productNameThai", "productCode"]);
   });
 
+  it("animates both rows when an admin moves a column with the arrow buttons", async () => {
+    const user = userEvent.setup();
+    const animateMock = vi.fn(() => ({}));
+    const originalAnimate = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "animate");
+    Object.defineProperty(HTMLElement.prototype, "animate", {
+      configurable: true,
+      writable: true,
+      value: animateMock,
+    });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function getMockRect() {
+      const isColumnRow = this.parentElement?.classList.contains("branch-stock-column-list");
+      const rowIndex = isColumnRow ? [...this.parentElement.children].indexOf(this) : 0;
+      const top = rowIndex * 56;
+      return {
+        x: 0,
+        y: top,
+        top,
+        right: 400,
+        bottom: top + 48,
+        left: 0,
+        width: 400,
+        height: 48,
+        toJSON: () => ({}),
+      };
+    });
+
+    try {
+      renderPanel({ isAdminUser: true, isOnlineMarketingStaff: false, userId: "admin-animation" });
+      await screen.findByText("A001");
+      await user.click(screen.getByRole("button", { name: "จัดคอลัมน์" }));
+      await user.click(screen.getByRole("button", { name: "ย้าย รหัสสินค้า ขึ้น" }));
+
+      expect([...document.querySelectorAll(".branch-stock-column-list li strong")].slice(0, 2).map((node) => node.textContent))
+        .toEqual(["รหัสสินค้า", "ชื่อสินค้าไทย"]);
+      expect(animateMock).toHaveBeenCalledTimes(2);
+      expect(animateMock.mock.calls.map(([frames]) => frames[0].transform)).toEqual(
+        expect.arrayContaining(["translateY(56px)", "translateY(-56px)"]),
+      );
+      expect(animateMock.mock.calls[0][1]).toMatchObject({
+        duration: 320,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      });
+    } finally {
+      if (originalAnimate) Object.defineProperty(HTMLElement.prototype, "animate", originalAnimate);
+      else delete HTMLElement.prototype.animate;
+    }
+  });
+
   it("shows progress feedback before restoring the default column order", async () => {
     const user = userEvent.setup();
     renderPanel({ isAdminUser: true, isOnlineMarketingStaff: false, userId: "admin-reset" });
