@@ -316,7 +316,7 @@ describe("BranchStockPanel branch scope", () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function getMockRect() {
       const isColumnRow = this.parentElement?.classList.contains("branch-stock-column-list");
       const rowIndex = isColumnRow ? [...this.parentElement.children].indexOf(this) : 0;
-      const top = rowIndex * 56;
+      const top = rowIndex * 64;
       return {
         x: 0,
         y: top,
@@ -340,7 +340,7 @@ describe("BranchStockPanel branch scope", () => {
         .toEqual(["รหัสสินค้า", "ชื่อสินค้าไทย"]);
       expect(animateMock).toHaveBeenCalledTimes(2);
       expect(animateMock.mock.calls.map(([frames]) => frames[0].transform)).toEqual(
-        expect.arrayContaining(["translateY(56px)", "translateY(-56px)"]),
+        expect.arrayContaining(["translateY(64px)", "translateY(-64px)"]),
       );
       expect(animateMock.mock.calls[0][1]).toMatchObject({
         duration: 320,
