@@ -2744,12 +2744,47 @@ button {
 
 .rq-recommendation-heading {
   display: grid;
-  gap: 5px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.rq-recommendation-heading::-webkit-details-marker {
+  display: none;
+}
+
+.rq-recommendation-heading::after {
+  content: "⌄";
+  color: #93c5fd;
+  font-size: 1rem;
+  line-height: 1;
+  transition: transform 160ms ease;
+}
+
+.rq-recommendation-disclosure[open] .rq-recommendation-heading::after {
+  transform: rotate(180deg);
 }
 
 .rq-recommendation-heading strong {
+  min-width: 0;
   color: #eff6ff;
   font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rq-recommendation-disclosure[open] .rq-recommendation-heading strong {
+  overflow: visible;
+  white-space: normal;
+}
+
+.rq-recommendation-expanded {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(147, 197, 253, 0.18);
 }
 
 .rq-recommendation-title {
@@ -2818,9 +2853,8 @@ button {
   font-size: 0.76rem;
 }
 
-.rq-recommendation-details summary {
+.rq-recommendation-details-title {
   color: #93c5fd;
-  cursor: pointer;
   font-weight: 700;
 }
 
