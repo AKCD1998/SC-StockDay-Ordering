@@ -16,8 +16,9 @@ describe("procurement toggle styling", () => {
     const recommendationRule = stylesheet.match(/\.rq-recommendation-card\s*\{([^}]*)\}/)?.[1];
 
     expect(recommendationRule).toBeDefined();
-    expect(recommendationRule).toMatch(/margin:\s*8px\s+0\s*;/);
+    expect(recommendationRule).toMatch(/margin:\s*0\s+0\s+8px\s*;/);
     expect(recommendationRule).toMatch(/border:\s*1px\s+solid\s+rgba\(59,\s*130,\s*246,\s*0\.18\)\s*;/);
+    expect(recommendationRule).toMatch(/border-top:\s*none\s*;/);
     expect(recommendationRule).toMatch(/border-radius:\s*0\s*;/);
   });
 });

@@ -2734,9 +2734,10 @@ button {
 }
 
 .rq-recommendation-card {
-  margin: 8px 0;
+  margin: 0 0 8px;
   padding: 14px;
   border: 1px solid rgba(59, 130, 246, 0.18);
+  border-top: none;
   border-radius: 0;
   background: rgba(30, 64, 175, 0.12);
   color: #cbd5e1;
