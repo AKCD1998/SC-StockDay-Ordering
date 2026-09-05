@@ -1,5 +1,6 @@
 import React from "react";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import BranchStockRecommendationSuggestion from "./BranchStockRecommendationSuggestion.jsx";
 
@@ -57,6 +58,7 @@ describe("BranchStockRecommendationSuggestion", () => {
   });
 
   it("shows normalized recommendation values from the API without exposing reader internals", async () => {
+    const user = userEvent.setup();
     const request = vi.fn(async () => jsonResponse(normalizedPayload()));
     render(
       <BranchStockRecommendationSuggestion branchCode="004" productCode="P001" request={request} />,
@@ -67,8 +69,16 @@ describe("BranchStockRecommendationSuggestion", () => {
       "/api/admin/stock-recommendations/004/P001",
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
-    expect(within(card).getByText("แนะนำขอจากสาขาอื่นและแจ้งจัดซื้อ: ขอ 5 และซื้อ 89 หลอด")).toBeInTheDocument();
-    expect(within(card).getByText("สต็อกยังต่ำกว่าเป้าหมาย")).toBeInTheDocument();
+    const headline = within(card).getByText("แนะนำขอจากสาขาอื่นและแจ้งจัดซื้อ: ขอ 5 และซื้อ 89 หลอด");
+    const disclosure = headline.closest("details");
+    expect(disclosure).not.toHaveAttribute("open");
+    expect(headline).toBeVisible();
+    expect(within(card).getByText("สต็อกยังต่ำกว่าเป้าหมาย")).not.toBeVisible();
+
+    await user.click(headline.closest("summary"));
+
+    expect(disclosure).toHaveAttribute("open");
+    expect(within(card).getByText("สต็อกยังต่ำกว่าเป้าหมาย")).toBeVisible();
     expect(within(card).getByText("สาขา 003: 5 หลอด")).toBeInTheDocument();
     expect(within(card).getByText("สต็อกตอนนี้").parentElement).toHaveTextContent("2");
     expect(within(card).getByText("ขายเฉลี่ยที่ใช้คำนวณ/วัน").parentElement).toHaveTextContent("1.1");
