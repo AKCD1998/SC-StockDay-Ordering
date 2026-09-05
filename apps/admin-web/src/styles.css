@@ -2592,20 +2592,9 @@ button {
 
 /* Branch rows */
 .rq-branch-table {
-  --rq-scrollbar-width: 8px;
   flex: 1;
   overflow-y: auto;
-  overflow-x: hidden;
   padding: 8px 0;
-  scrollbar-color: rgba(90, 116, 144, 0.65) transparent;
-  scrollbar-width: thin;
-}
-
-.rq-branch-table::-webkit-scrollbar { width: var(--rq-scrollbar-width); }
-.rq-branch-table::-webkit-scrollbar-track { background: transparent; }
-.rq-branch-table::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(90, 116, 144, 0.65);
 }
 
 .rq-branch-table-head {
@@ -2709,7 +2698,7 @@ button {
 
 .rq-procurement-toggle {
   display: block;
-  width: calc(100% + var(--rq-scrollbar-width));
+  width: 100%;
   margin-top: 10px;
   padding: 9px 16px;
   border: none;
@@ -2745,7 +2734,6 @@ button {
 }
 
 .rq-recommendation-card {
-  width: calc(100% + var(--rq-scrollbar-width));
   margin: 0 0 8px;
   padding: 14px;
   border: 1px solid rgba(59, 130, 246, 0.18);
