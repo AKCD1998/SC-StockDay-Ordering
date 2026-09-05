@@ -4,6 +4,7 @@ import MovementAndTransactionsPanel from "./MovementTransactionsPanel";
 import FocusProductsPanel from "./FocusProductsPanel";
 import BranchStockHistoryPanel from "./BranchStockHistoryPanel";
 import StockRecommendationsPanel from "./StockRecommendationsPanel";
+import BranchStockRecommendationSuggestion from "./BranchStockRecommendationSuggestion";
 import ProductTaxonomyPanel from "./ProductTaxonomyPanel";
 import TaxonomyReviewPanel from "./TaxonomyReviewPanel";
 import PreorderPanel from "./preorders/PreorderPanel";
@@ -3521,6 +3522,11 @@ export function BranchStockPanel({
                       <span className="rq-branch-unit">{requestDialogProduct.unit || "-"}</span>
                     </div>
                   ) : null}
+                  <BranchStockRecommendationSuggestion
+                    branchCode={branchCode}
+                    productCode={requestDialogProduct.productCode}
+                    request={apiFetch}
+                  />
                 </div>
                 {/* Summary panel */}
                 <div className="rq-dialog-summary">
