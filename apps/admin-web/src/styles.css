@@ -2701,7 +2701,7 @@ button {
   width: 100%;
   margin-top: 10px;
   padding: 9px 16px;
-  border: none;
+  border: 1px solid #dc2626;
   border-radius: 0;
   background: #dc2626;
   color: #fff;
@@ -2710,11 +2710,11 @@ button {
   font-weight: 700;
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s;
+  transition: background 0.15s, border-color 0.15s;
 }
-.rq-procurement-toggle:hover { background: #b91c1c; }
-.rq-procurement-toggle.active { background: #6b7280; }
-.rq-procurement-toggle.active:hover { background: #4b5563; }
+.rq-procurement-toggle:hover { border-color: #b91c1c; background: #b91c1c; }
+.rq-procurement-toggle.active { border-color: #6b7280; background: #6b7280; }
+.rq-procurement-toggle.active:hover { border-color: #4b5563; background: #4b5563; }
 
 .rq-procurement-row {
   border-color: rgba(220, 38, 38, 0.45) !important;
