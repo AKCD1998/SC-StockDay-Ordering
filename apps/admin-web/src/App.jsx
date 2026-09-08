@@ -30,6 +30,11 @@ import {
   reorderBranchStockColumn,
   saveBranchStockColumnOrder,
 } from "./lib/branchStockColumnPreferences.js";
+import {
+  buildRecommendationPriorityMap,
+  compareRowsByRecommendationPriority,
+  getRecommendationPriorityRowClass,
+} from "./lib/branchStockRecommendationPriority.js";
 import dkshLogoUrl from "./assets/dksh.svg";
 import hansaLogoUrl from "./assets/hansa-logo.png";
 import tnpHealthcareLogoUrl from "./assets/tnp-healthcare-logo.svg";
@@ -1793,6 +1798,10 @@ export function BranchStockPanel({
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
   const [requestMode, setRequestMode] = useState(false);
+  const [recommendationPriorityRows, setRecommendationPriorityRows] = useState([]);
+  const [recommendationPriorityActive, setRecommendationPriorityActive] = useState(false);
+  const [loadingRecommendationPriority, setLoadingRecommendationPriority] = useState(false);
+  const [requestPriorityManualSort, setRequestPriorityManualSort] = useState(false);
   const [requestDialogProduct, setRequestDialogProduct] = useState(null);
   const [requestQuantities, setRequestQuantities] = useState({});
   const [requestLineNote, setRequestLineNote] = useState("");
@@ -2002,6 +2011,50 @@ export function BranchStockPanel({
   }, [appliedSearchTerm, refreshKey]);
 
   useEffect(() => {
+    if (!requestMode || !isBranchStockScopeUser || !scopedBranchCode) {
+      setRecommendationPriorityRows([]);
+      setRecommendationPriorityActive(false);
+      setLoadingRecommendationPriority(false);
+      return undefined;
+    }
+
+    let active = true;
+    const controller = new AbortController();
+
+    async function loadRecommendationPriority() {
+      setRecommendationPriorityRows([]);
+      setRecommendationPriorityActive(false);
+      setLoadingRecommendationPriority(true);
+      try {
+        const params = new URLSearchParams({ branchCode: scopedBranchCode });
+        const response = await apiFetch(`/api/admin/stock-recommendations/priority-index?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        if (!active) return;
+        const normalizedActive = data.active === true && data.meta?.reader?.servedReader === "normalized";
+        setRecommendationPriorityRows(normalizedActive && Array.isArray(data.rows) ? data.rows : []);
+        setRecommendationPriorityActive(normalizedActive);
+      } catch (loadError) {
+        if (!active || loadError?.name === "AbortError") return;
+        setRecommendationPriorityRows([]);
+        setRecommendationPriorityActive(false);
+      } finally {
+        if (active) setLoadingRecommendationPriority(false);
+      }
+    }
+
+    loadRecommendationPriority();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [isBranchStockScopeUser, requestMode, refreshKey, scopedBranchCode]);
+
+  useEffect(() => {
     if (!isAdminUser) {
       setMatchReport(null);
       setReportError("");
@@ -2147,8 +2200,16 @@ export function BranchStockPanel({
 
   function updateColumnSort(columnKey, direction) {
     setSortConfig({ key: columnKey, direction });
+    if (requestMode) setRequestPriorityManualSort(true);
     setOpenFilterKey("");
     setPendingFilterValues([]);
+  }
+
+  function toggleRequestMode() {
+    setRequestMode((current) => !current);
+    setRequestPriorityManualSort(false);
+    setOffset(0);
+    setOpenFilterKey("");
   }
 
   function clearColumnFilter(columnKey) {
@@ -2326,6 +2387,11 @@ export function BranchStockPanel({
     );
   }, [scopedRecords, visibleBranchStockColumns]);
 
+  const recommendationPriorityMap = useMemo(
+    () => buildRecommendationPriorityMap(recommendationPriorityRows),
+    [recommendationPriorityRows],
+  );
+
   const visibleRecords = useMemo(() => {
     const filtered = scopedRecords.filter((row) => {
       return visibleBranchStockColumns.every((column) => {
@@ -2341,6 +2407,12 @@ export function BranchStockPanel({
       });
     });
 
+    if (requestMode && recommendationPriorityActive && !requestPriorityManualSort) {
+      return [...filtered].sort((left, right) => (
+        compareRowsByRecommendationPriority(left, right, recommendationPriorityMap)
+      ));
+    }
+
     const sortColumn = visibleBranchStockColumns.find((column) => column.key === sortConfig.key)
       || visibleBranchStockColumns.find((column) => column.key === "productCode")
       || visibleBranchStockColumns[0];
@@ -2352,7 +2424,16 @@ export function BranchStockPanel({
         sortConfig.direction,
       ),
     );
-  }, [scopedRecords, visibleBranchStockColumns, columnFilters, sortConfig]);
+  }, [
+    scopedRecords,
+    visibleBranchStockColumns,
+    columnFilters,
+    sortConfig,
+    requestMode,
+    recommendationPriorityActive,
+    recommendationPriorityMap,
+    requestPriorityManualSort,
+  ]);
 
   const total = visibleRecords.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -2667,7 +2748,7 @@ export function BranchStockPanel({
             ref={requestButtonRef}
             type="button"
             className={`request-entry-button${requestMode ? " active" : ""}`}
-            onClick={() => setRequestMode((value) => !value)}
+            onClick={toggleRequestMode}
           >
             {requestMode ? "ปิดโหมดขอสินค้า" : "ขอสินค้า"}
           </button>
@@ -2993,6 +3074,18 @@ export function BranchStockPanel({
         <p className="empty-state">ไม่พบข้อมูลสต็อกสาขาตามเงื่อนไขที่ค้นหา</p>
       )}
 
+      {requestMode && loadingRecommendationPriority ? (
+        <p className="branch-stock-priority-loading" role="status">กำลังจัดลำดับตามคำแนะนำ...</p>
+      ) : null}
+      {requestMode && recommendationPriorityActive ? (
+        <div className="branch-stock-priority-legend" aria-label="สีลำดับคำแนะนำสินค้า">
+          <span className="priority-purchase">ต้องสั่งซื้อเพิ่ม</span>
+          <span className="priority-transfer">ขอสาขาอื่น</span>
+          <span className="priority-no-action">ยังไม่ต้องสั่งเพิ่ม</span>
+          <small>เรียงจำนวนที่ต้องการจากมากไปน้อยในแต่ละกลุ่ม</small>
+        </div>
+      ) : null}
+
       <div className="branch-stock-loading-wrap">
         {loading && (
           <div className="branch-stock-loading-overlay" aria-live="polite" aria-label="กำลังโหลดข้อมูล">
@@ -3114,7 +3207,12 @@ export function BranchStockPanel({
           </thead>
           <tbody>
             {pagedRecords.map((row) => (
-              <tr key={row.productCode}>
+              <tr
+                key={row.productCode}
+                className={requestMode && recommendationPriorityActive
+                  ? getRecommendationPriorityRowClass(row, recommendationPriorityMap)
+                  : undefined}
+              >
                 {requestMode ? (
                   <td className="branch-stock-request-column">
                     {getAdminAlertTarget(row).length > 0 ? (
