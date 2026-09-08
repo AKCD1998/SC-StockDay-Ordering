@@ -3627,23 +3627,40 @@ export function BranchStockPanel({
                   />
                 </div>
                 {/* Summary panel */}
-                <div className="rq-dialog-summary">
-                  <div className="rq-summary-item">
-                    <span className="rq-summary-label">สาขาของคุณ</span>
-                    <span className="rq-summary-val">{requestBranchLabel}</span>
-                  </div>
-                  <div className="rq-summary-item rq-summary-stock-box">
-                    <span className="rq-summary-label">ที่ฉันมีตอนนี้</span>
-                    <span className="rq-summary-stock-num">{formatNumber(currentBranchStockQty, 0)}</span>
-                    <span className="rq-summary-stock-unit">{requestDialogProduct.unit || "-"}</span>
-                  </div>
-                  <div className="rq-summary-item rq-summary-total-box">
-                    <span className="rq-summary-label">จำนวน</span>
-                    <span className="rq-total-num">{totalRequestedQty}</span>
-                  </div>
-                  <div className="rq-summary-item">
-                    <span className="rq-summary-label">หน่วย</span>
-                    <span className="rq-summary-val">{requestDialogProduct.unit || "-"}</span>
+                <div className="rq-dialog-summary" aria-label="สรุปคำขอสินค้า">
+                  <div className="rq-summary-table">
+                    <div className="rq-dialog-summary-row rq-summary-branch-row">
+                      <div className="rq-dialog-summary-cell">
+                        <span className="rq-summary-label">สาขา</span>
+                      </div>
+                      <div className="rq-dialog-summary-cell">
+                        <span className="rq-summary-val" title={branchCode || "-"}>
+                          {branchCode || "-"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="rq-dialog-summary-row rq-summary-stock-row">
+                      <div className="rq-dialog-summary-cell">
+                        <span className="rq-summary-label" title={`ที่ ${branchCode || "-"} มีอยู่ตอนนี้`}>
+                          ที่ {branchCode || "-"} มีอยู่ตอนนี้
+                        </span>
+                      </div>
+                      <div className="rq-dialog-summary-cell rq-summary-stock-value">
+                        <span className="rq-summary-stock-num">{formatNumber(currentBranchStockQty, 0)}</span>
+                        <span className="rq-summary-stock-unit">{requestDialogProduct.unit || "-"}</span>
+                      </div>
+                    </div>
+                    <div className="rq-dialog-summary-row rq-summary-total-label-row">
+                      <div className="rq-dialog-summary-cell">
+                        <span className="rq-summary-label">จำนวนที่ขอเพิ่มจากสาขาต่างๆ รวมทั้งหมด</span>
+                      </div>
+                    </div>
+                    <div className="rq-dialog-summary-row rq-summary-total-row">
+                      <div className="rq-dialog-summary-cell rq-summary-total-value">
+                        <span className="rq-total-num">{totalRequestedQty}</span>
+                        <span className="rq-summary-total-unit">{requestDialogProduct.unit || "-"}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

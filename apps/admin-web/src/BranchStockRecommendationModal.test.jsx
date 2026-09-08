@@ -21,13 +21,13 @@ const RECORD = {
   syncedAt: "2026-09-05T01:20:00.000Z",
 };
 
-function stockResponse() {
+function stockResponse(record = RECORD) {
   return {
     ok: true,
     status: 200,
     headers: new Headers({ "content-type": "application/json" }),
     json: async () => ({
-      records: [RECORD],
+      records: [record],
       pagination: { limit: 10000, offset: 0, total: 1 },
     }),
   };
@@ -66,12 +66,17 @@ function recommendationResponse({ ok = true, status = 200 } = {}) {
   };
 }
 
-function renderPanel({ recommendationPromise, setRequestDraftItems = vi.fn() }) {
+function renderPanel({
+  recommendationPromise,
+  setRequestDraftItems = vi.fn(),
+  record = RECORD,
+  activeBranchCode = "004",
+}) {
   global.fetch = vi.fn((url) => {
     if (String(url).includes("/api/admin/stock-recommendations/")) {
       return recommendationPromise;
     }
-    return Promise.resolve(stockResponse());
+    return Promise.resolve(stockResponse(record));
   });
   return {
     ...render(
@@ -80,7 +85,7 @@ function renderPanel({ recommendationPromise, setRequestDraftItems = vi.fn() }) 
         isAdminUser={false}
         userId="branch004-test"
         isOnlineMarketingStaff={false}
-        branchCode="004"
+        branchCode={activeBranchCode}
         branchName="สาขา 004"
         onNavigate={vi.fn()}
         requestDraftItems={[]}
@@ -145,9 +150,31 @@ describe("BranchStockPanel normalized suggestion", () => {
     const dialog = await openRequestDialog(user);
 
     expect(await within(dialog).findByText("คำแนะนำยังไม่พร้อม แต่ยังขอสินค้าได้ตามปกติ")).toBeInTheDocument();
+    expect(dialog.querySelector(".rq-total-num")).toHaveTextContent("0");
+    expect(dialog.querySelector(".rq-summary-branch-row .rq-summary-val")).toHaveTextContent("004");
+    expect(dialog.querySelector(".rq-summary-stock-num")).toHaveTextContent("2");
+    expect(dialog.querySelector(".rq-summary-stock-unit")).toHaveTextContent(RECORD.unit);
     const firstQuantity = within(dialog).getAllByRole("spinbutton")[0];
     await user.type(firstQuantity, "1");
+    expect(dialog.querySelector(".rq-total-num")).toHaveTextContent("1");
     await user.click(within(dialog).getByRole("button", { name: "ยืนยันใส่ตะกร้า" }));
     expect(setRequestDraftItems).toHaveBeenCalledOnce();
+  });
+
+  it("shows long branch codes and units from the existing data without placeholders", async () => {
+    const user = userEvent.setup();
+    const longBranchCode = "BRANCH-004-NORTH-WAREHOUSE";
+    const longUnit = "extra-long-package-unit-name";
+    renderPanel({
+      recommendationPromise: Promise.resolve(recommendationResponse({ ok: false, status: 503 })),
+      activeBranchCode: longBranchCode,
+      record: { ...RECORD, unit: longUnit },
+    });
+    const dialog = await openRequestDialog(user);
+
+    expect(dialog.querySelector(".rq-summary-branch-row .rq-summary-val")).toHaveTextContent(longBranchCode);
+    expect(dialog.querySelector(".rq-summary-stock-row .rq-summary-label")).toHaveTextContent(longBranchCode);
+    expect(dialog.querySelector(".rq-summary-stock-unit")).toHaveTextContent(longUnit);
+    expect(dialog.querySelector(".rq-summary-total-unit")).toHaveTextContent(longUnit);
   });
 });
