@@ -60,7 +60,9 @@ export function getVisibleBranchStockColumns(columns, {
   const scope = getBranchStockScope(scopeId, branchCode);
   if (!scope) return columns;
   const visibleBranchCodes = new Set(scope.branchCodes);
+  const isOwnBranchScope = scope.id === getDefaultBranchStockScopeId(branchCode);
   return columns.filter((column) => {
+    if (isOwnBranchScope && column?.key === "qtyTotalAllBranches") return false;
     const match = String(column?.key || "").match(BRANCH_QTY_COLUMN_PATTERN);
     return !match || visibleBranchCodes.has(match[1]);
   });

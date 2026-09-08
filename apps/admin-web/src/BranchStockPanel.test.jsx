@@ -115,8 +115,12 @@ function productRow(productCode) {
   return screen.getByText(productCode).closest("tr");
 }
 
+function scopedColumnValue(productCode, columnKey) {
+  return productRow(productCode).querySelector(`[data-column-key="${columnKey}"]`)?.textContent;
+}
+
 function scopedTotal(productCode) {
-  return productRow(productCode).querySelector('[data-column-key="qtyTotalAllBranches"]').textContent;
+  return scopedColumnValue(productCode, "qtyTotalAllBranches");
 }
 
 describe("BranchStockPanel branch scope", () => {
@@ -169,6 +173,7 @@ describe("BranchStockPanel branch scope", () => {
 
     expect(screen.getByRole("button", { name: "แสดงสต็อกเฉพาะสาขา 000" })).toHaveAttribute("aria-pressed", "true");
     expect(headerKeys()).toContain("qtyBranch000");
+    expect(headerKeys()).not.toContain("qtyTotalAllBranches");
     expect(headerKeys()).not.toEqual(expect.arrayContaining(["qtyBranch001", "qtyBranch003", "qtyBranch004", "qtyBranch005"]));
   });
 
@@ -184,7 +189,9 @@ describe("BranchStockPanel branch scope", () => {
     expect(screen.getByRole("button", { name: `แสดงสต็อกเฉพาะสาขา ${branchCode}` })).toHaveAttribute("aria-pressed", "true");
     expect(headerKeys()).toContain(`qtyBranch${branchCode}`);
     expect(headerKeys().filter((key) => key.startsWith("qtyBranch"))).toEqual([`qtyBranch${branchCode}`]);
-    expect(scopedTotal("A001")).toBe(expectedTotal);
+    expect(headerKeys()).not.toContain("qtyTotalAllBranches");
+    expect(scopedColumnValue("A001", `qtyBranch${branchCode}`)).toBe(expectedTotal);
+    expect(scopedTotal("A001")).toBeUndefined();
     expect(screen.getByRole("button", { name: "แสดงสต็อกสมุทรสงคราม สาขา 000 001 003 และ 004" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "แสดงสต็อกทุกสาขา" })).toBeInTheDocument();
   });
@@ -197,6 +204,7 @@ describe("BranchStockPanel branch scope", () => {
 
     expect(headerKeys()).toEqual(expect.arrayContaining(["qtyBranch000", "qtyBranch001", "qtyBranch003", "qtyBranch004"]));
     expect(headerKeys()).not.toContain("qtyBranch005");
+    expect(headerKeys()).toContain("qtyTotalAllBranches");
     expect(scopedTotal("A001")).toBe("10.00");
   });
 
@@ -210,7 +218,8 @@ describe("BranchStockPanel branch scope", () => {
     const matrix = xlsxMock.aoaToSheet.mock.calls[0][0];
     expect(matrix[0]).toContain("สาขา 004");
     expect(matrix[0]).not.toEqual(expect.arrayContaining(["สาขา 000", "สาขา 001", "สาขา 003", "สาขา 005"]));
-    expect(matrix[1][matrix[0].indexOf("รวม")]).toBe(4);
+    expect(matrix[0]).not.toContain("รวม");
+    expect(matrix[1][matrix[0].indexOf("สาขา 004")]).toBe(4);
     expect(screen.queryByRole("dialog", { name: "ส่งออก Excel แยกตามสาขา" })).not.toBeInTheDocument();
     const clickedAnchor = HTMLAnchorElement.prototype.click.mock.instances.at(-1);
     expect(clickedAnchor.download).toMatch(/^branch-stock-branch-004-\d{4}-\d{2}-\d{2}\.xlsx$/);
@@ -239,14 +248,15 @@ describe("BranchStockPanel branch scope", () => {
       "qtyBranch004",
       "qtyBranch005",
     ]));
+    expect(headerKeys()).toContain("qtyTotalAllBranches");
   });
 
-  it("recalculates each total from the selected scope", async () => {
+  it("shows a total only when the selected scope contains multiple branches", async () => {
     const user = userEvent.setup();
     renderPanel();
     await screen.findByText("A001");
 
-    expect(scopedTotal("A001")).toBe("1.00");
+    expect(scopedTotal("A001")).toBeUndefined();
     await user.click(screen.getByRole("button", { name: "แสดงสต็อกสมุทรสงคราม สาขา 000 001 003 และ 004" }));
     expect(scopedTotal("A001")).toBe("10.00");
     await user.click(screen.getByRole("button", { name: "แสดงสต็อกทุกสาขา" }));
@@ -407,7 +417,8 @@ describe("BranchStockPanel branch scope", () => {
     renderPanel({ records: [MISSING_BRANCH_RECORD] });
     await screen.findByText("M003");
 
-    expect(scopedTotal("M003")).toBe("0.00");
+    expect(scopedColumnValue("M003", "qtyBranch000")).toBe("0.00");
+    expect(scopedTotal("M003")).toBeUndefined();
     await user.click(screen.getByRole("button", { name: "แสดงสต็อกทุกสาขา" }));
     expect(scopedTotal("M003")).toBe("0.00");
     expect(screen.queryByText("NaN")).not.toBeInTheDocument();
