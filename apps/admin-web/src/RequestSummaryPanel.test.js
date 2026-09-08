@@ -26,6 +26,9 @@ describe("request summary panel", () => {
 
     expect(rowRule).toMatch(/grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)\s*;/);
     expect(fullRowRule).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s*;/);
+    expect(fullRowRule).toMatch(/color:\s*#fde047\s*;/);
+    expect(fullRowRule).toMatch(/background:\s*rgba\(161,\s*98,\s*7,\s*0\.25\)\s*;/);
+    expect(stylesheet).toMatch(/\.rq-summary-total-unit\s*\{[^}]*color:\s*#fde047\s*;/s);
     expect(tableRule).toMatch(/border-radius:\s*12px\s*;/);
     expect(tableRule).toMatch(/overflow:\s*hidden\s*;/);
   });
