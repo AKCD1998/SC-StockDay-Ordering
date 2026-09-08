@@ -3008,6 +3008,8 @@ button {
 .rq-summary-total-label-row,
 .rq-summary-total-row {
   grid-template-columns: minmax(0, 1fr);
+  color: #fde047;
+  background: rgba(161, 98, 7, 0.25);
 }
 
 .rq-dialog-summary-cell {
@@ -3079,19 +3081,9 @@ button {
   overflow-wrap: anywhere;
 }
 
-.rq-summary-total-label-row {
-  color: #d9f99d;
-  background: rgba(101, 124, 24, 0.24);
-}
-
 .rq-summary-total-label-row .rq-dialog-summary-cell {
   min-height: 52px;
   padding-inline: 14px;
-}
-
-.rq-summary-total-row {
-  color: #fde047;
-  background: rgba(161, 98, 7, 0.25);
 }
 
 .rq-summary-total-row .rq-dialog-summary-cell {
@@ -3110,7 +3102,7 @@ button {
 
 .rq-summary-total-unit {
   max-width: 100%;
-  color: #ecfccb;
+  color: #fde047;
   font-size: 0.92rem;
   font-weight: 800;
   line-height: 1.2;
