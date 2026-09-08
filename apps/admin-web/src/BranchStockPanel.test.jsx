@@ -136,6 +136,33 @@ describe("BranchStockPanel branch scope", () => {
     vi.restoreAllMocks();
   });
 
+  it("groups branch-stock header controls without replacing their existing behavior", async () => {
+    const user = userEvent.setup();
+    const { container } = renderPanel({ isOnlineMarketingStaff: false, branchCode: "004" });
+    await screen.findByText("A001");
+
+    const header = container.querySelector(".branch-stock-panel-header");
+    const searchRow = header.querySelector(".branch-stock-search-row");
+    const actionRow = header.querySelector(".branch-stock-action-row");
+    const actionButtons = [...actionRow.querySelectorAll(":scope > button")];
+    const searchInput = searchRow.querySelector('input[type="search"]');
+    const searchButton = searchRow.querySelector('button[type="submit"]');
+
+    expect(header).toContainElement(header.querySelector(".branch-stock-header-info"));
+    expect(header).toContainElement(header.querySelector(".branch-stock-scope-bar"));
+    expect(searchInput).toHaveAccessibleName("ค้นหาสต็อกสินค้า");
+    expect(searchInput.parentElement).toBe(searchRow);
+    expect(searchButton.parentElement).toBe(searchRow);
+    expect(searchButton).toHaveClass("branch-stock-search-button");
+    expect(actionButtons).toHaveLength(3);
+    expect(actionButtons[0]).toHaveClass("excel-export-button");
+    expect(actionButtons[1]).toHaveClass("request-entry-button");
+    expect(actionButtons[2]).toHaveClass("branch-stock-refresh-button");
+
+    await user.click(actionButtons[1]);
+    expect(actionButtons[1]).toHaveClass("active");
+  });
+
   it("defaults Online Marketing to branch 000 only", async () => {
     renderPanel({ branchCode: "" });
     await screen.findByText("A001");
@@ -404,7 +431,7 @@ describe("BranchStockPanel branch scope", () => {
     await user.click(screen.getByRole("button", { name: "แสดงสต็อกสมุทรสงคราม สาขา 000 001 003 และ 004" }));
     expect([...document.querySelectorAll('tbody td[data-column-key="productCode"] strong')].map((node) => node.textContent)).toEqual(["B002", "A001"]);
 
-    await user.type(screen.getByRole("searchbox", { name: "" }), "Alpha");
+    await user.type(screen.getByRole("searchbox", { name: "ค้นหาสต็อกสินค้า" }), "Alpha");
     await user.click(screen.getByRole("button", { name: "ค้นหา" }));
     await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith(
       expect.stringContaining("search=Alpha"),

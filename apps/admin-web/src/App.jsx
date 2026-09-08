@@ -2670,8 +2670,10 @@ export function BranchStockPanel({
 
   return (
     <section className="panel branch-stock-panel">
-      <div className="panel-header stacked">
-        <div>
+      <div
+        className={`panel-header stacked branch-stock-panel-header${isBranchStockScopeUser ? "" : " branch-stock-panel-header-without-scope"}`}
+      >
+        <div className="branch-stock-header-info">
           <h2>สต็อกแยกตามสาขา</h2>
           <p>ข้อมูล snapshot ล่าสุดที่ Mother PC ส่งเข้า Render สำหรับการติดตามยอดแต่ละสาขา</p>
         </div>
@@ -2704,54 +2706,61 @@ export function BranchStockPanel({
         ) : null}
 
         <form className="toolbar branch-stock-toolbar" onSubmit={handleSearchSubmit}>
-          <input
-            type="search"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="ค้นหารหัสสินค้า ชื่อไทย ชื่ออังกฤษ หรือ Barcode"
-          />
-          <button
-            type="button"
-            className="excel-export-button"
-            aria-label={isBranchStockScopeUser ? "ส่งออก Excel ตามขอบเขตสต็อกที่เลือก" : "เปิดตัวเลือกส่งออก Excel แยกตามสาขา"}
-            onClick={isBranchStockScopeUser
-              ? handleExportExcel
-              : () => {
-                  setExportError("");
-                  setExportModalOpen(true);
-                }}
-            disabled={isBranchStockScopeUser && exporting}
-          >
-            {isBranchStockScopeUser && exporting ? "กำลังสร้างไฟล์..." : "ส่งออก Excel"}
-          </button>
-          <button type="submit" className="ghost-button branch-stock-search-button">
-            ค้นหา
-          </button>
-          <button
-            type="button"
-            className="ghost-button branch-stock-refresh-button"
-            onClick={() => setRefreshKey((value) => value + 1)}
-            disabled={loading}
-          >
-            รีเฟรช
-          </button>
-          {isAdminUser ? (
+          <div className="branch-stock-search-row">
+            <input
+              type="search"
+              aria-label="ค้นหาสต็อกสินค้า"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="ค้นหารหัสสินค้า ชื่อไทย ชื่ออังกฤษ หรือ Barcode"
+            />
+            <button type="submit" className="ghost-button branch-stock-search-button">
+              ค้นหา
+            </button>
+          </div>
+          <div className="branch-stock-action-row" role="group" aria-label="การดำเนินการสต็อก">
             <button
               type="button"
-              className="ghost-button branch-stock-column-editor-button"
-              onClick={openColumnEditor}
+              className="excel-export-button"
+              aria-label={isBranchStockScopeUser ? "ส่งออก Excel ตามขอบเขตสต็อกที่เลือก" : "เปิดตัวเลือกส่งออก Excel แยกตามสาขา"}
+              onClick={isBranchStockScopeUser
+                ? handleExportExcel
+                : () => {
+                    setExportError("");
+                    setExportModalOpen(true);
+                  }}
+              disabled={isBranchStockScopeUser && exporting}
             >
-              จัดคอลัมน์
+              {isBranchStockScopeUser && exporting ? "กำลังสร้างไฟล์..." : "ส่งออก Excel"}
             </button>
+            <button
+              ref={requestButtonRef}
+              type="button"
+              className={`request-entry-button${requestMode ? " active" : ""}`}
+              onClick={toggleRequestMode}
+            >
+              {requestMode ? "ปิดโหมดขอสินค้า" : "ขอสินค้า"}
+            </button>
+            <button
+              type="button"
+              className="ghost-button branch-stock-refresh-button"
+              onClick={() => setRefreshKey((value) => value + 1)}
+              disabled={loading}
+            >
+              รีเฟรช
+            </button>
+          </div>
+          {isAdminUser ? (
+            <div className="branch-stock-admin-action-row">
+              <button
+                type="button"
+                className="ghost-button branch-stock-column-editor-button"
+                onClick={openColumnEditor}
+              >
+                จัดคอลัมน์
+              </button>
+            </div>
           ) : null}
-          <button
-            ref={requestButtonRef}
-            type="button"
-            className={`request-entry-button${requestMode ? " active" : ""}`}
-            onClick={toggleRequestMode}
-          >
-            {requestMode ? "ปิดโหมดขอสินค้า" : "ขอสินค้า"}
-          </button>
         </form>
         {isBranchStockScopeUser && exportError ? (
           <p

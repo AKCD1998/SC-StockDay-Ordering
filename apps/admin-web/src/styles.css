@@ -2036,6 +2036,267 @@ button {
   color: #dbe5f3;
 }
 
+/* Branch-stock header only. Other panels also reuse .panel-header.stacked and
+   .branch-stock-toolbar, so keep the three-column composition scoped here. */
+.branch-stock-panel > .branch-stock-panel-header {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.25fr) minmax(0, 2.2fr);
+  align-items: start;
+  gap: clamp(16px, 1.8vw, 28px);
+}
+
+.branch-stock-panel > .branch-stock-panel-header-without-scope {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 2.1fr);
+}
+
+.branch-stock-panel-header .branch-stock-header-info,
+.branch-stock-panel-header .branch-stock-scope-bar,
+.branch-stock-panel-header .branch-stock-toolbar {
+  min-width: 0;
+}
+
+.branch-stock-panel-header .branch-stock-header-info {
+  grid-column: 1;
+}
+
+.branch-stock-panel-header .branch-stock-scope-bar {
+  grid-column: 2;
+  width: auto;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+}
+
+.branch-stock-panel-header .branch-stock-scope-label {
+  flex: 0 0 auto;
+}
+
+.branch-stock-panel-header .branch-stock-scope-segments {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.branch-stock-panel-header .branch-stock-scope-button {
+  min-width: 0;
+  padding-inline: clamp(8px, 1vw, 14px);
+  white-space: nowrap;
+}
+
+.branch-stock-panel-header .branch-stock-toolbar {
+  grid-column: 3;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  justify-content: stretch;
+  gap: 10px;
+}
+
+.branch-stock-panel-header-without-scope .branch-stock-toolbar {
+  grid-column: 2;
+}
+
+.branch-stock-panel-header .branch-stock-search-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #c8d3e2;
+  border-radius: 16px;
+  background: rgba(244, 247, 251, 0.9);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.branch-stock-panel-header .branch-stock-action-row > button {
+  width: 100%;
+  min-width: 0;
+  height: 54px;
+  margin-left: 0;
+}
+
+.branch-stock-panel-header .branch-stock-search-row input {
+  min-width: 0;
+  height: 46px;
+  flex: 1 1 auto;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branch-stock-panel-header .branch-stock-search-row input:focus {
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+}
+
+.branch-stock-panel-header .branch-stock-search-row input::placeholder {
+  color: #6f8095;
+  text-overflow: ellipsis;
+}
+
+.branch-stock-panel-header .branch-stock-search-row:focus-within {
+  border-color: #4d90ff;
+  box-shadow: 0 0 0 3px rgba(77, 144, 255, 0.18);
+}
+
+.branch-stock-panel-header .branch-stock-search-button {
+  width: auto;
+  min-width: 108px;
+  height: 46px;
+  flex: 0 0 auto;
+  margin-left: 0;
+  border-radius: 11px;
+}
+
+.branch-stock-panel-header .branch-stock-action-row > button {
+  border-radius: 14px;
+}
+
+.branch-stock-panel-header .branch-stock-action-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.branch-stock-panel-header .branch-stock-admin-action-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.branch-stock-panel-header .branch-stock-admin-action-row .branch-stock-column-editor-button {
+  min-width: min(160px, 100%);
+  margin-left: 0;
+}
+
+.branch-stock-panel > .branch-stock-panel-header .branch-stock-refresh-button {
+  border-color: #d6bc45;
+  background: linear-gradient(180deg, #fff7b8 0%, #f3e27b 100%);
+  color: #3d3300;
+}
+
+.branch-stock-panel > .branch-stock-panel-header .branch-stock-refresh-button:hover:not(:disabled),
+.branch-stock-panel > .branch-stock-panel-header .branch-stock-refresh-button:focus-visible:not(:disabled) {
+  border-color: #c8aa2f;
+  background: linear-gradient(180deg, #fff9c9 0%, #ead665 100%);
+  color: #2f2700;
+}
+
+.branch-stock-panel > .branch-stock-panel-header .branch-stock-search-button:active:not(:disabled) {
+  background: linear-gradient(180deg, #2e67d9 0%, #245bc7 100%);
+  transform: translateY(1px);
+}
+
+.branch-stock-panel > .branch-stock-panel-header .branch-stock-search-button:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+[data-theme="dark"] .branch-stock-panel > .branch-stock-panel-header .branch-stock-search-row {
+  border-color: #31445b;
+  background: #0c1724;
+}
+
+[data-theme="dark"] .branch-stock-panel > .branch-stock-panel-header .branch-stock-search-row:focus-within {
+  border-color: #4f8dff;
+  box-shadow: 0 0 0 3px rgba(79, 141, 255, 0.22);
+}
+
+[data-theme="dark"] .branch-stock-panel > .branch-stock-panel-header .branch-stock-search-row input {
+  color: #f4f7fb;
+}
+
+[data-theme="dark"] .branch-stock-panel > .branch-stock-panel-header .branch-stock-search-row input::placeholder {
+  color: #8297b1;
+}
+
+.branch-stock-panel-header > .branch-stock-export-error {
+  grid-column: 3;
+}
+
+.branch-stock-panel-header-without-scope > .branch-stock-export-error {
+  grid-column: 2;
+}
+
+@media (max-width: 1200px) {
+  .branch-stock-panel > .branch-stock-panel-header,
+  .branch-stock-panel > .branch-stock-panel-header-without-scope {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  }
+
+  .branch-stock-panel-header .branch-stock-toolbar,
+  .branch-stock-panel-header-without-scope .branch-stock-toolbar,
+  .branch-stock-panel-header > .branch-stock-export-error,
+  .branch-stock-panel-header-without-scope > .branch-stock-export-error {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .branch-stock-panel > .branch-stock-panel-header,
+  .branch-stock-panel > .branch-stock-panel-header-without-scope {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .branch-stock-panel-header .branch-stock-header-info,
+  .branch-stock-panel-header .branch-stock-scope-bar,
+  .branch-stock-panel-header .branch-stock-toolbar,
+  .branch-stock-panel-header-without-scope .branch-stock-toolbar,
+  .branch-stock-panel-header > .branch-stock-export-error,
+  .branch-stock-panel-header-without-scope > .branch-stock-export-error {
+    grid-column: 1;
+  }
+
+  .branch-stock-panel-header .branch-stock-scope-bar {
+    width: 100%;
+    display: grid;
+    gap: 8px;
+  }
+
+  .branch-stock-panel-header .branch-stock-scope-label,
+  .branch-stock-panel-header .branch-stock-scope-segments {
+    width: 100%;
+  }
+
+  .branch-stock-panel-header .branch-stock-scope-button {
+    padding-inline: 6px;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 520px) {
+  .branch-stock-panel-header .branch-stock-search-row {
+    gap: 3px;
+    padding: 3px;
+  }
+
+  .branch-stock-panel-header .branch-stock-search-button {
+    min-width: 84px;
+  }
+
+  .branch-stock-panel-header .branch-stock-action-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+}
+
+@media (max-width: 360px) {
+  .branch-stock-panel-header .branch-stock-action-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .taxonomy-report-card {
   margin-bottom: 20px;
   border: 1px solid #d6deea;
