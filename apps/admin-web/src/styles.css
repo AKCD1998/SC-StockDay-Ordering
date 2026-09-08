@@ -2356,6 +2356,94 @@ button {
   min-width: 180px;
 }
 
+.branch-stock-priority-loading {
+  margin: 0 0 12px;
+  color: #5f7084;
+  font-size: 0.9rem;
+}
+
+.branch-stock-priority-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+
+.branch-stock-priority-legend span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.branch-stock-priority-legend small {
+  color: #6a7a90;
+}
+
+.branch-stock-priority-legend .priority-purchase {
+  border-color: rgba(220, 38, 38, 0.24);
+  background: rgba(220, 38, 38, 0.1);
+  color: #a61b1b;
+}
+
+.branch-stock-priority-legend .priority-transfer {
+  border-color: rgba(234, 122, 35, 0.3);
+  background: rgba(249, 115, 22, 0.11);
+  color: #a34a0b;
+}
+
+.branch-stock-priority-legend .priority-no-action {
+  border-color: rgba(22, 163, 74, 0.24);
+  background: rgba(34, 197, 94, 0.09);
+  color: #147238;
+}
+
+.branch-stock-table.request-mode tbody tr.priority-purchase > td {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.branch-stock-table.request-mode tbody tr.priority-transfer > td {
+  background: rgba(249, 115, 22, 0.09);
+}
+
+.branch-stock-table.request-mode tbody tr.priority-no-action > td {
+  background: rgba(34, 197, 94, 0.07);
+}
+
+.branch-stock-table.request-mode tbody tr.priority-purchase > td:first-child {
+  box-shadow: inset 4px 0 #dc2626;
+}
+
+.branch-stock-table.request-mode tbody tr.priority-transfer > td:first-child {
+  box-shadow: inset 4px 0 #f97316;
+}
+
+.branch-stock-table.request-mode tbody tr.priority-no-action > td:first-child {
+  box-shadow: inset 4px 0 #22a447;
+}
+
+[data-theme="dark"] .branch-stock-priority-loading,
+[data-theme="dark"] .branch-stock-priority-legend small {
+  color: #9db1c8;
+}
+
+[data-theme="dark"] .branch-stock-priority-legend .priority-purchase {
+  color: #fecaca;
+}
+
+[data-theme="dark"] .branch-stock-priority-legend .priority-transfer {
+  color: #fed7aa;
+}
+
+[data-theme="dark"] .branch-stock-priority-legend .priority-no-action {
+  color: #bbf7d0;
+}
+
 .branch-stock-request-plus {
   width: 110px;
   height: 42px;
