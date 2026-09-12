@@ -33,6 +33,7 @@ import {
 import { toProductRecords, toSalesRecords, toSalesDetailPayload, chunkPayloadByDoc, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toStockSnapshotRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
 import { runSalesShadow as defaultRunSalesShadow } from "./delta/salesShadow.js";
 import { runTransferShadow as defaultRunTransferShadow } from "./delta/transferShadow.js";
+import { connectSqlWithRetry } from "./sqlConnection.js";
 
 const PERIOD_DAYS = 30;
 
@@ -160,6 +161,7 @@ export async function runOnce(dependencies = {}) {
   const runSalesShadow = dependencies.runSalesShadow ?? defaultRunSalesShadow;
   const runTransferShadow = dependencies.runTransferShadow ?? defaultRunTransferShadow;
   const connectSql = dependencies.connectSql ?? ((config) => sql.connect(config));
+  const sqlConnectRetryOptions = dependencies.sqlConnectRetryOptions ?? {};
   const fetchData = dependencies.fetchDatasets ?? fetchDatasets;
   const connectionConfig = dependencies.sqlServerConfig ?? sqlServerConfig;
   const postBatchesForRun = dependencies.postBatches ?? ((url, records, batchSize = 500, extraBody = {}) => (
@@ -213,7 +215,14 @@ export async function runOnce(dependencies = {}) {
 
   let pool;
   try {
-    pool = await connectSql(connectionConfig);
+    // This happens before run-start or any central write, so retrying a
+    // transient named-instance lookup/connection failure cannot duplicate a
+    // partially-started sync. Permanent login/configuration errors fail once.
+    pool = await connectSqlWithRetry({
+      ...sqlConnectRetryOptions,
+      connect: connectSql,
+      config: connectionConfig,
+    });
     console.log("SQL Server: connected OK\n");
 
     const data = await fetchData(pool, syncConfig);

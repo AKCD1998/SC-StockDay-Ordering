@@ -38,6 +38,38 @@ test("entrypoint validates branch and read-only SQL identity before connecting",
   assert.equal(connects, 0);
 });
 
+test("entrypoint retries a transient SQL connection failure before starting the central run", async () => {
+  const runtime = dependencies();
+  const delays = [];
+  const warnings = [];
+  let attempts = 0;
+
+  runtime.values.connectSql = async () => {
+    attempts += 1;
+    runtime.trace.push(["SQL_CONNECT", attempts]);
+    if (attempts === 1) throw Object.assign(new Error("browser lookup timed out"), { code: "ETIMEOUT" });
+    return { close: async () => runtime.trace.push(["SQL_CLOSE"]) };
+  };
+  runtime.values.sqlConnectRetryOptions = {
+    wait: async (delayMs) => delays.push(delayMs),
+    logger: { warn: (message) => warnings.push(message) },
+  };
+
+  await runOnce(runtime.values);
+
+  assert.equal(attempts, 2);
+  assert.deepEqual(delays, [5_000]);
+  assert.equal(warnings.length, 1);
+  assert.deepEqual(runtime.trace.slice(0, 2), [
+    ["SQL_CONNECT", 1],
+    ["SQL_CONNECT", 2],
+  ]);
+  const firstPostIndex = runtime.trace.findIndex(([kind]) => kind === "POST");
+  assert.ok(firstPostIndex > 1);
+  assert.equal(runtime.trace.slice(0, 2).some(([kind]) => kind === "POST"), false);
+  assert.deepEqual(runtime.trace.at(-1), ["SQL_CLOSE"]);
+});
+
 test("direct CLI exits nonzero and explains invalid configuration", () => {
   const cases = [
     {
