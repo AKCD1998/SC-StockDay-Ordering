@@ -13,6 +13,18 @@ import ReviewQueuePanel from "./ReviewQueuePanel.jsx";
 import IngredientDictionaryPanel from "./IngredientDictionaryPanel.jsx";
 import PreorderPanel from "./preorders/PreorderPanel";
 import LoginScreen from "./LoginScreen.jsx";
+import AdminNavigation from "./AdminNavigation.jsx";
+import {
+  adminOnlyViews,
+  adminViewKeys,
+  buildAdminViewHash,
+  defaultAdminView,
+  getNavigationGroups,
+  readAdminViewFromLocation,
+  stockCostAuditView,
+  taxonomyReviewView,
+  taxonomyView,
+} from "./adminNavigation.js";
 export { BranchStockPanel } from "./BranchStockPanel.jsx";
 export { IncomingRequestsTab, MyRequestsTab, StockRequestsPanel } from "./StockRequestsPanel.jsx";
 import dkshLogoUrl from "./assets/dksh.svg";
@@ -51,31 +63,6 @@ const customerPreordersEnabled = String(import.meta.env.VITE_FEATURE_CUSTOMER_PR
 const adminViewStorageKey = "sc-stockday-admin-view";
 const adminThemeStorageKey = "sc-stockday-admin-theme";
 const ONLINE_MARKETING_STAFF_USER_ID = "onlinemarketingstaff";
-const defaultAdminView = "receipts";
-const stockCostAuditView = "stock-cost-audit";
-const taxonomyView = "product-taxonomy";
-const taxonomyReviewView = "taxonomy-review";
-const adminOnlyViews = [stockCostAuditView, "category-review", "ingredient-dictionary", taxonomyView, taxonomyReviewView, "sync-log"];
-const adminViewKeys = [defaultAdminView, "branch-stock", "branch-stock-history", "stock-recommendations", "movement-trace", "stock-requests", "focus-products", "preorder", ...adminOnlyViews];
-const ADMIN_VIEW_ROUTE_SEGMENTS = {
-  receipts: "receipts",
-  "branch-stock": "branch-stock",
-  "branch-stock-history": "branch-stock-history",
-  "stock-recommendations": "stock-recommendations",
-  "movement-trace": "movement-trace",
-  "stock-requests": "stock-requests",
-  "focus-products": "focus-products",
-  preorder: "preorder",
-  [stockCostAuditView]: "stock-cost-audit",
-  "category-review": "category-review",
-  "ingredient-dictionary": "ingredient-dictionary",
-  [taxonomyView]: "taxonomy",
-  [taxonomyReviewView]: "taxonomy-review",
-  "sync-log": "sync-log",
-};
-const ADMIN_VIEW_BY_SEGMENT = Object.fromEntries(
-  Object.entries(ADMIN_VIEW_ROUTE_SEGMENTS).map(([viewKey, segment]) => [segment, viewKey]),
-);
 const CODE39_PATTERNS = {
   "0": "nnnwwnwnn",
   "1": "wnnwnnnnw",
@@ -122,60 +109,6 @@ const CODE39_PATTERNS = {
   "%": "nnnwnwnwn",
   "*": "nwnnwnwnn",
 };
-
-function getNavigationGroups(isAdminUser, hideDashboard = false) {
-  return [
-    {
-      id: "dashboard",
-      label: "Dashboard",
-      shortLabel: "DB",
-      items: [
-        { label: "สินค้าโฟกัส", view: "focus-products", description: "เป้าหมายสินค้าโปรโมชั่นและยอดขายสะสม" },
-      ],
-    },
-    {
-      id: "product-data",
-      label: "ข้อมูลสินค้า",
-      shortLabel: "PR",
-      items: [
-        { label: "ใบรับสินค้า", view: "receipts", description: "ตรวจใบรับสินค้าและโลโก้ Supplier" },
-        { label: "สต็อกสาขา", view: "branch-stock", description: "สถานะสต็อกแยกตามสาขา" },
-        { label: "สต๊อกดูย้อนหลัง", view: "branch-stock-history", description: "ประวัติสต๊อกสะสมตามรอบเวลา sync" },
-        { label: "คำแนะนำสต๊อก", view: "stock-recommendations", description: "ระบบแนะนำว่าควรถือสต๊อก ขอสาขาอื่น หรือซื้อเพิ่มเท่าไหร่" },
-        { label: "คำขอสินค้า", view: "stock-requests", description: "ส่งและติดตามคำขอสินค้าระหว่างสาขา" },
-        { label: "Movement & Transactions", view: "movement-trace", description: "ยอดรวม · รายการ transaction · เอกสาร" },
-        ...(isAdminUser ? [{
-          label: "ตรวจสอบต้นทุนสต๊อกสินค้า",
-          view: stockCostAuditView,
-          description: "ดูต้นทุนเฉลี่ยและมูลค่าคงเหลือต่อสาขา",
-        }] : []),
-      ],
-    },
-    {
-      id: "data-quality",
-      label: "ตรวจสอบฐานข้อมูล",
-      shortLabel: "DQ",
-      adminOnly: true,
-      items: [
-        { label: "ตรวจหมวดสินค้า", view: "category-review", description: "review queue สำหรับยืนยันหมวดสินค้า" },
-        { label: "พจนานุกรมสารสำคัญ", view: "ingredient-dictionary", description: "ดูแลฐานความรู้สารสำคัญ" },
-        { label: "Product Taxonomy", view: taxonomyView, description: "กำหนดประเภทสินค้าและจัดประเภทอัตโนมัติ" },
-        { label: "Taxonomy Review", view: taxonomyReviewView, description: "ยืนยันผล AI classification และจัดคิวตรวจทาน" },
-        { label: "ประวัติ Sync", view: "sync-log", description: "สถานะและประวัติการ sync ข้อมูล" },
-        { label: "Ingredient Mapping", description: "supervision workflow ระยะถัดไป", disabled: true },
-        { label: "Product Master", description: "ทะเบียนสินค้ากลาง", disabled: true },
-      ],
-    },
-    {
-      id: "customer-relations",
-      label: "ลูกค้าสัมพันธ์",
-      shortLabel: "CR",
-      items: [
-        { label: "พรีออเดอร์", view: "preorder", description: "รับและติดตามคำสั่งจองสินค้าล่วงหน้า" },
-      ],
-    },
-  ].filter((group) => (!group.adminOnly || isAdminUser) && (!hideDashboard || group.id !== "dashboard"));
-}
 
 function statusClass(status) {
   if (status === "Reorder soon") return "danger";
@@ -693,34 +626,6 @@ async function apiFetch(path, options = {}) {
       ...(options.headers || {}),
     },
   });
-}
-
-function readAdminViewFromLocation() {
-  if (typeof window === "undefined") return null;
-
-  const hashSegment = window.location.hash.replace(/^#\/?/, "").trim().toLowerCase();
-  if (hashSegment && ADMIN_VIEW_BY_SEGMENT[hashSegment]) {
-    return ADMIN_VIEW_BY_SEGMENT[hashSegment];
-  }
-
-  const pathSegment = window.location.pathname
-    .replace(/^\/+|\/+$/g, "")
-    .split("/")[0]
-    .trim()
-    .toLowerCase();
-  if (pathSegment && ADMIN_VIEW_BY_SEGMENT[pathSegment]) {
-    return ADMIN_VIEW_BY_SEGMENT[pathSegment];
-  }
-
-  return null;
-}
-
-function buildAdminViewHash(viewKey) {
-  const segment = ADMIN_VIEW_ROUTE_SEGMENTS[viewKey];
-  if (!segment || viewKey === defaultAdminView) {
-    return "";
-  }
-  return `#/${segment}`;
 }
 
 function movementTypeLabel(type) {
@@ -2226,122 +2131,20 @@ export default function App() {
           </div>
         </div>
 
-        <nav className="view-nav hero-nav" aria-label="เมนูหลัก" ref={navigationMenuRef}>
-          {navigationGroups.map((group) => {
-            const activeItem = group.items.find((item) => item.view === view);
-            const isOpen = openNavGroup === group.id;
-            const hasDropdown = group.items.length > 1 || group.items.some((item) => item.disabled);
-            const groupBadgeCount = group.items.some((item) => item.view === "stock-requests")
-              ? stockRequestBadgeCount
-              : group.items.some((item) => item.view === "sync-log")
-                ? syncFailureBadgeCount
-                : group.items.some((item) => item.view === "preorder")
-                  ? preorderBadgeCount
-                  : 0;
-            const groupHasNotif = groupBadgeCount > 0;
-            const triggerClassName = [
-              "view-nav-btn",
-              "hero-nav-trigger",
-              activeItem ? "active" : "",
-              isOpen ? "open" : "",
-            ].filter(Boolean).join(" ");
-
-            if (!hasDropdown) {
-              const item = group.items[0];
-              return (
-                <button
-                  key={group.id}
-                  type="button"
-                  className={[
-                    triggerClassName,
-                    item.disabled ? "view-nav-btn-disabled" : "",
-                  ].filter(Boolean).join(" ")}
-                  disabled={item.disabled}
-                  aria-disabled={item.disabled}
-                  onClick={() => handleNavigate(item)}
-                >
-                  <span className="hero-nav-mark" aria-hidden="true">{group.shortLabel}</span>
-                  <span className="hero-nav-label">{group.label}</span>
-                  {item.disabled ? <span className="view-nav-badge">เร็วๆนี้</span> : null}
-                  {item.view === "preorder" && preorderBadgeCount > 0 ? <span className="nav-notif-badge nav-trigger-badge">{preorderBadgeCount > 99 ? "99+" : preorderBadgeCount}</span> : null}
-                </button>
-              );
-            }
-
-            return (
-              <div
-                key={group.id}
-                className={isOpen ? "hero-nav-group open" : "hero-nav-group"}
-                data-nav-group={group.id}
-              >
-                <button
-                  type="button"
-                  className={triggerClassName}
-                  aria-haspopup="menu"
-                  aria-expanded={isOpen}
-                  data-nav-trigger={group.id}
-                  onClick={() => {
-                    if (isOpen) {
-                      closeNavGroup(group.id, { restoreFocus: true });
-                    } else {
-                      setOpenNavGroup(group.id);
-                    }
-                  }}
-                  onKeyDown={(event) => handleNavTriggerKeyDown(event, group)}
-                >
-                  <span className="hero-nav-mark" aria-hidden="true">{group.shortLabel}</span>
-                  <span className="hero-nav-label">{group.label}</span>
-                  <span className="hero-nav-chevron" aria-hidden="true">▾</span>
-                  {groupHasNotif ? (
-                    <span className="nav-notif-badge nav-trigger-badge">{groupBadgeCount > 99 ? "99+" : groupBadgeCount}</span>
-                  ) : null}
-                </button>
-                <div
-                  className="hero-nav-menu"
-                  role="menu"
-                  aria-label={group.label}
-                  aria-hidden={!isOpen}
-                  hidden={!isOpen}
-                >
-                  {group.items.map((item) => {
-                    const isActive = item.view === view;
-                    return (
-                      <button
-                        key={item.view || item.label}
-                        type="button"
-                        className={[
-                          "hero-nav-item",
-                          isActive ? "active" : "",
-                          item.disabled ? "disabled" : "",
-                        ].filter(Boolean).join(" ")}
-                        role="menuitem"
-                        disabled={item.disabled}
-                        data-nav-item
-                        onClick={() => handleNavigate(item)}
-                        onKeyDown={(event) => handleNavItemKeyDown(event, group.id)}
-                      >
-                        <span className="hero-nav-item-main">
-                          <span>{item.label}</span>
-                          {item.disabled ? <span className="view-nav-badge">เร็วๆนี้</span> : null}
-                          {item.view === "stock-requests" && stockRequestBadgeCount > 0 ? (
-                            <span className="nav-notif-badge">{stockRequestBadgeCount > 99 ? "99+" : stockRequestBadgeCount}</span>
-                          ) : null}
-                          {item.view === "sync-log" && syncFailureBadgeCount > 0 ? (
-                            <span className="nav-notif-badge">{syncFailureBadgeCount > 99 ? "99+" : syncFailureBadgeCount}</span>
-                          ) : null}
-                          {item.view === "preorder" && preorderBadgeCount > 0 ? (
-                            <span className="nav-notif-badge">{preorderBadgeCount > 99 ? "99+" : preorderBadgeCount}</span>
-                          ) : null}
-                        </span>
-                        <span className="hero-nav-item-desc">{item.description}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </nav>
+        <AdminNavigation
+          navigationGroups={navigationGroups}
+          view={view}
+          openNavGroup={openNavGroup}
+          navigationMenuRef={navigationMenuRef}
+          stockRequestBadgeCount={stockRequestBadgeCount}
+          syncFailureBadgeCount={syncFailureBadgeCount}
+          preorderBadgeCount={preorderBadgeCount}
+          handleNavigate={handleNavigate}
+          closeNavGroup={closeNavGroup}
+          setOpenNavGroup={setOpenNavGroup}
+          handleNavTriggerKeyDown={handleNavTriggerKeyDown}
+          handleNavItemKeyDown={handleNavItemKeyDown}
+        />
 
         <div className="account-actions">
           {(!branchCode && session?.user?.role !== "admin") ? <div className="branch-context-card">
