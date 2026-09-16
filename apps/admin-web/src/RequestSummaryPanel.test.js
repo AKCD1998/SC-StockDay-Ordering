@@ -3,20 +3,20 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("request summary panel", () => {
-  const appSource = readFileSync(resolve(process.cwd(), "src/App.jsx"), "utf8");
+  const panelSource = readFileSync(resolve(process.cwd(), "src/BranchStockPanel.jsx"), "utf8");
   const stylesheet = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
 
   it("renders one connected four-row table from existing dialog values", () => {
-    expect(appSource).toMatch(/className="rq-summary-table"/);
-    expect(appSource).toMatch(/className="rq-dialog-summary-row rq-summary-branch-row"/);
-    expect(appSource).toMatch(/className="rq-dialog-summary-row rq-summary-stock-row"/);
-    expect(appSource).toMatch(/className="rq-dialog-summary-row rq-summary-total-label-row"/);
-    expect(appSource).toMatch(/className="rq-dialog-summary-row rq-summary-total-row"/);
-    expect(appSource).toMatch(/className="rq-summary-stock-num">\{formatNumber\(currentBranchStockQty, 0\)\}/);
-    expect(appSource).toMatch(/className="rq-total-num">\{totalRequestedQty\}/);
-    expect(appSource).toMatch(/\{branchCode \|\| "-"\}/);
-    expect(appSource).toMatch(/\{requestDialogProduct\.unit \|\| "-"\}/);
-    expect(appSource).not.toMatch(/[>{]\s*(?:XXX|00x|\{จำนวน\}|\{ชิ้น\})\s*[<}]/);
+    expect(panelSource).toMatch(/className="rq-summary-table"/);
+    expect(panelSource).toMatch(/className="rq-dialog-summary-row rq-summary-branch-row"/);
+    expect(panelSource).toMatch(/className="rq-dialog-summary-row rq-summary-stock-row"/);
+    expect(panelSource).toMatch(/className="rq-dialog-summary-row rq-summary-total-label-row"/);
+    expect(panelSource).toMatch(/className="rq-dialog-summary-row rq-summary-total-row"/);
+    expect(panelSource).toMatch(/className="rq-summary-stock-num">\{formatNumber\(currentBranchStockQty, 0\)\}/);
+    expect(panelSource).toMatch(/className="rq-total-num">\{totalRequestedQty\}/);
+    expect(panelSource).toMatch(/\{branchCode \|\| "-"\}/);
+    expect(panelSource).toMatch(/\{requestDialogProduct\.unit \|\| "-"\}/);
+    expect(panelSource).not.toMatch(/[>{]\s*(?:XXX|00x|\{จำนวน\}|\{ชิ้น\})\s*[<}]/);
   });
 
   it("keeps equal cells in the first rows and full-width total rows", () => {

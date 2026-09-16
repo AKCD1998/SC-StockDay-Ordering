@@ -3,15 +3,15 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("branch stock header layout", () => {
-  const appSource = readFileSync(resolve(process.cwd(), "src/App.jsx"), "utf8");
+  const panelSource = readFileSync(resolve(process.cwd(), "src/BranchStockPanel.jsx"), "utf8");
   const stylesheet = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
 
   it("uses page-specific groups and keeps the requested action order", () => {
-    expect(appSource).toMatch(/panel-header stacked branch-stock-panel-header/);
-    expect(appSource).toMatch(/className="branch-stock-header-info"/);
-    expect(appSource).toMatch(/className="branch-stock-search-row"/);
-    expect(appSource).toMatch(/className="branch-stock-action-row"/);
-    expect(appSource).toMatch(
+    expect(panelSource).toMatch(/panel-header stacked branch-stock-panel-header/);
+    expect(panelSource).toMatch(/className="branch-stock-header-info"/);
+    expect(panelSource).toMatch(/className="branch-stock-search-row"/);
+    expect(panelSource).toMatch(/className="branch-stock-action-row"/);
+    expect(panelSource).toMatch(
       /branch-stock-action-row[\s\S]*?excel-export-button[\s\S]*?request-entry-button[\s\S]*?branch-stock-refresh-button/,
     );
   });
