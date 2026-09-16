@@ -15,13 +15,10 @@ import PreorderPanel from "./preorders/PreorderPanel";
 import LoginScreen from "./LoginScreen.jsx";
 import AdminNavigation from "./AdminNavigation.jsx";
 import AdminAccountActions from "./AdminAccountActions.jsx";
+import useAdminView from "./useAdminView.js";
 import {
   adminOnlyViews,
-  adminViewKeys,
-  buildAdminViewHash,
-  defaultAdminView,
   getNavigationGroups,
-  readAdminViewFromLocation,
   stockCostAuditView,
   taxonomyReviewView,
   taxonomyView,
@@ -61,7 +58,6 @@ import orexTradingLogoUrl from "./assets/orex-trading-logo.svg";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const customerPreordersEnabled = String(import.meta.env.VITE_FEATURE_CUSTOMER_PREORDERS || "").toLowerCase() === "true";
-const adminViewStorageKey = "sc-stockday-admin-view";
 const adminThemeStorageKey = "sc-stockday-admin-theme";
 const ONLINE_MARKETING_STAFF_USER_ID = "onlinemarketingstaff";
 const CODE39_PATTERNS = {
@@ -1303,17 +1299,7 @@ export default function App() {
   const [branchContextError, setBranchContextError] = useState("");
   const [selectedBranchContext, setSelectedBranchContext] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [view, setView] = useState(() => {
-    if (typeof window === "undefined") return defaultAdminView;
-    const locationView = readAdminViewFromLocation();
-    if (locationView && adminViewKeys.includes(locationView)) {
-      return locationView;
-    }
-    const savedView = window.localStorage.getItem(adminViewStorageKey);
-    return adminViewKeys.includes(savedView)
-      ? savedView
-      : defaultAdminView;
-  });
+  const [view, setView] = useAdminView();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [openNavGroup, setOpenNavGroup] = useState(null);
   const [incomingRequestBadgeCount, setIncomingRequestBadgeCount] = useState(0);
@@ -1883,36 +1869,6 @@ export default function App() {
   useEffect(() => {
     setCurrentPage(1);
   }, [query, statusFilter, stockDay.length]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(adminViewStorageKey, view);
-    const nextHash = buildAdminViewHash(view);
-    const nextUrl = `${window.location.pathname}${window.location.search}${nextHash}`;
-    if (`${window.location.pathname}${window.location.search}${window.location.hash}` !== nextUrl) {
-      window.history.replaceState(null, "", nextUrl);
-    }
-  }, [view]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return undefined;
-
-    function syncViewFromLocation() {
-      const locationView = readAdminViewFromLocation();
-      if (locationView && adminViewKeys.includes(locationView)) {
-        setView(locationView);
-      } else if (!window.location.hash && window.location.pathname === "/") {
-        setView((current) => current);
-      }
-    }
-
-    window.addEventListener("hashchange", syncViewFromLocation);
-    window.addEventListener("popstate", syncViewFromLocation);
-    return () => {
-      window.removeEventListener("hashchange", syncViewFromLocation);
-      window.removeEventListener("popstate", syncViewFromLocation);
-    };
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
