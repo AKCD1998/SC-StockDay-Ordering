@@ -3319,6 +3319,9 @@ function StockRequestsPanel({
   );
 }
 
+// Temporary test seam for R3 characterization. Runtime ownership remains in App.jsx.
+export { IncomingRequestsTab, MyRequestsTab, StockRequestsPanel };
+
 function countPendingIncomingRequests(records) {
   const list = Array.isArray(records) ? records : [];
   return list.filter((record) => record?.status === "SUBMITTED" && !record?.responseResult).length;
