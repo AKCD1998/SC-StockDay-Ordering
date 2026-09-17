@@ -61,52 +61,6 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const customerPreordersEnabled = String(import.meta.env.VITE_FEATURE_CUSTOMER_PREORDERS || "").toLowerCase() === "true";
 const adminThemeStorageKey = "sc-stockday-admin-theme";
 const ONLINE_MARKETING_STAFF_USER_ID = "onlinemarketingstaff";
-const CODE39_PATTERNS = {
-  "0": "nnnwwnwnn",
-  "1": "wnnwnnnnw",
-  "2": "nnwwnnnnw",
-  "3": "wnwwnnnnn",
-  "4": "nnnwwnnnw",
-  "5": "wnnwwnnnn",
-  "6": "nnwwwnnnn",
-  "7": "nnnwnnwnw",
-  "8": "wnnwnnwnn",
-  "9": "nnwwnnwnn",
-  A: "wnnnnwnnw",
-  B: "nnwnnwnnw",
-  C: "wnwnnwnnn",
-  D: "nnnnwwnnw",
-  E: "wnnnwwnnn",
-  F: "nnwnwwnnn",
-  G: "nnnnnwwnw",
-  H: "wnnnnwwnn",
-  I: "nnwnnwwnn",
-  J: "nnnnwwwnn",
-  K: "wnnnnnnww",
-  L: "nnwnnnnww",
-  M: "wnwnnnnwn",
-  N: "nnnnwnnww",
-  O: "wnnnwnnwn",
-  P: "nnwnwnnwn",
-  Q: "nnnnnnwww",
-  R: "wnnnnnwwn",
-  S: "nnwnnnwwn",
-  T: "nnnnwnwwn",
-  U: "wwnnnnnnw",
-  V: "nwwnnnnnw",
-  W: "wwwnnnnnn",
-  X: "nwnnwnnnw",
-  Y: "wwnnwnnnn",
-  Z: "nwwnwnnnn",
-  "-": "nwnnnnwnw",
-  ".": "wwnnnnwnn",
-  " ": "nwwnnnwnn",
-  $: "nwnwnwnnn",
-  "/": "nwnwnnnwn",
-  "+": "nwnnnwnwn",
-  "%": "nnnwnwnwn",
-  "*": "nwnnwnwnn",
-};
 
 function statusClass(status) {
   if (status === "Reorder soon") return "danger";
@@ -134,62 +88,6 @@ function formatDateTime(value) {
   return new Date(value).toLocaleString("th-TH");
 }
 
-
-function Code39Barcode({ value, height = 56, narrow = 2, wide = 5, gap = 2 }) {
-  const normalizedValue = String(value || "").trim().toUpperCase();
-  if (!normalizedValue) return null;
-
-  const encoded = `*${normalizedValue}*`;
-  const patterns = [];
-  for (const char of encoded) {
-    const pattern = CODE39_PATTERNS[char];
-    if (!pattern) return null;
-    patterns.push(pattern);
-  }
-
-  const rects = [];
-  let cursor = 0;
-  patterns.forEach((pattern, patternIndex) => {
-    for (let i = 0; i < pattern.length; i += 1) {
-      const width = pattern[i] === "w" ? wide : narrow;
-      const isBar = i % 2 === 0;
-      if (isBar) {
-        rects.push(
-          <rect
-            key={`${patternIndex}-${i}-${cursor}`}
-            x={cursor}
-            y="0"
-            width={width}
-            height={height}
-            rx="0.4"
-          />,
-        );
-      }
-      cursor += width;
-    }
-    if (patternIndex < patterns.length - 1) {
-      cursor += gap;
-    }
-  });
-
-  return (
-    <div className="srq-barcode-block" aria-label={`บาร์โค้ด ${normalizedValue}`}>
-      <svg
-        className="srq-barcode-svg"
-        viewBox={`0 0 ${cursor} ${height}`}
-        width="100%"
-        height={height}
-        role="img"
-        aria-hidden="true"
-      >
-        <g fill="currentColor">
-          {rects}
-        </g>
-      </svg>
-      <div className="srq-barcode-text mono">{normalizedValue}</div>
-    </div>
-  );
-}
 
 function translateStatus(status) {
   if (status === "Reorder soon") return "ควรสั่งซื้อเพิ่ม";
