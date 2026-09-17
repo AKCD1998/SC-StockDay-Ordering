@@ -2,6 +2,7 @@ import React from "react";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Code39Barcode } from "./StockRequestsPanel.jsx";
 import { IncomingRequestsTab, MyRequestsTab, StockRequestsPanel } from "./App.jsx";
 
 const DRAFT_LINE = {
@@ -62,6 +63,16 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   delete global.fetch;
+});
+
+describe("Code39Barcode", () => {
+  it("renders the stock-request public ID after the panel extraction", () => {
+    render(<Code39Barcode value=" srq-001 " />);
+
+    const barcode = screen.getByLabelText("บาร์โค้ด SRQ-001");
+    expect(barcode).toHaveTextContent("SRQ-001");
+    expect(barcode.querySelectorAll("rect").length).toBeGreaterThan(0);
+  });
 });
 
 describe("StockRequestsPanel characterization", () => {
