@@ -33,7 +33,10 @@ import {
 import { toProductRecords, toSalesRecords, toSalesDetailPayload, chunkPayloadByDoc, toTransferPayload, toPendingReceiptPayload, toApprovedReceiptPayload, toBranchStockRecords, toStockSnapshotRecords, toProductPriceDefaultRecords, toProductBranchPriceOverrideRecords } from "./transform.js";
 import { runSalesShadow as defaultRunSalesShadow } from "./delta/salesShadow.js";
 import { runTransferShadow as defaultRunTransferShadow } from "./delta/transferShadow.js";
+import { isActiveHourlyStockBranch } from "./delta/hourlyStockEvidence.js";
+import { runHourlyStockShadow as defaultRunHourlyStockShadow } from "./delta/hourlyStockShadow.js";
 import { connectSqlWithRetry } from "./sqlConnection.js";
+import { buildSqlServerConfig } from "./sqlServerConfig.js";
 
 const PERIOD_DAYS = 30;
 
@@ -41,22 +44,7 @@ const PERIOD_DAYS = 30;
 // Named instance (SERVER\SQLEXPRESS): pass instanceName separately.
 // mssql + tedious use SQL Server Browser (UDP 1434) to resolve the actual port.
 // Do NOT set port when instanceName is present — it will be ignored or cause errors.
-const sqlServerConfig = {
-  server:   defaultSyncConfig.sqlServerHost,
-  user:     defaultSyncConfig.sqlServerUser,
-  password: defaultSyncConfig.sqlServerPassword,
-  database: defaultSyncConfig.sqlServerDatabase,
-  options: {
-    encrypt:                false,  // SQL Server 2008 R2 does not support modern TLS
-    trustServerCertificate: true,
-    enableArithAbort:       true,
-    ...(defaultSyncConfig.sqlServerInstanceName
-      ? { instanceName: defaultSyncConfig.sqlServerInstanceName }
-      : {}),
-  },
-  // Only include port when NOT using a named instance
-  ...(defaultSyncConfig.sqlServerInstanceName ? {} : { port: defaultSyncConfig.sqlServerPort }),
-};
+const sqlServerConfig = buildSqlServerConfig(defaultSyncConfig);
 
 // ── Dataset routing ────────────────────────────────────────────────────────────
 async function fetchDatasets(pool, config = defaultSyncConfig) {
@@ -125,7 +113,9 @@ async function fetchDatasets(pool, config = defaultSyncConfig) {
     data.approved_receipt_lines   = await getApprovedReceiptLineRows(pool, branchCode, dateOpts);
   }
   if (datasets.includes("branch_stock") || datasets.includes("branch_stock_history")) {
-    data.branch_stock = await getBranchStockRows(pool, branchCode);
+    const hourlyEvidenceQueryEnabled = config.hourlyStockEvidence?.inlineAfterFullSyncEnabled === true
+      && isActiveHourlyStockBranch(branchCode);
+    data.branch_stock = await getBranchStockRows(pool, branchCode, hourlyEvidenceQueryEnabled);
   }
   // Price datasets are all-branch and read from the consolidated HQ/mother DB.
   // They are NOT scoped by branchCode — grouping per branch happens at post time.
@@ -160,6 +150,7 @@ export async function runOnce(dependencies = {}) {
   const completeSyncRun = dependencies.completeSyncRun ?? defaultCompleteSyncRun;
   const runSalesShadow = dependencies.runSalesShadow ?? defaultRunSalesShadow;
   const runTransferShadow = dependencies.runTransferShadow ?? defaultRunTransferShadow;
+  const runHourlyStockShadow = dependencies.runHourlyStockShadow ?? defaultRunHourlyStockShadow;
   const connectSql = dependencies.connectSql ?? ((config) => sql.connect(config));
   const sqlConnectRetryOptions = dependencies.sqlConnectRetryOptions ?? {};
   const fetchData = dependencies.fetchDatasets ?? fetchDatasets;
@@ -299,6 +290,7 @@ export async function runOnce(dependencies = {}) {
     let totalSent = 0;
     let approvedFailed = 0;
     let branchStockV2Manifest = null;
+    let branchStockAcknowledgedRecords = null;
     const branchStockV2Enabled = syncConfig.syncV2.datasets.includes("branch_stock");
 
     // CP2 (observability): ask the backend to open a run row immediately
@@ -503,6 +495,9 @@ export async function runOnce(dependencies = {}) {
           retryOptions: BRANCH_STOCK_RETRY_OPTIONS,
         });
         branchStockV2Manifest = handoff.manifest;
+        branchStockAcknowledgedRecords = branchStockV2Enabled
+          ? handoff.manifest.recordCount
+          : handoff.sent;
         if (branchStockV2Enabled) {
           console.log(`  branch_stock: ${handoff.manifest.recordCount} records staged in ${handoff.manifest.batchCount} batch(es)`);
         } else if (handoff.sent > 0) {
@@ -659,6 +654,35 @@ export async function runOnce(dependencies = {}) {
           message: `datasets=${syncConfig.datasets.join(",")} posted for branch ${syncConfig.branchCode}.`,
         }),
       });
+
+      // Hourly dual-stock evidence is allowed to advance only after the
+      // authoritative branch_stock path above has completed successfully. For
+      // CP4 that means finalize + terminal APPLIED; for v1 it means every batch
+      // was acknowledged and the success run-log was written. The shadow never
+      // changes the Full payload and any local evidence failure is isolated.
+      if (syncConfig.hourlyStockEvidence?.inlineAfterFullSyncEnabled === true
+          && isActiveHourlyStockBranch(syncConfig.branchCode)
+          && branchStockRecords) {
+        try {
+          const shadow = runHourlyStockShadow({
+            branchCode: syncConfig.branchCode,
+            rows: data.branch_stock ?? [],
+            cacheDir: syncConfig.hourlyStockEvidence.cacheDir,
+            contentCaptureBranches: syncConfig.hourlyStockEvidence.contentCaptureBranches,
+            observationKind: syncConfig.hourlyStockEvidence.observationKind,
+            observedAt: startedAt,
+            acknowledgement: {
+              authoritativeApplied: true,
+              acceptedRecords: branchStockAcknowledgedRecords,
+            },
+          });
+          console.log(`  [hourly-stock-shadow] ${JSON.stringify(shadow)}`);
+        } catch (shadowError) {
+          console.warn(
+            `  WARN: hourly stock evidence shadow failed, ignored — Full Sync is unaffected: ${shadowError.message}`,
+          );
+        }
+      }
 
       console.log(`\nDone. ${totalSent} records sent to API.`);
     } catch (postErr) {

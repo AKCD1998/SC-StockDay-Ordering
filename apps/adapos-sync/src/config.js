@@ -45,6 +45,8 @@ const cliDateFrom   = (args.find((a) => a.startsWith("--date-from="))     ?? "")
 const cliDateTo     = (args.find((a) => a.startsWith("--date-to="))       ?? "").replace("--date-to=",       "") || null;
 const cliLookback   = (args.find((a) => a.startsWith("--lookback-days=")) ?? "").replace("--lookback-days=", "") || null;
 const cliSkipIfSyncedToday = args.includes("--skip-if-synced-today");
+const cliHourlyKind = (args.find((a) => a.startsWith("--hourly-kind=")) ?? "").replace("--hourly-kind=", "") || null;
+const cliHourlySlot = (args.find((a) => a.startsWith("--hourly-slot=")) ?? "").replace("--hourly-slot=", "") || null;
 
 const { server, instanceName } = parseHost(process.env.ADAPOS_SQLSERVER_HOST ?? "");
 
@@ -158,6 +160,41 @@ export const syncConfig = {
         .map((s) => s.trim())
         .filter(Boolean),
     ),
+  },
+  // Future hourly dual-stock evidence. This is a local shadow only: it never
+  // changes the canonical FCPdtQtyRet payload and never posts FCPdtQtyNow to
+  // the Backend. Both controls are deliberately dormant by default.
+  hourlyStockEvidence: {
+    enabled: String(process.env.ADAPOS_HOURLY_STOCK_EVIDENCE_SHADOW ?? "false") === "true",
+    // Separate opt-in for the old local-only post-Full-Sync comparison. The
+    // durable hourly runner flag above must not alter the Full Sync query or
+    // request trace when an intraday pilot is eventually enabled.
+    inlineAfterFullSyncEnabled:
+      String(process.env.ADAPOS_HOURLY_STOCK_EVIDENCE_FULL_SYNC_LOCAL_SHADOW ?? "false") === "true",
+    cacheDir: process.env.ADAPOS_HOURLY_STOCK_EVIDENCE_CACHE_DIR
+      || process.env.ADAPOS_DELTA_SHADOW_CACHE_DIR
+      || defaultDeltaShadowCacheDir(),
+    contentCaptureBranches: new Set(
+      String(process.env.ADAPOS_HOURLY_STOCK_EVIDENCE_CONTENT_CAPTURE_BRANCHES ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+    // No implicit clock-based classification. A future Task must say whether
+    // it is the canonical 08:20 anchor or an intraday observation. Empty means
+    // that the shadow is intentionally skipped even if its feature flag is on.
+    observationKind: String(cliHourlyKind ?? process.env.ADAPOS_HOURLY_STOCK_EVIDENCE_OBSERVATION_KIND ?? "").trim(),
+    plannedSlot: String(cliHourlySlot ?? process.env.ADAPOS_HOURLY_STOCK_EVIDENCE_PLANNED_SLOT ?? "").trim(),
+    productCodes: [...new Set(
+      String(process.env.ADAPOS_HOURLY_STOCK_EVIDENCE_PRODUCT_CODES ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    )].sort(),
+    // Separate branch-bound credential; intentionally no fallback to the
+    // general Full Sync token so the evidence endpoint cannot be impersonated
+    // by another branch holding a shared legacy key.
+    uploadToken: String(process.env.ADAPOS_HOURLY_STOCK_EVIDENCE_TOKEN ?? ""),
   },
 };
 
