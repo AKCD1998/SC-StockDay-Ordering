@@ -32,6 +32,7 @@ export async function connectSqlWithRetry({
   retryMaxDelayMs = 15_000,
   wait = sleep,
   logger = console,
+  onRetry,
 }) {
   if (typeof connect !== "function") throw new TypeError("connect must be a function");
   if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
@@ -50,6 +51,7 @@ export async function connectSqlWithRetry({
         retryBaseDelayMs * (2 ** (attempt - 1)),
       );
       const code = errorCodes(error)[0] ?? "UNKNOWN";
+      onRetry?.({ attempt, maxAttempts, delayMs, code });
       logger.warn(
         `WARN: SQL Server connection attempt ${attempt}/${maxAttempts} failed (${code}); retrying in ${delayMs}ms.`,
       );
