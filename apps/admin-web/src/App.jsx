@@ -17,6 +17,7 @@ import AdminNavigation from "./AdminNavigation.jsx";
 import AdminAccountActions from "./AdminAccountActions.jsx";
 import useAdminView from "./useAdminView.js";
 import useAdminNavigationMenu from "./useAdminNavigationMenu.js";
+import { apiFetch, subscribeToUnauthorizedResponse } from "./lib/apiClient.js";
 import {
   adminOnlyViews,
   getNavigationGroups,
@@ -507,16 +508,6 @@ function validateSvgText(svgText) {
     return "SVG นี้มี markup ที่ไม่ปลอดภัย";
   }
   return "";
-}
-
-async function apiFetch(path, options = {}) {
-  return fetch(`${apiBaseUrl}${path}`, {
-    credentials: "include",
-    ...options,
-    headers: {
-      ...(options.headers || {}),
-    },
-  });
 }
 
 function movementTypeLabel(type) {
@@ -1225,12 +1216,29 @@ export default function App() {
   const draftHydrationRef = useRef({ items: null, note: null });
   const draftSaveTimerRef = useRef(null);
   const draftHydratedForBranchRef = useRef("");
+  const sessionExpiredRef = useRef(false);
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "dark";
     const savedTheme = window.localStorage.getItem(adminThemeStorageKey);
     return savedTheme === "light" ? "light" : "dark";
   });
   const accountMenuRef = useRef(null);
+
+  const handleUnauthorized = useCallback(() => {
+    if (sessionExpiredRef.current) return;
+    sessionExpiredRef.current = true;
+    setSession(null);
+    setAuthError("เซสชันหมดอายุแล้ว กรุณาเข้าสู่ระบบใหม่");
+    setLoading(false);
+    setOpenNavGroup(null);
+    setAccountMenuOpen(false);
+  }, [setOpenNavGroup]);
+
+  useEffect(() => {
+    if (!session) return undefined;
+    sessionExpiredRef.current = false;
+    return subscribeToUnauthorizedResponse(handleUnauthorized);
+  }, [handleUnauthorized, session]);
 
   useEffect(() => {
     let active = true;
@@ -1320,13 +1328,6 @@ export default function App() {
           apiFetch("/api/admin/order-requests"),
           apiFetch("/api/admin/sync-status"),
         ]);
-
-        if ([stockResponse, orderResponse, syncResponse].some((response) => response.status === 401)) {
-          if (!active) return;
-          setSession(null);
-          setAuthError("เซสชันหมดอายุแล้ว กรุณาเข้าสู่ระบบใหม่");
-          return;
-        }
 
         if (!stockResponse.ok || !orderResponse.ok || !syncResponse.ok) {
           throw new Error("โหลดข้อมูลแดชบอร์ดไม่สำเร็จ");
@@ -1819,13 +1820,6 @@ export default function App() {
     [isAdminUser, isOnlineMarketingStaff],
   );
 
-  const handleSyncUnauthorized = useCallback(() => {
-    setSession(null);
-    setAuthError("เซสชันหมดอายุแล้ว กรุณาเข้าสู่ระบบใหม่");
-    setOpenNavGroup(null);
-    setAccountMenuOpen(false);
-  }, []);
-
   useEffect(() => {
     if (!accountMenuOpen || typeof window === "undefined") return undefined;
 
@@ -1992,7 +1986,7 @@ export default function App() {
       ) : view === taxonomyReviewView && isAdminUser ? (
         <TaxonomyReviewPanel csrfToken={session.csrfToken} />
       ) : view === "sync-log" && isAdminUser ? (
-        <SyncLogPanel onUnauthorized={handleSyncUnauthorized} />
+        <SyncLogPanel onUnauthorized={handleUnauthorized} />
       ) : view === "preorder" ? (
         <PreorderPanel enabled={customerPreordersEnabled} csrfToken={session.csrfToken} isAdmin={isAdminUser} branchCode={branchCode} apiBaseUrl={apiBaseUrl} onBadgeChanged={refreshPreorderBadgeCount} />
       ) : (

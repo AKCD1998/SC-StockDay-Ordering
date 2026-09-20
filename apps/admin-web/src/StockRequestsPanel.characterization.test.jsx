@@ -205,4 +205,126 @@ describe("IncomingRequestsTab characterization", () => {
     expect(await screen.findByText("ยังไม่มีคำขอสินค้าเข้ามา")).toBeInTheDocument();
     expect(screen.queryByText("network unavailable")).not.toBeInTheDocument();
   });
+
+  it("loads an incoming detail only through the recipient-authorized endpoint", async () => {
+    const user = userEvent.setup();
+    const requestPublicId = "SRQ-20260920-001-000151-003";
+    const batchPublicId = "SRQ-20260920-001-000151";
+    const productName = "สินค้าทดสอบสำหรับสาขาผู้รับ";
+    const detail = {
+      publicId: requestPublicId,
+      batchPublicId,
+      requestingBranchCode: "001",
+      sourceBranchCode: "003",
+      status: "SUBMITTED",
+      version: 1,
+      lines: [{
+        lineId: 1,
+        productCode: "P900",
+        productNameThai: productName,
+        requestedQty: 2,
+        unit: "กล่อง",
+      }],
+    };
+
+    global.fetch = vi.fn(async (url) => {
+      const path = String(url);
+      if (path.endsWith(`/api/stock-requests/incoming/${requestPublicId}`)) {
+        return jsonResponse({ request: detail });
+      }
+      if (path.endsWith("/api/stock-requests/incoming")) {
+        return jsonResponse({
+          records: [{
+            requestPublicId,
+            batchPublicId,
+            requestingBranchCode: "001",
+            sourceBranchCode: "003",
+            status: "SUBMITTED",
+            createdAt: "2026-09-20T13:30:00.000Z",
+          }],
+        });
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+
+    render(<IncomingRequestsTab branchCode="003" csrfToken="csrf-test" />);
+
+    const requestHeader = await screen.findByRole("button", { name: new RegExp(requestPublicId) });
+    await user.click(requestHeader);
+    expect(await screen.findByText(productName)).toBeInTheDocument();
+
+    const requestedUrls = global.fetch.mock.calls.map(([url]) => String(url));
+    expect(requestedUrls).toContain(`http://localhost:4000/api/stock-requests/incoming/${requestPublicId}`);
+    expect(requestedUrls).not.toContain(`http://localhost:4000/api/stock-requests/${batchPublicId}`);
+  });
+
+  it("retains batch context for admins who are authorized to load requester details", async () => {
+    const user = userEvent.setup();
+    const requestPublicId = "SRQ-20260920-001-000151-003";
+    const batchPublicId = "SRQ-20260920-001-000151";
+    const siblingProductName = "สินค้าในคำขอสาขาอื่น";
+    const detail = {
+      publicId: requestPublicId,
+      batchPublicId,
+      requestingBranchCode: "001",
+      sourceBranchCode: "003",
+      status: "SUBMITTED",
+      version: 1,
+      lines: [],
+    };
+
+    global.fetch = vi.fn(async (url) => {
+      const path = String(url);
+      if (path.endsWith(`/api/stock-requests/incoming/${requestPublicId}`)) {
+        return jsonResponse({ request: detail });
+      }
+      if (path.endsWith(`/api/stock-requests/${batchPublicId}`)) {
+        return jsonResponse({
+          batch: {
+            requests: [
+              detail,
+              {
+                publicId: `${batchPublicId}-005`,
+                sourceBranchCode: "005",
+                status: "SUBMITTED",
+                lines: [{
+                  lineId: 2,
+                  productCode: "P901",
+                  productNameThai: siblingProductName,
+                  requestedQty: 1,
+                  unit: "กล่อง",
+                }],
+              },
+            ],
+          },
+        });
+      }
+      if (path.endsWith("/api/stock-requests/incoming")) {
+        return jsonResponse({
+          records: [{
+            requestPublicId,
+            batchPublicId,
+            requestingBranchCode: "001",
+            sourceBranchCode: "003",
+            status: "SUBMITTED",
+            createdAt: "2026-09-20T13:30:00.000Z",
+          }],
+        });
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+
+    render(<IncomingRequestsTab branchCode="" isAdmin csrfToken="csrf-test" />);
+
+    const requestHeader = await screen.findByRole("button", { name: new RegExp(requestPublicId) });
+    await user.click(requestHeader);
+    expect(await screen.findByText((_, element) => (
+      element?.classList.contains("srq-batch-context-line")
+      && element.textContent.includes(siblingProductName)
+    ))).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith(
+      `http://localhost:4000/api/stock-requests/${batchPublicId}`,
+      expect.anything(),
+    );
+  });
 });

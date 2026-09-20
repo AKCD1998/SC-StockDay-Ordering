@@ -5,8 +5,8 @@ import {
   summarizeRegulatedDrugBatch,
   summarizeRegulatedDrugLines,
 } from "./lib/regulatedDrugs.js";
+import { apiFetch } from "./lib/apiClient.js";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const STOCK_REQUEST_BRANCH_FILTER_CODES = ["000", "001", "003", "004", "005"];
 const CODE39_PATTERNS = {
   "0": "nnnwwnwnn",
@@ -313,16 +313,6 @@ function BranchMultiSelectFilter({ label, selectedCodes, onChange, active = fals
       ) : null}
     </div>
   );
-}
-
-async function apiFetch(path, options = {}) {
-  return fetch(`${apiBaseUrl}${path}`, {
-    credentials: "include",
-    ...options,
-    headers: {
-      ...(options.headers || {}),
-    },
-  });
 }
 
 function SrqStatusChip({ status }) {
@@ -959,18 +949,19 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted, isAdm
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setBatchSiblings([]);
     apiFetch(`/api/stock-requests/incoming/${encodeURIComponent(publicId)}`)
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then((data) => {
         if (!active) return;
-        const req = data.request;
-        setDetail(req);
-        if (req?.batchPublicId) {
-          apiFetch(`/api/stock-requests/${encodeURIComponent(req.batchPublicId)}`)
-            .then((r) => (r.ok ? r.json() : null))
-            .then((bd) => {
-              if (!active || !bd?.batch?.requests) return;
-              setBatchSiblings(bd.batch.requests.filter((r) => r.publicId !== req.publicId));
+        const request = data.request;
+        setDetail(request);
+        if (isAdmin && request?.batchPublicId) {
+          apiFetch(`/api/stock-requests/${encodeURIComponent(request.batchPublicId)}`)
+            .then((res) => (res.ok ? res.json() : null))
+            .then((batchData) => {
+              if (!active || !batchData?.batch?.requests) return;
+              setBatchSiblings(batchData.batch.requests.filter((sibling) => sibling.publicId !== request.publicId));
             })
             .catch(() => {});
         }
@@ -978,7 +969,7 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted, isAdm
       .catch((err) => { if (active) setError(err.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [publicId, refreshKey]);
+  }, [isAdmin, publicId, refreshKey]);
 
   if (loading) return <div className="srq-detail-body"><p className="notice compact">กำลังโหลดรายละเอียด...</p></div>;
   if (error)   return <div className="srq-detail-body"><p className="notice error compact">{error}</p></div>;
@@ -1008,24 +999,24 @@ function IncomingRequestDetail({ publicId, csrfToken, onResponseSubmitted, isAdm
           </div>
         </div>
 
-        {batchSiblings.length > 0 ? (
+        {isAdmin && batchSiblings.length > 0 ? (
           <div className="srq-batch-context-panel">
             <div className="srq-batch-context-header">
               🔗 คำขอร่วมในชุดเดียวกัน ({batchSiblings.length} รายการ)
             </div>
-            {batchSiblings.map((sib) => (
-              <div key={sib.publicId} className={`srq-batch-context-row${sib.requestMode === "ADMIN_ALERT" ? " alert" : ""}`}>
+            {batchSiblings.map((sibling) => (
+              <div key={sibling.publicId} className={`srq-batch-context-row${sibling.requestMode === "ADMIN_ALERT" ? " alert" : ""}`}>
                 <span className="srq-batch-context-branch">
-                  {sib.requestMode === "ADMIN_ALERT" ? "📋" : "📦"} {BRANCH_LABELS[sib.sourceBranchCode] ?? `สาขา ${sib.sourceBranchCode}`}
+                  {sibling.requestMode === "ADMIN_ALERT" ? "📋" : "📦"} {BRANCH_LABELS[sibling.sourceBranchCode] ?? `สาขา ${sibling.sourceBranchCode}`}
                 </span>
                 <div className="srq-batch-context-lines">
-                  {(sib.lines || []).map((ln) => (
-                    <span key={ln.lineId} className="srq-batch-context-line">
-                      {ln.productNameThai || ln.productCode} · <strong>{formatNumber(ln.requestedQty, 0)} {ln.unit}</strong>
+                  {(sibling.lines || []).map((line) => (
+                    <span key={line.lineId} className="srq-batch-context-line">
+                      {line.productNameThai || line.productCode} · <strong>{formatNumber(line.requestedQty, 0)} {line.unit}</strong>
                     </span>
                   ))}
                 </div>
-                <SrqStatusChip status={sib.responseResult || sib.status} />
+                <SrqStatusChip status={sibling.responseResult || sibling.status} />
               </div>
             ))}
           </div>
