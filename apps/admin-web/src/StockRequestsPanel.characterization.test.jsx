@@ -1,5 +1,5 @@
 import React from "react";
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Code39Barcode } from "./StockRequestsPanel.jsx";
@@ -131,6 +131,22 @@ describe("StockRequestsPanel characterization", () => {
 });
 
 describe("MyRequestsTab characterization", () => {
+  it("updates a draft quantity without throwing after the panel extraction", async () => {
+    global.fetch = emptyRequestFetch();
+    const setRequestDraftItems = vi.fn();
+
+    render(<MyRequestsTab {...requestPanelProps({ setRequestDraftItems })} />);
+    const quantityInput = await screen.findByRole("spinbutton", { name: "จำนวน" });
+
+    fireEvent.change(quantityInput, { target: { value: "7" } });
+
+    expect(setRequestDraftItems).toHaveBeenCalledTimes(1);
+    const updateDraft = setRequestDraftItems.mock.calls[0][0];
+    expect(updateDraft([DRAFT_LINE])).toEqual([
+      expect.objectContaining({ lineKey: DRAFT_LINE.lineKey, requestedQty: 7 }),
+    ]);
+  });
+
   it("passes submit lifecycle callbacks through, disables the draft while submitting, and keeps it after an error", async () => {
     const user = userEvent.setup();
     global.fetch = emptyRequestFetch();

@@ -62,6 +62,14 @@ const BRANCH_LABELS = {
   "005": "สาขา 005",
 };
 
+function normalizeRequestedQty(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue <= 0) {
+    return 1;
+  }
+  return Math.max(1, Math.floor(numericValue));
+}
+
 export function Code39Barcode({ value, height = 56, narrow = 2, wide = 5, gap = 2 }) {
   const normalizedValue = String(value || "").trim().toUpperCase();
   if (!normalizedValue) return null;
