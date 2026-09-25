@@ -159,6 +159,14 @@ export const syncConfig = {
         .filter(Boolean),
     ),
   },
+  // Transfer Delta delivery remains independently gated and defaults OFF.
+  // Enabling it does not disable Full Sync: negotiation, missing baseline,
+  // contract errors, or any uncertain acknowledgement fall back to the
+  // existing /transfers Full path exactly once.
+  deltaTransferApply: {
+    enabled: String(process.env.ADAPOS_DELTA_APPLY_TRANSFERS ?? "false") === "true",
+    maxDocuments: parsePositiveInteger(process.env.ADAPOS_DELTA_TRANSFER_MAX_DOCUMENTS, 30),
+  },
 };
 
 // Kept separate from parsing so the production entrypoint can be executed with

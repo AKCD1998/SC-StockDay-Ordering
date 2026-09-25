@@ -24,7 +24,7 @@ function line(overrides = {}) {
   };
 }
 
-function config(cacheDir, enabled, transferChunkDocs = 30) {
+function config(cacheDir, enabled, transferChunkDocs = 30, applyEnabled = false) {
   return {
     sqlServerHost: "test-sql", sqlServerInstanceName: "", sqlServerDatabase: "test",
     sqlServerUser: "readonly", sqlServerPort: 1433, branchCode: "004",
@@ -40,10 +40,12 @@ function config(cacheDir, enabled, transferChunkDocs = 30) {
       cacheDir,
       contentCaptureBranches: new Set(),
     },
+    deltaTransferApply: { enabled: applyEnabled, maxDocuments: 30 },
   };
 }
 
-function runtime({ cacheDir, enabled, data, postTransfer, runTransferShadow, transferChunkDocs } = {}) {
+function runtime({ cacheDir, enabled, applyEnabled = false, data, postTransfer, runTransferShadow,
+  deliverTransferDelta, rebaselineTransferDeltaAfterFull, transferChunkDocs } = {}) {
   const events = [];
   const transferBodies = [];
   const postJson = async (url, body) => {
@@ -60,12 +62,14 @@ function runtime({ cacheDir, enabled, data, postTransfer, runTransferShadow, tra
     events,
     transferBodies,
     dependencies: {
-      syncConfig: config(cacheDir, enabled, transferChunkDocs),
+      syncConfig: config(cacheDir, enabled, transferChunkDocs, applyEnabled),
       connectSql: async () => ({ close: async () => {} }),
       fetchDatasets: async () => data ?? { transfers: [header()], transfer_lines: [line()] },
       postJson,
       setSyncRunId: () => {},
       ...(runTransferShadow ? { runTransferShadow } : {}),
+      ...(deliverTransferDelta ? { deliverTransferDelta } : {}),
+      ...(rebaselineTransferDeltaAfterFull ? { rebaselineTransferDeltaAfterFull } : {}),
     },
   };
 }
@@ -139,6 +143,40 @@ test("feature ON runs shadow only after authoritative Full transfer succeeds", a
   assert.equal(candidate.transferBodies[0].headers[0].branchCode, "004");
   assert.equal(candidate.transferBodies[0].lines[0].branchCode, "004");
   assert.equal(candidate.transferBodies[0].lines[0].docType, "4");
+});
+
+test("Delta safe failure performs one Full fallback then one acknowledged rebaseline", async () => {
+  const candidate = runtime({
+    cacheDir: "unused", enabled: true, applyEnabled: true,
+    deliverTransferDelta: async () => {
+      candidate.events.push("delta-attempt");
+      return { mode: "fallback", reason: "lost-ack" };
+    },
+    rebaselineTransferDeltaAfterFull: async () => {
+      candidate.events.push("delta-rebaseline");
+      return { ok: true, checkpointToken: "cp3" };
+    },
+    runTransferShadow: () => { candidate.events.push("transfer-shadow"); return {}; },
+  });
+  await runOnce(candidate.dependencies);
+  assert.deepEqual(candidate.events, [
+    "delta-attempt", "full-transfer-post", "delta-rebaseline", "transfer-shadow",
+  ]);
+  assert.equal(candidate.transferBodies.length, 1);
+});
+
+test("successful Delta apply omits the Full endpoint and advances Shadow only afterward", async () => {
+  const candidate = runtime({
+    cacheDir: "unused", enabled: true, applyEnabled: true,
+    deliverTransferDelta: async () => {
+      candidate.events.push("delta-ack");
+      return { mode:"delta",acceptedHeaders:1,acceptedLines:1,checkpointToken:"cp2" };
+    },
+    runTransferShadow: () => { candidate.events.push("transfer-shadow"); return {}; },
+  });
+  await runOnce(candidate.dependencies);
+  assert.deepEqual(candidate.events, ["delta-ack", "transfer-shadow"]);
+  assert.equal(candidate.transferBodies.length, 0);
 });
 
 test("failed authoritative transfer sync cannot advance an existing cache", async () => {
