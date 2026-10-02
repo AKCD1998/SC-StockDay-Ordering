@@ -169,9 +169,8 @@ export const syncConfig = {
     enabled: String(process.env.ADAPOS_DELTA_APPLY_TRANSFERS ?? "false") === "true",
     maxDocuments: parsePositiveInteger(process.env.ADAPOS_DELTA_TRANSFER_MAX_DOCUMENTS, 30),
   },
-  // Future hourly dual-stock evidence. This is a local shadow only: it never
-  // changes the canonical FCPdtQtyRet payload and never posts FCPdtQtyNow to
-  // the Backend. Both controls are deliberately dormant by default.
+  // Separate evidence transport; never changes the canonical FCPdtQtyRet
+  // payload. All controls remain dormant by default.
   hourlyStockEvidence: {
     enabled: String(process.env.ADAPOS_HOURLY_STOCK_EVIDENCE_SHADOW ?? "false") === "true",
     // Separate opt-in for the old local-only post-Full-Sync comparison. The
@@ -179,6 +178,8 @@ export const syncConfig = {
     // request trace when an intraday pilot is eventually enabled.
     inlineAfterFullSyncEnabled:
       String(process.env.ADAPOS_HOURLY_STOCK_EVIDENCE_FULL_SYNC_LOCAL_SHADOW ?? "false") === "true",
+    fullSyncAnchorEnabled:
+      String(process.env.ADAPOS_HOURLY_STOCK_EVIDENCE_FULL_SYNC_ANCHOR ?? "false") === "true",
     cacheDir: process.env.ADAPOS_HOURLY_STOCK_EVIDENCE_CACHE_DIR
       || process.env.ADAPOS_DELTA_SHADOW_CACHE_DIR
       || defaultDeltaShadowCacheDir(),

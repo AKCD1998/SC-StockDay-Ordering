@@ -26,6 +26,24 @@ export function buildHourlyEvidencePayload({
   rows,
   clientMeta = {},
 }) {
+  const activeBranches = new Set(["000", "001", "003", "004", "005"]);
+  const intradaySlots = new Set(Array.from({ length: 11 }, (_, i) => String(i + 9).padStart(2, "0") + ":00"));
+  if (!activeBranches.has(branchCode) || !["intraday", "morning_anchor"].includes(observationKind)
+      || (observationKind === "morning_anchor" ? plannedSlot !== "08:20" : !intradaySlots.has(plannedSlot))) {
+    throw Object.assign(new Error("Invalid hourly evidence identity or slot."), { code: "CONFIG_ERROR" });
+  }
+  const captureTime = new Date(capturedAt);
+  if (!Number.isFinite(captureTime.getTime()) || captureTime.toISOString() !== capturedAt) {
+    throw Object.assign(new Error("Invalid hourly capture timestamp."), { code: "CONFIG_ERROR" });
+  }
+  const date = new Date(captureTime.getTime() + 7 * 3600_000).toISOString().slice(0, 10);
+  const plannedTime = new Date(date + "T" + plannedSlot + ":00+07:00").getTime();
+  if (captureTime.getTime() < plannedTime || (observationKind === "morning_anchor" && captureTime.getTime() >= plannedTime + 40 * 60_000)) {
+    throw Object.assign(new Error("Capture is outside its permitted slot window."), { code: "HOURLY_EVIDENCE_INVALID_TIME" });
+  }
+  if (observationKind === "morning_anchor" && !/^[1-9][0-9]{0,17}$/.test(String(clientMeta.authoritativeSyncRunId))) {
+    throw Object.assign(new Error("Morning anchor requires an authoritative Full Sync receipt."), { code: "HOURLY_EVIDENCE_ANCHOR_RECEIPT_REQUIRED" });
+  }
   const records = [...(rows ?? [])].map((row, index) => {
     const productCode = String(row.product_code ?? "").trim();
     const retailOnHand = Number(row.qty);
@@ -37,8 +55,8 @@ export function buildHourlyEvidencePayload({
         code: "HOURLY_EVIDENCE_INVALID_ROW",
       });
     }
-    if (!Number.isFinite(retailOnHand)
-        || (latestEstimatedOnHand != null && !Number.isFinite(latestEstimatedOnHand))) {
+    if (row.qty == null || row.qty === "" || !Number.isFinite(retailOnHand) || Math.abs(retailOnHand) > 1e12
+        || (latestEstimatedOnHand != null && (!Number.isFinite(latestEstimatedOnHand) || Math.abs(latestEstimatedOnHand) > 1e12))) {
       throw Object.assign(new Error(`Hourly evidence row ${index} has non-finite quantity.`), {
         code: "HOURLY_EVIDENCE_INVALID_ROW",
       });
@@ -64,6 +82,7 @@ export function buildHourlyEvidencePayload({
     capturedAt,
     sourceEventAt,
     records,
+    ...(observationKind === "morning_anchor" ? { authoritativeSyncRunId: String(clientMeta.authoritativeSyncRunId) } : {}),
   };
   const payload = {
     ...identity,
@@ -112,7 +131,13 @@ export async function uploadHourlyEvidence({
         signal: controller.signal,
       });
       const text = await response.text();
-      if (response.ok) return { ...JSON.parse(text), attempts: attempt };
+      if (response.ok) {
+        const ack = JSON.parse(text);
+        return {
+          accepted: ack.accepted, branchCode: ack.branchCode, captureId: ack.captureId,
+          duplicate: ack.duplicate, capturedAt: ack.capturedAt, receivedAt: ack.receivedAt, attempts: attempt,
+        };
+      }
       const error = Object.assign(new Error(`Hourly evidence upload failed with HTTP ${response.status}.`), {
         code: "HOURLY_EVIDENCE_HTTP_ERROR",
         status: response.status,

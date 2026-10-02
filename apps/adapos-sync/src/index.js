@@ -41,6 +41,9 @@ import { isActiveHourlyStockBranch } from "./delta/hourlyStockEvidence.js";
 import { runHourlyStockShadow as defaultRunHourlyStockShadow } from "./delta/hourlyStockShadow.js";
 import { connectSqlWithRetry } from "./sqlConnection.js";
 import { buildSqlServerConfig } from "./sqlServerConfig.js";
+import { queueHourlyMorningAnchor } from "./hourlyMorningAnchor.js";
+import { flushHourlyEvidenceOutbox, withHourlyCaptureLock } from "./hourlyEvidenceStorage.js";
+import { uploadHourlyEvidence } from "./hourlyStockEvidenceClient.js";
 
 const PERIOD_DAYS = 30;
 
@@ -117,9 +120,13 @@ async function fetchDatasets(pool, config = defaultSyncConfig) {
     data.approved_receipt_lines   = await getApprovedReceiptLineRows(pool, branchCode, dateOpts);
   }
   if (datasets.includes("branch_stock") || datasets.includes("branch_stock_history")) {
-    const hourlyEvidenceQueryEnabled = config.hourlyStockEvidence?.inlineAfterFullSyncEnabled === true
+    const hourlyEvidenceQueryEnabled = (config.hourlyStockEvidence?.inlineAfterFullSyncEnabled === true
+      || (config.hourlyStockEvidence?.enabled === true && config.hourlyStockEvidence?.fullSyncAnchorEnabled === true))
       && isActiveHourlyStockBranch(branchCode);
     data.branch_stock = await getBranchStockRows(pool, branchCode, hourlyEvidenceQueryEnabled);
+    if (hourlyEvidenceQueryEnabled) {
+      Object.defineProperty(data, "hourlyStockCapturedAt", { value: new Date().toISOString() });
+    }
   }
   // Price datasets are all-branch and read from the consolidated HQ/mother DB.
   // They are NOT scoped by branchCode — grouping per branch happens at post time.
@@ -142,6 +149,33 @@ const BRANCH_STOCK_RETRY_OPTIONS = Object.freeze({
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 export async function runOnce(dependencies = {}) {
+  const config = dependencies.syncConfig ?? defaultSyncConfig;
+  if (config.hourlyStockEvidence?.enabled !== true || !isActiveHourlyStockBranch(config.branchCode)) {
+    return runOnceUncoordinated(dependencies);
+  }
+  validateSyncConfig(config);
+  const captureLock = dependencies.withHourlyCaptureLock ?? withHourlyCaptureLock;
+  // Full waits a bounded time for a selected-SKU read; intraday fails fast if
+  // Full is active. No lock/filesystem changes at all when evidence is OFF.
+  const result = await captureLock({
+    cacheDir: config.hourlyStockEvidence.cacheDir, branchCode: config.branchCode, waitMs: 120_000,
+  }, () => runOnceUncoordinated(dependencies));
+  if (!config.dryRun && config.hourlyStockEvidence.fullSyncAnchorEnabled === true) {
+    try {
+      const delivery = await flushHourlyEvidenceOutbox({
+        cacheDir: config.hourlyStockEvidence.cacheDir, branchCode: config.branchCode,
+        apiBaseUrl: config.apiBaseUrl, token: config.hourlyStockEvidence.uploadToken,
+        uploadEvidence: dependencies.uploadHourlyEvidence ?? uploadHourlyEvidence, maxUploads: 1,
+      });
+      console.log("[hourly-stock-delivery] " + JSON.stringify(delivery));
+    } catch (error) {
+      console.warn("[hourly-stock-delivery] isolated evidence failure: " + (error.code || "HOURLY_DELIVERY_FAILED"));
+    }
+  }
+  return result;
+}
+
+async function runOnceUncoordinated(dependencies = {}) {
   const syncConfig = dependencies.syncConfig ?? defaultSyncConfig;
   validateSyncConfig(syncConfig);
   const postJson = dependencies.postJson ?? clientPostJson;
@@ -699,6 +733,19 @@ export async function runOnce(dependencies = {}) {
       // CP4 that means finalize + terminal APPLIED; for v1 it means every batch
       // was acknowledged and the success run-log was written. The shadow never
       // changes the Full payload and any local evidence failure is isolated.
+      if (branchStockRecords && syncConfig.hourlyStockEvidence?.enabled === true
+          && syncConfig.hourlyStockEvidence.fullSyncAnchorEnabled === true) {
+        try {
+          const anchor = (dependencies.queueHourlyMorningAnchor ?? queueHourlyMorningAnchor)({
+            config: syncConfig, rows: data.branch_stock ?? [],
+            capturedAt: data.hourlyStockCapturedAt, syncRunId,
+            acceptedRecords: branchStockAcknowledgedRecords,
+          });
+          console.log("[hourly-stock-anchor] " + JSON.stringify(anchor));
+        } catch (error) {
+          console.warn("[hourly-stock-anchor] isolated evidence failure: " + (error.code || "HOURLY_ANCHOR_FAILED"));
+        }
+      }
       if (syncConfig.hourlyStockEvidence?.inlineAfterFullSyncEnabled === true
           && isActiveHourlyStockBranch(syncConfig.branchCode)
           && branchStockRecords) {

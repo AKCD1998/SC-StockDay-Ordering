@@ -1,8 +1,25 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { after } from "node:test";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 import { runHourlyStockIntraday } from "../src/hourlyStockRunner.js";
 import { buildSqlServerConfig } from "../src/sqlServerConfig.js";
+import { acquireHourlyEvidenceLock } from "../src/hourlyEvidenceStorage.js";
+import { replayHourlyEvidence } from "../src/hourlyStockRunner.js";
+
+const temporaryDirs = [];
+after(() => { for (const dir of temporaryDirs) fs.rmSync(dir, { recursive: true, force: true }); });
+function temporaryDir() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sc-hourly-runner-"));
+  temporaryDirs.push(dir);
+  return dir;
+}
+function acknowledgement(body) {
+  const payload = JSON.parse(body);
+  return { accepted: payload.records.length, branchCode: payload.branchCode, capturedAt: payload.capturedAt, duplicate: false, captureId: "1", attempts: 1 };
+}
 
 function config(overrides = {}) {
   return {
@@ -15,12 +32,12 @@ function config(overrides = {}) {
     branchCode: "004",
     hourlyStockEvidence: {
       enabled: true,
-      cacheDir: "unused",
+      cacheDir: temporaryDir(),
       contentCaptureBranches: new Set(["004"]),
       observationKind: "intraday",
       plannedSlot: "10:00",
       productCodes: ["P1", "P2"],
-      uploadToken: "test-branch-token",
+      uploadToken: "test-branch-token".repeat(3),
     },
     apiBaseUrl: "https://example.test",
     ...overrides,
@@ -73,15 +90,15 @@ test("intraday runner performs one selected read, durable upload, and closes the
       events.push("upload");
       assert.equal(apiBaseUrl, "https://example.test");
       assert.equal(branchCode, "004");
-      assert.equal(token, "test-branch-token");
+      assert.equal(token, "test-branch-token".repeat(3));
       const payload = JSON.parse(body);
       assert.equal(payload.plannedSlot, "10:00");
       assert.equal(payload.capturedAt, "2026-09-16T03:00:00.000Z");
       assert.deepEqual(payload.records.map((record) => record.productCode), ["P1", "P2"]);
-      return { duplicate: false, captureId: "1", attempts: 1 };
+      return acknowledgement(body);
     },
   });
-  assert.deepEqual(events, ["connect", "query", "shadow", "upload", "close"]);
+  assert.deepEqual(events, ["connect", "query", "shadow", "close", "upload"]);
   assert.equal(result.status, "captured");
   assert.equal(result.scannedProducts, 2);
   assert.equal(result.sqlConnectionAttempts, 1);
@@ -95,6 +112,7 @@ test("runner reports bounded SQL retry count after transient recovery", async ()
   let attempts = 0;
   const result = await runHourlyStockIntraday({
     syncConfig: config(),
+    now: () => "2026-09-16T03:00:00.000Z",
     connectSql: async () => {
       attempts += 1;
       if (attempts === 1) throw Object.assign(new Error("transient"), { code: "ETIMEOUT" });
@@ -102,7 +120,7 @@ test("runner reports bounded SQL retry count after transient recovery", async ()
     },
     getHourlyStockEvidenceRows: async () => [row("P1", 20, 19)],
     runHourlyStockShadow: () => ({ scannedProducts: 1, cacheWriteOk: true }),
-    uploadHourlyEvidence: async () => ({ duplicate: false, captureId: "1", attempts: 1 }),
+    uploadHourlyEvidence: async ({ body }) => acknowledgement(body),
     sqlConnectRetryOptions: {
       retryBaseDelayMs: 1,
       retryMaxDelayMs: 1,
@@ -143,6 +161,8 @@ test("enabled runner with empty cohort or token fails before SQL and network", a
   for (const hourlyStockEvidence of [
     { ...config().hourlyStockEvidence, productCodes: [] },
     { ...config().hourlyStockEvidence, uploadToken: "" },
+    { ...config().hourlyStockEvidence, uploadToken: "too-short" },
+    { ...config().hourlyStockEvidence, plannedSlot: "08:20" },
   ]) {
     let connected = false;
     let uploaded = false;
@@ -163,4 +183,49 @@ test("SQL config keeps named-instance and direct-port modes distinct", () => {
   const direct = buildSqlServerConfig(config({ sqlServerInstanceName: null, sqlServerPort: 1444 }));
   assert.equal("instanceName" in direct.options, false);
   assert.equal(direct.port, 1444);
+});
+
+test("standalone morning anchor is rejected before SQL/files/network", async () => {
+  const candidate = config();
+  candidate.hourlyStockEvidence.observationKind = "morning_anchor";
+  candidate.hourlyStockEvidence.plannedSlot = "08:20";
+  await assert.rejects(runHourlyStockIntraday({ syncConfig: candidate,
+    connectSql: async () => assert.fail("must not connect"),
+  }), (error) => error.code === "HOURLY_EVIDENCE_ANCHOR_REQUIRES_FULL_SYNC");
+});
+
+test("Full capture lock prevents intraday SQL and is released after query failure", async () => {
+  const candidate = config();
+  const release = acquireHourlyEvidenceLock({ cacheDir: candidate.hourlyStockEvidence.cacheDir, branchCode: "004" });
+  await assert.rejects(runHourlyStockIntraday({ syncConfig: candidate,
+    connectSql: async () => assert.fail("must not overlap Full"),
+  }), (error) => error.code === "HOURLY_EVIDENCE_BUSY");
+  release();
+  await assert.rejects(runHourlyStockIntraday({ syncConfig: candidate,
+    connectSql: async () => ({ close: async () => {} }),
+    getHourlyStockEvidenceRows: async () => { throw new Error("query-failure"); },
+  }), /query-failure/);
+  const again = acquireHourlyEvidenceLock({ cacheDir: candidate.hourlyStockEvidence.cacheDir, branchCode: "004" });
+  assert.equal(typeof again, "function");
+  again();
+});
+
+test("failed upload survives restart and replay uses the original body without SQL", async () => {
+  const candidate = config();
+  let firstBody;
+  const first = await runHourlyStockIntraday({
+    syncConfig: candidate, now: () => "2026-10-02T03:00:05.000Z",
+    connectSql: async () => ({ close: async () => {} }),
+    getHourlyStockEvidenceRows: async () => [row("P1", 20, 19)],
+    runHourlyStockShadow: () => { throw new Error("cache unavailable"); },
+    uploadHourlyEvidence: async ({ body }) => { firstBody = body; throw Object.assign(new Error("network failure"), { code: "NETWORK_ERROR" }); },
+  });
+  assert.equal(first.upload.pending, 1);
+  assert.equal(first.shadowStatus, "failed");
+  const replay = await replayHourlyEvidence({
+    syncConfig: candidate,
+    uploadHourlyEvidence: async ({ body }) => { assert.equal(body, firstBody); return acknowledgement(body); },
+  });
+  assert.equal(replay.delivered, 1);
+  assert.equal(replay.pending, 0);
 });

@@ -79,4 +79,12 @@ test("payload builder rejects duplicate identities and missing canonical quantit
     () => buildHourlyEvidencePayload({ ...common, rows: [{ product_code: "P1", qty: undefined, latest_estimated_on_hand: 1 }] }),
     (error) => error.code === "HOURLY_EVIDENCE_INVALID_ROW",
   );
+  assert.throws(
+    () => buildHourlyEvidencePayload({ ...common, rows: [row("P1", 1e13, 1)] }),
+    (error) => error.code === "HOURLY_EVIDENCE_INVALID_ROW",
+  );
+  assert.throws(
+    () => buildHourlyEvidencePayload({ ...common, rows: [row("P1", 1, -1e13)] }),
+    (error) => error.code === "HOURLY_EVIDENCE_INVALID_ROW",
+  );
 });
