@@ -103,3 +103,21 @@ The test service targets Virginia, matching the shared backend, and keeps
 automatic deployments disabled. Compiled flags in the current production bundle
 confirm customer preorders are enabled and sync event logging is disabled; the
 test service preserves those values.
+
+## Live deployment result
+
+- URL: <https://sc-stockday-admin-gateway.onrender.com/#/branch-stock>
+- Render service: `srv-db0gguou01pc73a952d0`, Starter, Virginia, manual deploys.
+- Deploy: `dep-db0ggvgu01pc73a954e0`, live on 2026-10-03 at 20:52 Bangkok time.
+- Deployed code commit: `5e34880a88770338d247c10fb8f12d141df4d404`.
+- `/healthz`, website HTML, compiled JS, and proxied `/backend/admin/health`
+  returned 200. An unauthenticated session check returned the expected 401;
+  submitting an empty login request returned the expected 400 validation error.
+- The deployed JS contains the relative `/backend` prefix and contains neither
+  the old backend domain nor the local-development API address.
+- Desktop WebKit with iPhone emulation rendered the login page; its initial
+  session request used the gateway's own domain. No production account login was
+  attempted. User validation on the actual iPhone remains the final check.
+- The existing static site and shared backend were not redeployed or changed.
+
+The user can sign in with their existing account on this separate hostname.
