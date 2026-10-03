@@ -1,0 +1,24 @@
+# Separate iPhone test service. Existing static services are not modified.
+# Deploy a separate Web Service and validate Safari before routing users to it.
+services:
+  - type: web
+    name: sc-stockday-admin-gateway
+    runtime: node
+    branch: fix/iphone-same-origin-login-2026-10-03
+    region: virginia
+    plan: starter
+    autoDeployTrigger: "off"
+    buildCommand: npm ci && npm run build
+    startCommand: node apps/admin-web/server.mjs
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: VITE_API_BASE_URL
+        value: /backend
+      - key: STOCKDAY_API_ORIGIN
+        value: https://paasrtsm-project.onrender.com
+      - key: VITE_FEATURE_CUSTOMER_PREORDERS
+        value: "true"
+      - key: VITE_ENABLE_SYNC_EVENT_LOG
+        value: "false"
