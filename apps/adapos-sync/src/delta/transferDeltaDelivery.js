@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { toTransferPayload } from "../transform.js";
 import { scanTransferDocuments, transferDocumentKey } from "./transferFingerprint.js";
+import { transferFailureDiagnostic } from "./transferDiagnostics.js";
 import {
   readTransferDeliveryState,
   TRANSFER_DELTA_CONTRACT_VERSION,
@@ -113,7 +114,8 @@ export async function deliverTransferDelta({
 }) {
   let capability;
   try { capability = await getCapability(getJson, apiBaseUrl, branchCode); } catch (error) {
-    return { mode: "fallback", reason: `capability-unavailable:${error.status || error.code || "error"}` };
+    return { mode: "fallback", reason: `capability-unavailable:${error.status || error.code || "error"}`,
+      diagnostic: transferFailureDiagnostic(error) };
   }
   if (capability?.enabled !== true || capability?.contractVersion !== TRANSFER_DELTA_CONTRACT_VERSION) {
     return { mode: "fallback", reason: "capability-disabled-or-unsupported" };
@@ -156,10 +158,14 @@ export async function deliverTransferDelta({
       mode: "delta", changedDocumentCount: candidate.changedDocumentCount,
       acceptedHeaders: Number(acknowledgement.acceptedHeaders || 0),
       acceptedLines: Number(acknowledgement.acceptedLines || 0),
+      acceptedTombstones: Number(acknowledgement.acceptedTombstones || 0),
+      checkpointSequence: acknowledgement.checkpointSequence,
       replayed: acknowledgement.replayed === true, checkpointToken: acknowledgement.checkpointToken,
     };
   } catch (error) {
-    return { mode: "fallback", reason: `delta-request-failed:${error.status || error.code || "error"}` };
+    return { mode: "fallback", reason: `delta-request-failed:${error.status || error.code || "error"}`,
+      changedDocumentCount: candidate.changedDocumentCount,
+      diagnostic: transferFailureDiagnostic(error, candidate.payload) };
   }
 }
 
@@ -195,8 +201,10 @@ export async function rebaselineTransferDeltaAfterFull({
     }
     writeDeliveryState(cacheDir, branchCode, acknowledgement.checkpointToken,
       acknowledgement.checkpointSequence, stateHash, managedDocuments);
-    return { ok: true, checkpointToken: acknowledgement.checkpointToken, replayed: acknowledgement.replayed === true };
+    return { ok: true, checkpointToken: acknowledgement.checkpointToken,
+      checkpointSequence: acknowledgement.checkpointSequence, replayed: acknowledgement.replayed === true };
   } catch (error) {
-    return { ok: false, reason: `rebaseline-failed:${error.status || error.code || "error"}` };
+    return { ok: false, reason: `rebaseline-failed:${error.status || error.code || "error"}`,
+      diagnostic: transferFailureDiagnostic(error) };
   }
 }

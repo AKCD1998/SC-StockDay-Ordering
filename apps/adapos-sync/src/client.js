@@ -1,4 +1,5 @@
 import { syncConfig } from "./config.js";
+import { transferHttpFailureReason } from "./delta/transferDiagnostics.js";
 
 // A stalled backend response (Render cold start, network stall, etc.) must
 // never hang forever — the scheduled task's MultipleInstancesPolicy is
@@ -7,6 +8,24 @@ import { syncConfig } from "./config.js";
 // bounded timeout guarantees the run always finishes and reports its actual
 // success/failure to the run-log.
 const REQUEST_TIMEOUT_MS = Number(process.env.ADAPOS_SYNC_REQUEST_TIMEOUT_MS) || 60_000;
+
+function isTransferDeltaRequest(url) {
+  try {
+    return /^\/api\/sync\/ada\/transfers\/(delta|delta-capabilities|delta-rebaseline)$/.test(new URL(url).pathname);
+  } catch { return false; }
+}
+
+function httpRequestError(url, status, text) {
+  const transferRequest = isTransferDeltaRequest(url);
+  // Other callers keep their existing error detail. Transfer requests contain
+  // sensitive state: only the static diagnostic enum survives their response.
+  const error = new Error(transferRequest
+    ? `Transfer Delta request failed: ${status}`
+    : `Request failed: ${status} — ${text.slice(0, 300)}`);
+  error.status = status;
+  if (transferRequest) error.transferDeltaReason = transferHttpFailureReason(status, text);
+  return error;
+}
 
 // CP2 (observability): set once per run, right after /run-start returns its
 // ID — every request made afterward (via authHeaders(), below) carries this
@@ -43,7 +62,9 @@ async function requestWithTimeout(url, options) {
     return { response, text };
   } catch (err) {
     if (err.name === "AbortError") {
-      const timeoutError = new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms: ${url}`);
+      const timeoutError = new Error(isTransferDeltaRequest(url)
+        ? `Transfer Delta request timed out after ${REQUEST_TIMEOUT_MS}ms`
+        : `Request timed out after ${REQUEST_TIMEOUT_MS}ms: ${url}`);
       timeoutError.code = "REQUEST_TIMEOUT";
       throw timeoutError;
     }
@@ -61,9 +82,7 @@ export async function postJson(url, payload) {
   });
 
   if (!response.ok) {
-    const requestError = new Error(`Request failed: ${response.status} — ${text.slice(0, 300)}`);
-    requestError.status = response.status;
-    throw requestError;
+    throw httpRequestError(url, response.status, text);
   }
   return JSON.parse(text);
 }
@@ -71,9 +90,7 @@ export async function postJson(url, payload) {
 export async function getJson(url) {
   const { response, text } = await requestWithTimeout(url, { method: "GET", headers: authHeaders() });
   if (!response.ok) {
-    const requestError = new Error(`Request failed: ${response.status} — ${text.slice(0, 300)}`);
-    requestError.status = response.status;
-    throw requestError;
+    throw httpRequestError(url, response.status, text);
   }
   return JSON.parse(text);
 }
