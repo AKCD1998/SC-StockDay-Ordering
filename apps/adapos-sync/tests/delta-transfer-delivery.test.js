@@ -16,6 +16,7 @@ import {
   writeTransferDeliveryStateAtomic,
 } from "../src/delta/transferDeliveryState.js";
 import { scanTransferDocuments, transferDocumentKey } from "../src/delta/transferFingerprint.js";
+import { postJson as clientPostJson } from "../src/client.js";
 
 const header = (docNo, overrides = {}) => ({
   FTBchCode: "004", FTPthDocNo: docNo, FTPthDocType: "4", FDPthDocDate: "2026-09-23",
@@ -199,4 +200,70 @@ test("capability absence and apply failure both choose Full fallback", () => wit
     getJson: async () => ({ enabled: true, contractVersion: TRANSFER_DELTA_CONTRACT_VERSION,
       checkpointToken: "cp1", checkpointSequence: 1, stateHash: baseline.stateHash }) });
   assert.match(failed.reason, /delta-request-failed:503/);
+}));
+
+test("HTTP 400 diagnosis survives the real client while keeping fallback and delivery state unchanged", (t) => withCache(async (cacheDir) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const baseline = seed(cacheDir, [header("T1")], [line("T1", 1, "P1")]);
+  for (const [body, expectedReason] of [
+    [{ message: "Transfer Delta cannot mix branch codes.", code: "TRANSFER_DELTA_INVALID", checkpointToken: "PRIVATE-ACK" }, "mixed-branch-codes"],
+    [{ message: "PRIVATE-DOCUMENT-CONTENTS", code: "PRIVATE-CODE", stateHash: "PRIVATE-HASH" }, "unknown-validation-error"],
+  ]) {
+    globalThis.fetch = async () => ({ ok: false, status: 400, text: async () => JSON.stringify(body) });
+    const result = await deliverTransferDelta({
+      apiBaseUrl: "https://api.test", branchCode: "004", cacheDir,
+      headerRows: [header("T1", { FTPthBchFrm: "000", FTPthBchTo: "004" })],
+      lineRows: [line("T1", 1, "P1", { FTPthBchFrm: "000", FTPthBchTo: "004" })],
+      getJson: async () => ({ enabled: true, contractVersion: TRANSFER_DELTA_CONTRACT_VERSION,
+        checkpointToken: "cp1", checkpointSequence: 1, stateHash: baseline.stateHash }),
+      postJson: clientPostJson,
+    });
+    assert.equal(result.reason, "delta-request-failed:400");
+    assert.equal(result.mode, "fallback");
+    assert.equal(result.diagnostic.failureReason, expectedReason);
+    assert.equal(result.diagnostic.httpStatus, 400);
+    assert.equal(result.diagnostic.submittedHeaders, 1);
+    assert.equal(result.diagnostic.submittedLines, 1);
+    assert.equal(result.diagnostic.headerBranchCounts["000"], 1);
+    assert.doesNotMatch(JSON.stringify(result), /PRIVATE-/);
+    assert.equal(readTransferDeliveryState(cacheDir, "004").checkpointToken, "cp1");
+    assert.equal(readTransferDeliveryState(cacheDir, "004").checkpointSequence, 1);
+  }
+}));
+
+test("transport failure classification never echoes arbitrary network error codes or messages", () => withCache(async (cacheDir) => {
+  const baseline = seed(cacheDir, [header("T1")], [line("T1", 1, "P1")]);
+  for (const [error, expectedReason] of [
+    [Object.assign(new Error("PRIVATE-NETWORK-MESSAGE"), { code: "PRIVATE-NETWORK-CODE" }), "network-error"],
+    [Object.assign(new Error("PRIVATE-TIMEOUT-MESSAGE"), { code: "REQUEST_TIMEOUT" }), "request-timeout"],
+    [Object.assign(new Error("PRIVATE-HTTP-MESSAGE"), { status: 409 }), "http-error"],
+  ]) {
+    const result = await deliverTransferDelta({
+      apiBaseUrl: "https://api.test", branchCode: "004", cacheDir,
+      headerRows: [header("T1", { FCPthGrand: 11 })], lineRows: [line("T1", 1, "P1")],
+      getJson: async () => ({ enabled: true, contractVersion: TRANSFER_DELTA_CONTRACT_VERSION,
+        checkpointToken: "cp1", checkpointSequence: 1, stateHash: baseline.stateHash }),
+      postJson: async () => { throw error; },
+    });
+    assert.equal(result.mode, "fallback");
+    assert.equal(result.diagnostic.failureReason, expectedReason);
+    assert.doesNotMatch(JSON.stringify(result.diagnostic), /PRIVATE-/);
+  }
+}));
+
+test("successful Delta acknowledgement reports a sequence only after durable state is written", () => withCache(async (cacheDir) => {
+  const baseline = seed(cacheDir, [header("T1")], [line("T1", 1, "P1")]);
+  const result = await deliverTransferDelta({
+    apiBaseUrl: "https://api.test", branchCode: "004", cacheDir,
+    headerRows: [header("T1", { FCPthGrand: 11 })], lineRows: [line("T1", 1, "P1")],
+    getJson: async () => ({ enabled: true, contractVersion: TRANSFER_DELTA_CONTRACT_VERSION,
+      checkpointToken: "cp1", checkpointSequence: 1, stateHash: baseline.stateHash }),
+    postJson: async (_url, payload) => ({ ok: true, idempotencyKey: payload.idempotencyKey,
+      contentHash: payload.contentHash, stateHash: payload.nextStateHash, checkpointToken: "cp2", checkpointSequence: 2,
+      acceptedHeaders: 1, acceptedLines: 1, acceptedTombstones: 0 }),
+  });
+  assert.equal(result.mode, "delta");
+  assert.equal(result.checkpointSequence, 2);
+  assert.equal(readTransferDeliveryState(cacheDir, "004").checkpointSequence, 2);
 }));

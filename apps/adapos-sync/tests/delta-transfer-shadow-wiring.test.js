@@ -179,6 +179,89 @@ test("successful Delta apply omits the Full endpoint and advances Shadow only af
   assert.equal(candidate.transferBodies.length, 0);
 });
 
+function captureLogs(t) {
+  const logs = [];
+  const originals = { log: console.log, warn: console.warn };
+  console.log = (...args) => logs.push(args.join(" "));
+  console.warn = (...args) => logs.push(args.join(" "));
+  t.after(() => { console.log = originals.log; console.warn = originals.warn; });
+  return logs;
+}
+
+function metadataFrom(logs, tag) {
+  const entry = logs.find((value) => value.includes(`[${tag}]`));
+  assert.ok(entry, `missing ${tag} log`);
+  return JSON.parse(entry.slice(entry.indexOf("]") + 1).trim());
+}
+
+test("successful Delta log projects safe acknowledgement metadata and never logs secrets", async (t) => {
+  const logs = captureLogs(t);
+  const candidate = runtime({ cacheDir: "unused", enabled: true, applyEnabled: true,
+    deliverTransferDelta: async () => ({ mode: "delta", acceptedHeaders: 1, acceptedLines: 1,
+      checkpointSequence: 8, checkpointToken: "PRIVATE-TOKEN", contentHash: "PRIVATE-HASH",
+      idempotencyKey: "PRIVATE-KEY", rawPayload: { docNo: "PRIVATE-DOCUMENT" } }),
+    runTransferShadow: () => ({}),
+  });
+  await runOnce(candidate.dependencies);
+  assert.equal(candidate.transferBodies.length, 0);
+  assert.doesNotMatch(logs.join("\n"), /PRIVATE-/);
+  const metadata = metadataFrom(logs, "delta-apply:transfers");
+  assert.equal(metadata.branchCode, "004");
+  assert.equal(metadata.syncRunId, 77);
+  assert.equal(metadata.checkpointSequence, 8);
+  assert.equal(metadata.diagnosticVersion, "transfer-delta-diagnostics-v1");
+  assert.equal(metadata.agentVersion, "0.1.0");
+  assert.ok(Number.isFinite(Date.parse(metadata.observedAt)));
+});
+
+test("Delta failure and Full rebaseline logs are sanitized without changing fallback ordering", async (t) => {
+  const logs = captureLogs(t);
+  const candidate = runtime({ cacheDir: "unused", enabled: true, applyEnabled: true,
+    deliverTransferDelta: async () => {
+      candidate.events.push("delta-attempt");
+      return { mode: "fallback", reason: "delta-request-failed:400", message: "PRIVATE-ERROR",
+        diagnostic: { httpStatus: 400, failureReason: "mixed-branch-codes", submittedHeaders: 1,
+          submittedLines: 1, submittedTombstones: 0, checkpointToken: "PRIVATE-TOKEN",
+          headerBranchCounts: { "000": 1, "PRIVATE-BRANCH": 7 } } };
+    },
+    rebaselineTransferDeltaAfterFull: async () => {
+      candidate.events.push("delta-rebaseline");
+      return { ok: true, replayed: false, checkpointSequence: 8,
+        checkpointToken: "PRIVATE-ACK", stateHash: "PRIVATE-HASH", idempotencyKey: "PRIVATE-KEY" };
+    },
+    runTransferShadow: () => ({}),
+  });
+  await runOnce(candidate.dependencies);
+  assert.deepEqual(candidate.events, ["delta-attempt", "full-transfer-post", "delta-rebaseline"]);
+  assert.equal(candidate.transferBodies[0].headers[0].branchCode, "004");
+  assert.doesNotMatch(logs.join("\n"), /PRIVATE-/);
+  const failure = metadataFrom(logs, "delta-failure:transfers");
+  assert.equal(failure.reason, "delta-request-failed:400");
+  assert.equal(failure.failureReason, "mixed-branch-codes");
+  assert.equal(failure.httpStatus, 400);
+  assert.equal(failure.headerBranchCounts["000"], 1);
+  const rebaseline = metadataFrom(logs, "delta-rebaseline:transfers");
+  assert.equal(rebaseline.ok, true);
+  assert.equal(rebaseline.checkpointSequence, 8);
+  assert.equal(rebaseline.syncRunId, 77);
+});
+
+test("unknown error codes and diagnostic fields cannot leak through fallback warnings", async (t) => {
+  const logs = captureLogs(t);
+  const candidate = runtime({ cacheDir: "unused", enabled: true, applyEnabled: true,
+    deliverTransferDelta: async () => ({ mode: "fallback", reason: "delta-request-failed:PRIVATE-CODE",
+      diagnostic: { httpStatus: "PRIVATE-STATUS", failureReason: "PRIVATE-MESSAGE", submittedHeaders: "PRIVATE-DATA" } }),
+    rebaselineTransferDeltaAfterFull: async () => ({ ok: false, reason: "rebaseline-failed:PRIVATE-CODE",
+      diagnostic: { failureReason: "PRIVATE-MESSAGE", headerBranchCounts: { other: "PRIVATE-DOCUMENT" } } }),
+    runTransferShadow: () => ({}),
+  });
+  await runOnce(candidate.dependencies);
+  assert.doesNotMatch(logs.join("\n"), /PRIVATE-/);
+  assert.equal(metadataFrom(logs, "delta-failure:transfers").reason, "delta-request-failed:error");
+  assert.equal(metadataFrom(logs, "delta-rebaseline-failure:transfers").reason, "rebaseline-failed:error");
+  assert.deepEqual(candidate.events, ["full-transfer-post"]);
+});
+
 test("failed authoritative transfer sync cannot advance an existing cache", async () => {
   const cacheDir = mkdtempSync(path.join(os.tmpdir(), "transfer-wiring-test-"));
   try {
