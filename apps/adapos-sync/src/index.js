@@ -41,7 +41,7 @@ import { isActiveHourlyStockBranch } from "./delta/hourlyStockEvidence.js";
 import { runHourlyStockShadow as defaultRunHourlyStockShadow } from "./delta/hourlyStockShadow.js";
 import { connectSqlWithRetry } from "./sqlConnection.js";
 import { buildSqlServerConfig } from "./sqlServerConfig.js";
-import { queueHourlyMorningAnchor } from "./hourlyMorningAnchor.js";
+import { isHourlyMorningAnchorRun, queueHourlyMorningAnchor } from "./hourlyMorningAnchor.js";
 import { flushHourlyEvidenceOutbox, withHourlyCaptureLock } from "./hourlyEvidenceStorage.js";
 import { uploadHourlyEvidence } from "./hourlyStockEvidenceClient.js";
 import { transferLogMetadata } from "./delta/transferDiagnostics.js";
@@ -122,7 +122,7 @@ async function fetchDatasets(pool, config = defaultSyncConfig) {
   }
   if (datasets.includes("branch_stock") || datasets.includes("branch_stock_history")) {
     const hourlyEvidenceQueryEnabled = (config.hourlyStockEvidence?.inlineAfterFullSyncEnabled === true
-      || (config.hourlyStockEvidence?.enabled === true && config.hourlyStockEvidence?.fullSyncAnchorEnabled === true))
+      || isHourlyMorningAnchorRun(config))
       && isActiveHourlyStockBranch(branchCode);
     data.branch_stock = await getBranchStockRows(pool, branchCode, hourlyEvidenceQueryEnabled);
     if (hourlyEvidenceQueryEnabled) {
@@ -744,8 +744,7 @@ async function runOnceUncoordinated(dependencies = {}) {
       // CP4 that means finalize + terminal APPLIED; for v1 it means every batch
       // was acknowledged and the success run-log was written. The shadow never
       // changes the Full payload and any local evidence failure is isolated.
-      if (branchStockRecords && syncConfig.hourlyStockEvidence?.enabled === true
-          && syncConfig.hourlyStockEvidence.fullSyncAnchorEnabled === true) {
+      if (branchStockRecords && isHourlyMorningAnchorRun(syncConfig)) {
         try {
           const anchor = (dependencies.queueHourlyMorningAnchor ?? queueHourlyMorningAnchor)({
             config: syncConfig, rows: data.branch_stock ?? [],

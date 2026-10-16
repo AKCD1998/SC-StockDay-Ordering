@@ -53,7 +53,7 @@ function runtime(syncConfig, overrides = {}) {
   };
 }
 
-async function capturedBranchStockSql({ enabled, branchCode = "004" }) {
+async function capturedBranchStockSql({ enabled, branchCode = "004", durable = false, evening = false }) {
   const statements = [];
   const pool = {
     request() {
@@ -69,16 +69,20 @@ async function capturedBranchStockSql({ enabled, branchCode = "004" }) {
     syncConfig: config({
       branchCode,
       dryRun: true,
+      skipIfSyncedToday: evening,
       syncV2: { enabled: false, datasets: [], batchSize: 100, pollIntervalMs: 1, waitTimeoutMs: 10 },
       hourlyStockEvidence: {
-        enabled: false,
+        enabled: durable,
+        fullSyncAnchorEnabled: durable,
         inlineAfterFullSyncEnabled: enabled,
         cacheDir: "unused",
         contentCaptureBranches: new Set([branchCode]),
         observationKind: "morning_anchor",
+        plannedSlot: "08:20",
       },
     }),
     connectSql: async () => pool,
+    withHourlyCaptureLock: async (_options, capture) => capture(),
   });
   assert.equal(statements.length, 1);
   return statements[0];
@@ -91,6 +95,13 @@ test("routing keeps the legacy SQL projection OFF and adds FCPdtQtyNow only for 
   assert.doesNotMatch(offSql, /FCPdtQtyNow/);
   assert.match(onSql, /FCPdtQtyNow/);
   assert.doesNotMatch(inactiveSql, /FCPdtQtyNow/);
+});
+
+test("durable anchor SQL projection stays canonical during an evening Full fallback", async () => {
+  const morningSql = await capturedBranchStockSql({ enabled: false, durable: true });
+  const eveningSql = await capturedBranchStockSql({ enabled: false, durable: true, evening: true });
+  assert.match(morningSql, /FCPdtQtyNow/);
+  assert.doesNotMatch(eveningSql, /FCPdtQtyNow/);
 });
 
 test("feature OFF preserves the branch-stock payload and never calls hourly shadow", async () => {
@@ -224,4 +235,50 @@ test("durable morning anchor queues only after terminal apply and success run-lo
   isolated.values.queueHourlyMorningAnchor = () => { throw new Error("outbox-unavailable"); };
   await runOnce(isolated.values);
   assert.ok(isolated.events.includes("sql-close"), "evidence failure must not fail Full");
+});
+
+test("evening fallback preserves Full requests and stock payload without building a morning anchor", async (t) => {
+  for (const statusCheckFails of [false, true]) {
+    const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), "sc-hourly-evening-routing-"));
+    t.after(() => {
+      assert.equal(path.dirname(fs.realpathSync(cacheDir)), fs.realpathSync(os.tmpdir()));
+      assert.match(path.basename(cacheDir), /^sc-hourly-evening-routing-/);
+      fs.rmSync(cacheDir, { recursive: true, force: true });
+    });
+    function candidate(enabled) {
+      const result = runtime(config({
+        skipIfSyncedToday: true,
+        hourlyStockEvidence: {
+          enabled, fullSyncAnchorEnabled: true, inlineAfterFullSyncEnabled: false,
+          cacheDir, observationKind: "morning_anchor", plannedSlot: "08:20",
+          productCodes: ["P1"],
+        },
+      }));
+      let anchorCalls = 0;
+      result.values.getJson = async (url) => {
+        if (url.includes("/api/sync/today-status")) {
+          if (statusCheckFails) throw new Error("status-service-unavailable");
+          return { hasSuccessToday: false };
+        }
+        return { overallStatus: "success", applyStatus: "applied" };
+      };
+      result.values.queueHourlyMorningAnchor = () => { anchorCalls++; return { status: "queued" }; };
+      result.values.withHourlyCaptureLock = async (_options, capture) => capture();
+      result.anchorCalls = () => anchorCalls;
+      return result;
+    }
+    const baseline = candidate(false);
+    const hourly = candidate(true);
+    await runOnce(baseline.values);
+    await runOnce(hourly.values);
+    assert.equal(hourly.anchorCalls(), 0);
+    assert.deepEqual(hourly.posts.map(({ url }) => url), baseline.posts.map(({ url }) => url));
+    const stock = (result) => {
+      const records = result.posts.find(({ url }) => url.endsWith("/api/sync/v2/batches")).body.records;
+      return records.map(({ syncedAt, ...record }) => record);
+    };
+    assert.deepEqual(stock(hourly), stock(baseline));
+    assert.ok(hourly.events.includes("sql-close"));
+    assert.equal(hourly.posts.find(({ url }) => url.endsWith("/api/sync/run-log")).body.status, "success");
+  }
 });
