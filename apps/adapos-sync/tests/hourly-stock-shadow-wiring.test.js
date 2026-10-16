@@ -197,6 +197,25 @@ test("durable morning anchor queues only after terminal apply and success run-lo
   assert.ok(successful.events.indexOf("anchor") > successful.events.indexOf("applied"));
   assert.ok(successful.events.indexOf("anchor") > successful.events.findIndex((url) => typeof url === "string" && url.endsWith("/api/sync/run-log")));
   assert.ok(successful.events.indexOf("sql-close") > successful.events.indexOf("anchor"));
+  const combined = candidate();
+  combined.values.syncConfig.datasets = ["transfers", "branch_stock"];
+  combined.values.syncConfig.deltaTransferApply = { enabled: true, maxDocuments: 30 };
+  combined.values.syncConfig.deltaShadowTransfers = {
+    enabled: true, cacheDir, contentCaptureBranches: new Set(),
+  };
+  const fetchStock = combined.values.fetchDatasets;
+  combined.values.fetchDatasets = async () => ({
+    ...await fetchStock(), transfers: [], transfer_lines: [],
+  });
+  combined.values.deliverTransferDelta = async () => {
+    combined.events.push("transfer-delta");
+    return { mode: "delta", acceptedHeaders: 0, acceptedLines: 0, checkpointSequence: 1 };
+  };
+  combined.values.runTransferShadow = () => ({});
+  await runOnce(combined.values);
+  assert.ok(combined.events.indexOf("anchor") > combined.events.indexOf("transfer-delta"));
+  assert.ok(combined.events.indexOf("anchor") > combined.events.indexOf("applied"));
+  assert.equal(combined.posts.some(({ url }) => url.endsWith("/api/sync/ada/transfers")), false);
   const failed = candidate();
   failed.values.waitForApplied = async () => { throw new Error("apply-failed"); };
   await assert.rejects(runOnce(failed.values), /apply-failed/);

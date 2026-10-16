@@ -44,6 +44,7 @@ import { buildSqlServerConfig } from "./sqlServerConfig.js";
 import { queueHourlyMorningAnchor } from "./hourlyMorningAnchor.js";
 import { flushHourlyEvidenceOutbox, withHourlyCaptureLock } from "./hourlyEvidenceStorage.js";
 import { uploadHourlyEvidence } from "./hourlyStockEvidenceClient.js";
+import { transferLogMetadata } from "./delta/transferDiagnostics.js";
 
 const PERIOD_DAYS = 30;
 
@@ -461,13 +462,17 @@ async function runOnceUncoordinated(dependencies = {}) {
             getJson,
             postJson,
           });
+          const deliveryLog = transferLogMetadata(delivery, {
+            branchCode: syncConfig.branchCode, syncRunId, operation: "apply",
+          });
           if (delivery.mode === "delta" || delivery.mode === "noop") {
             usedDelta = true;
             hAccepted = delivery.acceptedHeaders ?? 0;
             lAccepted = delivery.acceptedLines ?? 0;
-            console.log(`  [delta-apply:transfers] ${JSON.stringify(delivery)}`);
+            console.log(`  [delta-apply:transfers] ${JSON.stringify(deliveryLog)}`);
           } else {
-            console.warn(`  WARN: Transfer Delta unavailable (${delivery.reason}); using authoritative Full fallback.`);
+            console.warn(`  WARN: Transfer Delta unavailable (${deliveryLog.reason}); using authoritative Full fallback.`);
+            console.warn(`  [delta-failure:transfers] ${JSON.stringify(deliveryLog)}`);
           }
         }
 
@@ -515,8 +520,14 @@ async function runOnceUncoordinated(dependencies = {}) {
               headerRows: data.transfers ?? [], lineRows: data.transfer_lines ?? [],
               cacheDir: syncConfig.deltaShadowTransfers.cacheDir, getJson, postJson,
             });
-            if (rebaseline.ok) console.log(`  [delta-rebaseline:transfers] ${JSON.stringify(rebaseline)}`);
-            else console.warn(`  WARN: Transfer Full succeeded but Delta delivery state was not rebaselined (${rebaseline.reason}); next run will safely use Full again.`);
+            const rebaselineLog = transferLogMetadata(rebaseline, {
+              branchCode: syncConfig.branchCode, syncRunId, operation: "rebaseline",
+            });
+            if (rebaseline.ok) console.log(`  [delta-rebaseline:transfers] ${JSON.stringify(rebaselineLog)}`);
+            else {
+              console.warn(`  WARN: Transfer Full succeeded but Delta delivery state was not rebaselined (${rebaselineLog.reason}); next run will safely use Full again.`);
+              console.warn(`  [delta-rebaseline-failure:transfers] ${JSON.stringify(rebaselineLog)}`);
+            }
           }
         }
         totalSent += hAccepted + lAccepted;
