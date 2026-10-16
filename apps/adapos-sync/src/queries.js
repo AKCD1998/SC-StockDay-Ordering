@@ -429,9 +429,17 @@ export async function getApprovedReceiptHeaderRows(
 // inferring "which branch owns this qty". The local branch's actual on-hand
 // stock is reflected in TCNMPdt.FCPdtQtyRet on that machine, so emit one row
 // per active product and tag it with the syncing branch code directly.
-export async function getBranchStockRows(pool, branchCode) {
+export async function getBranchStockRows(pool, branchCode, includeLatestEstimatedOnHand = false) {
   const req = pool.request();
   req.input("branchCode", sql.VarChar(3), branchCode);
+
+  // Keep the legacy query byte-shape and payload fields unchanged while the
+  // evidence feature is OFF. When explicitly enabled, the extra AdaSoft value
+  // is selected under a new name; it never replaces the canonical `qty`
+  // sourced from FCPdtQtyRet.
+  const latestEstimatedProjection = includeLatestEstimatedOnHand
+    ? ",\n      p.FCPdtQtyNow AS latest_estimated_on_hand"
+    : "";
 
   const result = await req.query(`
     SELECT
@@ -441,11 +449,40 @@ export async function getBranchStockRows(pool, branchCode) {
       COALESCE(p.FTPdtBarCode1, p.FTPdtBarCode2, p.FTPdtBarCode3) AS barcode,
       COALESCE(u.FTPunName, p.FTPdtSUnit, p.FTPdtMUnit, p.FTPdtLUnit) AS unit,
       @branchCode AS branch_code,
-      COALESCE(p.FCPdtQtyRet, 0) AS qty,
+      COALESCE(p.FCPdtQtyRet, 0) AS qty${latestEstimatedProjection},
       COALESCE(p.FCPdtCostAvg, 0) AS cost_avg
     FROM TCNMPdt p
     LEFT JOIN TCNMPdtUnit u ON u.FTPunCode = COALESCE(p.FTPdtSUnit, p.FTPdtMUnit, p.FTPdtLUnit)
     WHERE p.FTPdtStaActive = 1
+    ORDER BY p.FTPdtCode
+  `);
+  return result.recordset;
+}
+
+// Minimal SELECT used by the future 09:00-19:00 evidence runner. It avoids
+// product names, units, barcodes, costs, joins, and every network payload used
+// by Full Sync. Both quantities remain separate and FCPdtQtyNow stays nullable.
+export async function getHourlyStockEvidenceRows(pool, productCodes) {
+  const selected = [...new Set((productCodes ?? []).map((value) => String(value).trim()).filter(Boolean))];
+  if (selected.length < 1 || selected.length > 500) {
+    const error = new Error("Hourly stock evidence requires an explicit 1-500 product cohort.");
+    error.code = "HOURLY_EVIDENCE_COHORT_REQUIRED";
+    throw error;
+  }
+  const request = pool.request();
+  const placeholders = selected.map((productCode, index) => {
+    const name = `productCode${index}`;
+    request.input(name, sql.VarChar(80), productCode);
+    return `@${name}`;
+  });
+  const result = await request.query(`
+    SELECT
+      p.FTPdtCode AS product_code,
+      COALESCE(p.FCPdtQtyRet, 0) AS qty,
+      p.FCPdtQtyNow AS latest_estimated_on_hand
+    FROM TCNMPdt p
+    WHERE p.FTPdtStaActive = 1
+      AND p.FTPdtCode IN (${placeholders.join(", ")})
     ORDER BY p.FTPdtCode
   `);
   return result.recordset;
