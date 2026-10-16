@@ -1,12 +1,19 @@
 import { buildHourlyEvidencePayload } from "./hourlyStockEvidenceClient.js";
 import { enqueueHourlyEvidence } from "./hourlyEvidenceStorage.js";
 
+export function isHourlyMorningAnchorRun(config) {
+  const evidence = config.hourlyStockEvidence;
+  return evidence?.enabled === true && evidence.fullSyncAnchorEnabled === true
+    && config.skipIfSyncedToday !== true
+    && evidence.observationKind === "morning_anchor" && evidence.plannedSlot === "08:20";
+}
+
 export function queueHourlyMorningAnchor({ config, rows, capturedAt, syncRunId, acceptedRecords }) {
   const evidence = config.hourlyStockEvidence;
   if (evidence?.enabled !== true || evidence.fullSyncAnchorEnabled !== true) {
     return { status: "skipped", reason: "feature-disabled" };
   }
-  if (evidence.observationKind !== "morning_anchor" || evidence.plannedSlot !== "08:20") {
+  if (!isHourlyMorningAnchorRun(config)) {
     return { status: "skipped", reason: "not-morning-task" };
   }
   if (!capturedAt || String(evidence.uploadToken || "").trim().length < 32 || !Array.isArray(evidence.productCodes)

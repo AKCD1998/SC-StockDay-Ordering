@@ -67,3 +67,19 @@ test("morning anchor needs exact Full acknowledgement, receipt, explicit slot an
   assert.throws(() => queueHourlyMorningAnchor({ ...args, capturedAt: "2026-10-02T12:20:00.000Z" }), (e) => e.code === "HOURLY_EVIDENCE_INVALID_TIME");
   assert.throws(() => queueHourlyMorningAnchor({ ...args, capturedAt: "2026-10-02T01:19:59.000Z" }), (e) => e.code === "HOURLY_EVIDENCE_INVALID_TIME");
 });
+
+test("evening context skips an anchor before validation even when shared config names the morning slot", (t) => {
+  const options = fixture(t);
+  const config = { branchCode: "004", skipIfSyncedToday: true, hourlyStockEvidence: {
+    ...options, enabled: true, fullSyncAnchorEnabled: true,
+    observationKind: "morning_anchor", plannedSlot: "08:20", productCodes: ["P1"],
+    uploadToken: "test-only".repeat(4),
+  } };
+  for (const capturedAt of ["2026-10-02T01:21:00.000Z", "2026-10-02T12:20:00.000Z"]) {
+    assert.deepEqual(queueHourlyMorningAnchor({
+      config, rows: [{ product_code: "P1", qty: 20, latest_estimated_on_hand: 20 }],
+      capturedAt, acceptedRecords: 1, syncRunId: "2225",
+    }), { status: "skipped", reason: "not-morning-task" });
+  }
+  assert.deepEqual(fs.readdirSync(options.cacheDir), []);
+});
