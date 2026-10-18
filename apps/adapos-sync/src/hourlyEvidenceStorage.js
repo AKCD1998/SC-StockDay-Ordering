@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { buildHourlyEvidencePayload, HOURLY_EVIDENCE_MAX_BODY_BYTES } from "./hourlyStockEvidenceClient.js";
+import { buildHourlyIntradayPayload } from "./hourlyDerivedObservation.js";
 
 function directory(cacheDir, branchCode) {
   if (!cacheDir || !/^(000|001|003|004|005)$/.test(branchCode)) {
@@ -66,13 +67,16 @@ function validateBody(body, branchCode) {
     throw Object.assign(new Error("Hourly outbox capture exceeds its size bound."), { code: "HOURLY_OUTBOX_CORRUPT" });
   }
   const payload = JSON.parse(body);
-  const rebuilt = buildHourlyEvidencePayload({
+  const options = {
     ...payload,
     rows: payload.records.map((record) => ({
       product_code: record.productCode, qty: record.retailOnHand,
       latest_estimated_on_hand: record.latestEstimatedOnHand,
     })),
-  });
+  };
+  // Old bodies, including Full Sync morning anchors, keep their exact builder.
+  const rebuilt = payload.derivedObservation == null ? buildHourlyEvidencePayload(options)
+    : buildHourlyIntradayPayload(options, payload.derivedObservation);
   if (payload.branchCode !== branchCode || rebuilt.payload.idempotencyKey !== payload.idempotencyKey) {
     throw Object.assign(new Error("Hourly outbox integrity check failed."), { code: "HOURLY_OUTBOX_CORRUPT" });
   }

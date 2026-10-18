@@ -8,9 +8,36 @@ import { runHourlyStockIntraday } from "../src/hourlyStockRunner.js";
 import { buildSqlServerConfig } from "../src/sqlServerConfig.js";
 import { acquireHourlyEvidenceLock } from "../src/hourlyEvidenceStorage.js";
 import { replayHourlyEvidence } from "../src/hourlyStockRunner.js";
+import { describeHourlyStoredSource } from "../src/hourlyStockSource.js";
 
 const temporaryDirs = [];
 after(() => { for (const dir of temporaryDirs) fs.rmSync(dir, { recursive: true, force: true }); });
+
+test("supplemental derived evidence survives failed upload and exact-body replay without source re-read or shadow substitution", async () => {
+  const cfg = config();
+  const rows = [row("P1", 10, 10), row("P2", 4, null)];
+  const observation = { schemaVersion: "adapos-ordinary16-derived-v1", estimateBasis: "retail-plus-wholesale-plus-ordinary16",
+    sampleCount: 2, consistency: "unverified", qualifying: false, businessCutoffAt: null,
+    readStartedAt: "2026-10-18T03:00:00.000Z", readCompletedAt: "2026-10-18T03:00:00.500Z", records: [
+      { productCode: "P1", derivedOnHand: 8, reason: "observed-unverified" },
+      { productCode: "P2", derivedOnHand: null, reason: "changed-between-reads" }] };
+  let originalBody, reads = 0;
+  const result = await runHourlyStockIntraday({ syncConfig: cfg, now: () => "2026-10-18T03:00:01.000Z",
+    connectSql: async () => ({ close: async () => {} }),
+    getHourlyStockEvidenceRows: async () => { reads++; return { rows, derivedObservation: observation }; },
+    runHourlyStockShadow: args => { assert.deepEqual(args.rows, rows); return {}; },
+    uploadHourlyEvidence: async ({ body }) => { originalBody = body; throw new Error("offline"); } });
+  assert.equal(result.derivedObservationDiagnostics.changedProducts, 1);
+  assert.equal(result.derivedObservationDiagnostics.qualifying, false);
+  assert.equal(JSON.stringify(result).includes('"derivedOnHand"'), false);
+  assert.equal(result.upload.pending, 1);
+  await replayHourlyEvidence({ syncConfig: cfg, uploadHourlyEvidence: async ({ body }) => {
+    assert.equal(body, originalBody);
+    assert.deepEqual(JSON.parse(body).derivedObservation, observation);
+    return acknowledgement(body);
+  } });
+  assert.equal(reads, 1);
+});
 function temporaryDir() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sc-hourly-runner-"));
   temporaryDirs.push(dir);
@@ -133,6 +160,32 @@ test("runner reports bounded SQL retry count after transient recovery", async ()
   assert.equal(result.sqlConnectionRetryCount, 1);
   assert.deepEqual(waits, [1]);
   assert.deepEqual(retries, [{ attempt: 1, maxAttempts: 3, delayMs: 1, code: "ETIMEOUT" }]);
+});
+
+test("intraday provenance reaches the evidence body without certifying source freshness", async () => {
+  const snapshot = describeHourlyStoredSource([{ product_code: "P1", source_stock_code: "P1",
+    source_pending_stock_code: "P1", qty: 20, latest_estimated_on_hand: 19,
+    source_wholesale: 0, source_day_end: -1, source_pending_now: -2,
+    source_refresh_at: "2026-09-16T08:00:00+07:00", source_read_at: "2026-09-16T10:00:00+07:00",
+    source_offset_minutes: 420 }], ["P1"]);
+  const candidate = config();
+  candidate.hourlyStockEvidence.productCodes = ["P1"];
+  const result = await runHourlyStockIntraday({ syncConfig: candidate,
+    now: () => "2026-09-16T03:00:01.000Z",
+    connectSql: async () => ({ close: async () => {} }),
+    getHourlyStockEvidenceRows: async () => snapshot,
+    runHourlyStockShadow: () => ({}),
+    uploadHourlyEvidence: async ({ body }) => {
+      const payload = JSON.parse(body);
+      assert.equal(payload.sourceEventAt, null);
+      assert.equal(payload.clientMeta.sourceRead.formulaMatchedProducts, 1);
+      assert.deepEqual(Object.keys(payload.records[0]).sort(), ["latestEstimatedOnHand", "productCode", "retailOnHand"]);
+      return acknowledgement(body);
+    },
+  });
+  assert.equal(result.sourceFreshness.status, "unknown");
+  assert.equal(result.sourceFreshness.qualifying, false);
+  assert.equal(result.sourceFreshness.businessCutoffAt, null);
 });
 
 test("query failure is fatal for the window and still closes SQL", async () => {

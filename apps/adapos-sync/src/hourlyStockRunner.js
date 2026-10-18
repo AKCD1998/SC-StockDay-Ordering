@@ -7,11 +7,11 @@ import {
   scanHourlyStockEvidence,
 } from "./delta/hourlyStockEvidence.js";
 import { runHourlyStockShadow as defaultRunHourlyStockShadow } from "./delta/hourlyStockShadow.js";
-import { getHourlyStockEvidenceRows as defaultGetHourlyStockEvidenceRows } from "./queries.js";
+import { readHourlyDerivedStock } from "./hourlyStockDerivedSource.js";
+import { buildHourlyIntradayPayload, derivedObservationDiagnostics } from "./hourlyDerivedObservation.js";
 import { connectSqlWithRetry } from "./sqlConnection.js";
 import { buildSqlServerConfig } from "./sqlServerConfig.js";
 import {
-  buildHourlyEvidencePayload,
   uploadHourlyEvidence as defaultUploadHourlyEvidence,
 } from "./hourlyStockEvidenceClient.js";
 import { enqueueHourlyEvidence, flushHourlyEvidenceOutbox, withHourlyCaptureLock } from "./hourlyEvidenceStorage.js";
@@ -49,7 +49,7 @@ export async function runHourlyStockIntraday(dependencies = {}) {
   }
 
   const connectSql = dependencies.connectSql ?? ((connectionConfig) => sql.connect(connectionConfig));
-  const getRows = dependencies.getHourlyStockEvidenceRows ?? defaultGetHourlyStockEvidenceRows;
+  const getRows = dependencies.getHourlyStockEvidenceRows ?? readHourlyDerivedStock;
   const runShadow = dependencies.runHourlyStockShadow ?? defaultRunHourlyStockShadow;
   const uploadEvidence = dependencies.uploadHourlyEvidence ?? defaultUploadHourlyEvidence;
   const now = dependencies.now ?? (() => new Date().toISOString());
@@ -74,11 +74,14 @@ export async function runHourlyStockIntraday(dependencies = {}) {
       });
 
       const queryStartedAt = Date.now();
-      const rows = await getRows(pool, evidenceConfig.productCodes);
+      const snapshot = await getRows(pool, evidenceConfig.productCodes, { branchCode: config.branchCode });
+      const rows = Array.isArray(snapshot) ? snapshot : snapshot.rows;
+      const sourceRead = Array.isArray(snapshot) ? null : snapshot.sourceRead;
+      const derivedObservation = Array.isArray(snapshot) ? null : snapshot.derivedObservation;
       const queryDurationMs = Date.now() - queryStartedAt;
       const observedAt = now();
       const scanned = scanHourlyStockEvidence(rows, config.branchCode);
-      const { body } = buildHourlyEvidencePayload({
+      const { body } = buildHourlyIntradayPayload({
         branchCode: config.branchCode,
         observationKind: evidenceConfig.observationKind,
         plannedSlot: evidenceConfig.plannedSlot,
@@ -89,8 +92,9 @@ export async function runHourlyStockIntraday(dependencies = {}) {
           queryDurationMs,
           sqlConnectionAttempts: sqlConnectionRetryCount + 1,
           sqlConnectionRetryCount,
+          ...(sourceRead ? { sourceRead } : {}),
         },
-      });
+      }, derivedObservation);
       enqueueHourlyEvidence({ cacheDir: evidenceConfig.cacheDir, branchCode: config.branchCode, body });
       let shadow;
       try { shadow = runShadow({
@@ -112,6 +116,15 @@ export async function runHourlyStockIntraday(dependencies = {}) {
         sqlConnectionAttempts: sqlConnectionRetryCount + 1,
         sqlConnectionRetryCount,
         plannedSlot: evidenceConfig.plannedSlot,
+        derivedObservationDiagnostics: derivedObservationDiagnostics(derivedObservation,
+          rows.map(row => ({ productCode: row.product_code, latestEstimatedOnHand: row.latest_estimated_on_hand })), observedAt),
+        sourceFreshness: {
+          status: sourceRead?.invalidRefreshProducts ? "invalid" : "unknown",
+          qualifying: false,
+          reason: "source-business-cutoff-unverified",
+          businessCutoffAt: null,
+          sourceRead,
+        },
         ...shadow,
       };
     } finally {
