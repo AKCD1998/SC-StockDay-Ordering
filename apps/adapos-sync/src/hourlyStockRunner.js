@@ -7,7 +7,7 @@ import {
   scanHourlyStockEvidence,
 } from "./delta/hourlyStockEvidence.js";
 import { runHourlyStockShadow as defaultRunHourlyStockShadow } from "./delta/hourlyStockShadow.js";
-import { getHourlyStockEvidenceRows as defaultGetHourlyStockEvidenceRows } from "./queries.js";
+import { readHourlyStoredStock } from "./hourlyStockSource.js";
 import { connectSqlWithRetry } from "./sqlConnection.js";
 import { buildSqlServerConfig } from "./sqlServerConfig.js";
 import {
@@ -49,7 +49,7 @@ export async function runHourlyStockIntraday(dependencies = {}) {
   }
 
   const connectSql = dependencies.connectSql ?? ((connectionConfig) => sql.connect(connectionConfig));
-  const getRows = dependencies.getHourlyStockEvidenceRows ?? defaultGetHourlyStockEvidenceRows;
+  const getRows = dependencies.getHourlyStockEvidenceRows ?? readHourlyStoredStock;
   const runShadow = dependencies.runHourlyStockShadow ?? defaultRunHourlyStockShadow;
   const uploadEvidence = dependencies.uploadHourlyEvidence ?? defaultUploadHourlyEvidence;
   const now = dependencies.now ?? (() => new Date().toISOString());
@@ -74,7 +74,9 @@ export async function runHourlyStockIntraday(dependencies = {}) {
       });
 
       const queryStartedAt = Date.now();
-      const rows = await getRows(pool, evidenceConfig.productCodes);
+      const snapshot = await getRows(pool, evidenceConfig.productCodes, { branchCode: config.branchCode });
+      const rows = Array.isArray(snapshot) ? snapshot : snapshot.rows;
+      const sourceRead = Array.isArray(snapshot) ? null : snapshot.sourceRead;
       const queryDurationMs = Date.now() - queryStartedAt;
       const observedAt = now();
       const scanned = scanHourlyStockEvidence(rows, config.branchCode);
@@ -89,6 +91,7 @@ export async function runHourlyStockIntraday(dependencies = {}) {
           queryDurationMs,
           sqlConnectionAttempts: sqlConnectionRetryCount + 1,
           sqlConnectionRetryCount,
+          ...(sourceRead ? { sourceRead } : {}),
         },
       });
       enqueueHourlyEvidence({ cacheDir: evidenceConfig.cacheDir, branchCode: config.branchCode, body });
@@ -112,6 +115,13 @@ export async function runHourlyStockIntraday(dependencies = {}) {
         sqlConnectionAttempts: sqlConnectionRetryCount + 1,
         sqlConnectionRetryCount,
         plannedSlot: evidenceConfig.plannedSlot,
+        sourceFreshness: {
+          status: sourceRead?.invalidRefreshProducts ? "invalid" : "unknown",
+          qualifying: false,
+          reason: "source-business-cutoff-unverified",
+          businessCutoffAt: null,
+          sourceRead,
+        },
         ...shadow,
       };
     } finally {

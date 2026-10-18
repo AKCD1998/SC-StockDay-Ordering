@@ -8,6 +8,7 @@ import { runHourlyStockIntraday } from "../src/hourlyStockRunner.js";
 import { buildSqlServerConfig } from "../src/sqlServerConfig.js";
 import { acquireHourlyEvidenceLock } from "../src/hourlyEvidenceStorage.js";
 import { replayHourlyEvidence } from "../src/hourlyStockRunner.js";
+import { describeHourlyStoredSource } from "../src/hourlyStockSource.js";
 
 const temporaryDirs = [];
 after(() => { for (const dir of temporaryDirs) fs.rmSync(dir, { recursive: true, force: true }); });
@@ -133,6 +134,32 @@ test("runner reports bounded SQL retry count after transient recovery", async ()
   assert.equal(result.sqlConnectionRetryCount, 1);
   assert.deepEqual(waits, [1]);
   assert.deepEqual(retries, [{ attempt: 1, maxAttempts: 3, delayMs: 1, code: "ETIMEOUT" }]);
+});
+
+test("intraday provenance reaches the evidence body without certifying source freshness", async () => {
+  const snapshot = describeHourlyStoredSource([{ product_code: "P1", source_stock_code: "P1",
+    source_pending_stock_code: "P1", qty: 20, latest_estimated_on_hand: 19,
+    source_wholesale: 0, source_day_end: -1, source_pending_now: -2,
+    source_refresh_at: "2026-09-16T08:00:00+07:00", source_read_at: "2026-09-16T10:00:00+07:00",
+    source_offset_minutes: 420 }], ["P1"]);
+  const candidate = config();
+  candidate.hourlyStockEvidence.productCodes = ["P1"];
+  const result = await runHourlyStockIntraday({ syncConfig: candidate,
+    now: () => "2026-09-16T03:00:01.000Z",
+    connectSql: async () => ({ close: async () => {} }),
+    getHourlyStockEvidenceRows: async () => snapshot,
+    runHourlyStockShadow: () => ({}),
+    uploadHourlyEvidence: async ({ body }) => {
+      const payload = JSON.parse(body);
+      assert.equal(payload.sourceEventAt, null);
+      assert.equal(payload.clientMeta.sourceRead.formulaMatchedProducts, 1);
+      assert.deepEqual(Object.keys(payload.records[0]).sort(), ["latestEstimatedOnHand", "productCode", "retailOnHand"]);
+      return acknowledgement(body);
+    },
+  });
+  assert.equal(result.sourceFreshness.status, "unknown");
+  assert.equal(result.sourceFreshness.qualifying, false);
+  assert.equal(result.sourceFreshness.businessCutoffAt, null);
 });
 
 test("query failure is fatal for the window and still closes SQL", async () => {
