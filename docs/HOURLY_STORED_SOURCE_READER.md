@@ -26,25 +26,28 @@ the active getter at 15:19. These are current diagnostic observations, not
 historical reconstruction or a consistent-snapshot/freshness certification. See
 [the source formula review](HOURLY_SOURCE_FORMULA_REVIEW.md) for the recovered
 writer/getter differences, independent aggregate probes and remaining gates.
-A live derived estimate is deliberately not selected.
+A supplemental derived observation is now implemented as an explicitly
+unverified series; it does not replace either existing quantity field. See
+[the derived contract](HOURLY_DERIVED_OBSERVATION.md).
 
 ## Reader behavior
 
 - The existing Hourly OFF check returns before SQL/files/network work.
 - The new reader accepts only branch 004 and an explicit unique cohort of
-  1–500 products. A single parameterized SELECT reads master and pending-cache
-  components; a 10-second cancellation bound limits the request.
+  1–500 products. It verifies SERVER004 / AdaAcc / +07:00 and reads two bounded
+  parameterized samples of the stored fields and ordinary 16-view components.
+  A shared 10-second deadline cancels the complete source-reading operation.
 - Missing, duplicated or unexpected product rows reject the capture. Missing
   retail is not converted to zero. Nullable stored estimates remain nullable.
-- Only the existing two quantity fields enter capture records and shadow
-  processing. Component quantities, stock-code aliases and per-product
-  diagnostics are stripped before transport/logging.
+- The original capture records and shadow use only the existing two fields.
+  Derived quantities travel in a dedicated, identity-bound observation. Raw
+  components and stock-code aliases do not travel; logs expose aggregates only.
 - `clientMeta.sourceRead` contains bounded aggregate counts and operational
   read/refresh timestamps. It never supplies a business cutoff or a freshness
   PASS. SQL failures are reported with fixed codes, not raw source messages.
 - Formula checks apply only to master stock codes with available components.
   The `1e-6` tolerance addresses floating-point arithmetic, not an approved
-  business drift threshold. No estimate is recalculated or written to SQL.
+  business drift threshold. No source stock is written or recalculated in SQL.
 
 `FDPdtDayEnd` was observed as a local SQL datetime. Its diagnostic conversion
 uses the verified branch 004 +07:00 clock, and rejects an unverified source
@@ -69,6 +72,7 @@ counting; measure the selected query under read-only access; agree
 freshness/drift criteria. Do not fix vendor views or change database isolation
 options as part of this Hourly candidate. Keep all flags OFF and Tasks Disabled.
 Merge, deploy and a new pilot require their own authorization.
-Any proposed derived live estimate must have a reviewed separate source
-basis/contract; the existing canonical retail and stored-estimate meanings
-must remain intact, and reports must distinguish the evidence series.
+The new derived evidence remains non-qualifying even with unchanged samples:
+the vendor views contain NOLOCK. Posting tests include torn and identical
+dirty samples, rollback/ABA and equal-total component transitions. They do not
+certify real source commit atomicity or a complete business cutoff.

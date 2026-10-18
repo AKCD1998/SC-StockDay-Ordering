@@ -9,7 +9,9 @@ the active getter/full-refresh setting to the ordinary 16-view formula and
 recovers the exact SI warehouse, process-state and line-level contract.
 Independent SELECTs at 15:18–15:19 reconcile that contract and compare the
 active getter with the stored estimate. Read consistency and a complete
-business posting cutoff remain unresolved. No live reader was implemented.
+business posting cutoff remain unresolved. The paired drafts now implement a
+separate unverified derived observation and posting-transition tests; see
+[the implementation contract](HOURLY_DERIVED_OBSERVATION.md).
 
 ## Evidence boundaries
 
@@ -231,8 +233,8 @@ its interpretation. It needs a reviewed separate source basis/contract and
 report partition; do not silently replace the existing stored estimate field
 or mix old cached evidence and derived evidence as one series. The existing
 sourceRead aggregate metadata is not a container for additional product values.
-Implement a bounded, parameterized, read-only Hourly query only after agreeing
-read consistency and posting transitions. Reusing the existing views retains
+The bounded, parameterized, read-only draft reports its unverified consistency
+and suppresses quantities when two samples differ. Reusing existing views retains
 NOLOCK; a replacement must not claim to remove that by changing only a caller
 setting. Test the source's existing SQL version without changing its options.
 Do not add the pending field blindly, discard SI to force retail agreement,
@@ -240,9 +242,9 @@ run source approval/posting procedures, or change shared database options.
 An unknown business cutoff remains non-qualifying even when collection and
 stored arithmetic pass. Full Sync and Transfer Delta keep their current paths.
 
-## Safe next implementation gates
+## Gates before a consistent live reader or new pilot
 
-1. Keep the current draft as a stored-source diagnostic adapter. Preserve the
+1. Keep the current draft OFF as a supplemental diagnostic adapter. Preserve the
    existing quantities, reject incomplete cohorts, label operational refresh
    separately, leave `sourceEventAt` null and freshness non-qualifying. This
    avoids turning a recent refresh or matched formula into a freshness PASS.
@@ -251,10 +253,10 @@ stored arithmetic pass. Full Sync and Transfer Delta keep their current paths.
    signs and authoritative posting watermark needed for a consistent live
    query. Do not enumerate configuration values, increase the read-only
    account's rights or infer constants from arithmetic agreement.
-3. Before implementing a live adapter, agree how to obtain a consistent
+3. Before treating the derived observation as live stock, agree how to obtain a consistent
    read without changing shared database options or impeding POS writers.
    Review the SI outstanding components and posting/return/void transitions.
-   Add only an Hourly-specific SELECT adapter after those decisions; do not
+   The draft adds only an Hourly-specific SELECT adapter and claims no verified snapshot; do not
    execute source procedures or alter shared Full Sync/Delta queries.
 4. Test each transition with synthetic fixtures, compare bounded read-only
    aggregates, measure load, and agree freshness age and drift acceptance
@@ -266,4 +268,5 @@ stored arithmetic pass. Full Sync and Transfer Delta keep their current paths.
 Status: active formula and current SI component reconciliation verified from
 the stated evidence; stored-source diagnostic draft prepared; historical
 attribution, consistent live reads and business cutoff remain PARTIAL.
-Hourly stays OFF. The additional derived observation is a proposal only.
+Hourly stays OFF. The supplemental derived observation is implemented in draft,
+with consistency and freshness explicitly unverified; it is not pilot approval.
