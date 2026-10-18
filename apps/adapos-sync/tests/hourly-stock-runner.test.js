@@ -89,6 +89,21 @@ test("feature OFF exits before SQL connection and filesystem work", async () => 
   assert.equal(connected, false);
 });
 
+test("source clock diagnostics stay in local operational output, never the capture body or identity", async () => {
+  const diagnostics = { observerContext: "source-host", qualifying: false, businessCutoffAt: null,
+    status: "observed-unverified", reason: "clock-interval-is-not-business-freshness", sampleCount: 3,
+    sqlMinusObserverLowerMs: -10, sqlMinusObserverUpperMs: 10, maxRoundTripMs: 20, maxWallMonotonicDifferenceMs: 1 };
+  let body;
+  const result = await runHourlyStockIntraday({ syncConfig: config(), now: () => "2026-10-18T03:00:01.000Z",
+    connectSql: async () => ({ close: async () => {} }),
+    getHourlyStockEvidenceRows: async () => ({ rows: [row("P1", 10, 9), row("P2", 4, null)], sourceClockDiagnostics: diagnostics }),
+    runHourlyStockShadow: () => ({}),
+    uploadHourlyEvidence: async (args) => { body = args.body; return acknowledgement(body); } });
+  assert.deepEqual(result.sourceClockDiagnostics, diagnostics);
+  assert.equal(body.includes("sourceClockDiagnostics"), false);
+  assert.equal(body.includes("sqlMinusObserver"), false);
+});
+
 test("intraday runner performs one selected read, durable upload, and closes the pool", async () => {
   const events = [];
   const rows = [row("P1", 18, 17), row("P2", 4, null)];

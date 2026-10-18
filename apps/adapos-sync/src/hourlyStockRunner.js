@@ -1,5 +1,6 @@
 import sql from "mssql";
 import { pathToFileURL } from "node:url";
+import { performance } from "node:perf_hooks";
 
 import { syncConfig as defaultSyncConfig, validateSyncConfig } from "./config.js";
 import {
@@ -73,12 +74,13 @@ export async function runHourlyStockIntraday(dependencies = {}) {
         },
       });
 
-      const queryStartedAt = Date.now();
+      const queryStartedAt = performance.now();
       const snapshot = await getRows(pool, evidenceConfig.productCodes, { branchCode: config.branchCode });
       const rows = Array.isArray(snapshot) ? snapshot : snapshot.rows;
       const sourceRead = Array.isArray(snapshot) ? null : snapshot.sourceRead;
       const derivedObservation = Array.isArray(snapshot) ? null : snapshot.derivedObservation;
-      const queryDurationMs = Date.now() - queryStartedAt;
+      const sourceClockDiagnostics = Array.isArray(snapshot) ? null : snapshot.sourceClockDiagnostics;
+      const queryDurationMs = Math.ceil(performance.now() - queryStartedAt);
       const observedAt = now();
       const scanned = scanHourlyStockEvidence(rows, config.branchCode);
       const { body } = buildHourlyIntradayPayload({
@@ -116,6 +118,7 @@ export async function runHourlyStockIntraday(dependencies = {}) {
         sqlConnectionAttempts: sqlConnectionRetryCount + 1,
         sqlConnectionRetryCount,
         plannedSlot: evidenceConfig.plannedSlot,
+        ...(sourceClockDiagnostics ? { sourceClockDiagnostics } : {}),
         derivedObservationDiagnostics: derivedObservationDiagnostics(derivedObservation,
           rows.map(row => ({ productCode: row.product_code, latestEstimatedOnHand: row.latest_estimated_on_hand })), observedAt),
         sourceFreshness: {

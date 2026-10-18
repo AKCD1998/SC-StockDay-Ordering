@@ -1,6 +1,9 @@
 import sql from "mssql";
+import os from "node:os";
+import { performance } from "node:perf_hooks";
 import { describeHourlyStoredSource } from "./hourlyStockSource.js";
 import { DERIVED_VERSION, DERIVED_BASIS } from "./hourlyDerivedObservation.js";
+import { describeHourlySourceClock } from "./hourlySourceClock.js";
 
 export const ORDINARY_COMPONENTS = ["SAL", "PosSaleTmp", "CSM", "PI", "PT", "SI", "ST", "TNF41", "TNF42", "TNF31", "TNF32", "TNF7", "TNF8", "ChkStkSale", "ChkStkStop", "PICK"];
 function fail(code, number, sourceReadStage) {
@@ -28,13 +31,19 @@ function sample(raw, selected) {
 }
 
 // Repeated reads detect observed posting transitions, not dirty-read/ABA safety.
-export function describeHourlyDerivedSamples(firstRows, secondRows, selected, readStartedAt) {
+export function describeHourlyDerivedSamples(firstRows, secondRows, selected, readStartedAt,
+  { firstClosingRows, secondClosingRows } = {}) {
   const first = sample(firstRows, selected), second = sample(secondRows, selected);
+  const closing = rows => rows == null ? null : sample(rows.map(row => ({ ...row, component: null })), selected);
+  const firstClosing = closing(firstClosingRows), secondClosing = closing(secondClosingRows);
+  const masterFingerprint = entry => JSON.stringify(FIELDS.map(key => entry.source[key]));
   const records = selected.map(code => {
     const a = first.products.get(code), b = second.products.get(code);
     const fingerprint = entry => JSON.stringify([FIELDS.map(key => entry.source[key]), ORDINARY_COMPONENTS.map(key => entry.components.get(key) ?? null)]);
     let reason = "observed-unverified";
-    if (fingerprint(a) !== fingerprint(b)) reason = "changed-between-reads";
+    if (fingerprint(a) !== fingerprint(b)
+        || (firstClosing && masterFingerprint(a) !== masterFingerprint(firstClosing.products.get(code)))
+        || (secondClosing && masterFingerprint(b) !== masterFingerprint(secondClosing.products.get(code)))) reason = "changed-between-reads";
     else if (b.source.source_stock_code !== code) reason = "non-master-stock-code";
     else if ([...b.components.values()].some(value => value?.outside > 0)) reason = "outside-branch-movement";
     else if (!finite(b.source.source_wholesale) || [...b.components.values()].some(value => value &&
@@ -57,16 +66,23 @@ export async function readHourlyDerivedStock(pool, productCodes, { branchCode, q
   if (!Array.isArray(productCodes) || !Number.isSafeInteger(queryTimeoutMs) || queryTimeoutMs < 1 || queryTimeoutMs > 10_000) fail("HOURLY_EVIDENCE_COHORT_REQUIRED");
   const selected = productCodes.map(value => String(value).trim());
   if (!selected.length || selected.length > 500 || selected.some(code => !code || code.length > 80) || new Set(selected).size !== selected.length) fail("HOURLY_EVIDENCE_COHORT_REQUIRED");
-  const deadline = Date.now() + queryTimeoutMs;
+  const deadline = performance.now() + queryTimeoutMs;
+  const clockSamples = [];
   async function query(text, bind = false, stage = "metadata") {
-    if (Date.now() >= deadline) fail("HOURLY_SOURCE_TIMEOUT", undefined, stage);
+    if (performance.now() >= deadline) fail("HOURLY_SOURCE_TIMEOUT", undefined, stage);
     const request = pool.request();
     if (bind) selected.forEach((code, index) => request.input(`productCode${index}`, sql.VarChar(80), code));
+    const remainingMs = deadline - performance.now();
+    if (remainingMs <= 0) fail("HOURLY_SOURCE_TIMEOUT", undefined, stage);
     let expired = false;
-    const timer = setTimeout(() => { expired = true; try { request.cancel(); } catch {} }, deadline - Date.now());
+    const timer = setTimeout(() => { expired = true; try { request.cancel(); } catch {} }, remainingMs);
+    const startedAtMs = Date.now(), startedMonotonic = performance.now();
     try {
       const result = await request.query(text);
-      if (expired || Date.now() > deadline) fail("HOURLY_SOURCE_TIMEOUT");
+      const completedAtMs = Date.now(), elapsedMs = performance.now() - startedMonotonic;
+      if (expired || performance.now() > deadline) fail("HOURLY_SOURCE_TIMEOUT");
+      const sourceAt = stage === "metadata" ? result.recordset?.[0]?.read_started_at : result.recordsets?.[3]?.[0]?.read_completed_at;
+      clockSamples.push({ startedAtMs, completedAtMs, elapsedMs, sourceAt });
       return result;
     } catch (error) {
       fail(expired || error.code === "HOURLY_SOURCE_TIMEOUT" ? "HOURLY_SOURCE_TIMEOUT" :
@@ -90,7 +106,7 @@ export async function readHourlyDerivedStock(pool, productCodes, { branchCode, q
     GROUP BY v.FTPdtStkCode`).join(" UNION ALL ");
   // SELECT only; the vendor views themselves contain NOLOCK. No isolation or
   // database option changes, vendor EXEC, locks/hints or source writes.
-  const text = `
+  const stockText = `
     SELECT p.FTPdtCode AS product_code, p.FTPdtStkCode AS source_stock_code,
       p.FCPdtQtyRet AS qty, p.FCPdtQtyNow AS latest_estimated_on_hand, p.FCPdtQtyWhs AS source_wholesale,
       q.FTPdtStkCode AS source_pending_stock_code, q.FCPdtDayEnd AS source_day_end, q.FCPdtQtyNow AS source_pending_now,
@@ -98,10 +114,15 @@ export async function readHourlyDerivedStock(pool, productCodes, { branchCode, q
         CONVERT(varchar(40), SYSDATETIMEOFFSET(), 127) AS source_read_at,
         DATEPART(TZOFFSET, SYSDATETIMEOFFSET()) AS source_offset_minutes
     FROM dbo.TCNMPdt p LEFT JOIN dbo.TCNTPdtQtyNotApv q ON q.FTPdtStkCode = p.FTPdtStkCode
-    WHERE p.FTPdtStaActive = 1 AND p.FTPdtCode IN (${placeholders});
+    WHERE p.FTPdtStaActive = 1 AND p.FTPdtCode IN (${placeholders});`;
+  // Bracket each movement read with the original stock/cache projection.
+  // A changed bookend suppresses derived values; unchanged bookends still do
+  // not turn the vendor's NOLOCK movement views into a consistent snapshot.
+  const text = `${stockText}
   WITH cohort AS (${cohort}), scope AS (SELECT p.FTPdtStkCode AS source_stock_code FROM cohort c
     JOIN dbo.TCNMPdt p ON p.FTPdtCode = c.product_code WHERE p.FTPdtStaActive = 1)
   ${union} ORDER BY component, FTPdtStkCode;
+  ${stockText}
   SELECT CONVERT(varchar(40), SYSDATETIMEOFFSET(), 127) AS read_completed_at`;
   const first = await query(text, true, "first-sample");
   const second = await query(text, true, "second-sample");
@@ -115,12 +136,15 @@ export async function readHourlyDerivedStock(pool, productCodes, { branchCode, q
       return matching.length ? matching.map(movement => ({ ...row, ...movement })) : [{ ...row, component: null }];
     });
   }
-  const result = describeHourlyDerivedSamples(joinSample(first), joinSample(second), selected, start.toISOString());
-  const completedAt = second.recordsets?.[2]?.[0]?.read_completed_at;
+  if (!Array.isArray(first.recordsets?.[2]) || !Array.isArray(second.recordsets?.[2])) fail("HOURLY_SOURCE_COHORT_INCOMPLETE");
+  const result = describeHourlyDerivedSamples(joinSample(first), joinSample(second), selected, start.toISOString(),
+    { firstClosingRows: first.recordsets[2], secondClosingRows: second.recordsets[2] });
+  const completedAt = second.recordsets?.[3]?.[0]?.read_completed_at;
   if (typeof completedAt !== "string" || !/(Z|[+-]\d\d:\d\d)$/.test(completedAt) || !Number.isFinite(Date.parse(completedAt))) fail("HOURLY_SOURCE_CLOCK_UNVERIFIED");
   result.derivedObservation.readCompletedAt = new Date(completedAt).toISOString();
   if (result.derivedObservation.readCompletedAt < result.sourceRead.readAt) fail("HOURLY_SOURCE_CLOCK_UNVERIFIED");
   const duration = Date.parse(result.derivedObservation.readCompletedAt) - start.getTime();
   if (duration < 0 || duration > queryTimeoutMs) fail("HOURLY_SOURCE_CLOCK_UNVERIFIED");
+  result.sourceClockDiagnostics = describeHourlySourceClock(clockSamples, { observerHost: os.hostname(), sourceHost: metadata.machine_name });
   return result;
 }
