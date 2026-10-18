@@ -17,10 +17,13 @@ Selected sanitized fragments and current values cannot reconstruct historical
 posting events or establish that an outstanding component is legitimate.
 
 The user supplied the successful metadata-only v3 inspection from SERVER004
-at 2026-10-18 14:29:31 +07:00: 24 sanitized modules, no truncation. The full
-formula structure is now reviewed; configuration keys and several business
-literals remain redacted. This does not establish the active formula variant
-or reconstruct historical posting events. See
+at 2026-10-18 14:29:31 +07:00: 24 sanitized modules, no truncation, followed by
+the narrow active-contract inspection at 15:15:04. The latter verifies the
+ordinary 16-view getter/full-refresh variant and exact SI eligibility settings.
+Independent B50 SELECTs reconcile 8 eligible SI documents / 35 lines with the
+six nonzero cached components and observe 11 stored estimates differing from
+the active getter at 15:19. These are current diagnostic observations, not
+historical reconstruction or a consistent-snapshot/freshness certification. See
 [the source formula review](HOURLY_SOURCE_FORMULA_REVIEW.md) for the recovered
 writer/getter differences, independent aggregate probes and remaining gates.
 A live derived estimate is deliberately not selected.
@@ -59,10 +62,13 @@ credentials, Scheduled Tasks, cleanup and migrations are unchanged. Morning
 anchors retain their authoritative Full Sync receipt and original projection.
 The existing capture lock and durable replay still preserve original bodies.
 
-Before rollout: resolve the active source variant, branch and temporary scope,
-posting/cutoff and read-consistency contract; validate the pending components
-and historical transitions; test returns/voids, signed base units and double
+Before rollout: preserve the verified active variant, resolve remaining branch
+and temporary scope, posting/cutoff and read-consistency contracts; validate
+pending-component lifecycle and historical transitions; test returns/voids, signed base units and double
 counting; measure the selected query under read-only access; agree
 freshness/drift criteria. Do not fix vendor views or change database isolation
 options as part of this Hourly candidate. Keep all flags OFF and Tasks Disabled.
 Merge, deploy and a new pilot require their own authorization.
+Any proposed derived live estimate must have a reviewed separate source
+basis/contract; the existing canonical retail and stored-estimate meanings
+must remain intact, and reports must distinguish the evidence series.
