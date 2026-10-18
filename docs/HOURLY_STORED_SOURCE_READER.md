@@ -16,8 +16,14 @@ getter, its full movement-view union, posting conditions, units and signs.
 Selected sanitized fragments and current values cannot reconstruct historical
 posting events or establish that an outstanding component is legitimate.
 
-Complete source definitions remain pending the authorized metadata-only
-inspection on SERVER004. A live derived estimate is deliberately not selected.
+The user supplied the successful metadata-only v3 inspection from SERVER004
+at 2026-10-18 14:29:31 +07:00: 24 sanitized modules, no truncation. The full
+formula structure is now reviewed; configuration keys and several business
+literals remain redacted. This does not establish the active formula variant
+or reconstruct historical posting events. See
+[the source formula review](HOURLY_SOURCE_FORMULA_REVIEW.md) for the recovered
+writer/getter differences, independent aggregate probes and remaining gates.
+A live derived estimate is deliberately not selected.
 
 ## Reader behavior
 
@@ -43,6 +49,8 @@ offset. Operational refresh time says when a component was refreshed; it does
 not establish the time through which all business movements were processed.
 `sourceEventAt` therefore remains null. Backend source freshness remains
 non-qualifying until a business-cutoff contract and age policy are approved.
+The wire value `stored-master-day-end` names a stored formula component; it
+does not assert that the value is a completed end-of-day balance.
 
 ## Scope and review gates
 
@@ -51,8 +59,10 @@ credentials, Scheduled Tasks, cleanup and migrations are unchanged. Morning
 anchors retain their authoritative Full Sync receipt and original projection.
 The existing capture lock and durable replay still preserve original bodies.
 
-Before rollout: recover and review the complete source formula; explain the
-remaining pending components; test posting transitions, returns/voids, signed
-base units and double counting; measure the selected query under read-only
-access; agree freshness/drift criteria. Keep all flags OFF and Tasks Disabled.
+Before rollout: resolve the active source variant, branch and temporary scope,
+posting/cutoff and read-consistency contract; validate the pending components
+and historical transitions; test returns/voids, signed base units and double
+counting; measure the selected query under read-only access; agree
+freshness/drift criteria. Do not fix vendor views or change database isolation
+options as part of this Hourly candidate. Keep all flags OFF and Tasks Disabled.
 Merge, deploy and a new pilot require their own authorization.
