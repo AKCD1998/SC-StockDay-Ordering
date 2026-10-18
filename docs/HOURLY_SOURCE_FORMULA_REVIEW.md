@@ -121,6 +121,67 @@ or changing vendor views could affect POS traffic and is outside this task.
 A read-only query alone is not proof of zero operational load or a consistent
 business snapshot.
 
+## Follow-up: SI status and posting-time evidence, 2026-10-18
+
+Read-only SELECTs at 14:55–15:02 used the existing source identity and B50
+scope. All quantities and document identifiers stayed inside the query or
+process; only aggregate results were retained.
+
+- For the six B50 stock codes with nonzero current SI components, 8 candidate
+  documents / 35 lines had blank-or-null header and line processing states,
+  no recorded approval actor, and no matching primary stock-card row by branch,
+  document, stock code and warehouse. Their signed line totals agree with the
+  current SI view for all six products; all candidate lines are level zero.
+- The same candidate search also found 7 documents / 20 lines with processing
+  states `'1'`, an approval actor and a matching primary stock-card row for
+  every line. These groups must remain distinct. Code `'1'` and the presence
+  of a stock-card row are observations, not independently certified lifecycle
+  semantics. The exact warehouse/level predicate is still awaiting the narrow
+  source-contract lookup, and current matches cannot establish history.
+- For business date 17 October, the primary stock card contains 27 sale-type
+  rows across 16 B50 products. Their stored creation/update audit date is
+  18 October, with clock values from 07:46:22 to 07:46:30 local +07:00.
+  No actual per-document posting timestamp is certified by this observation.
+- The user confirms that the POS application was opened or its day started
+  around 07:44–07:47 on 18 October. This is supplied operator context and is
+  consistent with the observed refresh/card-writing period; it is not proof
+  that opening the application caused every stock change.
+
+The supplied full `STP_DOCxTPSTSalDT1Day` body assigns the temporary stock-card
+audit date from `@ptDateTo` and its audit clock from `@ptTime`. Thus at least
+this intermediate audit date can represent a processing/business date rather
+than the wall-clock insertion date. The final stock-card writer must be
+reviewed before treating its generic audit fields as a posting watermark.
+Do not concatenate these fields into `sourceEventAt` or claim a business cutoff.
+
+The existing source reports product version `10.50.1600.1`, database
+compatibility level 80. A diagnostic query using TRY_CONVERT was stopped;
+its corrected read-only form uses supported operations and returns the
+aggregate clock/date components separately. No database setting was changed.
+
+The assistant still lacks VIEW DEFINITION. A tested local helper was prepared
+for the administrator's existing Windows identity. It verifies that getter
+and full-refresh writer select the same configuration key, reads only that
+formula setting plus the SI line-level setting, and returns narrow operational
+enums and sanitized writer metadata. It never executes a source procedure or
+enumerates other configuration values. Its output is still pending.
+
+## Proposed Hourly-only correction
+
+Keep the current draft OFF and preserve the stored retail/estimate fields
+with explicit provenance. Report posted retail, the stored estimate, current
+pending components and source freshness as separate concepts; do not label
+the cross-time/cross-field comparison as stock accuracy.
+
+After the active contract is recovered, a proposed live Hourly adapter should
+use the selected POS movement formula and expose the inclusion of pending SI
+in its interpretation. Implement it only as a bounded, parameterized,
+read-only Hourly query after agreeing read consistency and posting transitions.
+Do not add the pending field blindly, discard SI to force retail agreement,
+run source approval/posting procedures, or change shared database options.
+An unknown business cutoff remains non-qualifying even when collection and
+stored arithmetic pass. Full Sync and Transfer Delta keep their current paths.
+
 ## Safe next implementation gates
 
 1. Keep the current draft as a stored-source diagnostic adapter. Preserve the
