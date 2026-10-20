@@ -24,6 +24,8 @@ change a credential, run Sync, or change Full Sync/Transfer Delta queries.
   has a separate 120,000 ms upper bound. These do not relax per-read limits.
 - A changed observer clock boundary over 250 ms stops assembly. This is not
   proof of Windows time synchronization or SQL business freshness.
+  Combining batches preserves missing/inconsistent SQL clock diagnostics;
+  it never relabels them as a consistent observation.
 - One logical slot is one durable upload, not independent per-batch captures.
   Thirteen slots are thirteen uploads. The outbox keeps the existing 168-item
   cap and adds a 64 MiB byte cap, without evicting unsent evidence.

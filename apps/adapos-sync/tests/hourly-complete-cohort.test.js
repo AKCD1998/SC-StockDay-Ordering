@@ -112,6 +112,16 @@ test("source privilege, availability, clock and deadline faults stop without a p
   assert.equal(expired.guards, 1);
 });
 
+test("combining batches never hides inconsistent source clock evidence", async () => {
+  const f=fixture(200);let batch=0;
+  const snapshot=await readHourlyCompleteCohort(f.pool,f.codes,{branchCode:"004",guard:f.guard,now:f.now,monotonic:f.monotonic,
+    readBatch:async(pool,codes,options)=>{const value=await readHourlyDerivedStock(pool,codes,options);value.sourceClockDiagnostics=++batch===1
+      ?{status:"inconsistent",maxRoundTripMs:10,maxWallMonotonicDifferenceMs:1}
+      :{status:"observed-unverified",sqlMinusObserverLowerMs:-5,sqlMinusObserverUpperMs:5,maxRoundTripMs:20,maxWallMonotonicDifferenceMs:2};return value;}});
+  assert.equal(snapshot.sourceClockDiagnostics.status,"inconsistent");assert.equal(snapshot.sourceClockDiagnostics.qualifying,false);
+  assert.equal(snapshot.sourceClockDiagnostics.sqlMinusObserverLowerMs,null);assert.equal(snapshot.sourceClockDiagnostics.maxRoundTripMs,20);
+});
+
 test("full runner closes SQL, preserves exact failed-upload body, replays without a read, and anchors only successful Full", async t => {
   const cacheDir = temp(t), f = fixture(7042, 215), manifest = path.join(cacheDir, "approved.json");
   fs.writeFileSync(manifest, JSON.stringify({ schemaVersion: "hourly-approved-cohort-v1", scope: "web-all", productCodes: f.codes }));

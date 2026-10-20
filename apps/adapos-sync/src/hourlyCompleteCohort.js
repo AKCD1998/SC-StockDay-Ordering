@@ -12,7 +12,7 @@ export async function readHourlyCompleteCohort(pool, productCodes, { branchCode,
       || new Set(productCodes).size !== productCodes.length || productCodes.some(code => typeof code !== "string" || !code || code.trim() !== code || code.length > 80)
       || !Number.isSafeInteger(batchSize) || batchSize < 1 || batchSize > HOURLY_SOURCE_MAX_BATCH_RECORDS || typeof guard !== "function"
       || !Number.isSafeInteger(maxWindowMs) || maxWindowMs < 1 || maxWindowMs > HOURLY_COMPLETE_COHORT_MAX_WINDOW_MS) fail("HOURLY_COHORT_COVERAGE_INVALID");
-  const start = monotonic(), wall = now(), rows = [], missing = [], derivedRows = [];
+  const start = monotonic(), wall = now(), rows = [], missing = [], derivedRows = [], clockBatches = [];
   const summary = { ...Object.fromEntries(HOURLY_SOURCE_COUNTERS.map(key => [key, 0])), schemaVersion: "adapos-stored-stock-read-v1", estimateBasis: "stored-master-day-end", readAt: null, oldestRefreshAt: null, newestRefreshAt: null };
   let readStartedAt = null, readCompletedAt = null, verifiedBoundary = false;
   const batches = Math.ceil(productCodes.length / batchSize);
@@ -74,6 +74,7 @@ export async function readHourlyCompleteCohort(pool, productCodes, { branchCode,
       for (const key of ["readAt", "newestRefreshAt"]) if (snapshot.sourceRead[key] && (!summary[key] || snapshot.sourceRead[key] > summary[key])) summary[key] = snapshot.sourceRead[key];
       if (snapshot.sourceRead.oldestRefreshAt && (!summary.oldestRefreshAt || snapshot.sourceRead.oldestRefreshAt < summary.oldestRefreshAt)) summary.oldestRefreshAt = snapshot.sourceRead.oldestRefreshAt;
       const observed = snapshot.derivedObservation;
+      clockBatches.push(snapshot.sourceClockDiagnostics);
       if (!readStartedAt || observed.readStartedAt < readStartedAt) readStartedAt = observed.readStartedAt;
       if (!readCompletedAt || observed.readCompletedAt > readCompletedAt) readCompletedAt = observed.readCompletedAt;
     }
@@ -83,9 +84,24 @@ export async function readHourlyCompleteCohort(pool, productCodes, { branchCode,
   if (!rows.length) fail("HOURLY_COMPLETE_COHORT_NO_SOURCE_ROWS");
   const coverage = buildCohortCoverage({ expectedProductCodes: productCodes, rows, missingProductCodes: missing, scope,
     readBatchSize: batchSize, readBatchCount: batches, observationWindowMs: Math.ceil(monotonic() - start), observationKind: "intraday" });
+  const validClockBatches = clockBatches.filter(value => value?.status === "observed-unverified"
+    && Number.isFinite(value.sqlMinusObserverLowerMs) && Number.isFinite(value.sqlMinusObserverUpperMs));
+  const lower = validClockBatches.length ? Math.max(...validClockBatches.map(value => value.sqlMinusObserverLowerMs)) : null;
+  const upper = validClockBatches.length ? Math.min(...validClockBatches.map(value => value.sqlMinusObserverUpperMs)) : null;
+  const clockStatus = clockBatches.some(value => value?.status === "invalid") ? "invalid"
+    : clockBatches.some(value => value?.status === "inconsistent") || (lower != null && lower > upper) ? "inconsistent"
+    : validClockBatches.length !== clockBatches.length ? "missing" : "observed-unverified";
+  const maximumClockMetric = key => {
+    const values = clockBatches.map(value => value?.[key]).filter(Number.isFinite);
+    return values.length ? Math.max(...values) : null;
+  };
   return { rows, sourceRead: summary, cohortCoverage: coverage, derivedObservation: {
     schemaVersion: "adapos-ordinary16-derived-v1", estimateBasis: "retail-plus-wholesale-plus-ordinary16", sampleCount: 2,
     consistency: "unverified", qualifying: false, businessCutoffAt: null, readStartedAt, readCompletedAt,
     records: derivedRows.sort((a,b) => a.productCode.localeCompare(b.productCode)),
-  }, sourceClockDiagnostics: { status: "observed-unverified", batchCount: batches, atomicSnapshotVerified: false, qualifying: false } };
+  }, sourceClockDiagnostics: { status: clockStatus, batchCount: batches, observedClockBatches: validClockBatches.length,
+    sqlMinusObserverLowerMs: clockStatus === "observed-unverified" ? lower : null,
+    sqlMinusObserverUpperMs: clockStatus === "observed-unverified" ? upper : null,
+    maxRoundTripMs: maximumClockMetric("maxRoundTripMs"), maxWallMonotonicDifferenceMs: maximumClockMetric("maxWallMonotonicDifferenceMs"),
+    reason: "batch-clock-observations-do-not-prove-time-synchronization", atomicSnapshotVerified: false, qualifying: false, businessCutoffAt: null } };
 }
