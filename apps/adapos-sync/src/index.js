@@ -42,7 +42,7 @@ import { runHourlyStockShadow as defaultRunHourlyStockShadow } from "./delta/hou
 import { connectSqlWithRetry } from "./sqlConnection.js";
 import { buildSqlServerConfig } from "./sqlServerConfig.js";
 import { isHourlyMorningAnchorRun, queueHourlyMorningAnchor } from "./hourlyMorningAnchor.js";
-import { flushHourlyEvidenceOutbox, withHourlyCaptureLock } from "./hourlyEvidenceStorage.js";
+import { flushHourlyEvidenceOutbox, withHourlyCaptureLock, hourlyEvidenceDeliveryBounds } from "./hourlyEvidenceStorage.js";
 import { uploadHourlyEvidence } from "./hourlyStockEvidenceClient.js";
 import { transferLogMetadata } from "./delta/transferDiagnostics.js";
 
@@ -167,6 +167,7 @@ export async function runOnce(dependencies = {}) {
         cacheDir: config.hourlyStockEvidence.cacheDir, branchCode: config.branchCode,
         apiBaseUrl: config.apiBaseUrl, token: config.hourlyStockEvidence.uploadToken,
         uploadEvidence: dependencies.uploadHourlyEvidence ?? uploadHourlyEvidence, maxUploads: 1,
+        ...hourlyEvidenceDeliveryBounds(config.hourlyStockEvidence),
       });
       console.log("[hourly-stock-delivery] " + JSON.stringify(delivery));
     } catch (error) {

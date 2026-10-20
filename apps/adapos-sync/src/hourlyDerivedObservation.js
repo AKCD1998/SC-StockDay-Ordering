@@ -1,12 +1,13 @@
 // Intraday-only supplemental evidence. Never substitutes the canonical pair.
 import { createHash } from "node:crypto";
 import { buildHourlyEvidencePayload, HOURLY_EVIDENCE_MAX_BODY_BYTES } from "./hourlyStockEvidenceClient.js";
+import { HOURLY_COMPLETE_COHORT_MAX_RECORDS, HOURLY_COMPLETE_COHORT_MAX_BODY_BYTES, HOURLY_COMPLETE_COHORT_MAX_WINDOW_MS } from "./hourlyCohortCoverage.js";
 
 export const DERIVED_VERSION = "adapos-ordinary16-derived-v1";
 export const DERIVED_BASIS = "retail-plus-wholesale-plus-ordinary16";
 const REASONS = new Set(["observed-unverified", "changed-between-reads", "invalid-source-component", "non-master-stock-code", "outside-branch-movement"]);
 function invalid() { throw new Error("Invalid intraday derived observation."); }
-export function parseDerivedObservation(value, records, capturedAt) {
+export function parseDerivedObservation(value, records, capturedAt, { completeCohort = false } = {}) {
   if (value == null) return null;
   if (!value || typeof value !== "object" || Array.isArray(value)) invalid();
   const keys = ["schemaVersion", "estimateBasis", "sampleCount", "consistency", "qualifying", "businessCutoffAt", "readStartedAt", "readCompletedAt", "records"];
@@ -18,9 +19,9 @@ export function parseDerivedObservation(value, records, capturedAt) {
         || new Date(value[key]).toISOString() !== value[key]) invalid();
   }
   const duration = Date.parse(value.readCompletedAt) - Date.parse(value.readStartedAt);
-  if (duration < 0 || duration > 10_000 || !Number.isFinite(Date.parse(capturedAt))) invalid();
+  if (duration < 0 || duration > (completeCohort ? HOURLY_COMPLETE_COHORT_MAX_WINDOW_MS : 10_000) || !Number.isFinite(Date.parse(capturedAt))) invalid();
   const expected = new Set(records.map(row => row.productCode));
-  if (!Array.isArray(value.records) || !expected.size || expected.size > 500 || value.records.length !== expected.size) invalid();
+  if (!Array.isArray(value.records) || !expected.size || expected.size > (completeCohort ? HOURLY_COMPLETE_COHORT_MAX_RECORDS : 500) || value.records.length !== expected.size) invalid();
   const seen = new Set();
   const parsedRows = value.records.map(row => {
     if (!row || typeof row !== "object" || Object.keys(row).length !== 3
@@ -35,11 +36,11 @@ export function parseDerivedObservation(value, records, capturedAt) {
   return { ...value, records: parsedRows };
 }
 
-export function derivedObservationDiagnostics(value, records, capturedAt) {
+export function derivedObservationDiagnostics(value, records, capturedAt, options = {}) {
   const base = { estimateBasis: DERIVED_BASIS, consistency: "unverified", qualifying: false, businessCutoffAt: null };
   if (value == null) return { ...base, status: "missing", reason: "derived-observation-missing" };
   let parsed;
-  try { parsed = parseDerivedObservation(value, records, capturedAt); }
+  try { parsed = parseDerivedObservation(value, records, capturedAt, options); }
   catch { return { ...base, status: "invalid", reason: "invalid-derived-observation" }; }
   const available = parsed.records.filter(row => row.reason === "observed-unverified");
   const changed = parsed.records.filter(row => row.reason === "changed-between-reads").length;
@@ -67,11 +68,11 @@ export function buildHourlyIntradayPayload(options, derivedObservation) {
   const built = buildHourlyEvidencePayload(options);
   if (derivedObservation == null) return built;
   if (options.branchCode !== "004" || options.observationKind !== "intraday") invalid();
-  const derived = parseDerivedObservation(derivedObservation, built.payload.records, options.capturedAt);
+  const derived = parseDerivedObservation(derivedObservation, built.payload.records, options.capturedAt, { completeCohort: built.payload.cohortCoverage != null });
   const { idempotencyKey: _key, clientMeta, ...identity } = built.payload;
   const payload = { ...identity, derivedObservation: derived,
     idempotencyKey: createHash("sha256").update(canonical({ ...identity, derivedObservation: derived }), "utf8").digest("hex"), clientMeta };
   const body = JSON.stringify(payload);
-  if (Buffer.byteLength(body, "utf8") > HOURLY_EVIDENCE_MAX_BODY_BYTES) throw new Error("Hourly evidence payload exceeds 256 KiB.");
+  if (Buffer.byteLength(body, "utf8") > (built.payload.cohortCoverage == null ? HOURLY_EVIDENCE_MAX_BODY_BYTES : HOURLY_COMPLETE_COHORT_MAX_BODY_BYTES)) throw new Error(built.payload.cohortCoverage == null ? "Hourly evidence payload exceeds 256 KiB." : "Hourly evidence payload exceeds 4 MiB.");
   return { payload, body };
 }

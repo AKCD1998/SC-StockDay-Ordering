@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { parseCohortCoverage, HOURLY_COMPLETE_COHORT_MAX_RECORDS, HOURLY_COMPLETE_COHORT_MAX_BODY_BYTES } from "./hourlyCohortCoverage.js";
 
 export const HOURLY_EVIDENCE_CONTRACT_VERSION = "hourly-dual-stock-evidence-v1";
 export const HOURLY_EVIDENCE_DATASET_TAG = "hourly_dual_stock_evidence";
@@ -25,6 +26,7 @@ export function buildHourlyEvidencePayload({
   sourceEventAt = null,
   rows,
   clientMeta = {},
+  cohortCoverage = null,
 }) {
   const activeBranches = new Set(["000", "001", "003", "004", "005"]);
   const intradaySlots = new Set(Array.from({ length: 11 }, (_, i) => String(i + 9).padStart(2, "0") + ":00"));
@@ -63,7 +65,9 @@ export function buildHourlyEvidencePayload({
     }
     return { productCode, retailOnHand, latestEstimatedOnHand };
   }).sort((left, right) => left.productCode.localeCompare(right.productCode));
-  if (records.length < 1 || records.length > HOURLY_EVIDENCE_MAX_RECORDS) {
+  const recordLimit = cohortCoverage == null ? HOURLY_EVIDENCE_MAX_RECORDS : HOURLY_COMPLETE_COHORT_MAX_RECORDS;
+  if (cohortCoverage != null && branchCode !== "004") throw Object.assign(new Error("Complete Hourly cohorts are limited to branch 004."), { code: "HOURLY_EVIDENCE_COHORT_NOT_APPROVED" });
+  if (records.length < 1 || records.length > recordLimit) {
     throw Object.assign(new Error(`Hourly evidence requires 1-${HOURLY_EVIDENCE_MAX_RECORDS} selected products.`), {
       code: "HOURLY_EVIDENCE_RECORD_LIMIT",
     });
@@ -73,6 +77,7 @@ export function buildHourlyEvidencePayload({
       code: "HOURLY_EVIDENCE_INVALID_ROW",
     });
   }
+  const coverage = parseCohortCoverage(cohortCoverage, records, observationKind);
   const identity = {
     contractVersion: HOURLY_EVIDENCE_CONTRACT_VERSION,
     datasetTag: HOURLY_EVIDENCE_DATASET_TAG,
@@ -82,6 +87,7 @@ export function buildHourlyEvidencePayload({
     capturedAt,
     sourceEventAt,
     records,
+    ...(coverage == null ? {} : { cohortCoverage: coverage }),
     ...(observationKind === "morning_anchor" ? { authoritativeSyncRunId: String(clientMeta.authoritativeSyncRunId) } : {}),
   };
   const payload = {
@@ -90,7 +96,7 @@ export function buildHourlyEvidencePayload({
     clientMeta,
   };
   const body = JSON.stringify(payload);
-  if (Buffer.byteLength(body, "utf8") > HOURLY_EVIDENCE_MAX_BODY_BYTES) {
+  if (Buffer.byteLength(body, "utf8") > (coverage == null ? HOURLY_EVIDENCE_MAX_BODY_BYTES : HOURLY_COMPLETE_COHORT_MAX_BODY_BYTES)) {
     throw Object.assign(new Error("Hourly evidence payload exceeds 256 KiB."), {
       code: "HOURLY_EVIDENCE_BODY_LIMIT",
     });

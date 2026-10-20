@@ -1,8 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { buildHourlyEvidencePayload, HOURLY_EVIDENCE_MAX_BODY_BYTES } from "./hourlyStockEvidenceClient.js";
+import { performance } from "node:perf_hooks";
+import { buildHourlyEvidencePayload } from "./hourlyStockEvidenceClient.js";
 import { buildHourlyIntradayPayload } from "./hourlyDerivedObservation.js";
+import { HOURLY_COMPLETE_COHORT_MAX_BODY_BYTES } from "./hourlyCohortCoverage.js";
 
 function directory(cacheDir, branchCode) {
   if (!cacheDir || !/^(000|001|003|004|005)$/.test(branchCode)) {
@@ -63,7 +65,7 @@ export async function withHourlyCaptureLock(options, callback) {
 }
 
 function validateBody(body, branchCode) {
-  if (Buffer.byteLength(body, "utf8") > HOURLY_EVIDENCE_MAX_BODY_BYTES) {
+  if (Buffer.byteLength(body, "utf8") > HOURLY_COMPLETE_COHORT_MAX_BODY_BYTES) {
     throw Object.assign(new Error("Hourly outbox capture exceeds its size bound."), { code: "HOURLY_OUTBOX_CORRUPT" });
   }
   const payload = JSON.parse(body);
@@ -83,7 +85,7 @@ function validateBody(body, branchCode) {
   return payload;
 }
 
-export function enqueueHourlyEvidence({ cacheDir, branchCode, body, maxPending = 168 }) {
+export function enqueueHourlyEvidence({ cacheDir, branchCode, body, maxPending = 168, maxPendingBytes = 64 * 1024 * 1024 }) {
   const payload = validateBody(body, branchCode);
   const dir = directory(cacheDir, branchCode);
   fs.mkdirSync(dir, { recursive: true });
@@ -92,7 +94,9 @@ export function enqueueHourlyEvidence({ cacheDir, branchCode, body, maxPending =
     if (fs.readFileSync(pendingPath, "utf8") !== body) throw new Error("Hourly outbox identity conflict.");
     return;
   }
-  if (fs.readdirSync(dir).filter((name) => /^[a-f0-9]{64}\.json(?:\.[a-f0-9-]+\.tmp)?$/.test(name)).length >= maxPending) {
+  const pendingFiles = fs.readdirSync(dir).filter((name) => /^[a-f0-9]{64}\.json(?:\.[a-f0-9-]+\.tmp)?$/.test(name));
+  if (!Number.isSafeInteger(maxPending) || maxPending < 1 || !Number.isSafeInteger(maxPendingBytes) || maxPendingBytes < 1
+      || pendingFiles.length >= maxPending || pendingFiles.reduce((sum, name) => sum + fs.statSync(path.join(dir, name)).size, 0) + Buffer.byteLength(body, "utf8") > maxPendingBytes) {
     throw Object.assign(new Error("Hourly outbox is full; no pending evidence was deleted."), { code: "HOURLY_OUTBOX_FULL" });
   }
   const temporaryPath = pendingPath + "." + randomUUID() + ".tmp";
@@ -113,14 +117,24 @@ export function assertHourlyAcknowledgement(ack, payload) {
   }
 }
 
-export async function flushHourlyEvidenceOutbox({ cacheDir, branchCode, token, apiBaseUrl, uploadEvidence, maxUploads = 12 }) {
+export function hourlyEvidenceDeliveryBounds(evidence) {
+  return evidence?.completeCohortEnabled === true ? { maxUploads: 24, maxDurationMs: 60_000 } : {};
+}
+
+export async function flushHourlyEvidenceOutbox({ cacheDir, branchCode, token, apiBaseUrl, uploadEvidence, maxUploads = 12,
+  maxDurationMs = null, monotonic = () => performance.now() }) {
+  if (!Number.isSafeInteger(maxUploads) || maxUploads < 1 || maxUploads > 24
+      || (maxDurationMs != null && (!Number.isSafeInteger(maxDurationMs) || maxDurationMs < 1 || maxDurationMs > 60_000))) {
+    throw Object.assign(new Error("Invalid Hourly delivery bounds."), { code: "CONFIG_ERROR" });
+  }
+  const deadline = maxDurationMs == null ? Infinity : monotonic() + maxDurationMs;
   const release = acquireHourlyEvidenceLock({ cacheDir, branchCode, purpose: "delivery" });
   if (!release) return { status: "busy", delivered: 0 };
   try {
     const dir = directory(cacheDir, branchCode);
     const pending = fs.readdirSync(dir).filter((name) => /^[a-f0-9]{64}\.json$/.test(name)).map((name) => {
       const file = path.join(dir, name);
-      if (fs.statSync(file).size > HOURLY_EVIDENCE_MAX_BODY_BYTES) {
+      if (fs.statSync(file).size > HOURLY_COMPLETE_COHORT_MAX_BODY_BYTES) {
         throw Object.assign(new Error("Hourly outbox capture exceeds its size bound."), { code: "HOURLY_OUTBOX_CORRUPT" });
       }
       const body = fs.readFileSync(file, "utf8");
@@ -128,8 +142,11 @@ export async function flushHourlyEvidenceOutbox({ cacheDir, branchCode, token, a
     }).sort((a, b) => a.payload.capturedAt.localeCompare(b.payload.capturedAt));
     let delivered = 0;
     for (const entry of pending.slice(0, maxUploads)) {
+      const remainingMs = Math.floor(deadline - monotonic());
+      if (remainingMs < 1) return { status: "pending", delivered, pending: pending.length - delivered, errorCode: "HOURLY_DELIVERY_BUDGET_EXHAUSTED" };
       try {
-        const ack = await uploadEvidence({ apiBaseUrl, branchCode, token, body: entry.body });
+        const ack = await uploadEvidence({ apiBaseUrl, branchCode, token, body: entry.body,
+          ...(maxDurationMs == null ? {} : { timeoutMs: Math.min(30_000, remainingMs), maxAttempts: 1 }) });
         assertHourlyAcknowledgement(ack, entry.payload);
         fs.unlinkSync(entry.file);
         delivered++;
