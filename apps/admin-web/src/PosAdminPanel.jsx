@@ -35,7 +35,10 @@ export default function PosAdminPanel() {
     async function load() {
       try {
         const response = await apiFetch("/api/admin/pos-devices", { signal: controller.signal, cache: "no-store" });
-        if (response.status === 403) throw new Error("หน้านี้สำหรับบัญชีแอดมินเท่านั้น");
+        if (response.status === 401 || response.status === 403) {
+          if (!controller.signal.aborted) setData(null);
+          throw new Error(response.status === 403 ? "หน้านี้สำหรับบัญชีแอดมินเท่านั้น" : "กรุณาเข้าสู่ระบบใหม่");
+        }
         if (!response.ok) throw new Error("ยังโหลดข้อมูลสิทธิ์เครื่องไม่ได้ กรุณาลองใหม่");
         const value = await response.json();
         if (!Array.isArray(value.devices) || !value.installer) throw new Error("ข้อมูลสิทธิ์เครื่องยังไม่พร้อม");

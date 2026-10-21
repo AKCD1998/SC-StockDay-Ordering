@@ -6,6 +6,20 @@ import { apiFetch } from "./lib/apiClient.js";
 vi.mock("./lib/apiClient.js", () => ({ apiFetch: vi.fn() }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers(); });
 describe("POS admin panel", () => {
+  it("keeps downloads after a transient fetch failure but removes them after server authorization is revoked", async () => {
+    apiFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ auditedAt: "2026-10-21T10:00:00Z", devices: [], installer: { version: "1.3.1", downloadUrl: "https://example.com/1.3.1.exe" } }) });
+    render(<PosAdminPanel />);
+    expect(await screen.findByRole("link", { name: /ดาวน์โหลดสำหรับ Windows/ })).toBeVisible();
+    apiFetch.mockRejectedValue(new Error("Offline"));
+    fireEvent.focus(window);
+    expect(await screen.findByText("Offline")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /ดาวน์โหลดสำหรับ Windows/ })).toBeVisible();
+    apiFetch.mockResolvedValue({ status: 403, ok: false });
+    fireEvent.focus(window);
+    expect(await screen.findByText("หน้านี้สำหรับบัญชีแอดมินเท่านั้น")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /ดาวน์โหลดสำหรับ Windows/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
   it("refreshes a published release without navigation, keeps the page visible, and removes the timer on exit", async () => {
     vi.useFakeTimers();
     const response = version => ({ ok: true, status: 200, json: async () => ({ auditedAt: "2026-10-21T10:00:00Z", devices: [], installer: { version, downloadUrl: `https://example.com/${version}.exe` }, previousReleases: [], releaseSync: { state: "verified" } }) });
