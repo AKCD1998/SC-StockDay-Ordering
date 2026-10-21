@@ -1989,6 +1989,16 @@ export default function App() {
         <SyncLogPanel onUnauthorized={handleUnauthorized} />
       ) : view === "preorder" ? (
         <PreorderPanel enabled={customerPreordersEnabled} csrfToken={session.csrfToken} isAdmin={isAdminUser} branchCode={branchCode} apiBaseUrl={apiBaseUrl} onBadgeChanged={refreshPreorderBadgeCount} />
+      ) : view === "members" ? (
+        <section className="panel" aria-labelledby="members-title">
+          <div className="panel-header stacked">
+            <div>
+              <h2 id="members-title">สมาชิก</h2>
+              <p>เตรียมพื้นที่สำหรับฟังก์ชันสมาชิก</p>
+            </div>
+          </div>
+          <p className="empty-state">ยังไม่มีฟังก์ชันในหน้านี้</p>
+        </section>
       ) : (
         <>
           <section className="kpis">

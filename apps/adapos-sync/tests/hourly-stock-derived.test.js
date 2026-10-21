@@ -176,6 +176,69 @@ test("reader requires closing master evidence; a changed bookend withholds deriv
   await assert.rejects(readHourlyDerivedStock(poolFor({ failClosing: true }), ["A"], { branchCode: "004" }),
     error => error.code === "HOURLY_SOURCE_COHORT_INCOMPLETE");
 });
+
+function transferPool(firstRows, secondRows = firstRows) {
+  let sampleIndex = 0;
+  const master = source(10, {});
+  return { request() { return { input() {}, query(text) {
+    if (text.includes("MachineName")) return Promise.resolve({ recordset: [
+      { machine_name: "SERVER004", database_name: "AdaAcc", offset_minutes: 420, read_started_at: start }] });
+    const grouped = new Map();
+    for (const row of sampleIndex++ === 0 ? firstRows : secondRows) {
+      const scoped = new RegExp(`FROM dbo\\.VCN_${row.component}QtyNowNotApv v\\s+WHERE \\(v\\.FTBchCode = '004' OR NULLIF\\(LTRIM\\(RTRIM\\(v\\.FTBchCode\\)\\), ''\\) IS NULL\\) AND`).test(text);
+      if (scoped && row.branch !== "004" && row.branch != null && row.branch.trim() !== "") continue;
+      const group = grouped.get(row.component) ?? { component: row.component, FTPdtStkCode: "A",
+        net_quantity: 0, movement_rows: 0, invalid_rows: 0, outside_branch_rows: 0 };
+      group.net_quantity += row.quantity;
+      group.movement_rows++;
+      if (row.branch !== "004" && row.component !== "PosSaleTmp") group.outside_branch_rows++;
+      grouped.set(row.component, group);
+    }
+    return Promise.resolve({ recordset: master, recordsets: [master, [...grouped.values()], master,
+      [{ read_completed_at: "2026-10-18T10:00:00.600+07:00" }]] });
+  } }; } };
+}
+
+test("transfer receipts/issues use their projected stock branch without mixing other branches or changing canonical stock", async () => {
+  for (const [component, quantity] of [["TNF41", 5], ["TNF42", -2], ["TNF31", -3], ["TNF32", 1], ["TNF7", 4], ["TNF8", -1]]) {
+    const local = { component, branch: "004", quantity };
+    const foreign = { component, branch: "001", quantity: -100 };
+    const result = await readHourlyDerivedStock(transferPool([local, foreign], [local, { ...foreign, quantity: 200 }]), ["A"], { branchCode: "004" });
+    assert.deepEqual(result.derivedObservation.records[0], { productCode: "A", derivedOnHand: 10 + quantity, reason: "observed-unverified" });
+    assert.deepEqual(result.rows, [{ product_code: "A", qty: 10, latest_estimated_on_hand: 10 }]);
+    assert.equal(result.derivedObservation.qualifying, false);
+  }
+});
+
+test("foreign-only transfers contribute zero when no local transfer group remains", async () => {
+  for (const component of ["TNF41", "TNF42", "TNF31", "TNF32", "TNF7", "TNF8"]) {
+    const rows = ["001", "005"].map(branch => ({ component, branch, quantity: -100 }));
+    const result = await readHourlyDerivedStock(transferPool(rows), ["A"], { branchCode: "004" });
+    assert.equal(result.derivedObservation.records[0].derivedOnHand, 10);
+    assert.equal(result.derivedObservation.records[0].reason, "observed-unverified");
+  }
+});
+
+test("missing transfer branch identities still suppress derived quantities rather than becoming zero", async () => {
+  for (const component of ["TNF41", "TNF42", "TNF31", "TNF32", "TNF7", "TNF8"]) {
+    for (const branch of ["", "   ", null]) {
+      const result = await readHourlyDerivedStock(transferPool([{ component, branch, quantity: -100 }]), ["A"], { branchCode: "004" });
+      assert.deepEqual(result.derivedObservation.records[0], { productCode: "A", derivedOnHand: null, reason: "outside-branch-movement" });
+    }
+  }
+});
+
+test("local transfer posting changes still suppress derived values and foreign non-transfer rows still fail closed", async () => {
+  const local = { component: "TNF42", branch: "004", quantity: -2 };
+  const changing = await readHourlyDerivedStock(transferPool([local], [{ ...local, quantity: -3 }]), ["A"], { branchCode: "004" });
+  assert.deepEqual(changing.derivedObservation.records[0], { productCode: "A", derivedOnHand: null, reason: "changed-between-reads" });
+  for (const component of ["SAL", "CSM", "PI", "PT", "SI", "ST", "ChkStkSale", "ChkStkStop", "PICK"]) {
+    const result = await readHourlyDerivedStock(transferPool([{ component, branch: "001", quantity: -2 }]), ["A"], { branchCode: "004" });
+    assert.deepEqual(result.derivedObservation.records[0], { productCode: "A", derivedOnHand: null, reason: "outside-branch-movement" });
+  }
+  await assert.rejects(readHourlyDerivedStock(transferPool([]), ["A"], { branchCode: "001" }),
+    error => error.code === "HOURLY_SOURCE_BRANCH_NOT_APPROVED");
+});
 test("source access denial/timeout/wrong machine stop without fallback, retry or exposed SQL", async () => {
   for (const [settings, code] of [[{ denied: true }, "HOURLY_SOURCE_ACCESS_DENIED"], [{ timeout: true }, "HOURLY_SOURCE_TIMEOUT"], [{ identity: "OTHER" }, "HOURLY_SOURCE_IDENTITY_UNVERIFIED"]]) {
     const pool = poolFor(settings);

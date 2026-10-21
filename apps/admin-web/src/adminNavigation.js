@@ -19,6 +19,7 @@ export const adminViewKeys = [
   "stock-requests",
   "focus-products",
   "preorder",
+  "members",
   ...adminOnlyViews,
 ];
 
@@ -31,6 +32,7 @@ const ADMIN_VIEW_ROUTE_SEGMENTS = {
   "stock-requests": "stock-requests",
   "focus-products": "focus-products",
   preorder: "preorder",
+  members: "members",
   [stockCostAuditView]: "stock-cost-audit",
   "category-review": "category-review",
   "ingredient-dictionary": "ingredient-dictionary",
@@ -92,6 +94,7 @@ export function getNavigationGroups(isAdminUser, hideDashboard = false) {
       shortLabel: "CR",
       items: [
         { label: "พรีออเดอร์", view: "preorder", description: "รับและติดตามคำสั่งจองสินค้าล่วงหน้า" },
+        { label: "สมาชิก", view: "members", description: "เตรียมพื้นที่สำหรับฟังก์ชันสมาชิก" },
       ],
     },
   ].filter((group) => (!group.adminOnly || isAdminUser) && (!hideDashboard || group.id !== "dashboard"));
