@@ -1,7 +1,7 @@
 # Branch 004 Hourly reader performance candidate
 
 The 2026-10-21 11:00 B50 pilot accepted all 50 distinct products but reported
-2,521 ms inside `readHourlyDerivedStock`. This exceeds the existing 2,000 ms
+2,521 ms inside `readHourlyDerivedStock`. This exceeded the earlier 2,000 ms
 review point. Source and receiver were stopped; no larger cohort is enabled.
 The pilot recorded total read duration, not per-batch CPU/compile/elapsed times,
 so that historical delay cannot be assigned to compilation, execution, network
@@ -36,18 +36,26 @@ are part of this patch.
   local host CPU and SQL parse/compile/execute statistics where available.
   `SET STATISTICS TIME` is confined to the test connection; do not clear plans,
   force hints, warm the reader, create source objects or change DB options.
+- The owner revised the diagnostic timing policy on 2026-10-21: allow a total
+  10,000 ms per B50 observation (identity and both samples combined); completed
+  reads above 3,000 ms are warnings and do not stop the experiment. This does
+  not retroactively pass the previous 2,000/3,000 ms experiment.
 - Run at most three candidate B50 observations and one installed-baseline
   observation, with at least 30 seconds between starts. Stop adding reads on
-  a completed read above 2,000 ms, a 3,000 ms reader deadline, CPU >= 70%,
-  existing Agent activity, or the 15-minute Full Sync exclusion window.
+  a 10,000 ms reader deadline, errors, CPU >= 70%, existing Agent activity,
+  integrity failure or the 15-minute Full Sync exclusion window. Keep the
+  existing source reader's default timeout and production configuration intact.
 - Compare candidate and baseline in RAM only when all observed input sets are
   identical, normalizing all 16 component sets before comparison with the
   installed combined set. Changed inputs are non-comparable, not a mismatch or
   a successful data validation. Persist aggregates only.
-- Require three candidate observations within the unchanged timing/CPU guards,
-  50/50 completeness and 50/50 observed-input comparison before calling this
-  candidate validated. A slow baseline remains a failed baseline and stops
-  additional reads; it never becomes a passing timing result.
+- Require three candidate observations within the revised deadline and
+  unchanged CPU/quiet guards, 50/50 completeness and 50/50 observed-input
+  comparison before calling this candidate validated. Report warnings on
+  candidate and baseline separately. Collect own-session CPU, logical/physical
+  reads and writes plus before/after host CPU; the samples are not a continuous
+  CPU peak measurement. No business I/O budget has been agreed, so I/O still
+  requires review and is not automatically qualified by a timing pass.
 
 Local fixtures cannot establish SQL load on SERVER004. Passing this test also
 does not establish committed posting, NOLOCK atomicity/ABA safety, clock sync
