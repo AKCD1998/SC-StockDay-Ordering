@@ -82,7 +82,7 @@ export async function readHourlyDerivedStock(pool, productCodes, { branchCode, q
       const result = await request.query(text);
       const completedAtMs = Date.now(), elapsedMs = performance.now() - startedMonotonic;
       if (expired || performance.now() > deadline) fail("HOURLY_SOURCE_TIMEOUT");
-      const sourceAt = stage === "metadata" ? result.recordset?.[0]?.read_started_at : result.recordsets?.[3]?.[0]?.read_completed_at;
+      const sourceAt = stage === "metadata" ? result.recordset?.[0]?.read_started_at : result.recordsets?.[ORDINARY_COMPONENTS.length + 2]?.[0]?.read_completed_at;
       clockSamples.push({ startedAtMs, completedAtMs, elapsedMs, sourceAt });
       return result;
     } catch (error) {
@@ -100,13 +100,16 @@ export async function readHourlyDerivedStock(pool, productCodes, { branchCode, q
   // Transfer views expose the stock-affecting branch as FTBchCode: receipt
   // destination, issue origin, or the document branch for internal transfers.
   // Keep missing branch identities visible to the existing fail-closed guard.
-  const union = ORDINARY_COMPONENTS.map(component => `SELECT '${component}' AS component, v.FTPdtStkCode,
+  const movements = ORDINARY_COMPONENTS.map(component => `
+    WITH scope AS (SELECT p.FTPdtStkCode AS source_stock_code FROM dbo.TCNMPdt p
+      WHERE p.FTPdtStaActive = 1 AND p.FTPdtCode IN (${placeholders}))
+    SELECT '${component}' AS component, v.FTPdtStkCode,
       SUM(v.FCStkQty) AS net_quantity, COUNT(*) AS movement_rows,
       SUM(CASE WHEN v.FCStkQty IS NULL THEN 1 ELSE 0 END) AS invalid_rows,
       SUM(CASE WHEN ${component === "PosSaleTmp" ? "1=0" : "ISNULL(v.FTBchCode,'')<>'004'"} THEN 1 ELSE 0 END) AS outside_branch_rows
     FROM dbo.VCN_${component}QtyNowNotApv v
     WHERE ${BRANCH_SCOPED_TRANSFERS.has(component) ? "(v.FTBchCode = '004' OR NULLIF(LTRIM(RTRIM(v.FTBchCode)), '') IS NULL) AND " : ""}EXISTS (SELECT 1 FROM scope s WHERE s.source_stock_code = v.FTPdtStkCode)
-    GROUP BY v.FTPdtStkCode`).join(" UNION ALL ");
+    GROUP BY v.FTPdtStkCode;`).join("\n");
   // SELECT only; the vendor views themselves contain NOLOCK. No isolation or
   // database option changes, vendor EXEC, locks/hints or source writes.
   const stockText = `
@@ -121,21 +124,23 @@ export async function readHourlyDerivedStock(pool, productCodes, { branchCode, q
   // Bracket each movement read with the original stock/cache projection.
   // A changed bookend suppresses derived values; unchanged bookends still do
   // not turn the vendor's NOLOCK movement views into a consistent snapshot.
-  // The scope is used only by EXISTS. Use the same parameterized membership
-  // predicate as the bookends rather than expanding one UNION ALL arm per
-  // product inside each of the sixteen view references. Aliases and multiple
-  // products sharing a stock code still have the same existential membership.
+  // Compile each view aggregate as an independent SELECT in the same request.
+  // A single UNION across sixteen vendor views gives the optimizer one large
+  // expanded expression. The sixteen result sets preserve the component
+  // groups without adding round trips, dropping views or weakening bookends.
   const text = `${stockText}
-  WITH scope AS (SELECT p.FTPdtStkCode AS source_stock_code FROM dbo.TCNMPdt p
-    WHERE p.FTPdtStaActive = 1 AND p.FTPdtCode IN (${placeholders}))
-  ${union} ORDER BY component, FTPdtStkCode;
+  ${movements}
   ${stockText}
   SELECT CONVERT(varchar(40), SYSDATETIMEOFFSET(), 127) AS read_completed_at`;
   const first = await query(text, true, "first-sample");
   const second = await query(text, true, "second-sample");
   function joinSample(result) {
-    const movements = result.recordsets?.[1];
-    if (!Array.isArray(movements)) fail("HOURLY_SOURCE_INVALID_COMPONENT");
+    const componentSets = result.recordsets?.slice(1, ORDINARY_COMPONENTS.length + 1);
+    if (result.recordsets?.length !== ORDINARY_COMPONENTS.length + 3
+        || componentSets?.length !== ORDINARY_COMPONENTS.length
+        || componentSets.some((rows, index) => !Array.isArray(rows)
+          || rows.some(row => row.component !== ORDINARY_COMPONENTS[index]))) fail("HOURLY_SOURCE_INVALID_COMPONENT");
+    const movements = componentSets.flat();
     const expectedStocks = new Set(result.recordset.map(row => row.source_stock_code));
     if (movements.some(row => !expectedStocks.has(row.FTPdtStkCode))) fail("HOURLY_SOURCE_COHORT_INCOMPLETE");
     return result.recordset.flatMap(row => {
@@ -143,10 +148,11 @@ export async function readHourlyDerivedStock(pool, productCodes, { branchCode, q
       return matching.length ? matching.map(movement => ({ ...row, ...movement })) : [{ ...row, component: null }];
     });
   }
-  if (!Array.isArray(first.recordsets?.[2]) || !Array.isArray(second.recordsets?.[2])) fail("HOURLY_SOURCE_COHORT_INCOMPLETE");
+  const closingIndex = ORDINARY_COMPONENTS.length + 1;
+  if (!Array.isArray(first.recordsets?.[closingIndex]) || !Array.isArray(second.recordsets?.[closingIndex])) fail("HOURLY_SOURCE_COHORT_INCOMPLETE");
   const result = describeHourlyDerivedSamples(joinSample(first), joinSample(second), selected, start.toISOString(),
-    { firstClosingRows: first.recordsets[2], secondClosingRows: second.recordsets[2] });
-  const completedAt = second.recordsets?.[3]?.[0]?.read_completed_at;
+    { firstClosingRows: first.recordsets[closingIndex], secondClosingRows: second.recordsets[closingIndex] });
+  const completedAt = second.recordsets?.[closingIndex + 1]?.[0]?.read_completed_at;
   if (typeof completedAt !== "string" || !/(Z|[+-]\d\d:\d\d)$/.test(completedAt) || !Number.isFinite(Date.parse(completedAt))) fail("HOURLY_SOURCE_CLOCK_UNVERIFIED");
   result.derivedObservation.readCompletedAt = new Date(completedAt).toISOString();
   if (result.derivedObservation.readCompletedAt < result.sourceRead.readAt) fail("HOURLY_SOURCE_CLOCK_UNVERIFIED");

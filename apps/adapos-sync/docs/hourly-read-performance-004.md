@@ -7,14 +7,17 @@ The pilot recorded total read duration, not per-batch CPU/compile/elapsed times,
 so that historical delay cannot be assigned to compilation, execution, network
 or host load from the retained total alone.
 
-The original movement query constructs one `SELECT @productCodeN` arm per
-product, then joins that CTE to the master table inside a scope referenced by
-16 movement views. This candidate replaces only that membership expression
-with the same parameterized `FTPdtCode IN (...)` predicate already used by
-the opening and closing master reads. It removes the product-count-sized
-`UNION ALL` expression from the repeated scope. SQL Server does not promise
+The original movement query joins a product-per-arm CTE to the master table
+inside a scope referenced by 16 movement views in a single UNION query. This
+candidate submits each of the 16 aggregates as its own SELECT within the same
+request. Each scope uses the same parameterized `FTPdtCode IN (...)` predicate
+as the master reads. There are still three requests (identity, first sample,
+second sample); only the movement result sets change from one combined set
+to sixteen ordered component sets. Missing/mislabeled/extra sets fail closed.
+SQL Server can compile each SELECT independently without optimizing one large
+UNION over all expanded vendor views. SQL Server does not promise
 materialization of a CTE; see [Microsoft's CTE guidance](https://learn.microsoft.com/en-us/sql/t-sql/queries/with-common-table-expression-transact-sql).
-Reduced query expansion is a performance hypothesis until measured on SERVER004.
+Reduced optimization complexity is a hypothesis until measured on SERVER004.
 
 Scope is consumed only through `EXISTS`; multiple products sharing a stock
 code and aliases preserve existential membership. Active-product filtering,
@@ -38,7 +41,8 @@ are part of this patch.
   a completed read above 2,000 ms, a 3,000 ms reader deadline, CPU >= 70%,
   existing Agent activity, or the 15-minute Full Sync exclusion window.
 - Compare candidate and baseline in RAM only when all observed input sets are
-  identical. Changed inputs are non-comparable, not an automatic mismatch or
+  identical, normalizing all 16 component sets before comparison with the
+  installed combined set. Changed inputs are non-comparable, not a mismatch or
   a successful data validation. Persist aggregates only.
 - Require three candidate observations within the unchanged timing/CPU guards,
   50/50 completeness and 50/50 observed-input comparison before calling this

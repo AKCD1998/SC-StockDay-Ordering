@@ -137,6 +137,10 @@ test("combined derived payload retains the existing 256 KiB bound, including mul
   assert.throws(() => buildHourlyIntradayPayload(options(rows), observation), /256 KiB/);
 });
 
+function componentResultSets(master, movements, closing, completedAt) {
+  return [master, ...ORDINARY_COMPONENTS.map(component => movements.filter(row => row.component === component)), closing,
+    [{ read_completed_at: completedAt }]];
+}
 function poolFor({ denied = false, identity = "SERVER004", timeout = false, closingRows = source(), failClosing = false } = {}) {
   const calls = [];
   return { calls, request() { return { input(name, _type, value) { calls.push({ name, value }); },
@@ -147,8 +151,8 @@ function poolFor({ denied = false, identity = "SERVER004", timeout = false, clos
       if (timeout) return new Promise((_resolve, reject) => { this.reject = reject; });
       if (text.includes("MachineName")) return Promise.resolve({ recordset: [{ machine_name: identity, database_name: "AdaAcc", offset_minutes: 420, read_started_at: start }] });
       const movements = source().map(row => ({ ...row, FTPdtStkCode: "A" }));
-      return Promise.resolve({ recordset: source(), recordsets: [source(), movements, failClosing ? undefined : closingRows,
-        [{ read_completed_at: "2026-10-18T10:00:00.600+07:00" }]] });
+      return Promise.resolve({ recordset: source(), recordsets: componentResultSets(source(), movements,
+        failClosing ? undefined : closingRows, "2026-10-18T10:00:00.600+07:00") });
     } }; } };
 }
 test("bounded reader verifies source identity and reads two parameterized ordinary16 samples with no source mutation", async () => {
@@ -177,7 +181,28 @@ test("reader requires closing master evidence; a changed bookend withholds deriv
     error => error.code === "HOURLY_SOURCE_COHORT_INCOMPLETE");
 });
 
-test("movement scope reuses parameterized membership at B50 and planned scale sizes without product UNION expansion", async () => {
+test("independent movement result sets fail closed when a component is missing, reordered or mislabeled", async () => {
+  for (const mutate of [
+    sets => sets.splice(1, 1),
+    sets => { sets[1] = [{ component: "PICK", FTPdtStkCode: "A" }]; },
+    sets => sets.push([]),
+  ]) {
+    const pool = poolFor(), request = pool.request.bind(pool);
+    pool.request = () => {
+      const value = request(), query = value.query.bind(value);
+      value.query = async text => {
+        const data = await query(text);
+        if (!text.includes("MachineName")) mutate(data.recordsets);
+        return data;
+      };
+      return value;
+    };
+    await assert.rejects(readHourlyDerivedStock(pool, ["A"], { branchCode: "004" }),
+      error => ["HOURLY_SOURCE_INVALID_COMPONENT", "HOURLY_SOURCE_COHORT_INCOMPLETE"].includes(error.code));
+  }
+});
+
+test("movement views have independent parameterized SELECTs at B50 and planned scale sizes without extra requests", async () => {
   for (const count of [50, 100, 200, 276, 500]) {
     const codes = Array.from({ length: count }, (_, i) => `SKU${i}`);
     const pool = poolFor();
@@ -191,7 +216,8 @@ test("movement scope reuses parameterized membership at B50 and planned scale si
     const text = batches[0].text;
     assert.match(text, /WITH scope AS \(SELECT p\.FTPdtStkCode AS source_stock_code FROM dbo\.TCNMPdt p\s+WHERE p\.FTPdtStaActive = 1 AND p\.FTPdtCode IN \(@productCode0, /);
     assert.doesNotMatch(text, /WITH cohort|SELECT @productCode\d+ AS product_code/);
-    assert.equal((text.match(/ UNION ALL /g) || []).length, 15);
+    assert.equal((text.match(/WITH scope AS/g) || []).length, 16);
+    assert.doesNotMatch(text, /\bUNION\b/i);
     assert.equal((text.match(/WHERE s\.source_stock_code = v\.FTPdtStkCode/g) || []).length, 16);
     assert.equal((text.match(/FROM dbo\.TCNMPdt p LEFT JOIN/g) || []).length, 2);
     for (let index = 0; index < count; index++) {
@@ -232,8 +258,8 @@ function transferPool(firstRows, secondRows = firstRows) {
       if (row.branch !== "004" && row.component !== "PosSaleTmp") group.outside_branch_rows++;
       grouped.set(row.component, group);
     }
-    return Promise.resolve({ recordset: master, recordsets: [master, [...grouped.values()], master,
-      [{ read_completed_at: "2026-10-18T10:00:00.600+07:00" }]] });
+    return Promise.resolve({ recordset: master, recordsets: componentResultSets(master, [...grouped.values()], master,
+      "2026-10-18T10:00:00.600+07:00") });
   } }; } };
 }
 
