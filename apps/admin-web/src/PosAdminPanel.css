@@ -1,0 +1,369 @@
+.pos-admin {
+  font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+}
+
+.pos-admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 6px 4px 22px;
+}
+
+.pos-admin-header h2 {
+  margin: 0 0 4px;
+  font-size: 1.4rem;
+}
+
+.pos-admin-header p {
+  margin: 0;
+  color: #526578;
+  font-size: 0.8rem;
+}
+
+[data-theme="dark"] .pos-admin-header p {
+  color: #a8b5cb;
+}
+
+.pos-download-hero {
+  --pos-ink: #080e24;
+  --pos-white: #ffffff;
+  --pos-muted: #a8b5d5;
+  --pos-yellow: #f6e96b;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 30px 28px 28px;
+  border: 1px solid #2b3b68;
+  border-top: 4px solid var(--pos-yellow);
+  border-radius: 24px;
+  background: var(--pos-ink);
+  color: var(--pos-white);
+  text-align: center;
+}
+
+.pos-download-hero::before,
+.pos-download-hero::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 440px;
+  height: 440px;
+  border: 1px solid #25345d;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.pos-download-hero::before {
+  top: -230px;
+  left: -250px;
+  box-shadow: 0 0 0 55px #101a36, 0 0 0 56px #25345d;
+}
+
+.pos-download-hero::after {
+  right: -300px;
+  bottom: -230px;
+  box-shadow: 0 0 0 70px #101a36, 0 0 0 71px #25345d;
+}
+
+.pos-download-edition {
+  display: block;
+  color: var(--pos-muted);
+  font-size: 0.6rem;
+  font-weight: 650;
+  letter-spacing: 0.18em;
+}
+
+.pos-download-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  margin: 24px 0 28px;
+}
+
+.pos-download-logo {
+  display: block;
+  width: 128px;
+  height: 128px;
+  flex: 0 0 auto;
+  border-radius: 24px;
+  box-shadow: 0 0 0 1px #455283, 0 12px 36px #020615;
+}
+
+.pos-download-wordmark {
+  display: grid;
+  gap: 7px;
+  text-align: left;
+}
+
+.pos-download-wordmark strong {
+  font-size: clamp(3.2rem, 7.5vw, 5.6rem);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.065em;
+}
+
+.pos-download-wordmark > span {
+  color: var(--pos-yellow);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.3em;
+}
+
+.pos-download-title {
+  margin: 0;
+  color: var(--pos-white);
+  font-size: clamp(1.3rem, 2.9vw, 2rem);
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: -0.025em;
+}
+
+.pos-download-title > span {
+  color: var(--pos-yellow);
+}
+
+.pos-download-description {
+  margin: 9px auto 0;
+  color: var(--pos-muted);
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+
+.pos-download-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.pos-download-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  min-height: 88px;
+  padding: 17px 25px;
+  border: 2px solid var(--pos-yellow);
+  border-radius: 14px;
+  background: var(--pos-yellow);
+  color: var(--pos-ink);
+  box-shadow: 0 5px 0 #b0a33c;
+  font-family: inherit;
+  text-decoration: none;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.pos-download-button > svg {
+  flex: 0 0 auto;
+  width: 31px;
+  height: 31px;
+}
+
+.pos-download-button > svg:last-child {
+  width: 27px;
+  height: 27px;
+}
+
+.pos-download-button > span {
+  display: grid;
+  gap: 5px;
+  text-align: left;
+}
+
+.pos-download-button strong {
+  font-size: 1.2rem;
+  font-weight: 750;
+  line-height: 1.3;
+}
+
+.pos-download-button small {
+  color: #4b491e;
+  font-size: 0.69rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.pos-download-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background: #fff59a;
+}
+
+.pos-download-button:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.pos-download-devices {
+  min-height: 60px;
+  padding: 14px 23px;
+  border: 1px solid #596785;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--pos-white);
+  font-size: 0.83rem;
+  font-family: inherit;
+}
+
+.pos-download-devices > span {
+  margin-left: 12px;
+  color: var(--pos-yellow);
+}
+
+.pos-download-devices:hover {
+  border-color: var(--pos-white);
+  background: #18213b;
+}
+
+.pos-download-button:focus-visible,
+.pos-download-devices:focus-visible {
+  outline: 3px solid var(--pos-white);
+  outline-offset: 5px;
+}
+
+.pos-download-requirements {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 24px;
+  margin-top: 26px;
+  color: #c1cce4;
+  font-size: 0.68rem;
+}
+
+.pos-download-requirements > span::before {
+  content: "✓";
+  margin-right: 7px;
+  color: var(--pos-yellow);
+}
+
+.pos-download-note {
+  margin: 16px 0 0;
+  color: var(--pos-muted);
+  font-size: 0.64rem;
+  line-height: 1.7;
+}
+
+.pos-device-inventory {
+  margin-top: 26px;
+  scroll-margin-top: 24px;
+}
+
+.pos-device-inventory h3 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+}
+
+.pos-device-inventory .panel-header p,
+.pos-device-inventory table {
+  font-size: 0.8rem;
+}
+
+@media (max-width: 640px) {
+  .pos-admin-header {
+    align-items: flex-start;
+  }
+
+  .pos-admin-header p {
+    max-width: 210px;
+    font-size: 0.72rem;
+  }
+
+  .pos-admin-header .ghost-button {
+    padding: 9px 12px;
+    font-size: 0.73rem;
+  }
+
+  .pos-download-hero {
+    padding: 26px 18px;
+    border-radius: 20px;
+  }
+
+  .pos-download-edition {
+    font-size: 0.5rem;
+    letter-spacing: 0.1em;
+  }
+
+  .pos-download-brand {
+    gap: 16px;
+    margin: 28px 0;
+  }
+
+  .pos-download-logo {
+    width: 80px;
+    height: 80px;
+    border-radius: 15px;
+  }
+
+  .pos-download-wordmark strong {
+    font-size: clamp(2.3rem, 11vw, 3.2rem);
+  }
+
+  .pos-download-wordmark > span {
+    font-size: 0.5rem;
+    letter-spacing: 0.2em;
+  }
+
+  .pos-download-title {
+    font-size: 1.27rem;
+  }
+
+  .pos-download-title > span {
+    display: block;
+  }
+
+  .pos-download-description {
+    font-size: 0.75rem;
+  }
+
+  .pos-download-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .pos-download-button {
+    gap: 12px;
+    padding: 17px 12px;
+  }
+
+  .pos-download-button strong {
+    font-size: 0.94rem;
+  }
+
+  .pos-download-button small {
+    font-size: 0.57rem;
+  }
+
+  .pos-download-button > svg {
+    width: 25px;
+    height: 25px;
+  }
+
+  .pos-download-button > svg:last-child {
+    width: 21px;
+    height: 21px;
+  }
+
+  .pos-download-requirements {
+    gap: 8px 12px;
+    font-size: 0.6rem;
+  }
+
+  .pos-device-inventory .table-wrap {
+    overflow-x: auto;
+  }
+
+  .pos-device-inventory table {
+    min-width: 760px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pos-download-button {
+    transition: none;
+  }
+}

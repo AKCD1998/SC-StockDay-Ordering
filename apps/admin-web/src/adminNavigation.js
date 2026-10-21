@@ -9,6 +9,7 @@ export const adminOnlyViews = [
   taxonomyView,
   taxonomyReviewView,
   "sync-log",
+  "pos-admin",
 ];
 export const adminViewKeys = [
   defaultAdminView,
@@ -33,6 +34,7 @@ const ADMIN_VIEW_ROUTE_SEGMENTS = {
   "focus-products": "focus-products",
   preorder: "preorder",
   members: "members",
+  "pos-admin": "pos-admin",
   [stockCostAuditView]: "stock-cost-audit",
   "category-review": "category-review",
   "ingredient-dictionary": "ingredient-dictionary",
@@ -95,6 +97,7 @@ export function getNavigationGroups(isAdminUser, hideDashboard = false) {
       items: [
         { label: "พรีออเดอร์", view: "preorder", description: "รับและติดตามคำสั่งจองสินค้าล่วงหน้า" },
         { label: "สมาชิก", view: "members", description: "เตรียมพื้นที่สำหรับฟังก์ชันสมาชิก" },
+        ...(isAdminUser ? [{ label: "แอดมิน", view: "pos-admin", description: "โปรแกรมหน้าร้านและสิทธิ์เครื่องที่อนุญาต" }] : []),
       ],
     },
   ].filter((group) => (!group.adminOnly || isAdminUser) && (!hideDashboard || group.id !== "dashboard"));

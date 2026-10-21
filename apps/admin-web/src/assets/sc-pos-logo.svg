@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
+  <defs><clipPath id="badge"><rect width="160" height="160" rx="30"/></clipPath></defs>
+  <g clip-path="url(#badge)">
+    <path fill="#0b1fb8" d="M0 0h160v160H0z"/>
+    <path fill="#f6e96b" d="M0 135h160v25H0z"/>
+    <text x="80" y="99" text-anchor="middle" fill="#fff" font-family="Segoe UI,Arial,sans-serif" font-size="74" font-weight="700" letter-spacing="-3">SC</text>
+  </g>
+</svg>

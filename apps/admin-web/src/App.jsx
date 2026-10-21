@@ -12,6 +12,7 @@ import StockCostAuditPanel from "./StockCostAuditPanel.jsx";
 import ReviewQueuePanel from "./ReviewQueuePanel.jsx";
 import IngredientDictionaryPanel from "./IngredientDictionaryPanel.jsx";
 import PreorderPanel from "./preorders/PreorderPanel";
+import PosAdminPanel from "./PosAdminPanel.jsx";
 import LoginScreen from "./LoginScreen.jsx";
 import AdminNavigation from "./AdminNavigation.jsx";
 import AdminAccountActions from "./AdminAccountActions.jsx";
@@ -1845,10 +1846,10 @@ export default function App() {
   }, [accountMenuOpen]);
 
   useEffect(() => {
-    if (!isAdminUser && adminOnlyViews.includes(view)) {
+    if (session && !isAdminUser && adminOnlyViews.includes(view)) {
       setView("receipts");
     }
-  }, [isAdminUser, view]);
+  }, [session, isAdminUser, view]);
 
   useEffect(() => {
     if (isOnlineMarketingStaff && view === "focus-products") {
@@ -1989,6 +1990,8 @@ export default function App() {
         <SyncLogPanel onUnauthorized={handleUnauthorized} />
       ) : view === "preorder" ? (
         <PreorderPanel enabled={customerPreordersEnabled} csrfToken={session.csrfToken} isAdmin={isAdminUser} branchCode={branchCode} apiBaseUrl={apiBaseUrl} onBadgeChanged={refreshPreorderBadgeCount} />
+      ) : view === "pos-admin" && isAdminUser ? (
+        <PosAdminPanel />
       ) : view === "members" ? (
         <section className="panel" aria-labelledby="members-title">
           <div className="panel-header stacked">

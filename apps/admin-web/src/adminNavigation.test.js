@@ -13,6 +13,12 @@ afterEach(() => {
 });
 
 describe("admin navigation model", () => {
+  it("exposes the POS admin page only to admin accounts", () => {
+    expect(getNavigationGroups(false).flatMap(group => group.items).map(item => item.view)).not.toContain("pos-admin");
+    expect(getNavigationGroups(true).find(group => group.id === "customer-relations").items.map(item => item.view)).toEqual(["preorder", "members", "pos-admin"]);
+    expect(adminOnlyViews).toContain("pos-admin");
+    expect(buildAdminViewHash("pos-admin")).toBe("#/pos-admin");
+  });
   it("keeps the default and supported view contracts", () => {
     expect(defaultAdminView).toBe("receipts");
     expect(adminViewKeys).toEqual(expect.arrayContaining([
