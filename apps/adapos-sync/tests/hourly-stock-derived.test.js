@@ -177,6 +177,44 @@ test("reader requires closing master evidence; a changed bookend withholds deriv
     error => error.code === "HOURLY_SOURCE_COHORT_INCOMPLETE");
 });
 
+test("movement scope reuses parameterized membership at B50 and planned scale sizes without product UNION expansion", async () => {
+  for (const count of [50, 100, 200, 276, 500]) {
+    const codes = Array.from({ length: count }, (_, i) => `SKU${i}`);
+    const pool = poolFor();
+    // This fixture returns A rather than the requested cohort. The intended
+    // rejection happens after the SQL shape and all bindings are captured.
+    await assert.rejects(readHourlyDerivedStock(pool, codes, { branchCode: "004" }),
+      error => error.code === "HOURLY_SOURCE_COHORT_INCOMPLETE");
+    const batches = pool.calls.filter(call => call.text && !call.text.includes("MachineName"));
+    assert.equal(batches.length, 2);
+    assert.equal(batches[0].text, batches[1].text);
+    const text = batches[0].text;
+    assert.match(text, /WITH scope AS \(SELECT p\.FTPdtStkCode AS source_stock_code FROM dbo\.TCNMPdt p\s+WHERE p\.FTPdtStaActive = 1 AND p\.FTPdtCode IN \(@productCode0, /);
+    assert.doesNotMatch(text, /WITH cohort|SELECT @productCode\d+ AS product_code/);
+    assert.equal((text.match(/ UNION ALL /g) || []).length, 15);
+    assert.equal((text.match(/WHERE s\.source_stock_code = v\.FTPdtStkCode/g) || []).length, 16);
+    assert.equal((text.match(/FROM dbo\.TCNMPdt p LEFT JOIN/g) || []).length, 2);
+    for (let index = 0; index < count; index++) {
+      assert.equal(pool.calls.filter(call => call.name === `productCode${index}` && call.value === codes[index]).length, 2);
+      assert.ok(!text.includes(codes[index]));
+    }
+  }
+});
+
+test("direct stock scope preserves existential membership for aliases, inactive products and shared stock codes", () => {
+  const products = [
+    { code: "A", stock: "A", active: 1 }, { code: "ALIAS", stock: "A", active: 1 },
+    { code: "OTHER", stock: "B", active: 1 }, { code: "INACTIVE", stock: "C", active: 0 },
+  ];
+  for (const selected of [["A"], ["ALIAS"], ["A", "ALIAS"], ["INACTIVE"], ["MISSING", "OTHER"]]) {
+    const oldScope = selected.flatMap(code => products.filter(p => p.active === 1 && p.code === code).map(p => p.stock));
+    const newScope = products.filter(p => p.active === 1 && selected.includes(p.code)).map(p => p.stock);
+    for (const movementStock of ["A", "B", "C", "MISSING", null]) {
+      assert.equal(oldScope.some(stock => stock === movementStock), newScope.some(stock => stock === movementStock));
+    }
+  }
+});
+
 function transferPool(firstRows, secondRows = firstRows) {
   let sampleIndex = 0;
   const master = source(10, {});

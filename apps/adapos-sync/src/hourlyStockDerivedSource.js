@@ -97,7 +97,6 @@ export async function readHourlyDerivedStock(pool, productCodes, { branchCode, q
   const start = new Date(metadata.read_started_at);
   if (!/(Z|[+-]\d\d:\d\d)$/.test(metadata.read_started_at) || !Number.isFinite(start.getTime())) fail("HOURLY_SOURCE_TIMEZONE_UNVERIFIED");
   const placeholders = selected.map((_, index) => `@productCode${index}`).join(", ");
-  const cohort = selected.map((_, index) => `SELECT @productCode${index} AS product_code`).join(" UNION ALL ");
   // Transfer views expose the stock-affecting branch as FTBchCode: receipt
   // destination, issue origin, or the document branch for internal transfers.
   // Keep missing branch identities visible to the existing fail-closed guard.
@@ -122,9 +121,13 @@ export async function readHourlyDerivedStock(pool, productCodes, { branchCode, q
   // Bracket each movement read with the original stock/cache projection.
   // A changed bookend suppresses derived values; unchanged bookends still do
   // not turn the vendor's NOLOCK movement views into a consistent snapshot.
+  // The scope is used only by EXISTS. Use the same parameterized membership
+  // predicate as the bookends rather than expanding one UNION ALL arm per
+  // product inside each of the sixteen view references. Aliases and multiple
+  // products sharing a stock code still have the same existential membership.
   const text = `${stockText}
-  WITH cohort AS (${cohort}), scope AS (SELECT p.FTPdtStkCode AS source_stock_code FROM cohort c
-    JOIN dbo.TCNMPdt p ON p.FTPdtCode = c.product_code WHERE p.FTPdtStaActive = 1)
+  WITH scope AS (SELECT p.FTPdtStkCode AS source_stock_code FROM dbo.TCNMPdt p
+    WHERE p.FTPdtStaActive = 1 AND p.FTPdtCode IN (${placeholders}))
   ${union} ORDER BY component, FTPdtStkCode;
   ${stockText}
   SELECT CONVERT(varchar(40), SYSDATETIMEOFFSET(), 127) AS read_completed_at`;
