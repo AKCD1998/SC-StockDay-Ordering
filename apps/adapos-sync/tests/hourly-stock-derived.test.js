@@ -105,6 +105,109 @@ test("missing movement rows mean zero; null components, aliases and foreign bran
   assert.throws(() => describe([]), error => error.code === "HOURLY_SOURCE_COHORT_INCOMPLETE");
 });
 
+function sharedSource(overrides = {}, movements = { SAL: -2 }) {
+  return source(999, movements, { source_stock_code: "MASTER", source_pending_stock_code: "MASTER",
+    source_stock_factor: 1, source_small_unit: "display-unit-a", source_small_factor: 1,
+    master_product_code: "MASTER", master_stock_code: "MASTER", master_active: 1,
+    master_stock_factor: 1, master_small_unit: "display-unit-a", master_small_factor: 1,
+    master_qty: 10, master_wholesale: 3, master_latest_estimated_on_hand: 13, ...overrides });
+}
+
+test("four one-to-one aliases use the active stock master's pool; unit names do not multiply stock", () => {
+  const selected = ["ALIAS-A", "ALIAS-B", "ALIAS-C", "ALIAS-D"];
+  const rows = selected.flatMap((product_code, i) => sharedSource({ product_code,
+    master_small_unit: i % 2 ? "different-display-name" : "display-unit-a" }));
+  const snap = describeHourlyDerivedSamples(rows, rows, selected, start,
+    { firstClosingRows: rows, secondClosingRows: rows });
+  assert.deepEqual(snap.derivedObservation.records.map(row => row.derivedOnHand), [11, 11, 11, 11]);
+  assert.ok(snap.derivedObservation.records.every(row => row.reason === "observed-unverified"));
+  assert.equal(snap.sourceRead.nonMasterProducts, 4);
+  // Canonical stored values retain their original meaning, separately from
+  // the shared-pool estimate. Four aliases are not four physical stock pools.
+  assert.ok(snap.rows.every(row => row.qty === 999 && row.latest_estimated_on_hand === 10));
+  assert.equal(snap.derivedObservation.qualifying, false);
+  assert.equal(snap.derivedObservation.businessCutoffAt, null);
+  parseDerivedObservation(snap.derivedObservation, selected.map(productCode => ({ productCode })), capturedAt);
+});
+
+test("unproved multipliers, unit factors and broken shared targets stay unavailable instead of guessing", () => {
+  const invalid = [
+    ...[null, 0, -1, 2, 0.5, Infinity].map(source_stock_factor => ({ source_stock_factor })),
+    { master_stock_factor: 2 }, { master_stock_factor: null }, { master_active: 0 },
+    { master_product_code: null }, { master_product_code: "OTHER" }, { master_stock_code: "OTHER" },
+    { source_small_unit: "" }, { master_small_unit: null }, { source_small_factor: 0 },
+    { master_small_factor: 0 }, { master_small_factor: 2 }, { source_small_factor: null },
+  ];
+  for (const change of invalid) {
+    const value = describe(sharedSource(change)).derivedObservation.records[0];
+    assert.deepEqual(value, { productCode: "A", derivedOnHand: null, reason: "non-master-stock-code" });
+  }
+  for (const change of [{ master_qty: null }, { master_wholesale: null }, { master_wholesale: Infinity }]) {
+    assert.equal(describe(sharedSource(change)).derivedObservation.records[0].reason, "invalid-source-component");
+  }
+  for (const change of [{ source_stock_factor: NaN }, { master_qty: NaN }]) {
+    assert.throws(() => describe(sharedSource(change)), { code: "HOURLY_SOURCE_COHORT_INCOMPLETE" });
+  }
+});
+
+test("shared pool retains signed and fractional quantities without applying small-unit factors twice", () => {
+  const snap = describe(sharedSource({ master_qty: -4.5, master_wholesale: 0.25,
+    source_small_factor: 12, master_small_factor: 12 }, { SAL: -0.5, PI: 1.25 }));
+  assert.equal(snap.derivedObservation.records[0].derivedOnHand, -3.5);
+  assert.equal(describe(sharedSource({}, {})).derivedObservation.records[0].derivedOnHand, 13);
+});
+
+test("shared mapping, factors, unit names and target components are guarded in both samples and all bookends", () => {
+  const opening = sharedSource();
+  const changes = { source_stock_factor: 2, source_small_unit: "changed", source_small_factor: 2,
+    master_product_code: "OTHER", master_stock_code: "OTHER", master_active: 0,
+    master_stock_factor: 2, master_small_unit: "changed", master_small_factor: 2,
+    master_qty: 9, master_wholesale: 2, master_latest_estimated_on_hand: 12 };
+  for (const [key, value] of Object.entries(changes)) {
+    const changed = sharedSource({ [key]: value });
+    for (const [firstRows, secondRows, bookends] of [
+      [opening, changed, { firstClosingRows: opening, secondClosingRows: changed }],
+      [opening, opening, { firstClosingRows: changed, secondClosingRows: opening }],
+      [opening, opening, { firstClosingRows: opening, secondClosingRows: changed }],
+    ]) {
+      const snap = describeHourlyDerivedSamples(firstRows, secondRows, ["A"], start, bookends);
+      assert.equal(snap.derivedObservation.records[0].derivedOnHand, null, key);
+      assert.equal(snap.derivedObservation.records[0].reason, "changed-between-reads", key);
+    }
+  }
+});
+
+test("shared stock still suppresses foreign movements and inconsistent repeated metadata", () => {
+  const foreign = sharedSource().map(row => ({ ...row, outside_branch_rows: 1 }));
+  assert.equal(describe(foreign).derivedObservation.records[0].reason, "outside-branch-movement");
+  const inconsistent = [...sharedSource(), ...sharedSource({ master_qty: 11 }, { PI: 1 })];
+  assert.throws(() => describe(inconsistent), { code: "HOURLY_SOURCE_COHORT_INCOMPLETE" });
+});
+
+test("reader groups one shared stock movement before distributing it to aliases and their master", async () => {
+  const selected = ["A", "B", "MASTER"], queries = [];
+  const aliases = ["A", "B"].flatMap(product_code => sharedSource({ product_code }, {}));
+  const master = source(10, {}, { product_code: "MASTER", source_stock_code: "MASTER",
+    source_pending_stock_code: "MASTER", source_wholesale: 3 });
+  const rows = [...aliases, ...master];
+  const pool = { request() { return { input() {}, async query(text) {
+    queries.push(text);
+    if (text.includes("MachineName")) return { recordset: [
+      { machine_name: "SERVER004", database_name: "AdaAcc", offset_minutes: 420, read_started_at: start }] };
+    return { recordset: rows, recordsets: [rows,
+      [{ component: "SAL", FTPdtStkCode: "MASTER", net_quantity: -2, movement_rows: 1, invalid_rows: 0, outside_branch_rows: 0 }], rows,
+      [{ read_completed_at: "2026-10-18T10:00:00.600+07:00" }]] };
+  } }; } };
+  const snap = await readHourlyDerivedStock(pool, selected, { branchCode: "004" });
+  assert.deepEqual(snap.derivedObservation.records.map(row => row.derivedOnHand), [11, 11, 11]);
+  assert.equal(queries.length, 3);
+  assert.match(queries[1], /scope AS \(SELECT DISTINCT p\.FTPdtStkCode/);
+  assert.equal(queries[1].match(/LEFT JOIN dbo\.TCNMPdt m ON m\.FTPdtCode = p\.FTPdtStkCode/g).length, 2);
+  assert.equal(queries[1].match(/AS master_stock_factor/g).length, 2);
+  assert.doesNotMatch(queries[1], /\b(?:EXEC|UPDATE|INSERT|DELETE|ALTER|DROP)\b/i);
+  assert.deepEqual(snap.rows.filter(row => row.product_code !== "MASTER").map(row => row.qty), [999, 999]);
+});
+
 test("derived content is identity-bound; legacy and morning payloads retain their existing exact bytes", () => {
   const snap = describe(source());
   const opts = options(snap.rows);

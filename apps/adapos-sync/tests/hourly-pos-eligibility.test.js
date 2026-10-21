@@ -62,3 +62,15 @@ test("private source selection rejects overlapping/extraneous identities, unboun
   }
   assert.throws(()=>buildPosActiveHourlyCohortManifest(codes(3),selection),{code:"HOURLY_COHORT_MANIFEST_INVALID"});
 });
+
+test("metadata selection honors the caller's remaining shared collection budget",async()=>{
+  const f=fixture();
+  await assert.rejects(selectHourlyPosActiveCohort(f.pool,f.products,{branchCode:"004",guard:f.guard,now:f.now,
+    monotonic:f.monotonic,maxWindowMs:3}),{code:"HOURLY_POS_ELIGIBILITY_TIMEOUT"});
+  assert.equal(f.queries.length,3);
+  for(const maxWindowMs of [0,-1,900001,1.5,Infinity]){
+    const invalid=fixture();await assert.rejects(selectHourlyPosActiveCohort(invalid.pool,invalid.products,
+      {branchCode:"004",guard:invalid.guard,maxWindowMs}),{code:"HOURLY_POS_ELIGIBILITY_INVALID"});
+    assert.equal(invalid.queries.length,0);
+  }
+});

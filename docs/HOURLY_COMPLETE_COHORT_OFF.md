@@ -98,6 +98,12 @@ change canonical Full Sync stock. All unavailable products remain unavailable.
    batch. Sampled host CPU was at most 23%; this was not continuous peak CPU.
    Four shared-stock products still had suppressed derived values in that
    historical run. It does not validate a subsequent shared-unit reader change.
+   The new candidate supports only the four observed one-to-one shared-stock
+   mappings, with matching positive small-unit factors and active self-stock
+   targets. It reads each target pool's movement once and leaves unsupported
+   factors suppressed. Unit names alone never trigger conversion. Its new
+   operator-local full-size SQL result is still required; fixture results do
+   not replace that field measurement. See HOURLY_DERIVED_OBSERVATION.md.
 3. The natural operational cycle and final self-disable pass. Boot/Logon
    evidence alone cannot guarantee a baseline before POS posting.
 4. Explain unavailable products and agree the business freshness/drift policy.

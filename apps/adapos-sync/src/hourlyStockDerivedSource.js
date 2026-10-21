@@ -12,7 +12,26 @@ function fail(code, number, sourceReadStage) {
     Number.isSafeInteger(number) ? { sourceSqlErrorNumber: number } : {}, sourceReadStage ? { sourceReadStage } : {});
 }
 const finite = value => value != null && value !== "" && Number.isFinite(Number(value)) && Math.abs(Number(value)) <= 1e12;
-const FIELDS = ["source_stock_code", "qty", "latest_estimated_on_hand", "source_wholesale", "source_pending_stock_code", "source_day_end", "source_pending_now", "source_refresh_at"];
+const FIELDS = ["source_stock_code", "qty", "latest_estimated_on_hand", "source_wholesale", "source_pending_stock_code", "source_day_end", "source_pending_now", "source_refresh_at",
+  "source_stock_factor", "source_small_unit", "source_small_factor", "master_product_code", "master_stock_code", "master_active",
+  "master_stock_factor", "master_small_unit", "master_small_factor", "master_qty", "master_wholesale", "master_latest_estimated_on_hand"];
+
+// The four observed active aliases have one-to-one stock factors and matching
+// positive small-unit factors. Different display-unit names are not conversion
+// multipliers. Non-unit stock factors remain unsupported until their operator
+// is independently established; never guess multiplication versus division.
+function supportedSharedStock(source) {
+  const unit = value => typeof value === "string" && value.trim().length > 0;
+  return typeof source.source_stock_code === "string" && source.source_stock_code.trim().length > 0
+    && source.master_product_code === source.source_stock_code
+    && source.master_stock_code === source.master_product_code && source.master_active === 1
+    && finite(source.source_stock_factor) && Number(source.source_stock_factor) === 1
+    && finite(source.master_stock_factor) && Number(source.master_stock_factor) === 1
+    && unit(source.source_small_unit) && unit(source.master_small_unit)
+    && finite(source.source_small_factor) && Number(source.source_small_factor) > 0
+    && finite(source.master_small_factor) && Number(source.master_small_factor) > 0
+    && Number(source.source_small_factor) === Number(source.master_small_factor);
+}
 
 function sample(raw, selected) {
   const products = new Map();
@@ -40,18 +59,21 @@ export function describeHourlyDerivedSamples(firstRows, secondRows, selected, re
   const masterFingerprint = entry => JSON.stringify(FIELDS.map(key => entry.source[key]));
   const records = selected.map(code => {
     const a = first.products.get(code), b = second.products.get(code);
+    const shared = b.source.source_stock_code !== code;
     const fingerprint = entry => JSON.stringify([FIELDS.map(key => entry.source[key]), ORDINARY_COMPONENTS.map(key => entry.components.get(key) ?? null)]);
     let reason = "observed-unverified";
     if (fingerprint(a) !== fingerprint(b)
         || (firstClosing && masterFingerprint(a) !== masterFingerprint(firstClosing.products.get(code)))
         || (secondClosing && masterFingerprint(b) !== masterFingerprint(secondClosing.products.get(code)))) reason = "changed-between-reads";
-    else if (b.source.source_stock_code !== code) reason = "non-master-stock-code";
+    else if (shared && !supportedSharedStock(b.source)) reason = "non-master-stock-code";
     else if ([...b.components.values()].some(value => value?.outside > 0)) reason = "outside-branch-movement";
-    else if (!finite(b.source.source_wholesale) || [...b.components.values()].some(value => value &&
-      (!finite(value.net) || !Number.isSafeInteger(value.count) || value.count < 1 || value.invalid !== 0 || value.outside !== 0))) reason = "invalid-source-component";
+    const retail = shared ? b.source.master_qty : b.source.qty;
+    const wholesale = shared ? b.source.master_wholesale : b.source.source_wholesale;
+    if (reason === "observed-unverified" && (!finite(retail) || !finite(wholesale) || [...b.components.values()].some(value => value &&
+      (!finite(value.net) || !Number.isSafeInteger(value.count) || value.count < 1 || value.invalid !== 0 || value.outside !== 0)))) reason = "invalid-source-component";
     const pending = [...b.components.values()].reduce((total, value) => total + Number(value?.net ?? 0), 0);
-    const quantity = Number(b.source.qty) + Number(b.source.source_wholesale) + pending;
-    if (!Number.isFinite(quantity) || Math.abs(quantity) > 1e12) reason = "invalid-source-component";
+    const quantity = Number(retail) + Number(wholesale) + pending;
+    if (reason === "observed-unverified" && (!Number.isFinite(quantity) || Math.abs(quantity) > 1e12)) reason = "invalid-source-component";
     return { productCode: code, derivedOnHand: reason === "observed-unverified" ? quantity : null, reason };
   });
   return { ...second.stored, derivedObservation: {
@@ -114,17 +136,22 @@ export async function readHourlyDerivedStock(pool, productCodes, { branchCode, q
   const stockText = `
     SELECT p.FTPdtCode AS product_code, p.FTPdtStkCode AS source_stock_code,
       p.FCPdtQtyRet AS qty, p.FCPdtQtyNow AS latest_estimated_on_hand, p.FCPdtQtyWhs AS source_wholesale,
+      p.FCPdtStkFac AS source_stock_factor, p.FTPdtSUnit AS source_small_unit, p.FCPdtSFactor AS source_small_factor,
+      m.FTPdtCode AS master_product_code, m.FTPdtStkCode AS master_stock_code, CONVERT(int, m.FTPdtStaActive) AS master_active,
+      m.FCPdtStkFac AS master_stock_factor, m.FTPdtSUnit AS master_small_unit, m.FCPdtSFactor AS master_small_factor,
+      m.FCPdtQtyRet AS master_qty, m.FCPdtQtyWhs AS master_wholesale, m.FCPdtQtyNow AS master_latest_estimated_on_hand,
       q.FTPdtStkCode AS source_pending_stock_code, q.FCPdtDayEnd AS source_day_end, q.FCPdtQtyNow AS source_pending_now,
       CONVERT(varchar(40), TODATETIMEOFFSET(q.FDPdtDayEnd, '+07:00'), 127) AS source_refresh_at,
         CONVERT(varchar(40), SYSDATETIMEOFFSET(), 127) AS source_read_at,
         DATEPART(TZOFFSET, SYSDATETIMEOFFSET()) AS source_offset_minutes
-    FROM dbo.TCNMPdt p LEFT JOIN dbo.TCNTPdtQtyNotApv q ON q.FTPdtStkCode = p.FTPdtStkCode
+    FROM dbo.TCNMPdt p LEFT JOIN dbo.TCNMPdt m ON m.FTPdtCode = p.FTPdtStkCode
+    LEFT JOIN dbo.TCNTPdtQtyNotApv q ON q.FTPdtStkCode = p.FTPdtStkCode
     WHERE p.FTPdtStaActive = 1 AND p.FTPdtCode IN (${placeholders});`;
   // Bracket each movement read with the original stock/cache projection.
   // A changed bookend suppresses derived values; unchanged bookends still do
   // not turn the vendor's NOLOCK movement views into a consistent snapshot.
   const text = `${stockText}
-  WITH cohort AS (${cohort}), scope AS (SELECT p.FTPdtStkCode AS source_stock_code FROM cohort c
+  WITH cohort AS (${cohort}), scope AS (SELECT DISTINCT p.FTPdtStkCode AS source_stock_code FROM cohort c
     JOIN dbo.TCNMPdt p ON p.FTPdtCode = c.product_code WHERE p.FTPdtStaActive = 1)
   ${union} ORDER BY component, FTPdtStkCode;
   ${stockText}

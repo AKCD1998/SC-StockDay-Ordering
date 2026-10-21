@@ -27,26 +27,28 @@ export function classifyHourlyPosEligibility(rows, webProductCodes) {
 
 export async function selectHourlyPosActiveCohort(pool, webProductCodes, {
   branchCode, guard, batchSize = 200, now = Date.now, monotonic = () => performance.now(),
+  maxWindowMs = HOURLY_COMPLETE_COHORT_MAX_WINDOW_MS,
 } = {}) {
   if (branchCode !== "004" || typeof guard !== "function" || !Array.isArray(webProductCodes) || !webProductCodes.length
       || webProductCodes.length > HOURLY_COMPLETE_COHORT_MAX_RECORDS || webProductCodes.some(value => !isCode(value))
-      || new Set(webProductCodes).size !== webProductCodes.length || !Number.isSafeInteger(batchSize) || batchSize < 1 || batchSize > 200) invalid("HOURLY_POS_ELIGIBILITY_INVALID");
+      || new Set(webProductCodes).size !== webProductCodes.length || !Number.isSafeInteger(batchSize) || batchSize < 1 || batchSize > 200
+      || !Number.isSafeInteger(maxWindowMs) || maxWindowMs < 1 || maxWindowMs > HOURLY_COMPLETE_COHORT_MAX_WINDOW_MS) invalid("HOURLY_POS_ELIGIBILITY_INVALID");
   const start = monotonic(), wall = now(), rows = [];
   const check = () => {
-    if (monotonic() - start >= HOURLY_COMPLETE_COHORT_MAX_WINDOW_MS) invalid("HOURLY_POS_ELIGIBILITY_TIMEOUT");
+    if (monotonic() - start >= maxWindowMs) invalid("HOURLY_POS_ELIGIBILITY_TIMEOUT");
     if (Math.abs(now() - wall - (monotonic() - start)) > 250) invalid("HOURLY_OBSERVER_CLOCK_STEP_DETECTED");
   };
   async function query(text, codes = []) {
     check();const request = pool.request();codes.forEach((code, index) => request.input("code" + index, sql.VarChar(80), code));
     let expired = false;
-    const timer = setTimeout(() => { expired = true;try { request.cancel(); } catch {} }, Math.max(1, Math.min(60000, HOURLY_COMPLETE_COHORT_MAX_WINDOW_MS - (monotonic() - start))));
+    const timer = setTimeout(() => { expired = true;try { request.cancel(); } catch {} }, Math.max(1, Math.min(60000, maxWindowMs - (monotonic() - start))));
     try { const result = await request.query(text);if (expired) invalid("HOURLY_POS_ELIGIBILITY_TIMEOUT");check();return result; }
     catch (error) {
       if (["HOURLY_POS_ELIGIBILITY_TIMEOUT", "HOURLY_OBSERVER_CLOCK_STEP_DETECTED"].includes(error.code)) throw error;
       invalid(expired ? "HOURLY_POS_ELIGIBILITY_TIMEOUT" : [229, 916, 18452, 18456, 4060].includes(error.number) ? "HOURLY_SOURCE_ACCESS_DENIED" : "HOURLY_POS_ELIGIBILITY_READ_FAILED");
     } finally { clearTimeout(timer); }
   }
-  await guard({ phase: "before", remainingMs: HOURLY_COMPLETE_COHORT_MAX_WINDOW_MS });check();
+  await guard({ phase: "before", remainingMs: maxWindowMs });check();
   const identity = (await query(`SELECT CONVERT(varchar(128),SERVERPROPERTY('MachineName')) AS machine_name,DB_NAME() AS database_name,
     CONVERT(varchar(32),DATABASEPROPERTYEX(DB_NAME(),'Status')) AS database_status,
     IS_SRVROLEMEMBER('sysadmin') AS is_admin,IS_MEMBER('db_owner') AS is_owner,IS_MEMBER('db_datawriter') AS is_writer,
@@ -56,7 +58,7 @@ export async function selectHourlyPosActiveCohort(pool, webProductCodes, {
       || [identity.is_admin, identity.is_owner, identity.is_writer, identity.can_insert, identity.can_update, identity.can_delete].some(value => value !== 0)) invalid("HOURLY_SOURCE_READONLY_BOUNDARY_UNVERIFIED");
   for (let offset = 0; offset < webProductCodes.length; offset += batchSize) {
     const batchIndex = Math.floor(offset / batchSize), codes = webProductCodes.slice(offset, offset + batchSize);
-    await guard({ phase: "before", batchIndex, remainingMs: HOURLY_COMPLETE_COHORT_MAX_WINDOW_MS - (monotonic() - start) });check();
+    await guard({ phase: "before", batchIndex, remainingMs: maxWindowMs - (monotonic() - start) });check();
     const cohort = codes.map((_, index) => "SELECT @code" + index + " AS product_code").join(" UNION ALL ");
     const result = await query(`WITH cohort AS (${cohort}) SELECT c.product_code,
       CASE WHEN p.FTPdtCode IS NULL THEN 0 ELSE 1 END AS master_exists,
@@ -65,7 +67,7 @@ export async function selectHourlyPosActiveCohort(pool, webProductCodes, {
     if (!Array.isArray(result.recordset) || result.recordset.length !== codes.length
         || result.recordset.some(row => !codes.includes(row.product_code))) invalid("HOURLY_POS_ELIGIBILITY_INCOMPLETE");
     rows.push(...result.recordset);
-    await guard({ phase: "after", batchIndex, remainingMs: HOURLY_COMPLETE_COHORT_MAX_WINDOW_MS - (monotonic() - start) });check();
+    await guard({ phase: "after", batchIndex, remainingMs: maxWindowMs - (monotonic() - start) });check();
   }
   const selected = classifyHourlyPosEligibility(rows, webProductCodes);
   if (!selected.productCodes.length) invalid("HOURLY_POS_ELIGIBILITY_EMPTY");
