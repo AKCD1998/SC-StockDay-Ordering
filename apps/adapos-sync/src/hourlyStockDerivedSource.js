@@ -6,6 +6,7 @@ import { DERIVED_VERSION, DERIVED_BASIS } from "./hourlyDerivedObservation.js";
 import { describeHourlySourceClock } from "./hourlySourceClock.js";
 
 export const ORDINARY_COMPONENTS = ["SAL", "PosSaleTmp", "CSM", "PI", "PT", "SI", "ST", "TNF41", "TNF42", "TNF31", "TNF32", "TNF7", "TNF8", "ChkStkSale", "ChkStkStop", "PICK"];
+const BRANCH_SCOPED_TRANSFERS = new Set(["TNF41", "TNF42", "TNF31", "TNF32", "TNF7", "TNF8"]);
 function fail(code, number, sourceReadStage) {
   throw Object.assign(new Error("Hourly derived source read failed."), { code },
     Number.isSafeInteger(number) ? { sourceSqlErrorNumber: number } : {}, sourceReadStage ? { sourceReadStage } : {});
@@ -97,12 +98,15 @@ export async function readHourlyDerivedStock(pool, productCodes, { branchCode, q
   if (!/(Z|[+-]\d\d:\d\d)$/.test(metadata.read_started_at) || !Number.isFinite(start.getTime())) fail("HOURLY_SOURCE_TIMEZONE_UNVERIFIED");
   const placeholders = selected.map((_, index) => `@productCode${index}`).join(", ");
   const cohort = selected.map((_, index) => `SELECT @productCode${index} AS product_code`).join(" UNION ALL ");
+  // Transfer views expose the stock-affecting branch as FTBchCode: receipt
+  // destination, issue origin, or the document branch for internal transfers.
+  // Keep missing branch identities visible to the existing fail-closed guard.
   const union = ORDINARY_COMPONENTS.map(component => `SELECT '${component}' AS component, v.FTPdtStkCode,
       SUM(v.FCStkQty) AS net_quantity, COUNT(*) AS movement_rows,
       SUM(CASE WHEN v.FCStkQty IS NULL THEN 1 ELSE 0 END) AS invalid_rows,
       SUM(CASE WHEN ${component === "PosSaleTmp" ? "1=0" : "ISNULL(v.FTBchCode,'')<>'004'"} THEN 1 ELSE 0 END) AS outside_branch_rows
     FROM dbo.VCN_${component}QtyNowNotApv v
-    WHERE EXISTS (SELECT 1 FROM scope s WHERE s.source_stock_code = v.FTPdtStkCode)
+    WHERE ${BRANCH_SCOPED_TRANSFERS.has(component) ? "(v.FTBchCode = '004' OR NULLIF(LTRIM(RTRIM(v.FTBchCode)), '') IS NULL) AND " : ""}EXISTS (SELECT 1 FROM scope s WHERE s.source_stock_code = v.FTPdtStkCode)
     GROUP BY v.FTPdtStkCode`).join(" UNION ALL ");
   // SELECT only; the vendor views themselves contain NOLOCK. No isolation or
   // database option changes, vendor EXEC, locks/hints or source writes.
