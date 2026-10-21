@@ -1,11 +1,37 @@
 import React from "react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import PosAdminPanel from "./PosAdminPanel.jsx";
 import { apiFetch } from "./lib/apiClient.js";
 vi.mock("./lib/apiClient.js", () => ({ apiFetch: vi.fn() }));
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers(); });
 describe("POS admin panel", () => {
+  it("refreshes a published release without navigation, keeps the page visible, and removes the timer on exit", async () => {
+    vi.useFakeTimers();
+    const response = version => ({ ok: true, status: 200, json: async () => ({ auditedAt: "2026-10-21T10:00:00Z", devices: [], installer: { version, downloadUrl: `https://example.com/${version}.exe` }, previousReleases: [], releaseSync: { state: "verified" } }) });
+    apiFetch.mockResolvedValue(response("1.3.1"));
+    const view = render(<PosAdminPanel />);
+    await act(async () => {});
+    expect(screen.getByText("รุ่นล่าสุด · 1.3.1")).toBeInTheDocument();
+    apiFetch.mockResolvedValue(response("1.3.2"));
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+    expect(screen.getByText("รุ่นล่าสุด · 1.3.2")).toBeInTheDocument();
+    expect(screen.queryByText("กำลังโหลดสิทธิ์เครื่อง…")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("ข้อมูลรุ่นอัปเดตอัตโนมัติ");
+    view.unmount();
+    const count = apiFetch.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(60000);
+    fireEvent.focus(window);
+    expect(apiFetch).toHaveBeenCalledTimes(count);
+  });
+  it("labels rollback recommendations and shows cached release status without hiding downloads", async () => {
+    apiFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ auditedAt: "2026-10-21T10:00:00Z", devices: [], installer: { version: "1.3.0", isLatest: false, downloadUrl: "https://example.com/1.3.0.exe" }, previousReleases: [{ version: "1.3.1", highlights: ["ประวัติการซื้อ"] }], releaseSync: { state: "stale" } }) });
+    render(<PosAdminPanel />);
+    expect(await screen.findByText("รุ่นแนะนำ · 1.3.0")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "เวอร์ชันอื่น" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("กำลังใช้ข้อมูลรุ่นที่บันทึกไว้");
+    expect(screen.getByRole("link", { name: /ดาวน์โหลดสำหรับ Windows/ })).toBeVisible();
+  });
   it("separates the latest download from dated release history and omits unrestricted downloads", async () => {
     apiFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({
       auditedAt: "2026-10-21T10:00:00Z", devices: [],

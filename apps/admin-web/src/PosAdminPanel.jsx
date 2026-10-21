@@ -39,13 +39,16 @@ export default function PosAdminPanel() {
         if (!response.ok) throw new Error("ยังโหลดข้อมูลสิทธิ์เครื่องไม่ได้ กรุณาลองใหม่");
         const value = await response.json();
         if (!Array.isArray(value.devices) || !value.installer) throw new Error("ข้อมูลสิทธิ์เครื่องยังไม่พร้อม");
-        if (!controller.signal.aborted) setData(value);
+        if (!controller.signal.aborted) { setData(value); setError(""); }
       } catch (failure) {
         if (!controller.signal.aborted) setError(failure.message);
       }
     }
     void load();
-    return () => controller.abort();
+    const reloadVisible = () => { if (document.visibilityState !== "hidden") void load(); };
+    const timer = window.setInterval(reloadVisible, 60000);
+    window.addEventListener("focus", reloadVisible);
+    return () => { controller.abort(); window.clearInterval(timer); window.removeEventListener("focus", reloadVisible); };
   }, [refresh]);
 
   return <section className="pos-admin" aria-labelledby="pos-admin-title">
@@ -53,7 +56,8 @@ export default function PosAdminPanel() {
       <div><h2 id="pos-admin-title">แอดมิน</h2><p>โปรแกรม SCCRM และสิทธิ์เครื่องหน้าร้าน</p></div>
       <button type="button" className="ghost-button" onClick={() => setRefresh(value => value + 1)}>โหลดข้อมูลใหม่</button>
     </div>
-    {error ? <div className="notice error" role="alert">{error}</div> : !data ? <p role="status">กำลังโหลดสิทธิ์เครื่อง…</p> : <>
+    {error && <div className="notice error" role="alert">{error}</div>}
+    {!data ? !error && <p role="status">กำลังโหลดสิทธิ์เครื่อง…</p> : <>
       <div className="pos-download-hero">
         <span className="pos-download-edition">SC DRUGSTORE · SOFTWARE DOWNLOAD</span>
         <div className="pos-download-brand">
@@ -63,8 +67,9 @@ export default function PosAdminPanel() {
         <h3 className="pos-download-title">ระบบสมาชิก <span>สำหรับหน้าร้านของเรา</span></h3>
         <p className="pos-download-description">จัดการสมาชิกและสะสมแต้ม พร้อมเชื่อมต่อ AdaSoftware ของบริษัท</p>
         <div className="pos-latest-release">
-          <span className="pos-latest-badge">รุ่นล่าสุด · {data.installer.version}</span>
+          <span className="pos-latest-badge">{data.installer.isLatest === false ? "รุ่นแนะนำ" : "รุ่นล่าสุด"} · {data.installer.version}</span>
           <ReleaseDate publishedAt={data.installer.publishedAt} showTimeZone />
+          {data.releaseSync && <p className="pos-download-note" role="status">{data.releaseSync.state === "verified" ? "ข้อมูลรุ่นอัปเดตอัตโนมัติ" : "กำลังใช้ข้อมูลรุ่นที่บันทึกไว้ · ยังตรวจประกาศรุ่นล่าสุดไม่ได้"}</p>}
         </div>
         <div className="pos-download-actions">
           {data.installer.downloadUrl ? <a href={data.installer.downloadUrl} className="pos-download-button" rel="noopener noreferrer">
@@ -82,7 +87,7 @@ export default function PosAdminPanel() {
         </div>}
       </div>
       {data.previousReleases?.length > 0 && <section className="panel pos-release-history" aria-labelledby="pos-release-history-title">
-        <div className="panel-header"><div><h3 id="pos-release-history-title">เวอร์ชันก่อนหน้า</h3><p>วันเผยแพร่ตามเวลาไทยและสิ่งที่เปลี่ยนในแต่ละรุ่น · แนะนำให้ใช้รุ่นล่าสุดด้านบน</p></div></div>
+        <div className="panel-header"><div><h3 id="pos-release-history-title">{data.installer.isLatest === false ? "เวอร์ชันอื่น" : "เวอร์ชันก่อนหน้า"}</h3><p>วันเผยแพร่ตามเวลาไทยและสิ่งที่เปลี่ยนในแต่ละรุ่น · แนะนำให้ใช้รุ่นที่แสดงด้านบน</p></div></div>
         <ul className="pos-release-list">{data.previousReleases.filter(release => release.version !== data.installer.version).map(release => <li className="pos-release-row" key={release.version}>
           <div className="pos-release-version"><h4>เวอร์ชัน {release.version}</h4><ReleaseDate publishedAt={release.publishedAt} /></div>
           <div className="pos-release-summary">{release.highlights?.map(change => <p key={change}>{change}</p>)}{release.downloadNote && <p className="pos-release-note">{release.downloadNote}</p>}</div>
