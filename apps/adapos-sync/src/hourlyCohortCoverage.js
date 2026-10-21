@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 export const HOURLY_COMPLETE_COHORT_MAX_RECORDS = 10_000;
 export const HOURLY_COMPLETE_COHORT_MAX_BODY_BYTES = 4 * 1024 * 1024;
-export const HOURLY_COMPLETE_COHORT_MAX_WINDOW_MS = 300_000;
+export const HOURLY_COMPLETE_COHORT_MAX_WINDOW_MS = 900_000;
 export const HOURLY_SOURCE_MAX_BATCH_RECORDS = 500;
 export const HOURLY_SOURCE_DEFAULT_BATCH_RECORDS = 100;
 const VERSION = "hourly-cohort-coverage-v1";

@@ -10,7 +10,7 @@ try {
   }
   foreach($process in @(Get-CimInstance Win32_Process -Filter "Name='node.exe'")){
     if([int]$process.ProcessId -ne $ObserverProcessId -and [string]::IsNullOrWhiteSpace($process.CommandLine)){throw 'process-unreadable'}
-    if([int]$process.ProcessId -ne $ObserverProcessId -and $process.CommandLine -match 'adapos-sync[\\/]+src[\\/]+(index|hourlyStockRunner)\.js'){throw 'existing-work'}
+    if([int]$process.ProcessId -ne $ObserverProcessId -and $process.CommandLine -match 'adapos-sync[\\/]+src[\\/]+(index|hourlyStockRunner|deltaShadowRunner)\.js'){throw 'existing-work'}
   }
   $cpu=@(Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -Filter "Name='_Total'")
   if($cpu.Count -ne 1 -or $null -eq $cpu[0].PercentProcessorTime){throw 'cpu-unreadable'}

@@ -21,7 +21,7 @@ change a credential, run Sync, or change Full Sync/Transfer Delta queries.
   No existing process is stopped.
 - Complete-mode SQL work in each batch has a 60,000 ms deadline; a completed
   batch over 3,000 ms records a timing warning. The whole collection, including
-  guards, has a separate 300,000 ms upper bound. The shared reader retains its
+  guards, has a separate 900,000 ms upper bound. The shared reader retains its
   legacy 10,000 ms ceiling unless complete mode explicitly selects the larger
   bound. This is a technical collection budget, not a business freshness policy.
 - A changed observer clock boundary over 250 ms stops assembly. This is not
@@ -44,10 +44,18 @@ the receiver to be ON, read stock, write capture rows or alter credentials.
 An absent/incorrect credential or disabled complete-cohort flag stops the call.
 
 An operator may then run src/prepareHourlyCohortManifest.js from the existing
-repository. It refuses all three enabled Hourly switches, reads only catalog
-membership, and writes a new private file in the existing protected cache
+repository. It refuses all three enabled Hourly switches and requires the
+existing readonly_pilot identity. It intersects website membership with
+TCNMPdt.FTPdtStaActive = 1 through parameterized metadata-only reads, guarded
+before and after every batch of at most 200. It does not read stock quantities
+or execute vendor procedures. It writes a new private file in the protected cache
 directory. It refuses redirects, oversized bodies and overwriting an existing
-file. Output contains only the count and file location. It does not edit .env,
+file. The private POS-active manifest records the selected identities and
+separate excluded-not-active and missing-master sets. Those three sets must be
+unique, disjoint and account for the original website membership. An optional
+priority order is preserved after filtering. Its wire coverage is an explicit
+cohort; the legacy web-all wire contract is unchanged. Output contains aggregate
+counts and the file location. It does not edit .env,
 Tasks or the source repository. ADAPOS_HOURLY_STOCK_EVIDENCE_COHORT_FILE is only a
 future approved config pointer; preparing a manifest does not set it.
 
@@ -59,7 +67,12 @@ Do not broaden SQL permissions or Git trust to make preparation pass.
 
 On 21 October 2026 the readonly catalog reference was 7,050 unique website
 products and 6,835 with a central branch-004 current record. The difference of
-215 is neither zero stock nor proof of live POS source availability.
+215 is neither zero stock nor proof of live POS source availability. The
+subsequent owner-run metadata diagnosis checked all 7,050 entries: 6,835 were
+active=1, 213 were present with another active flag, and two were absent. The
+new manifest therefore selects the 6,835 active entries, with source eligibility
+rechecked during collection. Later source status drift remains unavailable;
+it is never silently replaced by a zero or a different product.
 Coverage metadata privately accounts for unavailable identities;
 reports show counts and mark source completeness as incomplete. Ingestion of a
 new web-all capture checks membership against the current website catalog.
@@ -75,11 +88,16 @@ change canonical Full Sync stock. All unavailable products remain unavailable.
 1. Agent and backend contract/scale/error tests and CI pass; backend migration
    is reviewed and deployed separately under production migration rules.
 2. Operator-local readonly full-size load measurement passes the 70% CPU and
-   quiet-window checks, 60-second batch and 5-minute collection deadlines,
+   quiet-window checks, 60-second batch and 15-minute collection deadlines,
    including representative movement volume. Reads over 3 seconds are warnings.
    Synthetic timings are not SQL benchmarks. The 21 October PR68 field test
    completed 200/200 in 3,003.609 ms and 276/276 in 3,450.977 ms; this does not
-   establish full-catalog load or independent stock accuracy.
+   establish full-catalog load or independent stock accuracy. A later owner-run
+   PR68 full-catalog test completed all 36 batches of 200: 6,835 observed, 215
+   unavailable, 109.486 seconds collection time, and 1.822 seconds for the slowest
+   batch. Sampled host CPU was at most 23%; this was not continuous peak CPU.
+   Four shared-stock products still had suppressed derived values in that
+   historical run. It does not validate a subsequent shared-unit reader change.
 3. The natural operational cycle and final self-disable pass. Boot/Logon
    evidence alone cannot guarantee a baseline before POS posting.
 4. Explain unavailable products and agree the business freshness/drift policy.
@@ -101,9 +119,8 @@ limits and private manifest preparation. Backend local PostgreSQL integration
 uses these Agent builders to test all 13 slots, reporting and idempotency.
 No production SQL, captures, Sync or migrations are part of these tests.
 
-The 21 October isolated run passed all 296 Agent tests. The paired backend
-suite passed 630 tests with 104 optional tests skipped, using a newly owned
-loopback-only PostgreSQL cluster that was stopped afterwards. The owner-run
-load kit separately checks 500 / 1,000 / 2,000 / 4,000 / 7,050 in batches of 200.
-Its SQL results are pending operator execution; passing fixtures is not a field
+Full-suite totals must be taken from the validation for the exact reviewed
+revision. Local PostgreSQL tests use an owned loopback-only cluster which is
+stopped afterwards. The owner-run load kit uses batches of 200 and preserves
+the existing source installation. Passing fixtures is not a source SQL field
 result or authorization to activate complete mode.

@@ -65,7 +65,7 @@ test("slow reads warn within the approved minute, while busy or expired collecti
   await assert.rejects(readHourlyCompleteCohort(busy.pool, busy.codes, { branchCode: "004", guard: async () => { if (++guards === 2) throw Object.assign(new Error("busy"), { code: "SOURCE_BUSY" }); }, now: busy.now, monotonic: busy.monotonic }), { code: "SOURCE_BUSY" });
   assert.equal(guards, 2);
   const expired = fixture(200);
-  await assert.rejects(readHourlyCompleteCohort(expired.pool, expired.codes, { branchCode: "004", guard: async () => expired.advance(300001), now: expired.now, monotonic: expired.monotonic }), { code: "HOURLY_COMPLETE_COHORT_WINDOW_EXCEEDED" });
+  await assert.rejects(readHourlyCompleteCohort(expired.pool, expired.codes, { branchCode: "004", guard: async () => expired.advance(900001), now: expired.now, monotonic: expired.monotonic }), { code: "HOURLY_COMPLETE_COHORT_WINDOW_EXCEEDED" });
   assert.equal(expired.queries, 0);
 });
 test("over-limit, duplicate and non-004 cohorts stop before guard or SQL", async () => {
@@ -76,20 +76,20 @@ test("over-limit, duplicate and non-004 cohorts stop before guard or SQL", async
   assert.equal(f.guards, 0);assert.equal(f.queries, 0);
 });
 
-test("minute batch deadlines are explicit opt-in; collection coverage permits five minutes without changing legacy bounds", async () => {
+test("minute batch deadlines are explicit opt-in; collection coverage permits fifteen minutes without changing legacy bounds", async () => {
   const legacy=fixture(50);
   await assert.rejects(readHourlyDerivedStock(legacy.pool,legacy.codes,{branchCode:"004",queryTimeoutMs:60000}),{code:"HOURLY_EVIDENCE_COHORT_REQUIRED"});
   assert.equal(legacy.queries,0);
   const extended=fixture(50);
   const one=await readHourlyDerivedStock(extended.pool,extended.codes,{branchCode:"004",queryTimeoutMs:60000,maxQueryTimeoutMs:60000});
   assert.equal(one.rows.length,50);
-  const f=fixture(500);
+  const f=fixture(800);
   const result=await readHourlyCompleteCohort(f.pool,f.codes,{branchCode:"004",guard:f.guard,now:f.now,monotonic:f.monotonic,
     readBatch:async(pool,codes,options)=>{assert.equal(options.maxQueryTimeoutMs,60000);const value=await readHourlyDerivedStock(pool,codes,options);f.advance(50000);return value;}});
-  assert.equal(result.rows.length,500);assert.ok(result.cohortCoverage.observationWindowMs>120000);
-  assert.ok(result.cohortCoverage.observationWindowMs<300000);assert.ok(result.sourceBatchTimings.every(x=>x.timeWarning));
-  assert.equal(f.guards,10);
-  const tooLong={...result.cohortCoverage,observationWindowMs:300001};
+  assert.equal(result.rows.length,800);assert.ok(result.cohortCoverage.observationWindowMs>300000);
+  assert.ok(result.cohortCoverage.observationWindowMs<900000);assert.ok(result.sourceBatchTimings.every(x=>x.timeWarning));
+  assert.equal(f.guards,16);
+  const tooLong={...result.cohortCoverage,observationWindowMs:900001};
   assert.equal(cohortCoverageDiagnostics(tooLong,result.rows.map(x=>({productCode:x.product_code})),"intraday").status,"invalid");
 });
 test("13 complete-cohort slots fit the existing outbox without creating 182 independent captures", async t => {
@@ -179,15 +179,20 @@ test("full delivery budget, invalid acknowledgements and byte cap preserve pendi
   assert.equal(invalid.pending,1);assert.equal(invalid.errorCode,"HOURLY_EVIDENCE_ACK_INVALID");
 });
 
-test("private manifest preparation reads web membership while OFF and never prints or changes credentials/config", async t => {
-  const cacheDir=temp(t), config={branchCode:"004",apiBaseUrl:"https://example.test",hourlyStockEvidence:{enabled:false,fullSyncAnchorEnabled:false,inlineAfterFullSyncEnabled:false,cacheDir,uploadToken:"synthetic-token".repeat(4)}};
-  let calls=0;
-  const result=await prepareHourlyCohortManifest({config,now:()=>1,fetchImpl:async(url,options)=>{
+test("private manifest preparation intersects web membership with POS active while OFF and never prints identities", async t => {
+  const cacheDir=temp(t), config={branchCode:"004",sqlServerUser:"readonly_pilot",apiBaseUrl:"https://example.test",hourlyStockEvidence:{enabled:false,fullSyncAnchorEnabled:false,inlineAfterFullSyncEnabled:false,cacheDir,uploadToken:"synthetic-token".repeat(4)}};
+  const codes=products(7050), indices=new Map(codes.map((code,index)=>[code,index]));let closes=0, calls=0;
+  const connectSql=async options=>{assert.equal(options.pool.max,1);return {close:async()=>{closes++;},request(){const bound=[];return {input(_key,_type,value){bound.push(value);},cancel(){},async query(text){
+    if(text.includes(" AS is_admin"))return {recordset:[{machine_name:"SERVER004",database_name:"AdaAcc",database_status:"ONLINE",is_admin:0,is_owner:0,is_writer:0,can_insert:0,can_update:0,can_delete:0}]};
+    return {recordset:bound.map(product_code=>({product_code,master_exists:indices.get(product_code)<7048?1:0,source_active:indices.get(product_code)<6835?1:0}))};
+  }}}};};
+  const result=await prepareHourlyCohortManifest({config,now:()=>1,guard:async()=>{},connectSql,priorityProductCodes:[products(7050)[49],products(7050)[1]],fetchImpl:async(url,options)=>{
     calls++;assert.equal(url.pathname,"/api/hourly-stock-evidence/cohort");assert.equal(options.redirect,"error");
-    const bytes=Buffer.from(JSON.stringify({schemaVersion:"hourly-approved-cohort-v1",scope:"web-all",productCodes:products(7042)}));
+    const bytes=Buffer.from(JSON.stringify({schemaVersion:"hourly-approved-cohort-v1",scope:"web-all",productCodes:products(7050)}));
     return {status:200,body:(async function*(){yield bytes.subarray(0,53);yield bytes.subarray(53);})()};
   }});
-  assert.equal(result.productCount,7042);assert.equal(calls,1);assert.ok(!JSON.stringify(result).includes("SYNTHETIC-"));
+  assert.equal(result.productCount,6835);assert.equal(result.webCatalogProducts,7050);assert.equal(result.excludedNotActiveProducts,213);assert.equal(result.excludedMissingProducts,2);assert.equal(closes,1);assert.equal(calls,1);assert.ok(!JSON.stringify(result).includes("SYNTHETIC-"));
+  const manifest=JSON.parse(fs.readFileSync(result.manifestLocation,"utf8"));assert.equal(manifest.scope,"explicit");assert.equal(manifest.productCodes[0],products(7050)[49]);
   assert.equal(config.hourlyStockEvidence.enabled,false);assert.equal(fs.statSync(result.manifestLocation).isFile(),true);
   await assert.rejects(prepareHourlyCohortManifest({config:{...config,hourlyStockEvidence:{...config.hourlyStockEvidence,enabled:true}},fetchImpl:()=>assert.fail("no network while enabled")}),{code:"HOURLY_COHORT_PREPARATION_FAILED"});
   await assert.rejects(prepareHourlyCohortManifest({config,fetchImpl:async()=>{throw new Error("private token or server detail");}}),error=>error.code==="HOURLY_COHORT_PREPARATION_FAILED"&&!error.message.includes("token"));
