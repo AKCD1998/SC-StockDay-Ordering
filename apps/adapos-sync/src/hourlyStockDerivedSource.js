@@ -62,9 +62,10 @@ export function describeHourlyDerivedSamples(firstRows, secondRows, selected, re
   } };
 }
 
-export async function readHourlyDerivedStock(pool, productCodes, { branchCode, queryTimeoutMs = 10_000 } = {}) {
+export async function readHourlyDerivedStock(pool, productCodes, { branchCode, queryTimeoutMs = 10_000, maxQueryTimeoutMs = 10_000 } = {}) {
   if (branchCode !== "004") fail("HOURLY_SOURCE_BRANCH_NOT_APPROVED");
-  if (!Array.isArray(productCodes) || !Number.isSafeInteger(queryTimeoutMs) || queryTimeoutMs < 1 || queryTimeoutMs > 10_000) fail("HOURLY_EVIDENCE_COHORT_REQUIRED");
+  if (!Array.isArray(productCodes) || !Number.isSafeInteger(maxQueryTimeoutMs) || maxQueryTimeoutMs < 1 || maxQueryTimeoutMs > 60_000
+      || !Number.isSafeInteger(queryTimeoutMs) || queryTimeoutMs < 1 || queryTimeoutMs > maxQueryTimeoutMs) fail("HOURLY_EVIDENCE_COHORT_REQUIRED");
   const selected = productCodes.map(value => String(value).trim());
   if (!selected.length || selected.length > 500 || selected.some(code => !code || code.length > 80) || new Set(selected).size !== selected.length) fail("HOURLY_EVIDENCE_COHORT_REQUIRED");
   const deadline = performance.now() + queryTimeoutMs;

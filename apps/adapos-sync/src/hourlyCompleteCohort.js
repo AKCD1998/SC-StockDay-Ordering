@@ -15,6 +15,7 @@ export async function readHourlyCompleteCohort(pool, productCodes, { branchCode,
   const start = monotonic(), wall = now(), rows = [], missing = [], derivedRows = [], clockBatches = [];
   const summary = { ...Object.fromEntries(HOURLY_SOURCE_COUNTERS.map(key => [key, 0])), schemaVersion: "adapos-stored-stock-read-v1", estimateBasis: "stored-master-day-end", readAt: null, oldestRefreshAt: null, newestRefreshAt: null };
   let readStartedAt = null, readCompletedAt = null, verifiedBoundary = false;
+  const sourceBatchTimings = [];
   const batches = Math.ceil(productCodes.length / batchSize);
   function check() {
     if (monotonic() - start >= maxWindowMs) fail("HOURLY_COMPLETE_COHORT_WINDOW_EXCEEDED");
@@ -35,8 +36,8 @@ export async function readHourlyCompleteCohort(pool, productCodes, { branchCode,
     } finally { clearTimeout(timer); }
   }
   for (let offset = 0, index = 0; offset < productCodes.length; offset += batchSize, index++) {
-    check();await guard({ batchIndex: index, batches, remainingMs: maxWindowMs - (monotonic() - start) });check();
-    const batchStart = monotonic(), deadline = batchStart + Math.min(3000, maxWindowMs - (batchStart - start));
+    check();await guard({ phase: "before", batchIndex: index, batches, remainingMs: maxWindowMs - (monotonic() - start) });check();
+    const batchStart = monotonic(), deadline = batchStart + Math.min(60_000, maxWindowMs - (batchStart - start));
     const remaining = () => { check(); const ms = Math.floor(deadline - monotonic()); if (ms < 1) fail("HOURLY_SOURCE_TIMEOUT"); return ms; };
     if (!verifiedBoundary) {
       const id = (await query(`SELECT CONVERT(varchar(128),SERVERPROPERTY('MachineName')) AS machine_name,DB_NAME() AS database_name,
@@ -58,7 +59,7 @@ export async function readHourlyCompleteCohort(pool, productCodes, { branchCode,
     const present = available.filter(row => row.source_available === 1).map(row => row.product_code);
     missing.push(...available.filter(row => row.source_available === 0).map(row => row.product_code));
     if (present.length) {
-      const snapshot = await readBatch(pool, present, { branchCode, queryTimeoutMs: remaining() });
+      const snapshot = await readBatch(pool, present, { branchCode, queryTimeoutMs: remaining(), maxQueryTimeoutMs: 60_000 });
       check();remaining();
       if (!snapshot || snapshot.rows.length !== present.length || snapshot.derivedObservation.records.length !== present.length
           || new Set(snapshot.rows.map(row => row.product_code)).size !== present.length
@@ -78,7 +79,11 @@ export async function readHourlyCompleteCohort(pool, productCodes, { branchCode,
       if (!readStartedAt || observed.readStartedAt < readStartedAt) readStartedAt = observed.readStartedAt;
       if (!readCompletedAt || observed.readCompletedAt > readCompletedAt) readCompletedAt = observed.readCompletedAt;
     }
-    if (monotonic() - batchStart > 2000) fail("HOURLY_SOURCE_SLOW_BATCH_NO_ADDITIONAL_LOAD");
+    remaining();
+    const durationMs = monotonic() - batchStart;
+    sourceBatchTimings.push({ batchIndex: index, requestedProducts: codes.length, observedProducts: present.length,
+      unavailableProducts: codes.length - present.length, durationMs, timeWarning: durationMs > 3000, warningThresholdMs: 3000 });
+    await guard({ phase: "after", batchIndex: index, batches, remainingMs: maxWindowMs - (monotonic() - start) });
     check();
   }
   if (!rows.length) fail("HOURLY_COMPLETE_COHORT_NO_SOURCE_ROWS");
@@ -95,7 +100,7 @@ export async function readHourlyCompleteCohort(pool, productCodes, { branchCode,
     const values = clockBatches.map(value => value?.[key]).filter(Number.isFinite);
     return values.length ? Math.max(...values) : null;
   };
-  return { rows, sourceRead: summary, cohortCoverage: coverage, derivedObservation: {
+  return { rows, sourceRead: summary, cohortCoverage: coverage, sourceBatchTimings, derivedObservation: {
     schemaVersion: "adapos-ordinary16-derived-v1", estimateBasis: "retail-plus-wholesale-plus-ordinary16", sampleCount: 2,
     consistency: "unverified", qualifying: false, businessCutoffAt: null, readStartedAt, readCompletedAt,
     records: derivedRows.sort((a,b) => a.productCode.localeCompare(b.productCode)),

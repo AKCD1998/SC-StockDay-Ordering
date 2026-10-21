@@ -37,11 +37,11 @@ function fixture(count, missingCount = 0) {
     } }; } },
   };return state;
 }
-for (const count of [50, 100, 200, 500, 501, 1000, 2000, 5000, 6827, 7042, 10000]) {
+for (const count of [50, 100, 200, 500, 501, 1000, 2000, 5000, 6827, 7042, 7050, 10000]) {
   test(`complete cohort ${count}: bounded source batches become one identity-bound capture`, async () => {
     const f = fixture(count);const snapshot = await readHourlyCompleteCohort(f.pool, f.codes, { branchCode: "004", scope: "web-all", guard: f.guard, now: f.now, monotonic: f.monotonic });
     assert.equal(snapshot.rows.length, count);assert.equal(snapshot.sourceRead.productCount, count);assert.equal(snapshot.cohortCoverage.expectedProductCount, count);
-    assert.equal(snapshot.cohortCoverage.readBatchCount, Math.ceil(count / 100));assert.equal(f.guards, Math.ceil(count / 100));
+    assert.equal(snapshot.cohortCoverage.readBatchCount, Math.ceil(count / 100));assert.equal(f.guards, 2 * Math.ceil(count / 100));
     const capturedAt = new Date(f.now()).toISOString();
     const built = buildHourlyIntradayPayload({ branchCode: "004", observationKind: "intraday", plannedSlot: "09:00", capturedAt, rows: snapshot.rows, cohortCoverage: snapshot.cohortCoverage, clientMeta: { sourceRead: snapshot.sourceRead } }, snapshot.derivedObservation);
     assert.equal(built.payload.records.length, count);assert.equal(built.payload.derivedObservation.records.length, count);assert.ok(Buffer.byteLength(built.body) <= 4 * 1024 * 1024);
@@ -55,16 +55,17 @@ test("all 7042 web products are accounted for; 215 absent source products remain
   assert.equal(diagnostic.status, "incomplete-source");assert.equal(diagnostic.expectedProducts, 7042);assert.equal(diagnostic.accountedProducts, 7042);assert.equal(diagnostic.observedProducts, 6827);
   const safe = JSON.stringify(diagnostic);assert.ok(!safe.includes("SYNTHETIC-"));assert.ok(!safe.includes("Sha256"));
 });
-test("incomplete, denied, slow and out-of-budget reads never return a partial capture", async () => {
+test("slow reads warn within the approved minute, while busy or expired collections stop", async () => {
   const slow = fixture(200);
-  await assert.rejects(readHourlyCompleteCohort(slow.pool, slow.codes, { branchCode: "004", guard: slow.guard, now: slow.now, monotonic: slow.monotonic,
-    readBatch: async (pool, codes, options) => { const snapshot = await readHourlyDerivedStock(pool, codes, options);slow.advance(2001);return snapshot; } }), { code: "HOURLY_SOURCE_SLOW_BATCH_NO_ADDITIONAL_LOAD" });
-  assert.equal(slow.guards, 1);
+  const warned = await readHourlyCompleteCohort(slow.pool, slow.codes, { branchCode: "004", guard: slow.guard, now: slow.now, monotonic: slow.monotonic,
+    readBatch: async (pool, codes, options) => { const snapshot = await readHourlyDerivedStock(pool, codes, options);slow.advance(3001);return snapshot; } });
+  assert.equal(warned.rows.length, 200);assert.equal(warned.sourceBatchTimings.length, 2);
+  assert.ok(warned.sourceBatchTimings.every(batch => batch.timeWarning));assert.equal(slow.guards, 4);
   const busy = fixture(200);let guards = 0;
   await assert.rejects(readHourlyCompleteCohort(busy.pool, busy.codes, { branchCode: "004", guard: async () => { if (++guards === 2) throw Object.assign(new Error("busy"), { code: "SOURCE_BUSY" }); }, now: busy.now, monotonic: busy.monotonic }), { code: "SOURCE_BUSY" });
   assert.equal(guards, 2);
   const expired = fixture(200);
-  await assert.rejects(readHourlyCompleteCohort(expired.pool, expired.codes, { branchCode: "004", guard: async () => expired.advance(120001), now: expired.now, monotonic: expired.monotonic }), { code: "HOURLY_COMPLETE_COHORT_WINDOW_EXCEEDED" });
+  await assert.rejects(readHourlyCompleteCohort(expired.pool, expired.codes, { branchCode: "004", guard: async () => expired.advance(300001), now: expired.now, monotonic: expired.monotonic }), { code: "HOURLY_COMPLETE_COHORT_WINDOW_EXCEEDED" });
   assert.equal(expired.queries, 0);
 });
 test("over-limit, duplicate and non-004 cohorts stop before guard or SQL", async () => {
@@ -73,6 +74,23 @@ test("over-limit, duplicate and non-004 cohorts stop before guard or SQL", async
     await assert.rejects(readHourlyCompleteCohort(f.pool, codes, { branchCode, guard: f.guard }), { code: "HOURLY_COHORT_COVERAGE_INVALID" });
   }
   assert.equal(f.guards, 0);assert.equal(f.queries, 0);
+});
+
+test("minute batch deadlines are explicit opt-in; collection coverage permits five minutes without changing legacy bounds", async () => {
+  const legacy=fixture(50);
+  await assert.rejects(readHourlyDerivedStock(legacy.pool,legacy.codes,{branchCode:"004",queryTimeoutMs:60000}),{code:"HOURLY_EVIDENCE_COHORT_REQUIRED"});
+  assert.equal(legacy.queries,0);
+  const extended=fixture(50);
+  const one=await readHourlyDerivedStock(extended.pool,extended.codes,{branchCode:"004",queryTimeoutMs:60000,maxQueryTimeoutMs:60000});
+  assert.equal(one.rows.length,50);
+  const f=fixture(500);
+  const result=await readHourlyCompleteCohort(f.pool,f.codes,{branchCode:"004",guard:f.guard,now:f.now,monotonic:f.monotonic,
+    readBatch:async(pool,codes,options)=>{assert.equal(options.maxQueryTimeoutMs,60000);const value=await readHourlyDerivedStock(pool,codes,options);f.advance(50000);return value;}});
+  assert.equal(result.rows.length,500);assert.ok(result.cohortCoverage.observationWindowMs>120000);
+  assert.ok(result.cohortCoverage.observationWindowMs<300000);assert.ok(result.sourceBatchTimings.every(x=>x.timeWarning));
+  assert.equal(f.guards,10);
+  const tooLong={...result.cohortCoverage,observationWindowMs:300001};
+  assert.equal(cohortCoverageDiagnostics(tooLong,result.rows.map(x=>({productCode:x.product_code})),"intraday").status,"invalid");
 });
 test("13 complete-cohort slots fit the existing outbox without creating 182 independent captures", async t => {
   const cacheDir = temp(t), codes = products(7042), rows = codes.map(product_code => ({ product_code, qty: 10, latest_estimated_on_hand: 8 }));
@@ -108,7 +126,7 @@ test("source privilege, availability, clock and deadline faults stop without a p
   assert.equal(stepped.queries, 0);
   const expired = fixture(200);
   await assert.rejects(readHourlyCompleteCohort(expired.pool, expired.codes, { branchCode: "004", guard: expired.guard, now: expired.now, monotonic: expired.monotonic,
-    readBatch: async (pool, codes, options) => { const value = await readHourlyDerivedStock(pool, codes, options);expired.advance(3001);return value; } }), { code: "HOURLY_SOURCE_TIMEOUT" });
+    readBatch: async (pool, codes, options) => { const value = await readHourlyDerivedStock(pool, codes, options);expired.advance(60001);return value; } }), { code: "HOURLY_SOURCE_TIMEOUT" });
   assert.equal(expired.guards, 1);
 });
 

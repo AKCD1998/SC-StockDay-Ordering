@@ -14,14 +14,16 @@ change a credential, run Sync, or change Full Sync/Transfer Delta queries.
   per assembled capture. Membership comes from an approved private manifest,
   never a truncated environment variable.
 - The intraday reader uses one connection and sequential batches of 100
-  (hard maximum 500), retains the existing PR66 reader/formulas and suppressions,
+  (hard maximum 500), retains the PR68 branch-scoped transfer reader/formulas and suppressions,
   and only queues after all batches and coverage validation finish.
 - Local guard checks CPU below 70%, existing Agent/Full Sync activity and a
-  15-minute quiet window before every batch. A missing guard fails closed.
+  15-minute quiet window before and after every batch. A missing guard fails closed.
   No existing process is stopped.
-- Combined SQL work in each batch has a 3,000 ms deadline; a completed batch
-  over 2,000 ms stops further reads. The whole collection, including guards,
-  has a separate 120,000 ms upper bound. These do not relax per-read limits.
+- Complete-mode SQL work in each batch has a 60,000 ms deadline; a completed
+  batch over 3,000 ms records a timing warning. The whole collection, including
+  guards, has a separate 300,000 ms upper bound. The shared reader retains its
+  legacy 10,000 ms ceiling unless complete mode explicitly selects the larger
+  bound. This is a technical collection budget, not a business freshness policy.
 - A changed observer clock boundary over 250 ms stops assembly. This is not
   proof of Windows time synchronization or SQL business freshness.
   Combining batches preserves missing/inconsistent SQL clock diagnostics;
@@ -55,9 +57,10 @@ Do not broaden SQL permissions or Git trust to make preparation pass.
 
 ## Coverage versus availability
 
-On 20 October 2026 the readonly aggregate reference was 7,042 unique website
-products and 6,827 active branch-stock products. The difference of 215 is not
-zero stock. Coverage metadata privately accounts for unavailable identities;
+On 21 October 2026 the readonly catalog reference was 7,050 unique website
+products and 6,835 with a central branch-004 current record. The difference of
+215 is neither zero stock nor proof of live POS source availability.
+Coverage metadata privately accounts for unavailable identities;
 reports show counts and mark source completeness as incomplete. Ingestion of a
 new web-all capture checks membership against the current website catalog.
 Catalog changes require a newly approved manifest, not silently dropping rows.
@@ -71,9 +74,12 @@ change canonical Full Sync stock. All unavailable products remain unavailable.
 
 1. Agent and backend contract/scale/error tests and CI pass; backend migration
    is reviewed and deployed separately under production migration rules.
-2. Operator-local readonly full-size load measurement passes the unchanged
-   CPU/quiet-window/2-second/3-second limits, including worst-case movement
-   volume. Synthetic timings are not SQL benchmarks.
+2. Operator-local readonly full-size load measurement passes the 70% CPU and
+   quiet-window checks, 60-second batch and 5-minute collection deadlines,
+   including representative movement volume. Reads over 3 seconds are warnings.
+   Synthetic timings are not SQL benchmarks. The 21 October PR68 field test
+   completed 200/200 in 3,003.609 ms and 276/276 in 3,450.977 ms; this does not
+   establish full-catalog load or independent stock accuracy.
 3. The natural operational cycle and final self-disable pass. Boot/Logon
    evidence alone cannot guarantee a baseline before POS posting.
 4. Explain unavailable products and agree the business freshness/drift policy.
@@ -89,8 +95,15 @@ An operator-local measurement or approved access change needs human action.
 ## Tests
 
 Synthetic source batches cover 50, 100, 200, 500, 501, 1,000, 2,000, 5,000,
-6,827, 7,042 and 10,000 products, unavailable products, whole-run failure,
+6,827, 7,042, 7,050 and 10,000 products, unavailable products, whole-run failure,
 clock/privilege/deadline guards, Full receipt gating, exact replay, byte/budget
 limits and private manifest preparation. Backend local PostgreSQL integration
 uses these Agent builders to test all 13 slots, reporting and idempotency.
 No production SQL, captures, Sync or migrations are part of these tests.
+
+The 21 October isolated run passed all 296 Agent tests. The paired backend
+suite passed 630 tests with 104 optional tests skipped, using a newly owned
+loopback-only PostgreSQL cluster that was stopped afterwards. The owner-run
+load kit separately checks 500 / 1,000 / 2,000 / 4,000 / 7,050 in batches of 200.
+Its SQL results are pending operator execution; passing fixtures is not a field
+result or authorization to activate complete mode.
