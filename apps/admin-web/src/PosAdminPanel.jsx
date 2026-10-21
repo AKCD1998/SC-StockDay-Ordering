@@ -14,6 +14,15 @@ function DownloadIcon() {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4" /></svg>;
 }
 
+function ReleaseDate({ publishedAt, showTimeZone = false }) {
+  const date = new Date(publishedAt);
+  if (!publishedAt || Number.isNaN(date.getTime())) return null;
+  const options = { timeZone: "Asia/Bangkok" };
+  const day = date.toLocaleDateString("th-TH", { ...options, day: "numeric", month: "short", year: "numeric" });
+  const time = date.toLocaleTimeString("th-TH", { ...options, hour: "2-digit", minute: "2-digit" });
+  return <p className="pos-release-date">เผยแพร่ <time dateTime={publishedAt}>{day} เวลา {time} น.</time>{showTimeZone && " (เวลาไทย)"}</p>;
+}
+
 export default function PosAdminPanel() {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
@@ -53,6 +62,10 @@ export default function PosAdminPanel() {
         </div>
         <h3 className="pos-download-title">ระบบสมาชิก <span>สำหรับหน้าร้านของเรา</span></h3>
         <p className="pos-download-description">จัดการสมาชิกและสะสมแต้ม พร้อมเชื่อมต่อ AdaSoftware ของบริษัท</p>
+        <div className="pos-latest-release">
+          <span className="pos-latest-badge">รุ่นล่าสุด · {data.installer.version}</span>
+          <ReleaseDate publishedAt={data.installer.publishedAt} showTimeZone />
+        </div>
         <div className="pos-download-actions">
           {data.installer.downloadUrl ? <a href={data.installer.downloadUrl} className="pos-download-button" rel="noopener noreferrer">
             <WindowsIcon /><span><strong>ดาวน์โหลดสำหรับ Windows</strong><small>เวอร์ชัน {data.installer.version} · ตัวติดตั้ง .exe</small></span><DownloadIcon />
@@ -63,7 +76,19 @@ export default function PosAdminPanel() {
         </div>
         <div className="pos-download-requirements"><span>สำหรับเครื่องบริษัท</span><span>เชื่อมต่อ Tailscale</span><span>มี AdaSoftware</span></div>
         {!data.installer.downloadUrl && <p className="pos-download-note" id="pos-download-note">รุ่นใหม่กำลังเตรียมเผยแพร่ · รุ่น 1.2.0 เดิมยังไม่มีระบบจำกัดเครื่อง</p>}
+        {data.installer.highlights?.length > 0 && <div className="pos-latest-changes">
+          <h4>มีอะไรใหม่ใน {data.installer.version}</h4>
+          <ul>{data.installer.highlights.map(change => <li key={change}>{change}</li>)}</ul>
+        </div>}
       </div>
+      {data.previousReleases?.length > 0 && <section className="panel pos-release-history" aria-labelledby="pos-release-history-title">
+        <div className="panel-header"><div><h3 id="pos-release-history-title">เวอร์ชันก่อนหน้า</h3><p>วันเผยแพร่ตามเวลาไทยและสิ่งที่เปลี่ยนในแต่ละรุ่น · แนะนำให้ใช้รุ่นล่าสุดด้านบน</p></div></div>
+        <ul className="pos-release-list">{data.previousReleases.filter(release => release.version !== data.installer.version).map(release => <li className="pos-release-row" key={release.version}>
+          <div className="pos-release-version"><h4>เวอร์ชัน {release.version}</h4><ReleaseDate publishedAt={release.publishedAt} /></div>
+          <div className="pos-release-summary">{release.highlights?.map(change => <p key={change}>{change}</p>)}{release.downloadNote && <p className="pos-release-note">{release.downloadNote}</p>}</div>
+          {release.downloadUrl && <a className="pos-release-download" href={release.downloadUrl} rel="noopener noreferrer"><DownloadIcon />ดาวน์โหลด {release.version}</a>}
+        </li>)}</ul>
+      </section>}
       <section className="panel pos-device-inventory" aria-labelledby="pos-device-title" ref={inventoryRef}>
       <div className="panel-header"><div><h3 id="pos-device-title">เครื่องที่อนุญาตให้ใช้งาน</h3><p>ตรวจสอบสิทธิ์และหลักฐาน AdaSoftware ของแต่ละเครื่อง</p></div></div>
       <div className="kpis">

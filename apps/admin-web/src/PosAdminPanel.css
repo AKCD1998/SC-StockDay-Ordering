@@ -137,7 +137,7 @@
   justify-content: center;
   flex-wrap: wrap;
   gap: 16px;
-  margin-top: 28px;
+  margin-top: 20px;
 }
 
 .pos-download-button {
@@ -145,8 +145,9 @@
   align-items: center;
   justify-content: center;
   gap: 18px;
-  min-height: 88px;
-  padding: 17px 25px;
+  min-height: 100px;
+  min-width: min(100%, 460px);
+  padding: 20px 30px;
   border: 2px solid var(--pos-yellow);
   border-radius: 14px;
   background: var(--pos-yellow);
@@ -175,14 +176,14 @@
 }
 
 .pos-download-button strong {
-  font-size: 1.2rem;
+  font-size: 1.35rem;
   font-weight: 750;
   line-height: 1.3;
 }
 
 .pos-download-button small {
   color: #4b491e;
-  font-size: 0.69rem;
+  font-size: 0.78rem;
   font-weight: 500;
   line-height: 1.5;
 }
@@ -245,6 +246,153 @@
   color: var(--pos-muted);
   font-size: 0.64rem;
   line-height: 1.7;
+}
+
+.pos-latest-release {
+  margin-top: 20px;
+}
+
+.pos-latest-badge {
+  display: inline-block;
+  padding: 5px 12px;
+  border: 1px solid #596234;
+  border-radius: 999px;
+  background: #242b27;
+  color: var(--pos-yellow);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.pos-release-date {
+  margin: 8px 0 0;
+  color: #526578;
+  font-size: 0.73rem;
+  line-height: 1.7;
+}
+
+[data-theme="dark"] .pos-release-date {
+  color: #a8b5cb;
+}
+
+.pos-download-hero .pos-release-date {
+  color: var(--pos-muted);
+  font-size: 0.8rem;
+}
+
+.pos-latest-changes {
+  max-width: 920px;
+  margin: 26px auto 0;
+  padding-top: 20px;
+  border-top: 1px solid #2b3b68;
+  text-align: left;
+}
+
+.pos-latest-changes h4 {
+  margin: 0 0 12px;
+  color: var(--pos-white);
+  font-size: 0.85rem;
+}
+
+.pos-latest-changes ul {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 28px;
+  margin: 0;
+  padding-left: 18px;
+  color: #c1cce4;
+  font-size: 0.76rem;
+  line-height: 1.8;
+}
+
+.pos-latest-changes li::marker {
+  color: var(--pos-yellow);
+}
+
+.pos-release-history {
+  margin-top: 26px;
+}
+
+.pos-release-history h3 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+}
+
+.pos-release-history .panel-header p {
+  font-size: 0.8rem;
+}
+
+.pos-release-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pos-release-row {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 0;
+  border-top: 1px solid #dce3eb;
+}
+
+[data-theme="dark"] .pos-release-row {
+  border-color: #2c3b50;
+}
+
+.pos-release-version h4 {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.pos-release-summary p {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.8;
+}
+
+.pos-release-summary .pos-release-note {
+  margin-top: 4px;
+  color: #526578;
+  font-size: 0.72rem;
+}
+
+[data-theme="dark"] .pos-release-summary .pos-release-note {
+  color: #a8b5cb;
+}
+
+.pos-release-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid #b8c5d5;
+  border-radius: 9px;
+  color: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.pos-release-download svg {
+  width: 16px;
+  height: 16px;
+}
+
+.pos-release-download:hover {
+  background: #eaf0f8;
+}
+
+[data-theme="dark"] .pos-release-download:hover {
+  background: #25354b;
+}
+
+.pos-release-download:focus-visible {
+  outline: 3px solid #405dbe;
+  outline-offset: 3px;
 }
 
 .pos-device-inventory {
@@ -327,15 +475,16 @@
 
   .pos-download-button {
     gap: 12px;
+    min-width: 0;
     padding: 17px 12px;
   }
 
   .pos-download-button strong {
-    font-size: 0.94rem;
+    font-size: 1rem;
   }
 
   .pos-download-button small {
-    font-size: 0.57rem;
+    font-size: 0.65rem;
   }
 
   .pos-download-button > svg {
@@ -353,12 +502,42 @@
     font-size: 0.6rem;
   }
 
+  .pos-download-hero .pos-release-date {
+    font-size: 0.72rem;
+  }
+
+  .pos-latest-changes ul {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .pos-release-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+  }
+
+  .pos-release-download {
+    justify-self: start;
+  }
+
   .pos-device-inventory .table-wrap {
     overflow-x: auto;
   }
 
   .pos-device-inventory table {
     min-width: 760px;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1000px) {
+  .pos-release-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .pos-release-summary {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 }
 
