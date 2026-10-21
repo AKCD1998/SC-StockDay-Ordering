@@ -185,8 +185,8 @@ function transferPool(firstRows, secondRows = firstRows) {
       { machine_name: "SERVER004", database_name: "AdaAcc", offset_minutes: 420, read_started_at: start }] });
     const grouped = new Map();
     for (const row of sampleIndex++ === 0 ? firstRows : secondRows) {
-      const scoped = new RegExp(`FROM dbo\\.VCN_${row.component}QtyNowNotApv v\\s+WHERE v\\.FTBchCode = '004' AND`).test(text);
-      if (scoped && row.branch !== "004") continue;
+      const scoped = new RegExp(`FROM dbo\\.VCN_${row.component}QtyNowNotApv v\\s+WHERE \\(v\\.FTBchCode = '004' OR NULLIF\\(LTRIM\\(RTRIM\\(v\\.FTBchCode\\)\\), ''\\) IS NULL\\) AND`).test(text);
+      if (scoped && row.branch !== "004" && row.branch != null && row.branch.trim() !== "") continue;
       const group = grouped.get(row.component) ?? { component: row.component, FTPdtStkCode: "A",
         net_quantity: 0, movement_rows: 0, invalid_rows: 0, outside_branch_rows: 0 };
       group.net_quantity += row.quantity;
@@ -210,12 +210,21 @@ test("transfer receipts/issues use their projected stock branch without mixing o
   }
 });
 
-test("foreign-only, blank and null transfer branches contribute zero, including when no local transfer group remains", async () => {
+test("foreign-only transfers contribute zero when no local transfer group remains", async () => {
   for (const component of ["TNF41", "TNF42", "TNF31", "TNF32", "TNF7", "TNF8"]) {
-    const rows = ["001", "", null].map(branch => ({ component, branch, quantity: -100 }));
+    const rows = ["001", "005"].map(branch => ({ component, branch, quantity: -100 }));
     const result = await readHourlyDerivedStock(transferPool(rows), ["A"], { branchCode: "004" });
     assert.equal(result.derivedObservation.records[0].derivedOnHand, 10);
     assert.equal(result.derivedObservation.records[0].reason, "observed-unverified");
+  }
+});
+
+test("missing transfer branch identities still suppress derived quantities rather than becoming zero", async () => {
+  for (const component of ["TNF41", "TNF42", "TNF31", "TNF32", "TNF7", "TNF8"]) {
+    for (const branch of ["", "   ", null]) {
+      const result = await readHourlyDerivedStock(transferPool([{ component, branch, quantity: -100 }]), ["A"], { branchCode: "004" });
+      assert.deepEqual(result.derivedObservation.records[0], { productCode: "A", derivedOnHand: null, reason: "outside-branch-movement" });
+    }
   }
 });
 

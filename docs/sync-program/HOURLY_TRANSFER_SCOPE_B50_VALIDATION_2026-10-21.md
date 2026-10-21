@@ -17,6 +17,10 @@ before aggregation. The recovered source definitions project these branches:
 | TNF31, TNF32 | Document branch (`FTBchCode`) |
 | TNF7, TNF8 | Destination (`FTPthBchTo`) |
 
+NULL, blank and whitespace-only transfer branch identities remain visible to
+the existing safeguard and suppress the derived quantity. They are not silently
+treated as movements from another branch or as zero stock movement.
+
 Signed quantities still come from the existing vendor views. Other movement
 components retain their foreign-branch safeguard, and the local POS temporary
 view retains its existing scope. Posting-change suppression, deadlines, schema,
@@ -25,7 +29,7 @@ are unchanged. This adapter still accepts only branch 004.
 
 ## Actual read-only B50 comparison
 
-On 2026-10-21 at approximately 09:13 Asia/Bangkok, the candidate ran from
+On 2026-10-21 at approximately 09:16 Asia/Bangkok, the final candidate ran from
 SCPRODUCTDEV against SERVER004 using the existing technically read-only SQL
 account. The candidate was not installed on SERVER004.
 
@@ -51,19 +55,19 @@ document contents, credentials or raw result rows are included here.
 | Previously suppressed transfer case reconciled | 1 / 1 |
 | Excluded foreign transfer groups | 1 |
 | Missing source fields | 0 |
-| Candidate reader duration | 513.319 ms |
-| Opening / closing reference duration | 225.343 / 183.269 ms |
+| Candidate reader duration | 624.129 ms |
+| Opening / closing reference duration | 216.869 / 200.230 ms |
 
 An earlier completed candidate read also matched all 50 opening references, but
-took 2245.346 ms. It stopped further reads under the unchanged 2000 ms load guard
+took 2247.530 ms. It stopped further reads under the unchanged 2000 ms load guard
 and did not collect a closing reference. That slower observation is preserved;
 the later comparison does not establish a latency guarantee. The reader deadline
 remains 3000 ms for these checks.
 
 ## Regression coverage and limits
 
-All 272 Agent tests pass locally, including transfer signs, local and foreign
-groups, foreign-only/null/blank branch groups, local posting changes, retained
+All 273 Agent tests pass locally, including transfer signs, local and foreign
+groups, foreign-only groups, missing-branch rejection, local posting changes, retained
 foreign non-transfer rejection, payload compatibility, Full Sync and Delta tests.
 
 This is a current-source arithmetic and mapping check. Vendor NOLOCK views still
