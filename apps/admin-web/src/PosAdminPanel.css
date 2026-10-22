@@ -308,8 +308,29 @@
   color: var(--pos-yellow);
 }
 
+.pos-setup-guide,
 .pos-release-history {
   margin-top: 26px;
+}
+
+.pos-setup-guide h3 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+}
+
+.pos-setup-guide p,
+.pos-setup-guide li {
+  font-size: 0.8rem;
+  line-height: 1.8;
+}
+
+.pos-setup-guide code {
+  overflow-wrap: anywhere;
+}
+
+.pos-setup-guide .pos-release-download {
+  max-width: 100%;
+  white-space: normal;
 }
 
 .pos-release-history h3 {
