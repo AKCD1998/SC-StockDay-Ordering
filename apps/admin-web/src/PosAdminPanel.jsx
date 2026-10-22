@@ -6,6 +6,11 @@ import "./PosAdminPanel.css";
 const labels = { approved: "อนุญาต", pending: "รอตรวจยืนยัน", denied: "ไม่อนุญาต" };
 const tones = { approved: "good", pending: "warning", denied: "danger" };
 
+function hasAdaPosSetup(version) {
+  const [major, minor, patch] = String(version).split(".").map(Number);
+  return major > 1 || (major === 1 && (minor > 3 || (minor === 3 && patch >= 2)));
+}
+
 function WindowsIcon() {
   return <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m2 4 9-1.3v8.6H2V4Zm10.5-1.5L22 1v10.3h-9.5V2.5ZM2 12.8h9v8.5L2 20v-7.2Zm10.5 0H22V23l-9.5-1.5v-8.7Z" /></svg>;
 }
@@ -76,7 +81,7 @@ export default function PosAdminPanel() {
         </div>
         <div className="pos-download-actions">
           {data.installer.downloadUrl ? <a href={data.installer.downloadUrl} className="pos-download-button" rel="noopener noreferrer">
-            <WindowsIcon /><span><strong>ดาวน์โหลดสำหรับ Windows</strong><small>เวอร์ชัน {data.installer.version} · ตัวติดตั้ง .exe</small></span><DownloadIcon />
+            <WindowsIcon /><span><strong>ดาวน์โหลดสำหรับ Windows</strong><small>เวอร์ชัน {data.installer.version} · {hasAdaPosSetup(data.installer.version) ? "รวมตั้งค่าเชื่อม AdaPos" : "ตัวติดตั้ง .exe"}</small></span><DownloadIcon />
           </a> : <button type="button" className="pos-download-button" disabled aria-describedby="pos-download-note">
             <WindowsIcon /><span><strong>ดาวน์โหลดสำหรับ Windows</strong><small>เวอร์ชัน {data.installer.version} · กำลังเตรียมเผยแพร่</small></span><DownloadIcon />
           </button>}
@@ -89,16 +94,15 @@ export default function PosAdminPanel() {
           <ul>{data.installer.highlights.map(change => <li key={change}>{change}</li>)}</ul>
         </div>}
       </div>
-      {data.installer.version === "1.3.1" && <section className="panel pos-setup-guide" aria-labelledby="pos-setup-title">
-        <div className="panel-header"><div><h3 id="pos-setup-title">ตั้งค่าเชื่อม AdaPos หลังติดตั้ง</h3><p>ตัวช่วยสำหรับเครื่อง POSSRV สาขา 005 ที่ติดตั้ง SCCRM เวอร์ชัน 1.3.1 แล้ว</p></div></div>
-        <a className="pos-release-download" href="https://github.com/AKCD1998/SCCRMonPOS/releases/download/pos-1.3.1/SCCRMonPOS-Branch005-Setup-20261022-v2.zip" rel="noopener noreferrer"><DownloadIcon />ดาวน์โหลดตัวช่วยตั้งค่า สาขา 005 (.zip)</a>
+      {hasAdaPosSetup(data.installer.version) && <section className="panel pos-setup-guide" aria-labelledby="pos-setup-title">
+        <div className="panel-header"><div><h3 id="pos-setup-title">ติดตั้งพร้อมเชื่อม AdaPos ในไฟล์เดียว</h3><p>ตัวติดตั้งตรวจการเชื่อมต่อกับ AdaPos ให้ก่อนติดตั้งเสร็จ</p></div></div>
         <ol>
           <li>ออกจาก SCCRM ที่ไอคอนมุมขวาล่าง โดยเปิดโปรแกรมขาย AdaPos ไว้ตามปกติ</li>
-          <li>ดาวน์โหลดไฟล์ ZIP ไปที่เครื่องสาขา 005 แล้วคลิกขวาเลือก Extract All / แยกไฟล์ทั้งหมด</li>
-          <li>เปิดโฟลเดอร์ที่แยกไฟล์แล้ว ดับเบิลคลิก <code>Setup-SCCRMonPOS-005.cmd</code> และรอจน SCCRM เปิดขึ้น</li>
+          <li>ดาวน์โหลดสำหรับ Windows จากปุ่มด้านบน แล้วเปิดไฟล์ติดตั้งและทำตามขั้นตอน</li>
+          <li>ตัวติดตั้งจะอ่านค่าบนเครื่องและตรวจการเชื่อมต่อ เมื่อเสร็จแล้วเปิด SCCRM เพื่อใช้งานได้เลย</li>
         </ol>
-        <p>ตัวช่วยจะตรวจการเชื่อมต่อแบบอ่านบิลอย่างเดียว สำรองค่าตั้งค่าเดิม แล้วเปิดการเชื่อม AdaPos ให้ SCCRM</p>
-        <p className="meta-line">หากมีข้อความผิดพลาด ให้เปิดหน้าต่างนั้นค้างไว้แล้วแจ้งผู้ดูแล ขั้นตอนนี้สำหรับสาขา 005 เท่านั้น</p>
+        <p>หากเครื่องยังไม่มีค่าฐานข้อมูล ตัวติดตั้งจะให้ผู้ดูแลระบุบัญชีอ่านอย่างเดียวก่อนดำเนินการต่อ</p>
+        <p className="meta-line">บัญชีพนักงานและข้อมูลเดิมจะถูกเก็บไว้ เครื่องที่ติดตั้งใหม่เข้าสู่ระบบด้วย PIN พนักงานตามเดิม</p>
       </section>}
       {data.previousReleases?.length > 0 && <section className="panel pos-release-history" aria-labelledby="pos-release-history-title">
         <div className="panel-header"><div><h3 id="pos-release-history-title">{data.installer.isLatest === false ? "เวอร์ชันอื่น" : "เวอร์ชันก่อนหน้า"}</h3><p>วันเผยแพร่ตามเวลาไทยและสิ่งที่เปลี่ยนในแต่ละรุ่น · แนะนำให้ใช้รุ่นที่แสดงด้านบน</p></div></div>

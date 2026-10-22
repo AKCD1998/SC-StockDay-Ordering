@@ -1,29 +1,25 @@
-# SCCRM AdaPos connection setup download
+# SCCRM combined installer
 
-The admin-only StockDay **แอดมิน** page offers a Branch 005 connection helper
-below the existing Windows installer. This is a separate post-install setup
-download, not a replacement for the signed desktop updater or installer.
+The admin-only StockDay **ลูกค้าสัมพันธ์ → แอดมิน** page offers one Windows
+installer. From release 1.3.2 it includes native AdaPos connection setup; the
+separate Branch 005 ZIP download has been removed from the page.
 
-- Target: approved POSSRV, Branch 005, Tailscale `100.106.107.80`.
-- Required installed application: SCCRMonPOS 1.3.1. The helper checks its exact
-  executable hash and device policy before applying configuration.
-- Asset: [Branch 005 setup v2](https://github.com/AKCD1998/SCCRMonPOS/releases/download/pos-1.3.1/SCCRMonPOS-Branch005-Setup-20261022-v2.zip).
-- The helper uses the existing local StockDay agent's read-only SQL identity;
-  the website and download contain no database password or staff session.
-- Exit SCCRM, extract the ZIP locally, and run `Setup-SCCRMonPOS-005.cmd`.
-  Leave AdaPos running. The helper verifies read-only permissions, backs up the
-  application configuration, preserves the saved staff session, enables the
-  watcher, and opens SCCRM. It does not write to AdaAcc.
-- Other branches, other app versions, existing private SCCRM configuration,
-  or failed permission checks require administrator review. The helper stops
-  rather than replacing an existing secrets file.
+Exit SCCRM, download the Windows installer, and follow the wizard. Its existing
+company device policy still applies. It discovers the local database connection
+from existing SCCRM/StockDay settings, verifies read-only SQL access and receipt
+tables, backs up configuration, and enables the watcher before installation can
+finish. If no suitable connection exists, it asks the local administrator for a
+read-only database account. The website carries no database passwords or tokens.
 
-The download card appears for the recommended 1.3.1 installer only, because this
-helper requires that exact application. A future recommendation hides the card
-until a matching setup flow is provided. Existing download authorization and
-server-revocation behavior also govern this card.
+Existing staff sessions and unrelated local settings are preserved. New staff
+devices still require their normal staff PIN. No AdaAcc data is modified, no SQL
+users are created, and other app versions remain usable without forced updates.
 
-The helper's Windows PowerShell 5.1 validation and remote SQL read-only checks
-have passed. Applying it locally on Branch 005 and verifying a real receipt in
-the member's history remain separate operational checks; the download card is
-not evidence that those checks have completed.
+The signed release catalog continues to supply installer URLs and publication
+dates. The combined-setup wording appears only for versions 1.3.2 and newer;
+older/rollback recommendations do not claim this capability. The same admin
+authorization and server-revocation behavior cover these instructions.
+
+Native implementation and verification details are in SCCRMonPOS's
+`docs/INSTALLER.md`. Publishing the download is distinct from proving a local
+Branch 005 installation and a member-linked real receipt.
