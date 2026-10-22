@@ -324,15 +324,6 @@
   line-height: 1.8;
 }
 
-.pos-setup-guide code {
-  overflow-wrap: anywhere;
-}
-
-.pos-setup-guide .pos-release-download {
-  max-width: 100%;
-  white-space: normal;
-}
-
 .pos-release-history h3 {
   margin: 0 0 6px;
   font-size: 1.05rem;
