@@ -163,6 +163,29 @@ describe("BranchStockPanel branch scope", () => {
     expect(global.fetch.mock.calls[0][0]).toContain("stockView=hourly004");
   });
 
+  it("shows 004 orange shared-stock availability with separate POS and marketplace demand", async () => {
+    const data = { records: [{ ...STOCK_RECORDS[0], qtyBranch004: 1, posQtyBranch004: 4,
+      stock004: { basis: "hourly-and-shopee", posBasis: "hourly-calculated", shopee: {
+        reservedQuantity: 2, shippedUnpostedQuantity: 1, asOf: "2026-10-22T12:00:00Z" } } }],
+      shopeeStock004: { status: "available", asOf: "2026-10-22T12:00:00Z" } };
+    renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: async () => ({ ...makeJsonResponse([]), json: async () => data }) });
+    await screen.findByText("A001");
+    const cell = productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
+    expect(cell).toHaveTextContent("แชร์กับ Shopee"); expect(cell).toHaveTextContent("POS 4.00");
+    expect(cell).toHaveTextContent("จอง 2.00"); expect(cell).toHaveTextContent("ส่งแล้วไม่ลง POS 1.00");
+    expect(cell.querySelector(".stock-shopee-shared")).not.toBeNull();
+  });
+
+  it("keeps unknown Shopee availability unknown for branch users and scoped totals", async () => {
+    const data = { records: [{ ...STOCK_RECORDS[0], qtyBranch004: null, qtyTotalAllBranches: null, posQtyBranch004: 4,
+      stock004: { basis: "shopee-availability-unknown", posBasis: "hourly-calculated", shopee: {} } }],
+      shopeeStock004: { status: "projection-unavailable" } };
+    renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: async () => ({ ...makeJsonResponse([]), json: async () => data }) });
+    await screen.findByText("A001");
+    const cell = productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
+    expect(cell).toHaveTextContent("รอตรวจ"); expect(cell.querySelector("strong")).not.toHaveTextContent("0.00");
+  });
+
   it("labels suppressed fallback quantities rather than representing the morning value as Hourly", async () => {
     renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: async () => {
       const response = hourlyResponse(); const data = await response.json();

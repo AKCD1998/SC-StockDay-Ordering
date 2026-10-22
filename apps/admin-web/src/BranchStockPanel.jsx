@@ -125,6 +125,7 @@ const STOCK_COST_COMPARE_BRANCHES = [
 ];
 
 function getBranchStockQty(row, branchCode) {
+  if (branchCode === "004" && row?.stock004?.basis === "shopee-availability-unknown") return null;
   return Number(row?.[`qtyBranch${branchCode}`] || 0);
 }
 
@@ -273,6 +274,7 @@ export function BranchStockPanel({
   ];
   const [records, setRecords] = useState([]);
   const [hourlyStock004, setHourlyStock004] = useState(null);
+  const [shopeeStock004, setShopeeStock004] = useState(null);
   const [matchReport, setMatchReport] = useState(null);
   const [matchPreview, setMatchPreview] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -496,7 +498,7 @@ export function BranchStockPanel({
         const params = new URLSearchParams({
           limit: String(pageFetchLimit),
           offset: "0",
-          stockView: "hourly004",
+          stockView: "hourly004-shopee",
         });
         if (appliedSearchTerm) {
           params.set("search", appliedSearchTerm);
@@ -509,6 +511,7 @@ export function BranchStockPanel({
         if (!active) return;
         setRecords(data.records || []);
         setHourlyStock004(data.hourlyStock004 || null);
+        setShopeeStock004(data.shopeeStock004 || null);
         setError("");
         setPagination(
           data.pagination || {
@@ -519,6 +522,8 @@ export function BranchStockPanel({
         );
       } catch (loadError) {
         if (!active) return;
+        setRecords(current => current.map(row => row.stock004?.shopee ? { ...row, qtyBranch004: null,
+          qtyTotalAllBranches: null, stock004: { ...row.stock004, basis: "shopee-availability-unknown", reason: "refresh-failed" } } : row));
         setError(loadError.name === "AbortError" ? "โหลดข้อมูลนานเกินไป กรุณาลองกด รีเฟรช" : loadError.message || "โหลดข้อมูลสต็อกสาขาไม่สำเร็จ");
       } finally {
         clearTimeout(timeout);
@@ -846,7 +851,7 @@ export function BranchStockPanel({
       const params = new URLSearchParams({
         branchCode: selectedExportBranch,
       });
-      if (selectedExportBranch === "004" || selectedExportBranch === "all") params.set("stockView", "hourly004");
+      if (selectedExportBranch === "004" || selectedExportBranch === "all") params.set("stockView", "hourly004-shopee");
       const exportSearch = searchTerm.trim() || appliedSearchTerm;
       if (exportSearch) {
         params.set("search", exportSearch);
@@ -1086,6 +1091,10 @@ export function BranchStockPanel({
       if (rawValue === "" || rawValue == null) continue;
       const requestedQty = normalizeRequestedQty(rawValue);
       const snapshotQty = getBranchStockQty(requestDialogProduct, branch.branchCode);
+      if (snapshotQty === null) {
+        setRequestDialogError("ยังยืนยันยอดพร้อมใช้ของสาขา 004 ไม่ได้ กรุณาตรวจบัญชีจอง Shopee ก่อน");
+        return;
+      }
       if (branch.requestMode !== "ADMIN_ALERT" && requestedQty > snapshotQty) {
         setRequestDialogError(`จำนวนที่ขอจาก ${branch.branchCode} มากกว่าสต็อกที่มีอยู่`);
         return;
@@ -1195,6 +1204,15 @@ export function BranchStockPanel({
     }
     if (column.type === "number") {
       if (column.key === "qtyBranch004" && row.stock004) {
+        if (["hourly-and-shopee", "shopee-availability-unknown"].includes(row.stock004.basis)) {
+          const known = row.stock004.basis === "hourly-and-shopee";
+          return <div className={`branch-stock-004-quantity ${known ? "stock-shopee-shared" : "stock-shopee-unknown"}`}>
+            <strong>{known ? formatNumber(row.qtyBranch004, 2) : "รอตรวจ"}</strong>
+            <small>{known ? "พร้อมใช้ · แชร์กับ Shopee" : "ยังยืนยันยอดพร้อมใช้ไม่ได้"}</small>
+            <small>POS {formatNumber(row.posQtyBranch004, 2)} · จอง {formatNumber(row.stock004.shopee?.reservedQuantity, 2)} · ส่งแล้วไม่ลง POS {formatNumber(row.stock004.shopee?.shippedUnpostedQuantity, 2)}</small>
+            <small>บัญชีจอง {hourlyTime(row.stock004.shopee?.asOf)} · POS {row.stock004.posBasis === "hourly-calculated" ? "Hourly" : "Full Sync"}</small>
+          </div>;
+        }
         const hourly = row.stock004.basis === "hourly-calculated";
         const detail = hourly
           ? `อ่าน ${hourlyTime(row.stock004.capturedAt)} · Full Sync เดิม ${formatNumber(row.fullSyncQtyBranch004, 2)}`
@@ -1235,6 +1253,11 @@ export function BranchStockPanel({
                 <span>{hourlyFallbackLabel(hourlyStock004?.status)}</span>
               </>}
               <small>ตรวจรอบใหม่ทุก 1 นาทีขณะเปิดหน้านี้</small>
+              {shopeeStock004 && shopeeStock004.status !== "disabled" ? <div className="branch-stock-shopee-status">
+                <strong>{shopeeStock004.status === "available" ? "หักยอดจอง Shopee แล้ว" : "ยอด Shopee บางส่วนยังต้องตรวจ — ดูรายการที่แสดงว่ารอตรวจ"}</strong>
+                <span>บัญชีจอง {hourlyTime(shopeeStock004.asOf)} · รับอีเมลล่าสุด {hourlyTime(shopeeStock004.lastEmailIngestedAt)}</span>
+                <small>ใช้เฉพาะออเดอร์ที่ระบบรับจากอีเมล การคืนเงินยังไม่ถือว่าได้รับสินค้ากลับ</small>
+              </div> : null}
             </div>
           ) : null}
         </div>
