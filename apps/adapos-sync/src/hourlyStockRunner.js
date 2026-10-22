@@ -15,10 +15,16 @@ import { buildSqlServerConfig } from "./sqlServerConfig.js";
 import {
   uploadHourlyEvidence as defaultUploadHourlyEvidence,
 } from "./hourlyStockEvidenceClient.js";
-import { enqueueHourlyEvidence, flushHourlyEvidenceOutbox, withHourlyCaptureLock } from "./hourlyEvidenceStorage.js";
+import { enqueueHourlyEvidence, flushHourlyEvidenceOutbox, withHourlyCaptureLock, hourlyEvidenceDeliveryBounds } from "./hourlyEvidenceStorage.js";
+import { readHourlyCompleteCohort } from "./hourlyCompleteCohort.js";
+import { resolveHourlyCohortConfig } from "./hourlyCohortManifest.js";
+import { assertHourlyCompleteCohortGuard } from "./hourlyCompleteCohortGuard.js";
+import { HOURLY_COMPLETE_COHORT_MAX_RECORDS } from "./hourlyCohortCoverage.js";
 
 export async function runHourlyStockIntraday(dependencies = {}) {
-  const config = dependencies.syncConfig ?? defaultSyncConfig;
+  const originalConfig = dependencies.syncConfig ?? defaultSyncConfig;
+  const config = originalConfig.hourlyStockEvidence?.enabled === true && originalConfig.hourlyStockEvidence.completeCohortEnabled === true
+    ? { ...originalConfig, hourlyStockEvidence: resolveHourlyCohortConfig(originalConfig.hourlyStockEvidence) } : originalConfig;
   if (config.hourlyStockEvidence?.enabled !== true) {
     return { status: "skipped", reason: "feature-disabled" };
   }
@@ -45,12 +51,14 @@ export async function runHourlyStockIntraday(dependencies = {}) {
   if (!/^(09|1[0-9]):00$/.test(evidenceConfig.plannedSlot)) {
     throw Object.assign(new Error("Intraday planned slot must be 09:00-19:00."), { code: "CONFIG_ERROR" });
   }
-  if (evidenceConfig.productCodes.length > 500 || new Set(evidenceConfig.productCodes).size !== evidenceConfig.productCodes.length) {
+  if (evidenceConfig.productCodes.length > (evidenceConfig.completeCohortEnabled === true ? HOURLY_COMPLETE_COHORT_MAX_RECORDS : 500) || new Set(evidenceConfig.productCodes).size !== evidenceConfig.productCodes.length) {
     throw Object.assign(new Error("Hourly cohort must contain 1-500 unique products."), { code: "CONFIG_ERROR" });
   }
 
   const connectSql = dependencies.connectSql ?? ((connectionConfig) => sql.connect(connectionConfig));
-  const getRows = dependencies.getHourlyStockEvidenceRows ?? readHourlyDerivedStock;
+  const getRows = dependencies.getHourlyStockEvidenceRows ?? (evidenceConfig.completeCohortEnabled === true
+    ? (pool, codes, options) => readHourlyCompleteCohort(pool, codes, { ...options, scope: evidenceConfig.cohortScope,
+      guard: dependencies.completeCohortGuard ?? assertHourlyCompleteCohortGuard }) : readHourlyDerivedStock);
   const runShadow = dependencies.runHourlyStockShadow ?? defaultRunHourlyStockShadow;
   const uploadEvidence = dependencies.uploadHourlyEvidence ?? defaultUploadHourlyEvidence;
   const now = dependencies.now ?? (() => new Date().toISOString());
@@ -89,6 +97,7 @@ export async function runHourlyStockIntraday(dependencies = {}) {
         plannedSlot: evidenceConfig.plannedSlot,
         capturedAt: observedAt,
         rows,
+        cohortCoverage: Array.isArray(snapshot) ? null : snapshot.cohortCoverage,
         clientMeta: {
           agentVersion: "hourly-evidence-candidate-v1",
           queryDurationMs,
@@ -120,7 +129,8 @@ export async function runHourlyStockIntraday(dependencies = {}) {
         plannedSlot: evidenceConfig.plannedSlot,
         ...(sourceClockDiagnostics ? { sourceClockDiagnostics } : {}),
         derivedObservationDiagnostics: derivedObservationDiagnostics(derivedObservation,
-          rows.map(row => ({ productCode: row.product_code, latestEstimatedOnHand: row.latest_estimated_on_hand })), observedAt),
+          rows.map(row => ({ productCode: row.product_code, latestEstimatedOnHand: row.latest_estimated_on_hand })), observedAt,
+          { completeCohort: evidenceConfig.completeCohortEnabled === true }),
         sourceFreshness: {
           status: sourceRead?.invalidRefreshProducts ? "invalid" : "unknown",
           qualifying: false,
@@ -137,6 +147,7 @@ export async function runHourlyStockIntraday(dependencies = {}) {
   const upload = await flushHourlyEvidenceOutbox({
     cacheDir: evidenceConfig.cacheDir, branchCode: config.branchCode,
     apiBaseUrl: config.apiBaseUrl, token: evidenceConfig.uploadToken, uploadEvidence,
+    ...hourlyEvidenceDeliveryBounds(evidenceConfig),
   });
   return { ...captured, upload };
 }
@@ -150,6 +161,7 @@ export async function replayHourlyEvidence(dependencies = {}) {
     cacheDir: config.hourlyStockEvidence.cacheDir, branchCode: config.branchCode,
     apiBaseUrl: config.apiBaseUrl, token: config.hourlyStockEvidence.uploadToken,
     uploadEvidence: dependencies.uploadHourlyEvidence ?? defaultUploadHourlyEvidence,
+    ...hourlyEvidenceDeliveryBounds(config.hourlyStockEvidence),
   });
 }
 

@@ -173,6 +173,8 @@ export const syncConfig = {
   // payload. All controls remain dormant by default.
   hourlyStockEvidence: {
     enabled: String(process.env.ADAPOS_HOURLY_STOCK_EVIDENCE_SHADOW ?? "false") === "true",
+    completeCohortEnabled: String(process.env.ADAPOS_HOURLY_STOCK_EVIDENCE_COMPLETE_COHORT ?? "false") === "true",
+    cohortFile: String(process.env.ADAPOS_HOURLY_STOCK_EVIDENCE_COHORT_FILE ?? ""),
     // Separate opt-in for the old local-only post-Full-Sync comparison. The
     // durable hourly runner flag above must not alter the Full Sync query or
     // request trace when an intraday pilot is eventually enabled.

@@ -34,10 +34,35 @@ A changed product has a null derived quantity and `changed-between-reads`.
 This includes a change between either sample's opening and closing master/cache
 projection, even if both opening samples match. Closing evidence must contain
 the complete cohort; missing evidence fails the read without a fallback.
-Missing/invalid components, aliases or non-POS foreign branch rows also withhold
+Missing/invalid components, unsupported aliases or non-POS foreign branch rows also withhold
 the derived quantity. Missing movement rows alone mean zero, as in the getter.
 The fixed local POS temporary scope is preserved, not filtered to branch 004.
 The second sample supplies the unchanged canonical fields and stored provenance.
+
+## Observed one-to-one shared stock
+
+Owner-local metadata on 21 October identified four active aliases with existing
+active self-stock targets. All four alias and target stock factors are one;
+their positive small-unit factors match. Two display-unit names differ, which
+does not by itself establish a numerical conversion. The two SQL objects that
+reference the stock-factor column project that column without a conversion
+operator. General multiplication/division for non-unit factors remains unproved.
+
+For this verified one-to-one case only, the supplemental estimate uses the
+target master's retail and wholesale quantities plus the ordinary16 movements
+grouped once by the stock code. It does not use the alias's independent cached
+retail value, multiply by a display-unit name, or apply the small-unit factor
+again. Master and aliases refer to the same physical pool; summing their
+estimates would double count that pool. The canonical stored pair remains the
+original per-product stored pair and is never replaced by this estimate.
+
+An absent/inactive/non-self target, a stock factor other than one, unequal or
+nonpositive small-unit factors, or missing unit metadata retains the existing
+`non-master-stock-code` suppression. Invalid target quantities suppress with
+`invalid-source-component`. No unsupported case becomes zero. Mapping, unit
+metadata, factors and target components participate in both opening/closing
+bookends and between-sample checks. A detected change withholds the estimate.
+This remains observed, non-qualifying evidence rather than an atomic snapshot.
 
 All vendor views contain NOLOCK; snapshot options are OFF. Two identical
 samples can still be dirty, torn or miss ABA transitions. Therefore consistency
