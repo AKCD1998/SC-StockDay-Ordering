@@ -13,6 +13,7 @@ import ReviewQueuePanel from "./ReviewQueuePanel.jsx";
 import IngredientDictionaryPanel from "./IngredientDictionaryPanel.jsx";
 import PreorderPanel from "./preorders/PreorderPanel";
 import PosAdminPanel from "./PosAdminPanel.jsx";
+import MembersPanel from "./MembersPanel.jsx";
 import LoginScreen from "./LoginScreen.jsx";
 import AdminNavigation from "./AdminNavigation.jsx";
 import AdminAccountActions from "./AdminAccountActions.jsx";
@@ -1993,15 +1994,7 @@ export default function App() {
       ) : view === "pos-admin" && isAdminUser ? (
         <PosAdminPanel />
       ) : view === "members" ? (
-        <section className="panel" aria-labelledby="members-title">
-          <div className="panel-header stacked">
-            <div>
-              <h2 id="members-title">สมาชิก</h2>
-              <p>เตรียมพื้นที่สำหรับฟังก์ชันสมาชิก</p>
-            </div>
-          </div>
-          <p className="empty-state">ยังไม่มีฟังก์ชันในหน้านี้</p>
-        </section>
+        <MembersPanel isAdmin={isAdminUser} />
       ) : (
         <>
           <section className="kpis">
