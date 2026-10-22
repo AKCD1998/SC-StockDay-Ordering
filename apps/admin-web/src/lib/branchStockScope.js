@@ -137,6 +137,12 @@ export async function createBranchStockScopeWorkbook({
 
   const workbook = xlsx.utils.book_new();
   xlsx.utils.book_append_sheet(workbook, worksheet, scope.label.slice(0, 31));
+  if (columns.some(column => column.key === "qtyBranch004") && records.some(row => row.stock004)) {
+    const sources = [["รหัสสินค้า", "แหล่งยอด 004", "ยอด Full Sync 004", "อ่าน Hourly เมื่อ", "Full Sync เมื่อ", "เหตุที่ใช้ Full Sync"],
+      ...records.map(row => [row.productCode, row.stock004?.basis || "full-sync", row.fullSyncQtyBranch004 ?? row.qtyBranch004,
+        row.stock004?.capturedAt || "", row.stock004?.fullSyncAt || "", row.stock004?.reason || ""])];
+    xlsx.utils.book_append_sheet(workbook, xlsx.utils.aoa_to_sheet(sources), "ที่มาสต็อก004");
+  }
   const data = xlsx.write(workbook, { type: "array", bookType: "xlsx" });
   return {
     blob: new Blob([data], {
