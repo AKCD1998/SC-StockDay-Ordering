@@ -89,6 +89,17 @@ export default function PosAdminPanel() {
           <ul>{data.installer.highlights.map(change => <li key={change}>{change}</li>)}</ul>
         </div>}
       </div>
+      {data.installer.version === "1.3.1" && <section className="panel pos-setup-guide" aria-labelledby="pos-setup-title">
+        <div className="panel-header"><div><h3 id="pos-setup-title">ตั้งค่าเชื่อม AdaPos หลังติดตั้ง</h3><p>ตัวช่วยสำหรับเครื่อง POSSRV สาขา 005 ที่ติดตั้ง SCCRM เวอร์ชัน 1.3.1 แล้ว</p></div></div>
+        <a className="pos-release-download" href="https://github.com/AKCD1998/SCCRMonPOS/releases/download/pos-1.3.1/SCCRMonPOS-Branch005-Setup-20261022-v2.zip" rel="noopener noreferrer"><DownloadIcon />ดาวน์โหลดตัวช่วยตั้งค่า สาขา 005 (.zip)</a>
+        <ol>
+          <li>ออกจาก SCCRM ที่ไอคอนมุมขวาล่าง โดยเปิดโปรแกรมขาย AdaPos ไว้ตามปกติ</li>
+          <li>ดาวน์โหลดไฟล์ ZIP ไปที่เครื่องสาขา 005 แล้วคลิกขวาเลือก Extract All / แยกไฟล์ทั้งหมด</li>
+          <li>เปิดโฟลเดอร์ที่แยกไฟล์แล้ว ดับเบิลคลิก <code>Setup-SCCRMonPOS-005.cmd</code> และรอจน SCCRM เปิดขึ้น</li>
+        </ol>
+        <p>ตัวช่วยจะตรวจการเชื่อมต่อแบบอ่านบิลอย่างเดียว สำรองค่าตั้งค่าเดิม แล้วเปิดการเชื่อม AdaPos ให้ SCCRM</p>
+        <p className="meta-line">หากมีข้อความผิดพลาด ให้เปิดหน้าต่างนั้นค้างไว้แล้วแจ้งผู้ดูแล ขั้นตอนนี้สำหรับสาขา 005 เท่านั้น</p>
+      </section>}
       {data.previousReleases?.length > 0 && <section className="panel pos-release-history" aria-labelledby="pos-release-history-title">
         <div className="panel-header"><div><h3 id="pos-release-history-title">{data.installer.isLatest === false ? "เวอร์ชันอื่น" : "เวอร์ชันก่อนหน้า"}</h3><p>วันเผยแพร่ตามเวลาไทยและสิ่งที่เปลี่ยนในแต่ละรุ่น · แนะนำให้ใช้รุ่นที่แสดงด้านบน</p></div></div>
         <ul className="pos-release-list">{data.previousReleases.filter(release => release.version !== data.installer.version).map(release => <li className="pos-release-row" key={release.version}>

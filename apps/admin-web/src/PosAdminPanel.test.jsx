@@ -10,6 +10,7 @@ describe("POS admin panel", () => {
     apiFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ auditedAt: "2026-10-21T10:00:00Z", devices: [], installer: { version: "1.3.1", downloadUrl: "https://example.com/1.3.1.exe" } }) });
     render(<PosAdminPanel />);
     expect(await screen.findByRole("link", { name: /ดาวน์โหลดสำหรับ Windows/ })).toBeVisible();
+    expect(screen.getByRole("link", { name: "ดาวน์โหลดตัวช่วยตั้งค่า สาขา 005 (.zip)" })).toHaveAttribute("href", "https://github.com/AKCD1998/SCCRMonPOS/releases/download/pos-1.3.1/SCCRMonPOS-Branch005-Setup-20261022-v2.zip");
     apiFetch.mockRejectedValue(new Error("Offline"));
     fireEvent.focus(window);
     expect(await screen.findByText("Offline")).toBeInTheDocument();
@@ -19,6 +20,7 @@ describe("POS admin panel", () => {
     expect(await screen.findByText("หน้านี้สำหรับบัญชีแอดมินเท่านั้น")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /ดาวน์โหลดสำหรับ Windows/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "ตั้งค่าเชื่อม AdaPos หลังติดตั้ง" })).not.toBeInTheDocument();
   });
   it("refreshes a published release without navigation, keeps the page visible, and removes the timer on exit", async () => {
     vi.useFakeTimers();
@@ -30,6 +32,7 @@ describe("POS admin panel", () => {
     apiFetch.mockResolvedValue(response("1.3.2"));
     await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
     expect(screen.getByText("รุ่นล่าสุด · 1.3.2")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "ตั้งค่าเชื่อม AdaPos หลังติดตั้ง" })).not.toBeInTheDocument();
     expect(screen.queryByText("กำลังโหลดสิทธิ์เครื่อง…")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("ข้อมูลรุ่นอัปเดตอัตโนมัติ");
     view.unmount();
