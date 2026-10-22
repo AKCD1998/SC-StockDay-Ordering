@@ -524,6 +524,7 @@ export function BranchStockPanel({
         if (!active) return;
         setRecords(current => current.map(row => row.stock004?.shopee ? { ...row, qtyBranch004: null,
           qtyTotalAllBranches: null, stock004: { ...row.stock004, basis: "shopee-availability-unknown", reason: "refresh-failed" } } : row));
+        setShopeeStock004(current => current && current.status !== "disabled" ? { ...current, status: "refresh-failed", applied: false } : current);
         setError(loadError.name === "AbortError" ? "โหลดข้อมูลนานเกินไป กรุณาลองกด รีเฟรช" : loadError.message || "โหลดข้อมูลสต็อกสาขาไม่สำเร็จ");
       } finally {
         clearTimeout(timeout);

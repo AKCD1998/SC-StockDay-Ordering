@@ -228,6 +228,18 @@ describe("BranchStockPanel branch scope", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
+  it("invalidates both the old marketplace quantity and its available banner after a failed refresh", async () => {
+    vi.useFakeTimers(); let calls=0;
+    const data={records:[{...STOCK_RECORDS[0],qtyBranch004:1,posQtyBranch004:4,stock004:{basis:'hourly-and-shopee',posBasis:'hourly-calculated',
+      shopee:{reservedQuantity:2,shippedUnpostedQuantity:1}}}],shopeeStock004:{status:'available'}};
+    renderPanel({isOnlineMarketingStaff:false,branchCode:'004',fetchImplementation:async()=>{
+      calls++;if(calls>1)throw Error('synthetic network failure');return {...makeJsonResponse([]),json:async()=>data};
+    }});
+    await act(async()=>{});expect(screen.getByText('หักยอดจอง Shopee แล้ว')).toBeInTheDocument();
+    await act(async()=>{await vi.advanceTimersByTimeAsync(60000);});
+    expect(productRow('A001').querySelector('[data-column-key="qtyBranch004"]')).toHaveTextContent('รอตรวจ');
+    expect(screen.queryByText('หักยอดจอง Shopee แล้ว')).not.toBeInTheDocument();
+  });
 
   it("exports the displayed Hourly zero and includes a separate source/baseline sheet", async () => {
     const user = userEvent.setup();
