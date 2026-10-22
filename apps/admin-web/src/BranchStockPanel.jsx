@@ -39,6 +39,27 @@ function formatDateTime(value) {
   return new Date(value).toLocaleString("th-TH");
 }
 
+function hourlyTime(value) {
+  if (!value || !Number.isFinite(Date.parse(value))) return "-";
+  return new Date(value).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" });
+}
+
+function hourlyFallbackLabel(reason) {
+  return ({
+    "not-in-cohort": "อยู่นอกชุด Hourly",
+    "full-sync-newer": "Full Sync ใหม่กว่าช่วงอ่าน Hourly",
+    "full-sync-time-unknown": "ยังยืนยันเวลา Full Sync ไม่ได้",
+    "changed-between-reads": "ข้อมูลเปลี่ยนระหว่างอ่าน",
+    "invalid-source-component": "ส่วนประกอบยอดยังยืนยันไม่ได้",
+    "non-master-stock-code": "ยังยืนยันรหัสสต็อกร่วมไม่ได้",
+    "outside-branch-movement": "ยังยืนยันการเคลื่อนไหวของสาขาไม่ได้",
+    "disabled": "ยังไม่เปิดแสดงยอด Hourly",
+    "no-today-capture": "ยังไม่มีรอบ Hourly ของวันนี้",
+    "invalid-capture": "ชุด Hourly ไม่ผ่านการตรวจครบชุด",
+    "unavailable": "อ่านชุด Hourly ไม่สำเร็จ",
+  })[reason] || "ยังไม่มียอด Hourly ที่ใช้แสดงได้";
+}
+
 function translateCategoryReviewStatus(status) {
   if (status === "confirmed") return "ยืนยันแล้ว";
   if (status === "imported_exact_match") return "นำเข้าจาก exact code";
@@ -251,6 +272,7 @@ export function BranchStockPanel({
     { branchCode: "005", label: "สาขา 005", description: "ดึงเฉพาะคอลัมน์จำนวนของ สาขา 005" },
   ];
   const [records, setRecords] = useState([]);
+  const [hourlyStock004, setHourlyStock004] = useState(null);
   const [matchReport, setMatchReport] = useState(null);
   const [matchPreview, setMatchPreview] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -460,25 +482,33 @@ export function BranchStockPanel({
 
   useEffect(() => {
     let active = true;
+    let pending = false;
+    let controller;
 
-    async function loadBranchStock() {
-      setLoading(true);
+    async function loadBranchStock(background = false) {
+      if (pending) return;
+      pending = true;
+      controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 45000);
+      if (!background) setLoading(true);
       setError("");
       try {
         const params = new URLSearchParams({
           limit: String(pageFetchLimit),
           offset: "0",
+          stockView: "hourly004",
         });
         if (appliedSearchTerm) {
           params.set("search", appliedSearchTerm);
         }
-        const response = await apiFetch(`/api/branch-stock?${params.toString()}`);
+        const response = await apiFetch(`/api/branch-stock?${params.toString()}`, { signal: controller.signal });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
         const data = await response.json();
         if (!active) return;
         setRecords(data.records || []);
+        setHourlyStock004(data.hourlyStock004 || null);
         setError("");
         setPagination(
           data.pagination || {
@@ -489,8 +519,10 @@ export function BranchStockPanel({
         );
       } catch (loadError) {
         if (!active) return;
-        setError(loadError.message || "โหลดข้อมูลสต็อกสาขาไม่สำเร็จ");
+        setError(loadError.name === "AbortError" ? "โหลดข้อมูลนานเกินไป กรุณาลองกด รีเฟรช" : loadError.message || "โหลดข้อมูลสต็อกสาขาไม่สำเร็จ");
       } finally {
+        clearTimeout(timeout);
+        pending = false;
         if (active) {
           setLoading(false);
         }
@@ -498,8 +530,16 @@ export function BranchStockPanel({
     }
 
     loadBranchStock();
+    const refreshVisible = () => {
+      if (document.visibilityState !== "hidden") loadBranchStock(true);
+    };
+    const interval = setInterval(refreshVisible, 60000);
+    document.addEventListener("visibilitychange", refreshVisible);
     return () => {
       active = false;
+      controller?.abort();
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshVisible);
     };
   }, [appliedSearchTerm, refreshKey]);
 
@@ -806,6 +846,7 @@ export function BranchStockPanel({
       const params = new URLSearchParams({
         branchCode: selectedExportBranch,
       });
+      if (selectedExportBranch === "004" || selectedExportBranch === "all") params.set("stockView", "hourly004");
       const exportSearch = searchTerm.trim() || appliedSearchTerm;
       if (exportSearch) {
         params.set("search", exportSearch);
@@ -1153,6 +1194,19 @@ export function BranchStockPanel({
       );
     }
     if (column.type === "number") {
+      if (column.key === "qtyBranch004" && row.stock004) {
+        const hourly = row.stock004.basis === "hourly-calculated";
+        const detail = hourly
+          ? `อ่าน ${hourlyTime(row.stock004.capturedAt)} · Full Sync เดิม ${formatNumber(row.fullSyncQtyBranch004, 2)}`
+          : hourlyFallbackLabel(row.stock004.reason);
+        return <div className="branch-stock-004-quantity">
+          <span>{formatNumber(row.qtyBranch004, 2)}</span>
+          <small className={hourly ? "stock-source-hourly" : "stock-source-fallback"} title={detail}>
+            {hourly ? "Hourly คำนวณ" : "Full Sync"}
+          </small>
+          <small className="branch-stock-004-detail">{detail}</small>
+        </div>;
+      }
       return formatNumber(row[column.key], 2);
     }
     if (column.key === "syncedAt") {
@@ -1168,7 +1222,21 @@ export function BranchStockPanel({
       >
         <div className="branch-stock-header-info">
           <h2>สต็อกแยกตามสาขา</h2>
-          <p>ข้อมูล snapshot ล่าสุดที่ Mother PC ส่งเข้า Render สำหรับการติดตามยอดแต่ละสาขา</p>
+          <p>ติดตามยอดแต่ละสาขา พร้อมแหล่งข้อมูลและเวลาที่อ่าน</p>
+          {visibleBranchStockColumns.some(column => column.key === "qtyBranch004") ? (
+            <div className="branch-stock-hourly-status" role="region" aria-live="polite" aria-label="แหล่งข้อมูลสต็อกสาขา 004">
+              {hourlyStock004?.status === "available" ? <>
+                <strong>004 · ยอดคำนวณ Hourly {formatNumber(hourlyStock004.availableProducts)} รายการ</strong>
+                <span>{hourlyStock004.plannedSlot ? `รอบ ${hourlyStock004.plannedSlot} · ` : ""}อ่านเมื่อ {hourlyTime(hourlyStock004.capturedAt)} (เวลาไทย)</span>
+                {hourlyStock004.pageFallbackProducts > 0 ? <span>รายการที่แสดงใช้ Full Sync {formatNumber(hourlyStock004.pageFallbackProducts)} รายการ ดูเหตุผลใต้ยอด</span> : null}
+                <small>ยอดระหว่างวันรวมการขายและการเคลื่อนไหวที่อ่านได้ ยังไม่รับรองว่าอ่านทุกสินค้าพร้อมกัน ณ วินาทีเดียว</small>
+              </> : <>
+                <strong>004 · กำลังแสดงยอด Full Sync</strong>
+                <span>{hourlyFallbackLabel(hourlyStock004?.status)}</span>
+              </>}
+              <small>ตรวจรอบใหม่ทุก 1 นาทีขณะเปิดหน้านี้</small>
+            </div>
+          ) : null}
         </div>
 
         {isBranchStockScopeUser ? (

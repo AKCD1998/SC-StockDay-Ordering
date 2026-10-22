@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BranchStockPanel } from "./App.jsx";
@@ -137,7 +137,100 @@ describe("BranchStockPanel branch scope", () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  function hourlyResponse(quantity = 0) {
+    const data = {
+      records: [{ ...STOCK_RECORDS[0], qtyBranch004: quantity, qtyTotalAllBranches: 11 + quantity,
+        fullSyncQtyBranch004: 4, stock004: { basis: "hourly-calculated", reason: null,
+          capturedAt: "2026-10-22T06:02:00.000Z", fullSyncAt: "2026-10-22T01:22:00.000Z" } }],
+      hourlyStock004: { status: "available", availableProducts: 6835, capturedAt: "2026-10-22T06:02:00.000Z", pageFallbackProducts: 0 },
+      pagination: { limit: 10000, offset: 0, total: 1 },
+    };
+    return { ...makeJsonResponse([]), json: async () => data };
+  }
+
+  it("requests the Hourly read view and displays a sold-to-zero quantity with its original Full Sync baseline", async () => {
+    renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: async () => hourlyResponse() });
+    await screen.findByText("A001");
+    const cell = productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
+    expect(cell.querySelector("span")).toHaveTextContent("0.00");
+    expect(cell).toHaveTextContent("Hourly คำนวณ");
+    expect(cell).toHaveTextContent("Full Sync เดิม 4.00");
+    expect(screen.getByRole("region", { name: "แหล่งข้อมูลสต็อกสาขา 004" })).toHaveTextContent("6,835");
+    expect(global.fetch.mock.calls[0][0]).toContain("stockView=hourly004");
+  });
+
+  it("labels suppressed fallback quantities rather than representing the morning value as Hourly", async () => {
+    renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: async () => {
+      const response = hourlyResponse(); const data = await response.json();
+      data.records[0].qtyBranch004 = 4;
+      data.records[0].stock004 = { basis: "full-sync", reason: "changed-between-reads" };
+      data.hourlyStock004.pageFallbackProducts = 1;
+      return { ...response, json: async () => data };
+    } });
+    await screen.findByText("A001");
+    const cell = productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
+    expect(cell).toHaveTextContent("ข้อมูลเปลี่ยนระหว่างอ่าน");
+    expect(cell).not.toHaveTextContent("Hourly คำนวณ");
+    expect(screen.getByRole("region", { name: "แหล่งข้อมูลสต็อกสาขา 004" })).toHaveTextContent("ใช้ Full Sync 1 รายการ");
+  });
+
+  it("keeps another branch's quantity and export scope independent of the 004 overlay", async () => {
+    renderPanel({ isOnlineMarketingStaff: false, branchCode: "001", fetchImplementation: async () => hourlyResponse() });
+    await screen.findByText("A001");
+    expect(scopedColumnValue("A001", "qtyBranch001")).toBe("2.00");
+    expect(screen.queryByRole("region", { name: "แหล่งข้อมูลสต็อกสาขา 004" })).not.toBeInTheDocument();
+  });
+
+  it("refreshes visible data each minute, skips hidden tabs, and aborts on unmount", async () => {
+    vi.useFakeTimers();
+    let quantity = 0;
+    const view = renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: async () => hourlyResponse(quantity) });
+    await act(async () => {});
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    quantity = -2;
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(productRow("A001").querySelector('[data-column-key="qtyBranch004"] span')).toHaveTextContent("-2.00");
+    vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    const signal = global.fetch.mock.calls.at(-1)[1].signal;
+    view.unmount();
+    expect(signal.aborted).toBe(true);
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("exports the displayed Hourly zero and includes a separate source/baseline sheet", async () => {
+    const user = userEvent.setup();
+    renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: async () => hourlyResponse() });
+    await screen.findByText("A001");
+    await user.click(screen.getByRole("button", { name: "ส่งออก Excel ตามขอบเขตสต็อกที่เลือก" }));
+    await waitFor(() => expect(xlsxMock.aoaToSheet).toHaveBeenCalledTimes(2));
+    const displayed = xlsxMock.aoaToSheet.mock.calls[0][0];
+    expect(displayed[1][displayed[0].indexOf("สาขา 004")]).toBe(0);
+    const sources = xlsxMock.aoaToSheet.mock.calls[1][0];
+    expect(sources[1]).toEqual(["A001", "hourly-calculated", 4, "2026-10-22T06:02:00.000Z", "2026-10-22T01:22:00.000Z", ""]);
+  });
+
+  it("does not let an older slow response overwrite a newer search", async () => {
+    const user = userEvent.setup();
+    let resolveOld;
+    let call = 0;
+    renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: () => {
+      call += 1;
+      return call === 1 ? new Promise(resolve => { resolveOld = resolve; }) : Promise.resolve(hourlyResponse(2));
+    } });
+    await user.type(screen.getByRole("searchbox", { name: "ค้นหาสต็อกสินค้า" }), "Alpha");
+    await user.click(screen.getByRole("button", { name: "ค้นหา" }));
+    await screen.findByText("A001");
+    await act(async () => { resolveOld(hourlyResponse(99)); });
+    expect(productRow("A001").querySelector('[data-column-key="qtyBranch004"] span')).toHaveTextContent("2.00");
+    expect(global.fetch.mock.calls[0][1].signal.aborted).toBe(true);
   });
 
   it("groups branch-stock header controls without replacing their existing behavior", async () => {
