@@ -167,13 +167,14 @@ describe("BranchStockPanel branch scope", () => {
     const data = { records: [{ ...STOCK_RECORDS[0], qtyBranch004: 1, posQtyBranch004: 4,
       stock004: { basis: "hourly-and-shopee", posBasis: "hourly-calculated", shopee: {
         reservedQuantity: 2, shippedUnpostedQuantity: 1, asOf: "2026-10-22T12:00:00Z" } } }],
-      shopeeStock004: { status: "available", asOf: "2026-10-22T12:00:00Z" } };
+      shopeeStock004: { status: "available", asOf: "2026-10-22T12:00:00Z", sourceLabelReviewOrders: 1 } };
     renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: async () => ({ ...makeJsonResponse([]), json: async () => data }) });
     await screen.findByText("A001");
     const cell = productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
     expect(cell).toHaveTextContent("แชร์กับ Shopee"); expect(cell).toHaveTextContent("POS 4.00");
     expect(cell).toHaveTextContent("จอง 2.00"); expect(cell).toHaveTextContent("ส่งแล้วไม่ลง POS 1.00");
     expect(cell.querySelector(".stock-shopee-shared")).not.toBeNull();
+    expect(screen.getByText(/มีรูปแบบชื่อต้นทาง/)).toBeInTheDocument();
   });
 
   it("keeps unknown Shopee availability unknown for branch users and scoped totals", async () => {

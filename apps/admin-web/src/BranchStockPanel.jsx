@@ -1256,6 +1256,7 @@ export function BranchStockPanel({
               {shopeeStock004 && shopeeStock004.status !== "disabled" ? <div className="branch-stock-shopee-status">
                 <strong>{shopeeStock004.status === "available" ? "หักยอดจอง Shopee แล้ว" : "ยอด Shopee บางส่วนยังต้องตรวจ — ดูรายการที่แสดงว่ารอตรวจ"}</strong>
                 <span>บัญชีจอง {hourlyTime(shopeeStock004.asOf)} · รับอีเมลล่าสุด {hourlyTime(shopeeStock004.lastEmailIngestedAt)}</span>
+                {shopeeStock004.sourceLabelReviewOrders > 0 ? <small>มีรูปแบบชื่อต้นทางที่ใช้การยืนยันจับคู่เฉพาะจากผู้ดูแล {formatNumber(shopeeStock004.sourceLabelReviewOrders)} ออเดอร์</small> : null}
                 <small>ใช้เฉพาะออเดอร์ที่ระบบรับจากอีเมล การคืนเงินยังไม่ถือว่าได้รับสินค้ากลับ</small>
               </div> : null}
             </div>
