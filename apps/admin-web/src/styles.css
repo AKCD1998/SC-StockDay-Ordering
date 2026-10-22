@@ -2064,6 +2064,7 @@ button {
   border: 1px solid #bfd4df;
   border-radius: 8px;
   background: #f2f8fb;
+  color: #173f50;
   font-size: 0.82rem;
   overflow-wrap: anywhere;
 }
@@ -2072,6 +2073,9 @@ button {
 .branch-stock-004-quantity .stock-source-hourly { color: #17624d; }
 .branch-stock-004-quantity .stock-source-fallback { color: #805417; }
 .branch-stock-004-detail { color: #526170; font-size: 0.7rem; max-width: 220px; white-space: normal; }
+[data-theme="dark"] .branch-stock-004-quantity .stock-source-hourly { color: #83ddba; }
+[data-theme="dark"] .branch-stock-004-quantity .stock-source-fallback { color: #ffd082; }
+[data-theme="dark"] .branch-stock-004-detail { color: #b4c4d8; }
 
 .branch-stock-panel-header .branch-stock-header-info {
   grid-column: 1;
