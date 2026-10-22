@@ -20,5 +20,5 @@ for the unit actually sold. Legacy totals are labelled separately from stored
 POS-header totals. Future unit snapshots require a POS version that sends them
 (1.3.3+); older clients retain the existing claim contract.
 
-Verification: full admin-web Vitest suite (139 tests), production build, and
+Verification: full admin-web Vitest suite (140 tests), production build, and
 browser inspection of directory/modal with synthetic multi-receipt data.

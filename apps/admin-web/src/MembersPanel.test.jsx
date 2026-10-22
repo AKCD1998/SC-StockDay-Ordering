@@ -27,6 +27,11 @@ it('searches on submit with escaped values and uses server pagination', async ()
   await screen.findByText('สมาชิกทดสอบ'); fireEvent.click(screen.getByRole('button', { name: 'ถัดไป' }));
   await waitFor(() => expect(apiFetch.mock.calls.at(-1)[0]).toContain('page=2'));
 });
+it('retains fractional sale quantities instead of rounding small quantities to zero', async () => {
+  apiFetch.mockImplementation(async path => reply(String(path).includes('purchase-history') ? { memberId: member.id, purchases: [{ ...receipt, totalAmount: 3.77, items: [{ ...receipt.items[0], qty: 0.1256, lineTotal: 3.77 }] }] } : { members: [member], total: 1 }));
+  render(<MembersPanel isAdmin />); fireEvent.click(await screen.findByRole('button', { name: /ดูประวัติการซื้อ สมาชิก/ }));
+  expect(await screen.findByText('0.1256')).toBeVisible();
+});
 it('supports history pagination, unknown historic units and members with no bills', async () => {
   let count = 0;
   apiFetch.mockImplementation(async path => reply(String(path).includes('purchase-history') ? { memberId: member.id, purchases: [{ ...receipt, claimId: String(++count), items: [{ ...receipt.items[0], unitName: null, unitCode: null }] }], hasMore: count === 1, nextCursor: 'cursor-test' } : { members: [member], total: 1 }));

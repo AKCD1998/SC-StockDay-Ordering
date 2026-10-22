@@ -3,7 +3,7 @@ import { apiFetch } from "./lib/apiClient.js";
 import "./MembersPanel.css";
 
 const base = "/api/admin/sccrm-members";
-const number = value => Number(value || 0).toLocaleString("th-TH", { maximumFractionDigits: 3 });
+const number = value => Number(value || 0).toLocaleString("th-TH", { maximumFractionDigits: 6 });
 const money = value => Number(value || 0).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 function date(value, withTime = false) {
   if (!value || Number.isNaN(new Date(value).getTime())) return "ไม่ระบุ";
