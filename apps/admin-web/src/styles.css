@@ -11898,4 +11898,5 @@ input[type="radio"] {
 .stock-shopee-shared { color: #a84906; }
 .stock-shopee-shared > strong { color: #d95d06; text-shadow: 0 0 8px #ffb45c66; }
 .stock-shopee-unknown { color: #9a3412; }
+.stock-pos-reference { font-weight: 600; font-size: 0.85rem; }
 .branch-stock-shopee-status { display: grid; gap: 4px; padding-top: 8px; }

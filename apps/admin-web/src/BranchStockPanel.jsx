@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import BranchStockRecommendationSuggestion from "./BranchStockRecommendationSuggestion";
+import { shopee004StockStatusMessage } from "./lib/shopee004StockStatus.js";
 import {
   createBranchStockScopeWorkbook,
   getBranchStockScopeOptions,
@@ -1210,7 +1211,8 @@ export function BranchStockPanel({
           return <div className={`branch-stock-004-quantity ${known ? "stock-shopee-shared" : "stock-shopee-unknown"}`}>
             <strong>{known ? formatNumber(row.qtyBranch004, 2) : "รอตรวจ"}</strong>
             <small>{known ? "พร้อมใช้ · แชร์กับ Shopee" : "ยังยืนยันยอดพร้อมใช้ไม่ได้"}</small>
-            <small>POS {formatNumber(row.posQtyBranch004, 2)} · จอง {formatNumber(row.stock004.shopee?.reservedQuantity, 2)} · ส่งแล้วไม่ลง POS {formatNumber(row.stock004.shopee?.shippedUnpostedQuantity, 2)}</small>
+            {!known ? <span className="stock-pos-reference">POS {formatNumber(row.posQtyBranch004, 2)} ก่อนหัก Shopee</span> : null}
+            <small>{known ? `POS ${formatNumber(row.posQtyBranch004, 2)} · ` : ""}จอง {formatNumber(row.stock004.shopee?.reservedQuantity, 2)} · ส่งแล้วไม่ลง POS {formatNumber(row.stock004.shopee?.shippedUnpostedQuantity, 2)}</small>
             <small>บัญชีจอง {hourlyTime(row.stock004.shopee?.asOf)} · POS {row.stock004.posBasis === "hourly-calculated" ? "Hourly" : "Full Sync"}</small>
           </div>;
         }
@@ -1255,7 +1257,7 @@ export function BranchStockPanel({
               </>}
               <small>ตรวจรอบใหม่ทุก 1 นาทีขณะเปิดหน้านี้</small>
               {shopeeStock004 && shopeeStock004.status !== "disabled" ? <div className="branch-stock-shopee-status">
-                <strong>{shopeeStock004.status === "available" ? "หักยอดจอง Shopee แล้ว" : "ยอด Shopee บางส่วนยังต้องตรวจ — ดูรายการที่แสดงว่ารอตรวจ"}</strong>
+                <strong>{shopee004StockStatusMessage(shopeeStock004)}</strong>
                 <span>บัญชีจอง {hourlyTime(shopeeStock004.asOf)} · รับอีเมลล่าสุด {hourlyTime(shopeeStock004.lastEmailIngestedAt)}</span>
                 {shopeeStock004.sourceLabelReviewOrders > 0 ? <small>มีรูปแบบชื่อต้นทางที่ใช้การยืนยันจับคู่เฉพาะจากผู้ดูแล {formatNumber(shopeeStock004.sourceLabelReviewOrders)} ออเดอร์</small> : null}
                 <small>ใช้เฉพาะออเดอร์ที่ระบบรับจากอีเมล การคืนเงินยังไม่ถือว่าได้รับสินค้ากลับ</small>

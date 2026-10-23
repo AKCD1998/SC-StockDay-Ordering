@@ -185,8 +185,32 @@ describe("BranchStockPanel branch scope", () => {
     await screen.findByText("A001");
     const cell = productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
     expect(cell).toHaveTextContent("รอตรวจ"); expect(cell.querySelector("strong")).not.toHaveTextContent("0.00");
+    expect(cell).toHaveTextContent("POS 4.00 ก่อนหัก Shopee");
+    expect(screen.getByText("ติดต่อข้อมูล Shopee ไม่สำเร็จ — ยอด POS ยังแสดงแยกไว้")).toBeInTheDocument();
+  });
+  it("explains a Shopee review count without hiding the separately labelled POS reference",async()=>{
+    const data={records:[{...STOCK_RECORDS[0],qtyBranch004:null,qtyTotalAllBranches:null,posQtyBranch004:4,
+      stock004:{basis:"shopee-availability-unknown",posBasis:"hourly-calculated",shopee:{}}}],
+      shopeeStock004:{status:"shopee-orders-need-review",reviewOrders:2}};
+    renderPanel({isOnlineMarketingStaff:false,branchCode:"004",fetchImplementation:async()=>({...makeJsonResponse([]),json:async()=>data})});
+    await screen.findByText("A001");
+    expect(screen.getByText("Shopee รอตรวจ 2 ออเดอร์ — ยอด POS ยังแสดงแยกไว้")).toBeInTheDocument();
+    const cell=productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
+    expect(cell).toHaveTextContent("POS 4.00 ก่อนหัก Shopee");expect(cell.querySelector("strong")).toHaveTextContent("รอตรวจ");
   });
 
+  it("retains unaffected availability when only a mapped product needs marketplace review",async()=>{
+    const data={records:[{...STOCK_RECORDS[0],qtyBranch004:null,qtyTotalAllBranches:null,posQtyBranch004:4,
+      stock004:{basis:"shopee-availability-unknown",posBasis:"hourly-calculated",shopee:{}}},
+      {...STOCK_RECORDS[0],productCode:"PARTIAL002",qtyBranch004:3,posQtyBranch004:4,
+        stock004:{basis:"hourly-and-shopee",posBasis:"hourly-calculated",shopee:{reservedQuantity:1,shippedUnpostedQuantity:0}}}],
+      shopeeStock004:{status:"partial",reviewOrders:1}};
+    renderPanel({isOnlineMarketingStaff:false,branchCode:"004",fetchImplementation:async()=>({...makeJsonResponse([]),json:async()=>data})});
+    await screen.findByText("A001");
+    expect(productRow("A001").querySelector('[data-column-key="qtyBranch004"]')).toHaveTextContent("รอตรวจ");
+    const available=productRow("PARTIAL002").querySelector('[data-column-key="qtyBranch004"]');
+    expect(available.querySelector("strong")).toHaveTextContent("3.00");expect(available).not.toHaveTextContent("รอตรวจ");
+  });
   it("labels suppressed fallback quantities rather than representing the morning value as Hourly", async () => {
     renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: async () => {
       const response = hourlyResponse(); const data = await response.json();
