@@ -4,8 +4,12 @@ export function exceptionFixture(overrides = {}) {
     productName: "สินค้าแพ็กตัวอย่าง", variantName: "กล่อง 2 ชิ้น", reasonCode: "unit_conflict", issueClass: "unit",
     observedUnit: "ชิ้น", affectedOrders: 2, canApproveMapping: true, requiresLifecycleReview: false,
     ruleVersion: null,
-    proposedMatches: [{ productCode: "SYNTHETIC-A", productName: "สินค้า POS ตัวอย่าง", unit: "กล่อง", quantityPerSale: 1, evidenceRefs: ["fixture-evidence"] }],
-    evidence: [{ kind: "seller-listing", reference: "fixture-evidence", label: "คำอธิบายแพ็กจากหน้าสินค้าที่ตรวจแล้ว", verifiedAt: "2026-10-23T09:00:00Z" }],
+    proposedMatches: [{ productCode: "SYNTHETIC-A", productName: "สินค้า POS ตัวอย่าง", unit: "กล่อง", quantityPerSale: 1, evidenceRefs: ["fixture-evidence", "fixture-catalog", "fixture-pos-unit"] }],
+    evidence: [
+      { kind: "seller_description", reference: "fixture-evidence", label: "คำอธิบายแพ็กจากหน้าสินค้าที่ตรวจแล้ว", verifiedAt: "2026-10-23T09:00:00Z" },
+      { kind: "seller_catalog", reference: "fixture-catalog", label: "ทะเบียนรายการและตัวเลือกจาก Seller Centre", verifiedAt: "2026-10-23T09:00:00Z" },
+      { kind: "pos_unit", reference: "fixture-pos-unit", label: "หน่วยจากทะเบียน POS ที่ตรวจแล้ว", verifiedAt: "2026-10-23T09:00:00Z" },
+    ],
     ...overrides };
 }
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  approveStockMapping, createOperationId, makeMappingRequest, readStockExceptions,
+  approveStockMapping, createOperationId, isApprovalEvidence, makeMappingRequest, readStockExceptions,
   readStockReconciliation, revokeStockRule, stockExceptionReasonLabel,
 } from "./lib/shopee004ExceptionsClient.js";
 import "./Shopee004ExceptionsPanel.css";
@@ -33,7 +33,7 @@ function ExceptionCard({ record, csrfToken, readOnly, onChanged, onUncertainChan
   }, [record.revision]);
 
   const mappingAllowed = record.canApproveMapping && ["identity", "unit"].includes(record.issueClass)
-    && record.listingId && record.proposedMatches.length > 0;
+    && record.listingId && record.variationId && record.proposedMatches.length > 0;
   const matches = record.proposedMatches.filter(match => selected[match.productCode] !== undefined)
     .map(match => ({ ...match, quantityPerSale: selected[match.productCode] }));
   let ready = false;
@@ -50,7 +50,7 @@ function ExceptionCard({ record, csrfToken, readOnly, onChanged, onUncertainChan
         : await revokeStockRule(record.ruleId, operation.body, csrfToken);
       setPending(null); setOutcomeUnknown(false);
       setMessage(operation.kind === "mapping"
-        ? `บันทึกกฎแล้ว · ให้คิวเดิมตรวจต่อ ${number(result.requeuedOrders)} ออเดอร์`
+        ? result.requeuePending ? "บันทึกกฎแล้ว · รอ worker รับรายการที่เกี่ยวข้องกลับคิวเดิม" : `บันทึกกฎแล้ว · ให้คิวเดิมตรวจต่อ ${number(result.requeuedOrders)} ออเดอร์`
         : "ยกเลิกกฎแล้ว · เก็บประวัติและยอดถือเดิมไว้ตรวจต่อ");
       onUncertainChange(null);
       onChanged();
@@ -82,9 +82,9 @@ function ExceptionCard({ record, csrfToken, readOnly, onChanged, onUncertainChan
     } catch (failure) { setError(failure.message); }
   }
 
-  return <article className="stock-exception-card" aria-label={`${record.productName} · ${record.variantName || "ไม่ระบุตัวเลือก"}`}>
+  return <article className="stock-exception-card" aria-label={`${record.productName || "ยังระบุสินค้าไม่ได้"} · ${record.variantName || "ไม่ระบุตัวเลือก"}`}>
     <header>
-      <div><h3>{record.productName}</h3><p>{record.variantName || "ไม่ระบุตัวเลือก"}</p></div>
+      <div><h3>{record.productName || "ยังระบุสินค้าไม่ได้"}</h3><p>{record.variantName || "ไม่ระบุตัวเลือก"}</p></div>
       <span className={`stock-exception-issue issue-${record.issueClass}`}>{issueLabels[record.issueClass]}</span>
     </header>
     <p className="stock-exception-reason">{stockExceptionReasonLabel(record.reasonCode)}</p>
@@ -93,31 +93,38 @@ function ExceptionCard({ record, csrfToken, readOnly, onChanged, onUncertainChan
       <div><dt>หน่วยที่พบ</dt><dd>{record.observedUnit || "ยังไม่ยืนยัน"}</dd></div>
       <div><dt>รุ่นกฎ</dt><dd>{record.ruleVersion ?? "ยังไม่มีกฎ"}</dd></div>
     </dl>
+    {record.recovery ? <p className="stock-exception-recovery">
+      {record.recovery.state === "retry_wait" ? `รอลองใหม่ตามคิวเดิม · ล้มเหลวแล้ว ${number(record.recovery.attempts)} ครั้ง · ครั้งถัดไป ${displayTime(record.recovery.nextRetryAt)}`
+        : record.recovery.state === "blocked" ? `หยุดลองซ้ำ · ต้องตรวจหลักฐานหรือแก้ต้นเหตุ · ล้มเหลวแล้ว ${number(record.recovery.attempts)} ครั้ง`
+          : record.recovery.state === "ready" ? "คิวเดิมพร้อมตรวจต่อเมื่อ worker ว่าง" : "ยังไม่มีการลองซ้ำที่ยืนยันได้"}
+    </p> : null}
     {record.requiresLifecycleReview ? <p className="stock-exception-warning">มีเรื่องการส่ง ยกเลิก หรือคืนที่ต้องตรวจแยก การจับคู่สินค้าจะไม่อนุมัติปลดจองหรือคืนยอด</p> : null}
     <details className="stock-exception-evidence" open={mappingAllowed}>
       <summary>หลักฐานและคู่สินค้าที่เสนอ</summary>
       <ul className="stock-exception-evidence-list">
         {record.evidence.map(evidence => <li key={evidence.reference}>
-          {mappingAllowed ? <label><input type="checkbox" disabled={blocked || !evidence.verifiedAt}
+          {mappingAllowed ? <label><input type="checkbox" disabled={blocked || !isApprovalEvidence(evidence)}
             checked={selectedEvidence.includes(evidence.reference)}
             onChange={event => setSelectedEvidence(current => event.target.checked ? [...current, evidence.reference] : current.filter(ref => ref !== evidence.reference))} />
             {evidence.label}</label> : <span>{evidence.label}</span>}
-          <small>{evidence.verifiedAt ? `ตรวจเมื่อ ${displayTime(evidence.verifiedAt)}` : "หลักฐานยังไม่ผ่านการยืนยัน ใช้อนุมัติหน่วยไม่ได้"}</small>
+          <small>{isApprovalEvidence(evidence) ? `ตรวจเมื่อ ${displayTime(evidence.verifiedAt)}` : "ข้อมูลประกอบนี้ใช้อนุมัติหน่วยไม่ได้"}</small>
         </li>)}
         {!record.evidence.length ? <li>ยังไม่มีหลักฐานที่ใช้ยืนยันได้</li> : null}
       </ul>
       {record.proposedMatches.length ? <form onSubmit={approve}>
-        <p>ต่อการขาย Shopee 1 หน่วย ให้ถือสินค้า POS ตามรายการที่เลือกด้านล่าง คู่ที่เสนอไม่ถือเป็นการอนุมัติ</p>
+        <p>ต่อการขาย Shopee 1 หน่วย ต้องยืนยันส่วนประกอบครบตามหลักฐานด้านล่าง คู่ที่เสนอไม่ถือเป็นการอนุมัติ</p>
+        <p>ถ้าตัวคูณไม่ตรง ต้องเพิ่มหลักฐานหน่วยที่ถูกต้องก่อน ระบบจะไม่ใช้การแก้ตัวเลขแทนหลักฐาน</p>
         <fieldset disabled={blocked || !mappingAllowed}>
           <legend>สินค้าและตัวคูณหน่วย</legend>
           {record.proposedMatches.map((match, index) => <div className="stock-exception-match" key={`${match.productCode}-${index}`}>
             <label><input type="checkbox" checked={selected[match.productCode] !== undefined} onChange={event => setSelected(current => {
               const next = { ...current }; if (event.target.checked) next[match.productCode] = match.quantityPerSale; else delete next[match.productCode]; return next;
-            })} />{match.productName} <small>{match.productCode}</small></label>
+            })} />{match.productName || "ยังไม่พบชื่อสินค้าจาก POS"} <small>{match.productCode}</small></label>
             <label>จำนวน POS ต่อการขาย 1 หน่วย
-              <input type="number" min="0.000001" step="any" value={selected[match.productCode] ?? match.quantityPerSale}
+              <input type="number" min="1" max="10000" step="1" value={selected[match.productCode] ?? match.quantityPerSale}
+                readOnly
                 disabled={selected[match.productCode] === undefined || blocked || !mappingAllowed}
-                onChange={event => setSelected(current => ({ ...current, [match.productCode]: event.target.value }))} />
+                />
               <span>{match.unit}</span>
             </label>
           </div>)}

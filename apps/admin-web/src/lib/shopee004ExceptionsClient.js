@@ -2,6 +2,9 @@ import { apiFetch } from "./apiClient.js";
 
 const ROOT = "/admin/shopee004";
 const ISSUE_CLASSES = new Set(["identity", "unit", "lifecycle", "temporary"]);
+const EVIDENCE_KINDS = new Set(["seller_catalog", "seller_description", "pos_unit", "owner_unit", "reviewed_stock_rule", "source_item", "retained_contract"]);
+const APPROVAL_EVIDENCE_KINDS = new Set(["seller_catalog", "seller_description", "pos_unit", "owner_unit", "reviewed_stock_rule"]);
+const QUANTITY_EVIDENCE_KINDS = new Set(["seller_description", "owner_unit", "reviewed_stock_rule"]);
 const ERROR_MESSAGES = {
   REVISION_CONFLICT: "ข้อมูลเปลี่ยนแล้ว กรุณาอ่านใหม่ก่อนยืนยัน",
   RULE_VERSION_CONFLICT: "กฎนี้มีรุ่นใหม่แล้ว กรุณาอ่านใหม่ก่อนยกเลิก",
@@ -9,6 +12,7 @@ const ERROR_MESSAGES = {
   UNIT_EVIDENCE_REQUIRED: "ต้องมีหลักฐานหน่วยก่อนยืนยัน",
   LIFECYCLE_REVIEW_REQUIRED: "ต้องตรวจการส่งหรือคืนสินค้าแยกจากการจับคู่",
   BRIDGE_UNAVAILABLE: "ช่องทางจัดการข้อยกเว้นยังไม่พร้อม",
+  STOCK_EXCEPTION_ADMIN_DISABLED: "หน้าจัดการข้อยกเว้นยังไม่ได้เปิดใช้งาน",
   FORBIDDEN: "บัญชีนี้ไม่มีสิทธิ์จัดการข้อยกเว้น",
   UNAUTHORIZED: "กรุณาเข้าสู่ระบบใหม่",
   INVALID_RESPONSE: "ข้อมูลตอบกลับไม่ครบ จึงยังยืนยันผลไม่ได้",
@@ -29,34 +33,41 @@ const count = value => Number.isSafeInteger(value) && value >= 0;
 const stamp = value => typeof value === "string" && Number.isFinite(Date.parse(value));
 const opaque = value => text(value, 200);
 const ruleVersion = value => text(value, 100) || count(value);
-const positive = value => typeof value === "number" && Number.isFinite(value) && value > 0;
+const positive = value => Number.isSafeInteger(value) && value >= 1 && value <= 10000;
+const displayText = (value, max = 500) => typeof value === "string" && value.length <= max;
+
+export function isApprovalEvidence(evidence) {
+  return APPROVAL_EVIDENCE_KINDS.has(evidence?.kind) && stamp(evidence.verifiedAt);
+}
 
 function validEvidence(evidence) {
-  return evidence && text(evidence.kind, 80) && opaque(evidence.reference) && text(evidence.label, 400)
+  return evidence && EVIDENCE_KINDS.has(evidence.kind) && opaque(evidence.reference) && displayText(evidence.label)
     && (evidence.verifiedAt == null || stamp(evidence.verifiedAt));
 }
 
 function validMatch(match) {
-  return match && text(match.productCode, 80) && text(match.productName, 400) && text(match.unit, 80)
+  return match && text(match.productCode, 100) && displayText(match.productName) && text(match.unit, 80)
     && positive(match.quantityPerSale) && Array.isArray(match.evidenceRefs) && match.evidenceRefs.every(opaque);
 }
 
 function validRecord(record) {
-  return record && opaque(record.exceptionId) && ruleVersion(record.revision)
+  return record && opaque(record.exceptionId) && opaque(record.revision)
     && (record.listingId == null || opaque(record.listingId))
     && (record.variationId == null || opaque(record.variationId))
-    && text(record.productName, 400) && typeof record.variantName === "string" && record.variantName.length <= 300
+    && displayText(record.productName) && displayText(record.variantName)
     && text(record.reasonCode, 100) && ISSUE_CLASSES.has(record.issueClass)
     && (record.observedUnit == null || text(record.observedUnit, 100))
     && count(record.affectedOrders) && typeof record.canApproveMapping === "boolean"
     && typeof record.requiresLifecycleReview === "boolean"
     && Array.isArray(record.proposedMatches) && record.proposedMatches.length <= 50 && record.proposedMatches.every(validMatch)
-    && Array.isArray(record.evidence) && record.evidence.length <= 100 && record.evidence.every(validEvidence)
+    && Array.isArray(record.evidence) && record.evidence.length <= 50 && record.evidence.every(validEvidence)
     && (record.ruleId == null || opaque(record.ruleId))
     && (record.ruleVersion == null || ruleVersion(record.ruleVersion))
     && (record.auditHistory == null || (Array.isArray(record.auditHistory) && record.auditHistory.length <= 100
       && record.auditHistory.every(entry => entry && text(entry.action, 80) && stamp(entry.at)
-        && (entry.ruleVersion == null || ruleVersion(entry.ruleVersion)) && (entry.reason == null || text(entry.reason, 400)))));
+        && (entry.ruleVersion == null || ruleVersion(entry.ruleVersion)) && (entry.reason == null || displayText(entry.reason, 200)))))
+    && (record.recovery == null || ([null, "ready", "retry_wait", "blocked"].includes(record.recovery.state)
+      && count(record.recovery.attempts) && ["nextRetryAt", "firstFailedAt", "lastFailedAt"].every(key => record.recovery[key] == null || stamp(record.recovery[key]))));
 }
 
 export function validateExceptionsResponse(value) {
@@ -100,7 +111,7 @@ async function request(path, { body, csrfToken, signal, timeoutMs = 8000 } = {})
     try { payload = await response.json(); } catch { throw new StockExceptionError(body ? "OUTCOME_UNKNOWN" : "INVALID_RESPONSE", { outcomeUnknown: Boolean(body) }); }
     if (!response.ok) {
       const definitiveNoWrite = payload?.definitiveNoWrite === true && payload?.error?.definitiveNoWrite === true
-        && payload?.error?.code === "BRIDGE_UNAVAILABLE";
+        && ["BRIDGE_UNAVAILABLE", "STOCK_EXCEPTION_ADMIN_DISABLED"].includes(payload?.error?.code);
       const uncertain = Boolean(body && response.status >= 500 && !definitiveNoWrite);
       throw new StockExceptionError(uncertain ? "OUTCOME_UNKNOWN" : safeHttpError(response.status, payload), { outcomeUnknown: uncertain });
     }
@@ -132,12 +143,16 @@ export async function readStockReconciliation({ signal } = {}) {
 
 export function makeMappingRequest(record, selectedMatches, evidenceRefs, acknowledgeUnitEvidence, operationId) {
   if (!record.canApproveMapping || !["identity", "unit"].includes(record.issueClass)
-    || !opaque(record.listingId) || !opaque(operationId) || !acknowledgeUnitEvidence
-    || !selectedMatches.length || selectedMatches.length > 50 || !evidenceRefs.length
+    || !opaque(record.listingId) || !opaque(record.variationId) || !opaque(operationId) || !acknowledgeUnitEvidence
+    || !selectedMatches.length || selectedMatches.length > 20 || evidenceRefs.length < 2 || evidenceRefs.length > 50
+    || selectedMatches.length !== record.proposedMatches.length
     || new Set(selectedMatches.map(row => row.productCode)).size !== selectedMatches.length
     || new Set(evidenceRefs).size !== evidenceRefs.length
-    || evidenceRefs.some(ref => !record.evidence.some(e => e.reference === ref && stamp(e.verifiedAt)))
-    || selectedMatches.some(row => !positive(Number(row.quantityPerSale)) || !record.proposedMatches.some(candidate => candidate.productCode === row.productCode && candidate.unit === row.unit
+    || evidenceRefs.some(ref => !record.evidence.some(e => e.reference === ref && isApprovalEvidence(e)))
+    || !record.evidence.some(e => evidenceRefs.includes(e.reference) && e.kind === "seller_catalog" && isApprovalEvidence(e))
+    || !record.evidence.some(e => evidenceRefs.includes(e.reference) && QUANTITY_EVIDENCE_KINDS.has(e.kind) && isApprovalEvidence(e))
+    || !record.evidence.some(e => evidenceRefs.includes(e.reference) && e.kind === "pos_unit" && isApprovalEvidence(e))
+    || selectedMatches.some(row => !positive(Number(row.quantityPerSale)) || !record.proposedMatches.some(candidate => candidate.productCode === row.productCode && candidate.unit === row.unit && candidate.quantityPerSale === Number(row.quantityPerSale)
       && candidate.evidenceRefs.length > 0 && candidate.evidenceRefs.every(ref => evidenceRefs.includes(ref))))) throw new StockExceptionError("UNIT_EVIDENCE_REQUIRED");
   return { operationId, expectedRevision: record.revision, listingId: record.listingId,
     variationId: record.variationId ?? null,
@@ -148,7 +163,8 @@ export function makeMappingRequest(record, selectedMatches, evidenceRefs, acknow
 export async function approveStockMapping(exceptionId, body, csrfToken) {
   const payload = await request(`/stock-exceptions/${encodeURIComponent(exceptionId)}/mapping`, { body, csrfToken });
   if (typeof payload?.recorded !== "boolean" || typeof payload?.duplicate !== "boolean" || !opaque(payload.ruleId)
-    || !ruleVersion(payload.ruleVersion) || !count(payload.requeuedOrders) || (!payload.recorded && !payload.duplicate)) throw new StockExceptionError("OUTCOME_UNKNOWN", { outcomeUnknown: true });
+    || !ruleVersion(payload.ruleVersion) || !count(payload.requeuedOrders) || (!payload.recorded && !payload.duplicate)
+    || (payload.requeuePending != null && typeof payload.requeuePending !== "boolean")) throw new StockExceptionError("OUTCOME_UNKNOWN", { outcomeUnknown: true });
   return payload;
 }
 
@@ -160,8 +176,13 @@ export async function revokeStockRule(ruleId, body, csrfToken) {
 }
 
 export function stockExceptionReasonLabel(code) {
+  const key = typeof code === "string" ? code.toLowerCase().replaceAll("-", "_") : "";
   return ({ product_mapping_unverified: "ยังไม่มีคู่สินค้าที่ตรวจยืนยัน", pos_product_missing: "ยังไม่พบรหัสในทะเบียน POS",
     unit_conflict: "หน่วยขัดกัน", quantity_unverified: "จำนวนต่อหน่วยยังไม่ชัด", source_changed: "รายการต้นทางเปลี่ยน ต้องตรวจอีกครั้ง",
     cancelled_without_dispatch_evidence: "ยกเลิกแล้ว แต่หลักฐานการส่งยังไม่ครบ", confirmation_missing: "ยังไม่พบหลักฐานยืนยันคำสั่งซื้อ",
-    projection_timeout: "ระบบปลายทางตอบไม่ทัน", temporary_unavailable: "ระบบปลายทางไม่พร้อมชั่วคราว" })[code] || "ต้องตรวจหลักฐานเพิ่มเติม";
+    projection_timeout: "ระบบปลายทางตอบไม่ทัน", temporary_unavailable: "ระบบปลายทางไม่พร้อมชั่วคราว",
+    processing_pending: "รายการเปลี่ยนแล้ว กำลังรอประมวลผล", processing_timeout: "ประมวลผลไม่ทันเวลา",
+    processing_lock_busy: "ระบบกำลังใช้งานข้อมูลชุดนี้", processing_service_unavailable: "บริการประมวลผลไม่พร้อมชั่วคราว",
+    processing_review_required: "หยุดประมวลผลเพื่อรอตรวจเพิ่มเติม", pos_unit_contract_invalid: "นิยามหน่วย POS ไม่ผ่านการตรวจ",
+    pos_unit_contract_required: "ยังไม่มีนิยามหน่วย POS ที่ยืนยันแล้ว", projection_scope_invalid: "ขอบเขตข้อมูลที่อ่านยังไม่ผ่านการตรวจ" })[key] || "ต้องตรวจหลักฐานเพิ่มเติม";
 }

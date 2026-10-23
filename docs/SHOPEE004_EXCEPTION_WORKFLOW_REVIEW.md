@@ -12,8 +12,10 @@ flags, SQL readers, scheduled tasks or automations.
   observed unit, affected-order count, verified evidence and proposed POS
   components. No customer, raw email or order/document number is displayed.
 - Proposed matches are never pre-approved. An administrator explicitly selects
-  the component(s), positive quantity per Shopee sale, verified evidence and unit
-  attestation. A fuzzy/AI proposal without verified evidence cannot be approved.
+  every component of the evidence-backed bundle, positive integer quantity per
+  Shopee sale, verified evidence and unit attestation. Multipliers are read-only
+  facts from the proposal: a different multiplier requires newly verified unit
+  evidence first. A fuzzy/AI proposal without verified evidence cannot be approved.
 - Mapping approval is independent from shipment, cancellation and return review.
   This page exposes no lifecycle approval action.
 - Rule revocation requires a separate reason, current version and acknowledgement
@@ -30,6 +32,9 @@ flags, SQL readers, scheduled tasks or automations.
   server idempotency/revision checks remain mandatory after browser closure.
 - A configured bridge is required by the API. Explicit fail-closed 503 responses
   show unavailable; other 5xx/transport/invalid POST responses remain ambiguous.
+- Recovery state, attempt count and next retry time are displayed from the server.
+  This page never starts a worker retry itself. A pending durable rule-recovery job
+  is labelled pending rather than presented as zero successfully requeued orders.
 
 The branch-stock table keeps its compact number plus information disclosure.
 `confirmed`, `reference` and `unverified` displays remain distinct. A cached
@@ -61,6 +66,16 @@ Optional record fields `ruleId` and `auditHistory[{action,at,ruleVersion,reason}
 support review and revocation. Audit data must already be administrator-scoped
 and filtered by the bridge. The client validates the additive contract and keeps
 existing per-product-review-v2 branch-stock fields compatible.
+
+Unit approvals require selected server-verified `seller_catalog`, `pos_unit` and
+quantity evidence (`seller_description`, `owner_unit` or `reviewed_stock_rule`).
+The two contextual kinds `source_item` and `retained_contract` can be displayed
+but do not confer unit authority, even when timestamped. References must belong
+to the current exception response and the complete proposed components. The
+source API independently verifies the server-owned evidence registry, scope,
+units, exact quantities and aliases; client checkboxes cannot create trusted
+evidence. Empty public names or audit reasons remain displayable without hiding
+other valid exceptions.
 
 ## Stock-count preparation
 

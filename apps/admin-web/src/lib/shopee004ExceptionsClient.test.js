@@ -36,7 +36,7 @@ describe("Shopee 004 exception client", () => {
     expect(() => validateExceptionsResponse(exceptionsFixture(undefined, overrides))).toThrow();
   });
   it("retains opaque revision and constructs explicit pack components", () => {
-    const row = exceptionFixture(); const body = makeMappingRequest(row, row.proposedMatches, ["fixture-evidence"], true, "fixture-operation");
+    const row = exceptionFixture(); const body = makeMappingRequest(row, row.proposedMatches, row.evidence.map(e => e.reference), true, "fixture-operation");
     expect(body.expectedRevision).toBe("fixture-revision-2");
     expect(body.components).toEqual([{ productCode: "SYNTHETIC-A", quantityPerSale: 1, unit: "กล่อง" }]);
     expect(body).not.toHaveProperty("cancelBeforeDispatch"); expect(body).not.toHaveProperty("physicalEvidenceVerified");
@@ -55,7 +55,7 @@ describe("Shopee 004 exception client", () => {
   });
   it("includes CSRF and reuses the caller operation without automatic POST retries", async () => {
     const fetch = vi.fn(async () => response({ recorded: true, duplicate: false, ruleId: "fixture-rule", ruleVersion: 2, requeuedOrders: 2 })); vi.stubGlobal("fetch", fetch);
-    const row = exceptionFixture(); const body = makeMappingRequest(row, row.proposedMatches, ["fixture-evidence"], true, "fixture-operation");
+    const row = exceptionFixture(); const body = makeMappingRequest(row, row.proposedMatches, row.evidence.map(e => e.reference), true, "fixture-operation");
     await approveStockMapping(row.exceptionId, body, "fixture-csrf");
     expect(fetch).toHaveBeenCalledTimes(1); const options = fetch.mock.calls[0][1];
     expect(options.headers["X-CSRF-Token"]).toBe("fixture-csrf"); expect(JSON.parse(options.body)).toEqual(body);
@@ -87,5 +87,33 @@ describe("Shopee 004 exception client", () => {
     vi.stubGlobal("fetch", vi.fn(async () => response({ definitiveNoWrite: true, error: { code: "BRIDGE_UNAVAILABLE", definitiveNoWrite: true, detailsWithheld: true } }, 503)));
     const error = await approveStockMapping("fixture-exception", {}, "fixture-csrf").catch(value => value);
     expect(error).toMatchObject({ code: "BRIDGE_UNAVAILABLE", outcomeUnknown: false });
+  });
+  it("accepts the actual additive read contract with reviewed authority, empty audit reason and recovery metadata", () => {
+    const row = exceptionFixture({ revision: "r".repeat(180), productName: "", variantName: "", ruleId: "fixture-rule", ruleVersion: 2,
+      auditHistory: [{ action: "mapping_approved", at: "2026-10-23T10:00:00Z", ruleVersion: 2, reason: "" }],
+      recovery: { state: "retry_wait", attempts: 2, nextRetryAt: "2026-10-23T10:01:00Z", firstFailedAt: "2026-10-23T10:00:00Z", lastFailedAt: "2026-10-23T10:00:30Z" } });
+    row.evidence[0].kind = "reviewed_stock_rule";
+    expect(validateExceptionsResponse(exceptionsFixture([row]))).toMatchObject({ records: [ { productName: "", recovery: { attempts: 2 } } ] });
+    expect(makeMappingRequest(row, row.proposedMatches, row.evidence.map(e => e.reference), true, "fixture-operation").expectedRevision).toHaveLength(180);
+  });
+  it.each(["seller_description", "owner_unit", "reviewed_stock_rule"])("accepts server-verified %s together with catalog and POS evidence", kind => {
+    const row = exceptionFixture(); row.evidence[0].kind = kind;
+    expect(() => makeMappingRequest(row, row.proposedMatches, row.evidence.map(e => e.reference), true, "fixture-operation")).not.toThrow();
+  });
+  it.each(["source_item", "retained_contract"])("never promotes %s into unit authority even if timestamped", kind => {
+    const row = exceptionFixture(); row.evidence[0].kind = kind;
+    expect(() => makeMappingRequest(row, row.proposedMatches, row.evidence.map(e => e.reference), true, "fixture-operation")).toThrow();
+  });
+  it.each([0.5, 2, 10001])("rejects non-canonical or unproven component quantity %s before mutation", quantityPerSale => {
+    const row = exceptionFixture();
+    expect(() => makeMappingRequest(row, [{ ...row.proposedMatches[0], quantityPerSale }], row.evidence.map(e => e.reference), true, "fixture-operation")).toThrow();
+  });
+  it("does not approve only part of an evidence-backed bundle", () => {
+    const row = exceptionFixture(); row.proposedMatches.push({ ...row.proposedMatches[0], productCode: "SYNTHETIC-B" });
+    expect(() => makeMappingRequest(row, [row.proposedMatches[0]], row.evidence.map(e => e.reference), true, "fixture-operation")).toThrow();
+  });
+  it("bounds the explicitly disabled admin bridge as a definite no-write", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => response({ definitiveNoWrite: true, error: { code: "STOCK_EXCEPTION_ADMIN_DISABLED", definitiveNoWrite: true, detailsWithheld: true } }, 503)));
+    expect(await approveStockMapping("fixture-exception", {}, "fixture-csrf").catch(value => value)).toMatchObject({ code: "STOCK_EXCEPTION_ADMIN_DISABLED", outcomeUnknown: false });
   });
 });

@@ -18,6 +18,8 @@ async function selectMapping(user) {
   await screen.findByRole("heading", { name: "สินค้าแพ็กตัวอย่าง" });
   await user.click(screen.getByRole("checkbox", { name: /สินค้า POS ตัวอย่าง/ }));
   await user.click(screen.getByRole("checkbox", { name: /คำอธิบายแพ็กจากหน้าสินค้าที่ตรวจแล้ว/ }));
+  await user.click(screen.getByRole("checkbox", { name: /ทะเบียนรายการและตัวเลือกจาก Seller Centre/ }));
+  await user.click(screen.getByRole("checkbox", { name: /หน่วยจากทะเบียน POS ที่ตรวจแล้ว/ }));
   await user.click(screen.getByRole("checkbox", { name: /ตรวจหลักฐานแล้วว่าแพ็ก/ }));
 }
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -45,7 +47,7 @@ describe("admin Shopee004 exception workflow", () => {
     const [url, options] = fetch.mock.calls.find(([, options]) => options.method === "POST");
     expect(url).toContain("/stock-exceptions/fixture-exception-a/mapping");
     const body = JSON.parse(options.body);
-    expect(body).toMatchObject({ expectedRevision: "fixture-revision-2", components: [{ productCode: "SYNTHETIC-A", quantityPerSale: 1, unit: "กล่อง" }], evidenceRefs: ["fixture-evidence"], acknowledgeUnitEvidence: true });
+    expect(body).toMatchObject({ expectedRevision: "fixture-revision-2", components: [{ productCode: "SYNTHETIC-A", quantityPerSale: 1, unit: "กล่อง" }], evidenceRefs: ["fixture-evidence", "fixture-catalog", "fixture-pos-unit"], acknowledgeUnitEvidence: true });
     expect(body).not.toHaveProperty("physicalEvidenceVerified"); expect(options.headers["X-CSRF-Token"]).toBe("fixture-csrf");
   });
   it("supports a verified multi-product bundle without implicitly selecting components", async () => {
@@ -58,7 +60,7 @@ describe("admin Shopee004 exception workflow", () => {
     expect(JSON.parse(fetch.mock.calls.find(([, options]) => options.method === "POST")[1].body).components).toHaveLength(2);
   });
   it("does not approve a fuzzy proposal without verified unit evidence", async () => {
-    mockReads(exceptionsFixture([exceptionFixture({ evidence: [ { kind: "ai-proposal", reference: "fixture-evidence", label: "ข้อเสนอจากชื่อคล้ายกัน", verifiedAt: null } ] })]));
+    mockReads(exceptionsFixture([exceptionFixture({ evidence: [ { kind: "source_item", reference: "fixture-evidence", label: "ข้อเสนอจากชื่อคล้ายกัน", verifiedAt: null } ] })]));
     render(<Shopee004ExceptionsPanel isAdminUser csrfToken="fixture-csrf" />);
     const evidence = await screen.findByRole("checkbox", { name: /ข้อเสนอจากชื่อคล้ายกัน/ }); expect(evidence).toBeDisabled();
     expect(screen.getByRole("button", { name: "บันทึกกฎจับคู่เท่านั้น" })).toBeDisabled();
@@ -124,6 +126,28 @@ describe("admin Shopee004 exception workflow", () => {
     await screen.findByText("ช่องทางจัดการข้อยกเว้นยังไม่พร้อม");
     expect(screen.queryByRole("button", { name: "ส่งคำขอเดิมซ้ำเพื่อยืนยันผล" })).not.toBeInTheDocument();
     expect(fetch.mock.calls.filter(([, options]) => options.method === "POST")).toHaveLength(1);
+  });
+  it("shows bounded recovery waits and never starts retries from the page", async () => {
+    const fetch = mockReads(exceptionsFixture([exceptionFixture({ issueClass: "temporary", reasonCode: "PROCESSING_TIMEOUT", canApproveMapping: false,
+      recovery: { state: "retry_wait", attempts: 2, nextRetryAt: "2026-10-23T10:01:00Z", firstFailedAt: "2026-10-23T10:00:00Z", lastFailedAt: "2026-10-23T10:00:30Z" } })]));
+    render(<Shopee004ExceptionsPanel isAdminUser csrfToken="fixture-csrf" />);
+    await screen.findByText("ประมวลผลไม่ทันเวลา");
+    expect(screen.getByText(/รอลองใหม่ตามคิวเดิม · ล้มเหลวแล้ว 2 ครั้ง/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /สั่งลองใหม่/ })).not.toBeInTheDocument();
+    expect(fetch.mock.calls.filter(([, options]) => options.method === "POST")).toHaveLength(0);
+  });
+  it("retains an unidentified exception without hiding the other identifiable records", async () => {
+    mockReads(exceptionsFixture([exceptionFixture({ exceptionId: "fixture-unknown", productName: "", variantName: "", canApproveMapping: false, proposedMatches: [], evidence: [] }), exceptionFixture()]));
+    render(<Shopee004ExceptionsPanel isAdminUser csrfToken="fixture-csrf" />);
+    await screen.findByRole("heading", { name: "ยังระบุสินค้าไม่ได้" });
+    expect(screen.getByRole("heading", { name: "สินค้าแพ็กตัวอย่าง" })).toBeInTheDocument();
+  });
+  it("does not report requeued zero as completed when the durable worker handoff is pending", async () => {
+    const user = userEvent.setup(); mockReads(exceptionsFixture(), async () => response({ ...recorded, requeuedOrders: 0, requeuePending: true }));
+    render(<Shopee004ExceptionsPanel isAdminUser csrfToken="fixture-csrf" />);
+    await selectMapping(user); await user.click(screen.getByRole("button", { name: "บันทึกกฎจับคู่เท่านั้น" }));
+    await screen.findByText("บันทึกกฎแล้ว · รอ worker รับรายการที่เกี่ยวข้องกลับคิวเดิม");
+    expect(screen.queryByText(/ให้คิวเดิมตรวจต่อ 0/)).not.toBeInTheDocument();
   });
   it("requires a separate reason and acknowledgement to revoke a versioned rule", async () => {
     const user = userEvent.setup(); const fetch = mockReads(exceptionsFixture([exceptionFixture({ ruleId: "fixture-rule", ruleVersion: 3,
