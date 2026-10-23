@@ -2057,16 +2057,9 @@ button {
 }
 
 .branch-stock-hourly-status {
-  display: grid;
-  gap: 4px;
-  margin-top: 10px;
-  padding: 10px;
-  border: 1px solid #bfd4df;
-  border-radius: 8px;
-  background: #f2f8fb;
-  color: #173f50;
-  font-size: 0.82rem;
-  overflow-wrap: anywhere;
+  margin-top: 8px;
+  color: #526779;
+  font-size: 0.78rem;
 }
 
 .branch-stock-004-quantity { display: grid; gap: 3px; }
@@ -11920,3 +11913,12 @@ input[type="radio"] {
 [data-theme="dark"] .stock-shopee-unknown > strong { color: #fbbf24; }
 .stock-pos-reference { font-weight: 600; font-size: 0.85rem; }
 .branch-stock-shopee-status { display: grid; gap: 4px; padding-top: 8px; }
+.branch-stock-hourly-status > .stock-004-disclosure { display: flex; flex-wrap: wrap; max-width: 100%; white-space: normal; gap: 5px 8px; }
+.branch-stock-hourly-status .stock-004-primary { font-size: 0.78rem; font-weight: 500; color: #526779; }
+.branch-stock-hourly-status .stock-004-reference-label { font-size: 0.76rem; }
+.branch-stock-source-labels { display: inline-flex; flex-wrap: wrap; gap: 4px 9px; }
+.branch-stock-source-labels .is-healthy { color: #28785c; }
+.branch-stock-source-labels .is-warning { color: #9a5b0b; }
+[data-theme="dark"] .branch-stock-hourly-status .stock-004-primary { color: #a9bbcf; }
+[data-theme="dark"] .branch-stock-source-labels .is-healthy { color: #91cdb4; }
+[data-theme="dark"] .branch-stock-source-labels .is-warning { color: #efc575; }

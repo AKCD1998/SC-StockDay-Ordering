@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import BranchStockRecommendationSuggestion from "./BranchStockRecommendationSuggestion";
-import { shopee004StockStatusMessage } from "./lib/shopee004StockStatus.js";
+import { shopee004StockStatusMessage, shopee004StockStatusShortMessage } from "./lib/shopee004StockStatus.js";
 import { stock004DisplayView } from "./lib/stock004DisplayView.js";
 import StockQuantityPopover from "./StockQuantityPopover.jsx";
 import {
@@ -1258,6 +1258,11 @@ export function BranchStockPanel({
     return row[column.key] || "-";
   }
 
+  const hourlyAvailable = hourlyStock004?.status === "available";
+  const compactSlot = hourlyStock004?.plannedSlot || (hourlyStock004?.capturedAt && Number.isFinite(Date.parse(hourlyStock004.capturedAt))
+    ? new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" }).format(new Date(hourlyStock004.capturedAt)) : "");
+  const showShopeeStatus = shopeeStock004 && shopeeStock004.status !== "disabled";
+
   return (
     <section className="panel branch-stock-panel">
       <div
@@ -1268,6 +1273,14 @@ export function BranchStockPanel({
           <p>ติดตามยอดแต่ละสาขา พร้อมแหล่งข้อมูลและเวลาที่อ่าน</p>
           {visibleBranchStockColumns.some(column => column.key === "qtyBranch004") ? (
             <div className="branch-stock-hourly-status" role="region" aria-live="polite" aria-label="แหล่งข้อมูลสต็อกสาขา 004">
+              <StockQuantityPopover open={openStockDetails === "$source004"}
+                onOpenChange={next => setOpenStockDetails(current => next ? "$source004" : current === "$source004" ? null : current)}
+                label="ดูรายละเอียดแหล่งข้อมูลสาขา 004" heading="แหล่งข้อมูลสาขา 004" dialogLabel="รายละเอียดแหล่งข้อมูลสาขา 004"
+                quantity={hourlyAvailable ? `004 · Hourly${compactSlot ? ` ${compactSlot}` : ""}` : "004 · Full Sync"}
+                badge={<span className="branch-stock-source-labels">
+                  {hourlyAvailable && hourlyStock004.pageFallbackProducts > 0 ? <span className="is-warning">Full Sync {formatNumber(hourlyStock004.pageFallbackProducts)}</span> : null}
+                  {showShopeeStatus ? <span className={shopeeStock004.status === "available" ? "is-healthy" : "is-warning"}>{shopee004StockStatusShortMessage(shopeeStock004)}</span> : null}
+                </span>}>
               {hourlyStock004?.status === "available" ? <>
                 <strong>004 · ยอดคำนวณ Hourly {formatNumber(hourlyStock004.availableProducts)} รายการ</strong>
                 <span>{hourlyStock004.plannedSlot ? `รอบ ${hourlyStock004.plannedSlot} · ` : ""}อ่านเมื่อ {hourlyTime(hourlyStock004.capturedAt)} (เวลาไทย)</span>
@@ -1285,6 +1298,7 @@ export function BranchStockPanel({
                 {shopeeStock004.sourceLabelReviewOrders > 0 ? <small>มีรูปแบบชื่อต้นทางที่ใช้การยืนยันจับคู่เฉพาะจากผู้ดูแล {formatNumber(shopeeStock004.sourceLabelReviewOrders)} ออเดอร์</small> : null}
                 <small>ใช้เฉพาะออเดอร์ที่ระบบรับจากอีเมล การคืนเงินยังไม่ถือว่าได้รับสินค้ากลับ</small>
               </div> : null}
+              </StockQuantityPopover>
             </div>
           ) : null}
         </div>

@@ -124,6 +124,12 @@ The portal avoids clipping by the scrolling table and preserves compact row
 heights. Temporary/reference badges remain visible beside qualified quantities.
 This presentation change does not alter quantities, exports or backend behavior.
 
+The large source-status card is replaced by a compact, transparent status line.
+It keeps the latest Hourly slot and a short Shopee state visible, including
+incomplete/review/unavailable warnings and a Full Sync fallback count when needed.
+Counts, full timestamps and operational explanations move into the same speech
+bubble pattern. Header and row details share the one-open-bubble rule.
+
 ## Release and rollback
 
 Review together with the StockDay API bridge and SC producer changes before any

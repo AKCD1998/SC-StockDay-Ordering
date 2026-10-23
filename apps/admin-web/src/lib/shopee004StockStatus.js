@@ -13,3 +13,18 @@ export function shopee004StockStatusMessage(summary) {
     default: return "ข้อมูล Shopee ยังไม่พร้อม — ดูยอด POS แยกใต้แต่ละรายการ";
   }
 }
+
+export function shopee004StockStatusShortMessage(summary) {
+  const pending = Number.isSafeInteger(summary?.unallocatedOrders) && summary.unallocatedOrders > 0
+    ? ` · ${summary.unallocatedOrders.toLocaleString("th-TH")} ออเดอร์` : "";
+  switch (summary?.status) {
+    case "available": return "Shopee หักจองแล้ว";
+    case "partial-known-commitments": return `Shopee ยังไม่ครบ${pending}`;
+    case "partial": return "Shopee รอตรวจบางรายการ";
+    case "shopee-orders-need-review": return "Shopee มีออเดอร์รอตรวจ";
+    case "shopee-orders-processing": return "Shopee รอประมวลผล";
+    case "reference": return "Shopee ยอดอ้างอิง";
+    case "reservation-paused-holds-retained": return "Shopee พักอยู่";
+    default: return "Shopee ยังไม่พร้อม";
+  }
+}

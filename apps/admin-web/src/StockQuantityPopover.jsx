@@ -1,7 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-export default function StockQuantityPopover({ open, onOpenChange, className = "", label, quantity, badge, children }) {
+export default function StockQuantityPopover({ open, onOpenChange, className = "", label, quantity, badge,
+  heading = "สต็อกสาขา 004", dialogLabel = "รายละเอียดสต็อกสาขา 004", children }) {
   const id = useId();
   const trigger = useRef(null), bubble = useRef(null), closeTimer = useRef(null), pinned = useRef(false);
   const change = useRef(onOpenChange), skipFocus = useRef(false);
@@ -58,12 +59,12 @@ export default function StockQuantityPopover({ open, onOpenChange, className = "
       onClick={() => { if (pinned.current) hide(); else { pinned.current = true; show(); } }}>
       <span aria-hidden="true">ⓘ</span>
     </button>
-    {open ? createPortal(<div ref={bubble} id={id} role="dialog" aria-label="รายละเอียดสต็อกสาขา 004"
+    {open ? createPortal(<div ref={bubble} id={id} role="dialog" aria-label={dialogLabel}
       className={`stock-004-popover ${position?.side || "below"}`}
       style={position ? { left: position.left, top: position.top, "--stock-bubble-arrow": `${position.arrow}px` } : { visibility: "hidden" }}
       onMouseEnter={() => clearTimeout(closeTimer.current)} onMouseLeave={leave}
       onBlur={event => { if (!bubble.current?.contains(event.relatedTarget) && event.relatedTarget !== trigger.current) hide(); }}>
-      <div className="stock-004-popover-heading"><strong>สต็อกสาขา 004</strong><button type="button" aria-label="ปิดรายละเอียดสต็อก" onClick={dismiss}>×</button></div>
+      <div className="stock-004-popover-heading"><strong>{heading}</strong><button type="button" aria-label="ปิดรายละเอียดสต็อก" onClick={dismiss}>×</button></div>
       <div className="stock-004-expanded-details">{children}</div>
     </div>, document.body) : null}
   </span>;

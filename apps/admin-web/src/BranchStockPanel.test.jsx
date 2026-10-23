@@ -161,7 +161,9 @@ describe("BranchStockPanel branch scope", () => {
     await userEvent.click(within(cell).getByRole("button"));
     expect(screen.getByRole("dialog")).toHaveTextContent("Hourly คำนวณ");
     expect(screen.getByRole("dialog")).toHaveTextContent("Full Sync เดิม 4.00");
-    expect(screen.getByRole("region", { name: "แหล่งข้อมูลสต็อกสาขา 004" })).toHaveTextContent("6,835");
+    expect(screen.getByRole("region", { name: "แหล่งข้อมูลสต็อกสาขา 004" })).not.toHaveTextContent("6,835");
+    await userEvent.click(screen.getByRole("button",{name:"ดูรายละเอียดแหล่งข้อมูลสาขา 004"}));
+    expect(screen.getByRole("dialog",{name:"รายละเอียดแหล่งข้อมูลสาขา 004"})).toHaveTextContent("6,835");
     expect(global.fetch.mock.calls[0][0]).toContain("stockView=hourly004");
   });
 
@@ -183,6 +185,7 @@ describe("BranchStockPanel branch scope", () => {
     expect(breakdown).toHaveTextContent("POS 4.00");expect(breakdown).toHaveTextContent("จอง 2.00");expect(breakdown).toHaveTextContent("ส่งแล้วไม่ลง POS 1.00");
     expect(cell).not.toContainElement(breakdown);
     await userEvent.keyboard("{Escape}");expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button",{name:"ดูรายละเอียดแหล่งข้อมูลสาขา 004"}));
     expect(screen.getByText(/มีรูปแบบชื่อต้นทาง/)).toBeInTheDocument();
   });
 
@@ -197,6 +200,8 @@ describe("BranchStockPanel branch scope", () => {
     expect(cell).not.toHaveTextContent("POS 4.00 ก่อนหัก Shopee");
     await userEvent.click(within(cell).getByRole("button"));
     expect(screen.getByRole("dialog")).toHaveTextContent("POS 4.00 ก่อนหัก Shopee");
+    expect(screen.getByText("Shopee ยังไม่พร้อม")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button",{name:"ดูรายละเอียดแหล่งข้อมูลสาขา 004"}));
     expect(screen.getByText("ติดต่อข้อมูล Shopee ไม่สำเร็จ — ยอด POS ยังแสดงแยกไว้")).toBeInTheDocument();
   });
   it("explains a Shopee review count without hiding the separately labelled POS reference",async()=>{
@@ -205,6 +210,8 @@ describe("BranchStockPanel branch scope", () => {
       shopeeStock004:{status:"shopee-orders-need-review",reviewOrders:2}};
     renderPanel({isOnlineMarketingStaff:false,branchCode:"004",fetchImplementation:async()=>({...makeJsonResponse([]),json:async()=>data})});
     await screen.findByText("A001");
+    expect(screen.getByText("Shopee มีออเดอร์รอตรวจ")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button",{name:"ดูรายละเอียดแหล่งข้อมูลสาขา 004"}));
     expect(screen.getByText("Shopee รอตรวจ 2 ออเดอร์ — ยอด POS ยังแสดงแยกไว้")).toBeInTheDocument();
     const cell=productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
     expect(cell.querySelector("strong")).toHaveTextContent("รอตรวจ");await userEvent.click(within(cell).getByRole("button"));
@@ -225,6 +232,7 @@ describe("BranchStockPanel branch scope", () => {
     expect(bubble).toHaveTextContent("POS 4.00 ก่อนหัก Shopee");
     expect(bubble).toHaveTextContent("ยอดจองอ้างอิง 1.00");
     expect(bubble).toHaveTextContent("ส่งแล้วไม่ลง POS อ้างอิง 0.00");
+    await userEvent.click(screen.getByRole("button",{name:"ดูรายละเอียดแหล่งข้อมูลสาขา 004"}));
     expect(screen.getByText(/ดูยอดอ้างอิงล่าสุดได้ 1 รายการ/)).toBeInTheDocument();
     expect(cell).not.toHaveTextContent("พร้อมใช้ · แชร์กับ Shopee");
   });
@@ -255,7 +263,8 @@ describe("BranchStockPanel branch scope", () => {
     await screen.findByText("A001");const cell=productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
     expect(cell.querySelector('strong')).toHaveTextContent('2.00');expect(cell).not.toHaveTextContent('พร้อมใช้ · แชร์กับ Shopee');
     expect(cell).toHaveTextContent('ชั่วคราว');expect(cell).not.toHaveTextContent('รอตรวจ');
-    expect(screen.getByText('ยอดชั่วคราว — ยังไม่รวม 1 ออเดอร์ที่รอจับคู่สินค้า')).toBeInTheDocument();
+    expect(screen.getByText('Shopee ยังไม่ครบ · 1 ออเดอร์')).toBeInTheDocument();
+    expect(screen.queryByText('ยอดชั่วคราว — ยังไม่รวม 1 ออเดอร์ที่รอจับคู่สินค้า')).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();await userEvent.click(within(cell).getByRole('button'));
     expect(screen.getByRole('dialog')).toHaveTextContent('ยังไม่ใช่ยอดพร้อมขายที่ยืนยันแล้ว');
   });
@@ -290,7 +299,7 @@ describe("BranchStockPanel branch scope", () => {
     await userEvent.click(within(cell).getByRole("button"));
     expect(screen.getByRole("dialog")).toHaveTextContent("ข้อมูลเปลี่ยนระหว่างอ่าน");
     expect(screen.getByRole("dialog")).not.toHaveTextContent("Hourly คำนวณ");
-    expect(screen.getByRole("region", { name: "แหล่งข้อมูลสต็อกสาขา 004" })).toHaveTextContent("ใช้ Full Sync 1 รายการ");
+    expect(screen.getByRole("region", { name: "แหล่งข้อมูลสต็อกสาขา 004" })).toHaveTextContent("Full Sync 1");
   });
 
   it("keeps another branch's quantity and export scope independent of the 004 overlay", async () => {
@@ -326,10 +335,10 @@ describe("BranchStockPanel branch scope", () => {
     renderPanel({isOnlineMarketingStaff:false,branchCode:'004',fetchImplementation:async()=>{
       calls++;if(calls>1)throw Error('synthetic network failure');return {...makeJsonResponse([]),json:async()=>data};
     }});
-    await act(async()=>{});expect(screen.getByText('หักยอดจอง Shopee แล้ว')).toBeInTheDocument();
+    await act(async()=>{});expect(screen.getByText('Shopee หักจองแล้ว')).toBeInTheDocument();
     await act(async()=>{await vi.advanceTimersByTimeAsync(60000);});
     expect(productRow('A001').querySelector('[data-column-key="qtyBranch004"]')).toHaveTextContent('รอตรวจ');
-    expect(screen.queryByText('หักยอดจอง Shopee แล้ว')).not.toBeInTheDocument();
+    expect(screen.queryByText('Shopee หักจองแล้ว')).not.toBeInTheDocument();
   });
 
   it("exports the displayed Hourly zero and includes a separate source/baseline sheet", async () => {
