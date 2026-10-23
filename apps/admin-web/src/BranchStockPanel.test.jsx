@@ -174,6 +174,11 @@ describe("BranchStockPanel branch scope", () => {
     expect(cell).toHaveTextContent("แชร์กับ Shopee"); expect(cell).toHaveTextContent("POS 4.00");
     expect(cell).toHaveTextContent("จอง 2.00"); expect(cell).toHaveTextContent("ส่งแล้วไม่ลง POS 1.00");
     expect(cell.querySelector(".stock-shopee-shared")).not.toBeNull();
+    const details=cell.querySelector("details"),breakdown=cell.querySelector(".stock-004-expanded-details");
+    expect(details).not.toHaveAttribute("open");expect(breakdown).not.toBeVisible();
+    expect(cell.querySelector("summary strong")).toBeVisible();
+    await userEvent.click(cell.querySelector("summary"));
+    expect(details).toHaveAttribute("open");expect(breakdown).toBeVisible();
     expect(screen.getByText(/มีรูปแบบชื่อต้นทาง/)).toBeInTheDocument();
   });
 
@@ -186,6 +191,7 @@ describe("BranchStockPanel branch scope", () => {
     const cell = productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
     expect(cell).toHaveTextContent("รอตรวจ"); expect(cell.querySelector("strong")).not.toHaveTextContent("0.00");
     expect(cell).toHaveTextContent("POS 4.00 ก่อนหัก Shopee");
+    expect(cell.querySelector(".stock-004-expanded-details")).not.toBeVisible();
     expect(screen.getByText("ติดต่อข้อมูล Shopee ไม่สำเร็จ — ยอด POS ยังแสดงแยกไว้")).toBeInTheDocument();
   });
   it("explains a Shopee review count without hiding the separately labelled POS reference",async()=>{

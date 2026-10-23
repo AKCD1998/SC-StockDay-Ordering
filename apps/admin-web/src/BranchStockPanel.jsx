@@ -1208,25 +1208,35 @@ export function BranchStockPanel({
       if (column.key === "qtyBranch004" && row.stock004) {
         if (["hourly-and-shopee", "shopee-availability-unknown"].includes(row.stock004.basis)) {
           const known = row.stock004.basis === "hourly-and-shopee";
-          return <div className={`branch-stock-004-quantity ${known ? "stock-shopee-shared" : "stock-shopee-unknown"}`}>
-            <strong>{known ? formatNumber(row.qtyBranch004, 2) : "รอตรวจ"}</strong>
+          return <details className={`branch-stock-004-quantity stock-004-disclosure ${known ? "stock-shopee-shared" : "stock-shopee-unknown"}`}>
+            <summary title="ดูรายละเอียดสต็อกสาขา 004">
+              <strong>{known ? formatNumber(row.qtyBranch004, 2) : "รอตรวจ"}</strong>
+              <span className="stock-004-info-icon" aria-hidden="true">ⓘ</span>
+            </summary>
+            <div className="stock-004-expanded-details">
             <small>{known ? "พร้อมใช้ · แชร์กับ Shopee" : "ยังยืนยันยอดพร้อมใช้ไม่ได้"}</small>
             {!known ? <span className="stock-pos-reference">POS {formatNumber(row.posQtyBranch004, 2)} ก่อนหัก Shopee</span> : null}
             <small>{known ? `POS ${formatNumber(row.posQtyBranch004, 2)} · ` : ""}จอง {formatNumber(row.stock004.shopee?.reservedQuantity, 2)} · ส่งแล้วไม่ลง POS {formatNumber(row.stock004.shopee?.shippedUnpostedQuantity, 2)}</small>
             <small>บัญชีจอง {hourlyTime(row.stock004.shopee?.asOf)} · POS {row.stock004.posBasis === "hourly-calculated" ? "Hourly" : "Full Sync"}</small>
-          </div>;
+            </div>
+          </details>;
         }
         const hourly = row.stock004.basis === "hourly-calculated";
         const detail = hourly
           ? `อ่าน ${hourlyTime(row.stock004.capturedAt)} · Full Sync เดิม ${formatNumber(row.fullSyncQtyBranch004, 2)}`
           : hourlyFallbackLabel(row.stock004.reason);
-        return <div className="branch-stock-004-quantity">
-          <span>{formatNumber(row.qtyBranch004, 2)}</span>
+        return <details className="branch-stock-004-quantity stock-004-disclosure">
+          <summary title="ดูรายละเอียดสต็อกสาขา 004">
+            <span className="stock-004-primary">{formatNumber(row.qtyBranch004, 2)}</span>
+            <span className="stock-004-info-icon" aria-hidden="true">ⓘ</span>
+          </summary>
+          <div className="stock-004-expanded-details">
           <small className={hourly ? "stock-source-hourly" : "stock-source-fallback"} title={detail}>
             {hourly ? "Hourly คำนวณ" : "Full Sync"}
           </small>
           <small className="branch-stock-004-detail">{detail}</small>
-        </div>;
+          </div>
+        </details>;
       }
       return formatNumber(row[column.key], 2);
     }
@@ -1249,7 +1259,7 @@ export function BranchStockPanel({
               {hourlyStock004?.status === "available" ? <>
                 <strong>004 · ยอดคำนวณ Hourly {formatNumber(hourlyStock004.availableProducts)} รายการ</strong>
                 <span>{hourlyStock004.plannedSlot ? `รอบ ${hourlyStock004.plannedSlot} · ` : ""}อ่านเมื่อ {hourlyTime(hourlyStock004.capturedAt)} (เวลาไทย)</span>
-                {hourlyStock004.pageFallbackProducts > 0 ? <span>รายการที่แสดงใช้ Full Sync {formatNumber(hourlyStock004.pageFallbackProducts)} รายการ ดูเหตุผลใต้ยอด</span> : null}
+                {hourlyStock004.pageFallbackProducts > 0 ? <span>รายการที่แสดงใช้ Full Sync {formatNumber(hourlyStock004.pageFallbackProducts)} รายการ กด ⓘ ดูเหตุผล</span> : null}
                 <small>ยอดระหว่างวันรวมการขายและการเคลื่อนไหวที่อ่านได้ ยังไม่รับรองว่าอ่านทุกสินค้าพร้อมกัน ณ วินาทีเดียว</small>
               </> : <>
                 <strong>004 · กำลังแสดงยอด Full Sync</strong>

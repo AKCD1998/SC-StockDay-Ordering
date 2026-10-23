@@ -11895,8 +11895,19 @@ input[type="radio"] {
 [data-theme="dark"] .fp-month-card.selected { background: rgba(42, 52, 255, 0.12); }
 [data-theme="dark"] .fp-month-card-name { color: #f1f5f9; }
 
-.stock-shopee-shared { color: #a84906; }
-.stock-shopee-shared > strong { color: #d95d06; text-shadow: 0 0 8px #ffb45c66; }
+.stock-004-disclosure > summary { display: inline-flex; align-items: center; gap: 8px; width: fit-content; cursor: pointer; list-style: none; }
+.stock-004-disclosure > summary::-webkit-details-marker { display: none; }
+.stock-004-disclosure > summary::marker { content: ""; }
+.stock-004-disclosure > summary:focus-visible { outline: 2px solid #f59e0b; outline-offset: 4px; border-radius: 3px; }
+.stock-004-disclosure > summary > strong,
+.stock-004-primary { font-size: 1.05rem; font-weight: 700; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.stock-004-info-icon { color: #64748b; font-size: 0.8rem; font-weight: 400; }
+.stock-004-expanded-details { display: grid; gap: 4px; margin-top: 8px; max-width: 260px; white-space: normal; color: #526170; }
+[data-theme="dark"] .stock-004-info-icon { color: #adc1d4; }
+[data-theme="dark"] .stock-004-expanded-details { color: #b4c4d8; }
+.stock-shopee-shared > summary > strong { color: #b65000; text-shadow: 0 0 8px #ffb45c44; }
+[data-theme="dark"] .stock-shopee-shared > summary > strong { color: #ffad55; }
 .stock-shopee-unknown { color: #9a3412; }
+[data-theme="dark"] .stock-shopee-unknown > summary > strong { color: #fbbf24; }
 .stock-pos-reference { font-weight: 600; font-size: 0.85rem; }
 .branch-stock-shopee-status { display: grid; gap: 4px; padding-top: 8px; }
