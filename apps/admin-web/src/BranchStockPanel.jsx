@@ -1206,15 +1206,17 @@ export function BranchStockPanel({
     }
     if (column.type === "number") {
       if (column.key === "qtyBranch004" && row.stock004) {
-        if (["hourly-and-shopee", "shopee-availability-unknown"].includes(row.stock004.basis)) {
-          const known = row.stock004.basis === "hourly-and-shopee";
+        if (["hourly-and-shopee", "hourly-and-shopee-known-only", "shopee-availability-unknown"].includes(row.stock004.basis)) {
+          const estimated=row.stock004.basis==='hourly-and-shopee-known-only';
+          const known = row.stock004.basis !== "shopee-availability-unknown";
           return <details className={`branch-stock-004-quantity stock-004-disclosure ${known ? "stock-shopee-shared" : "stock-shopee-unknown"}`}>
-            <summary title="ดูรายละเอียดสต็อกสาขา 004">
+            <summary title={estimated?"ยอดชั่วคราว · ยังไม่รวมออเดอร์ค้างจับคู่ · กดดูรายละเอียด":"ดูรายละเอียดสต็อกสาขา 004"}>
               <strong>{known ? formatNumber(row.qtyBranch004, 2) : "รอตรวจ"}</strong>
               <span className="stock-004-info-icon" aria-hidden="true">ⓘ</span>
             </summary>
             <div className="stock-004-expanded-details">
-            <small>{known ? "พร้อมใช้ · แชร์กับ Shopee" : "ยังยืนยันยอดพร้อมใช้ไม่ได้"}</small>
+            <small>{estimated?"ยอดชั่วคราว · หักเฉพาะออเดอร์ที่ยืนยันแล้ว":known ? "พร้อมใช้ · แชร์กับ Shopee" : "ยังยืนยันยอดพร้อมใช้ไม่ได้"}</small>
+            {estimated?<small>ยังไม่รวมออเดอร์ Shopee ที่รอจับคู่สินค้า</small>:null}
             {!known ? <span className="stock-pos-reference">POS {formatNumber(row.posQtyBranch004, 2)} ก่อนหัก Shopee</span> : null}
             <small>{known ? `POS ${formatNumber(row.posQtyBranch004, 2)} · ` : ""}จอง {formatNumber(row.stock004.shopee?.reservedQuantity, 2)} · ส่งแล้วไม่ลง POS {formatNumber(row.stock004.shopee?.shippedUnpostedQuantity, 2)}</small>
             <small>บัญชีจอง {hourlyTime(row.stock004.shopee?.asOf)} · POS {row.stock004.posBasis === "hourly-calculated" ? "Hourly" : "Full Sync"}</small>

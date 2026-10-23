@@ -217,6 +217,16 @@ describe("BranchStockPanel branch scope", () => {
     const available=productRow("PARTIAL002").querySelector('[data-column-key="qtyBranch004"]');
     expect(available.querySelector("strong")).toHaveTextContent("3.00");expect(available).not.toHaveTextContent("รอตรวจ");
   });
+  it("shows temporary quantities with an explicit incomplete-order banner and compact details",async()=>{
+    const data={records:[{...STOCK_RECORDS[0],qtyBranch004:2,posQtyBranch004:4,
+      stock004:{basis:"hourly-and-shopee-known-only",posBasis:"hourly-calculated",shopee:{reservedQuantity:2,shippedUnpostedQuantity:0,unallocatedOrders:1,allOrdersAllocated:false}}}],
+      shopeeStock004:{status:"partial-known-commitments",unallocatedOrders:1}};
+    renderPanel({isOnlineMarketingStaff:false,branchCode:"004",fetchImplementation:async()=>({...makeJsonResponse([]),json:async()=>data})});
+    await screen.findByText("A001");const cell=productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
+    expect(cell.querySelector('summary strong')).toHaveTextContent('2.00');expect(cell).not.toHaveTextContent('พร้อมใช้ · แชร์กับ Shopee');
+    expect(screen.getByText('ยอดชั่วคราว — ยังไม่รวม 1 ออเดอร์ที่รอจับคู่สินค้า')).toBeInTheDocument();
+    expect(cell.querySelector('.stock-004-expanded-details')).not.toBeVisible();
+  });
   it("labels suppressed fallback quantities rather than representing the morning value as Hourly", async () => {
     renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: async () => {
       const response = hourlyResponse(); const data = await response.json();
