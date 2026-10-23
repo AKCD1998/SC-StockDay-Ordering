@@ -204,6 +204,27 @@ describe("BranchStockPanel branch scope", () => {
     const cell=productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
     expect(cell).toHaveTextContent("POS 4.00 ก่อนหัก Shopee");expect(cell.querySelector("strong")).toHaveTextContent("รอตรวจ");
   });
+  it("keeps last-confirmed stock clearly labelled as a closed reference disclosure and never a current total",async()=>{
+    const data={records:[{...STOCK_RECORDS[0],qtyBranch004:null,qtyTotalAllBranches:null,posQtyBranch004:4,
+      stock004:{basis:"shopee-availability-unknown",viewStatus:"reference",posBasis:"hourly-calculated",shopee:{reservedQuantity:1,shippedUnpostedQuantity:0,asOf:"2026-10-23T09:00:00Z"},
+        lastConfirmed:{quantity:3,observedAt:"2026-10-23T09:00:00Z",fetchedAt:"2026-10-23T09:01:00Z",stale:true,reasonCode:"projection-timeout"}}}],
+      shopeeStock004:{status:"reference"}};
+    renderPanel({isOnlineMarketingStaff:false,branchCode:"004",fetchImplementation:async()=>({...makeJsonResponse([]),json:async()=>data})});
+    await screen.findByText("A001"); const cell=productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
+    expect(cell.querySelector("summary strong")).toHaveTextContent("3.00");
+    expect(cell.querySelector("summary")).toHaveTextContent("อ้างอิง");
+    expect(cell.querySelector(".stock-004-expanded-details")).not.toBeVisible();
+    await userEvent.click(cell.querySelector("summary"));
+    expect(cell).toHaveTextContent("ไม่ใช่ยอดพร้อมใช้ปัจจุบัน");
+    expect(cell).toHaveTextContent("POS 4.00 ก่อนหัก Shopee");
+    expect(cell).not.toHaveTextContent("พร้อมใช้ · แชร์กับ Shopee");
+  });
+  it("does not display a malformed reference as a ready-to-sell zero",async()=>{
+    const data={records:[{...STOCK_RECORDS[0],qtyBranch004:null,stock004:{basis:"shopee-availability-unknown",viewStatus:"reference",lastConfirmed:{quantity:null}}}]};
+    renderPanel({isOnlineMarketingStaff:false,branchCode:"004",fetchImplementation:async()=>({...makeJsonResponse([]),json:async()=>data})});
+    await screen.findByText("A001"); const summary=productRow("A001").querySelector('[data-column-key="qtyBranch004"] summary');
+    expect(summary).toHaveTextContent("รอตรวจ");expect(summary).not.toHaveTextContent("0.00");
+  });
 
   it("retains unaffected availability when only a mapped product needs marketplace review",async()=>{
     const data={records:[{...STOCK_RECORDS[0],qtyBranch004:null,qtyTotalAllBranches:null,posQtyBranch004:4,

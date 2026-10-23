@@ -69,7 +69,8 @@ export function getVisibleBranchStockColumns(columns, {
 }
 
 export function getSafeBranchStockQty(row, branchCode) {
-  if (branchCode === "004" && row?.stock004?.basis === "shopee-availability-unknown") return null;
+  if (branchCode === "004" && (row?.stock004?.basis === "shopee-availability-unknown"
+    || ["reference", "unverified"].includes(row?.stock004?.viewStatus))) return null;
   const value = Number(row?.[`qtyBranch${branchCode}`]);
   return Number.isFinite(value) ? value : 0;
 }
@@ -110,7 +111,7 @@ export function buildBranchStockExportMatrix(records, columns, getColumnValue = 
     ...records.map((row) => columns.map((column) => {
       const value = getColumnValue(row, column.key);
       if (column.type !== "number") return value ?? "";
-      if (row.stock004?.basis === "shopee-availability-unknown"
+      if ((row.stock004?.basis === "shopee-availability-unknown" || ["reference", "unverified"].includes(row.stock004?.viewStatus))
         && ["qtyBranch004", "qtyTotalAllBranches"].includes(column.key)) return "ไม่ทราบ";
       const numericValue = Number(value);
       if(row.stock004?.basis==='hourly-and-shopee-known-only'&&Number.isFinite(numericValue)
@@ -146,12 +147,15 @@ export async function createBranchStockScopeWorkbook({
   xlsx.utils.book_append_sheet(workbook, worksheet, scope.label.slice(0, 31));
   if (columns.some(column => column.key === "qtyBranch004") && records.some(row => row.stock004)) {
     const hasShopee = records.some(row => row.stock004?.shopee);
+    const hasReference = records.some(row => row.stock004?.lastConfirmed);
     const sources = [["รหัสสินค้า", "แหล่งยอด 004", "ยอด Full Sync 004", "อ่าน Hourly เมื่อ", "Full Sync เมื่อ", "เหตุที่ใช้ Full Sync",
-      ...(hasShopee ? ["ยอด POS", "จอง Shopee", "ส่งแล้วไม่ลง POS", "บัญชีจองเมื่อ"] : [])],
+      ...(hasShopee ? ["ยอด POS", "จอง Shopee", "ส่งแล้วไม่ลง POS", "บัญชีจองเมื่อ"] : []),
+      ...(hasReference ? ["สถานะยอดปัจจุบัน", "ยอดอ้างอิงเดิม ไม่ใช่ยอดพร้อมใช้", "เวลาอ้างอิง", "อ่านอ้างอิงสำเร็จเมื่อ"] : [])],
       ...records.map(row => [row.productCode, row.stock004?.basis || "full-sync", row.fullSyncQtyBranch004 ?? row.qtyBranch004,
         row.stock004?.capturedAt || "", row.stock004?.fullSyncAt || "", row.stock004?.reason || "",
         ...(hasShopee ? [row.posQtyBranch004 ?? "", row.stock004?.shopee?.reservedQuantity ?? "",
-          row.stock004?.shopee?.shippedUnpostedQuantity ?? "", row.stock004?.shopee?.asOf || ""] : [])])];
+          row.stock004?.shopee?.shippedUnpostedQuantity ?? "", row.stock004?.shopee?.asOf || ""] : []),
+        ...(hasReference ? [row.stock004?.viewStatus || "", row.stock004?.lastConfirmed?.quantity ?? "", row.stock004?.lastConfirmed?.observedAt || "", row.stock004?.lastConfirmed?.fetchedAt || ""] : [])])];
     xlsx.utils.book_append_sheet(workbook, xlsx.utils.aoa_to_sheet(sources), "ที่มาสต็อก004");
   }
   const data = xlsx.write(workbook, { type: "array", bookType: "xlsx" });

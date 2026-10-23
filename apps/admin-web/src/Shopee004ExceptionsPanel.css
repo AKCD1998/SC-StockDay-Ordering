@@ -1,0 +1,35 @@
+.shopee004-exceptions-panel { display: grid; gap: 18px; }
+.stock-exception-guide { display: flex; flex-wrap: wrap; gap: 12px 24px; padding: 14px; border: 1px solid #71809666; border-radius: 12px; }
+.stock-exception-guide > span { display: grid; gap: 4px; font-size: .88rem; }
+.stock-exception-list { display: grid; gap: 16px; }
+.stock-exception-card { padding: 18px; border: 1px solid #71809677; border-radius: 14px; }
+.stock-exception-card header { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
+.stock-exception-card h3 { margin: 0; font-size: 1rem; }
+.stock-exception-card p { margin: 8px 0; }
+.stock-exception-issue { white-space: nowrap; border: 1px solid #71809688; border-radius: 20px; padding: 4px 10px; font-size: .8rem; }
+.stock-exception-reason { font-weight: 600; }
+.stock-exception-warning { padding: 10px 14px; border-left: 3px solid #d97706; background: #d9770612; }
+.stock-exception-facts { display: flex; flex-wrap: wrap; gap: 12px 32px; }
+.stock-exception-facts div { display: grid; gap: 4px; }
+.stock-exception-facts dt { font-size: .85rem; opacity: .8; }
+.stock-exception-facts dd { margin: 0; }
+.stock-exception-card details { margin-top: 14px; }
+.stock-exception-card summary, .stock-exception-reconciliation > summary { cursor: pointer; font-weight: 600; }
+.stock-exception-evidence-list { padding-left: 20px; }
+.stock-exception-evidence-list li { margin: 10px 0; }
+.stock-exception-evidence-list small { display: block; opacity: .8; }
+.stock-exception-card fieldset { border: 1px solid #71809655; border-radius: 8px; padding: 12px; }
+.stock-exception-match { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(160px, 240px); gap: 12px; padding: 10px 0; border-bottom: 1px solid #71809633; }
+.stock-exception-match label, .stock-exception-history form > label { display: block; }
+.stock-exception-match small { display: block; opacity: .75; }
+.stock-exception-card input[type="checkbox"] { margin-right: 8px; width: auto; }
+.stock-exception-match input[type="number"] { width: 90px; display: inline-block; margin: 5px 8px 0 0; }
+.stock-exception-attestation { display: block; margin: 14px 0; font-size: .9rem; }
+.stock-exception-history form { display: grid; gap: 8px; max-width: 650px; }
+.stock-exception-card button { margin-top: 10px; }
+.stock-exception-card [role="alert"] { border-left: 3px solid #d97706; padding-left: 12px; }
+.stock-exception-pagination { display: flex; gap: 12px; justify-content: end; }
+.stock-exception-asof { margin: 0; font-size: .85rem; opacity: .8; }
+.stock-exception-reconciliation { padding: 14px; border: 1px solid #71809666; border-radius: 12px; }
+.stock-exception-reconciliation li { padding: 4px 0; }
+@media (max-width: 700px) { .stock-exception-card header { display: grid; } .stock-exception-issue { justify-self: start; } .stock-exception-match { grid-template-columns: 1fr; } }

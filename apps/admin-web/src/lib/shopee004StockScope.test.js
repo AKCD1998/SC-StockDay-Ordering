@@ -19,4 +19,11 @@ describe('unknown marketplace quantities in branch scope',()=>{
     const estimate={...row,qtyBranch004:2,stock004:{basis:'hourly-and-shopee-known-only'}};
     expect(buildBranchStockExportMatrix([estimate],columns)[1]).toEqual(['2 (ยังไม่รวมออเดอร์ค้างจับคู่)',3]);
   });
+  it('never exports a stale reference as current stock or a current total',()=>{
+    const cached={...row,qtyBranch004:999,qtyTotalAllBranches:1000,stock004:{basis:'hourly-and-shopee',viewStatus:'reference',lastConfirmed:{quantity:7}}};
+    const [projected]=projectBranchStockRows([cached],{isBranchStockScopeUser:true,scopeId:'all',branchCode:'004'});
+    expect(projected.qtyBranch004).toBeNull();expect(projected.qtyTotalAllBranches).toBeNull();
+    const columns=[{key:'qtyBranch004',label:'004',type:'number'},{key:'qtyTotalAllBranches',label:'total',type:'number'},{key:'qtyBranch001',label:'001',type:'number'}];
+    expect(buildBranchStockExportMatrix([cached],columns)[1]).toEqual(['ไม่ทราบ','ไม่ทราบ',3]);
+  });
 });

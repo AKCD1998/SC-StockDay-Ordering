@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import BranchStockRecommendationSuggestion from "./BranchStockRecommendationSuggestion";
 import { shopee004StockStatusMessage } from "./lib/shopee004StockStatus.js";
+import { stock004DisplayView } from "./lib/stock004DisplayView.js";
 import {
   createBranchStockScopeWorkbook,
   getBranchStockScopeOptions,
@@ -126,7 +127,8 @@ const STOCK_COST_COMPARE_BRANCHES = [
 ];
 
 function getBranchStockQty(row, branchCode) {
-  if (branchCode === "004" && row?.stock004?.basis === "shopee-availability-unknown") return null;
+  if (branchCode === "004" && (row?.stock004?.basis === "shopee-availability-unknown"
+    || ["reference", "unverified"].includes(row?.stock004?.viewStatus))) return null;
   return Number(row?.[`qtyBranch${branchCode}`] || 0);
 }
 
@@ -1206,6 +1208,24 @@ export function BranchStockPanel({
     }
     if (column.type === "number") {
       if (column.key === "qtyBranch004" && row.stock004) {
+        const display = stock004DisplayView(row);
+        if (["reference", "unverified"].includes(row.stock004.viewStatus)) {
+          const reference = display.lastConfirmed;
+          return <details className="branch-stock-004-quantity stock-004-disclosure stock-shopee-unknown">
+            <summary title={display.status === "reference" ? "ยอดอ้างอิงล่าสุด · ไม่ใช่ยอดพร้อมใช้ปัจจุบัน" : "ยังยืนยันยอดพร้อมใช้ไม่ได้"}>
+              <strong>{display.status === "reference" ? formatNumber(reference.quantity, 2) : "รอตรวจ"}</strong>
+              {display.status === "reference" ? <small className="stock-004-reference-label">อ้างอิง</small> : null}
+              <span className="stock-004-info-icon" aria-hidden="true">ⓘ</span>
+            </summary>
+            <div className="stock-004-expanded-details">
+              <small>ยังยืนยันยอดพร้อมใช้ปัจจุบันไม่ได้</small>
+              {reference ? <small>ยอดอ้างอิงล่าสุด {formatNumber(reference.quantity, 2)} · ข้อมูลเมื่อ {hourlyTime(reference.observedAt)} · อ่านสำเร็จเมื่อ {hourlyTime(reference.fetchedAt)} · ไม่ใช่ยอดพร้อมใช้ปัจจุบัน</small> : null}
+              <span className="stock-pos-reference">POS {formatNumber(row.posQtyBranch004, 2)} ก่อนหัก Shopee</span>
+              <small>จองที่ยืนยันแล้ว {formatNumber(row.stock004.shopee?.reservedQuantity, 2)} · ส่งแล้วไม่ลง POS {formatNumber(row.stock004.shopee?.shippedUnpostedQuantity, 2)}</small>
+              <small>บัญชีจองอ้างอิง {hourlyTime(row.stock004.shopee?.asOf)} · ต้องอ่านล่าสุดก่อนใช้ยืนยันยอด</small>
+            </div>
+          </details>;
+        }
         if (["hourly-and-shopee", "hourly-and-shopee-known-only", "shopee-availability-unknown"].includes(row.stock004.basis)) {
           const estimated=row.stock004.basis==='hourly-and-shopee-known-only';
           const known = row.stock004.basis !== "shopee-availability-unknown";
