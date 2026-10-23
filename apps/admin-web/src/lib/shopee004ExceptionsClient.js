@@ -73,6 +73,7 @@ function validRecord(record) {
 export function validateExceptionsResponse(value) {
   if (!value || value.schemaVersion !== "shopee004-exceptions-v1" || value.branchCode !== "004"
     || !stamp(value.asOf) || !["available", "unavailable"].includes(value.status)
+    || (value.unreadableRecords != null && !count(value.unreadableRecords))
     || !Array.isArray(value.records) || value.records.length > 100 || !value.records.every(validRecord)
     || new Set(value.records.map(row => row.exceptionId)).size !== value.records.length
     || typeof value.pagination?.hasMore !== "boolean"

@@ -199,12 +199,13 @@ export default function Shopee004ExceptionsPanel({ isAdminUser, csrfToken }) {
     <p className="stock-exception-warning">หน้านี้อนุมัติเฉพาะกฎจับคู่สินค้า การส่ง การยกเลิก และการรับคืนต้องยืนยันแยกกัน</p>
     {error ? <p role="alert">{error}{data ? ` · คงรายการอ้างอิงที่อ่านสำเร็จเมื่อ ${displayTime(data.asOf)} ไว้ โดยปิดการยืนยัน` : ""}</p> : null}
     {data?.status === "unavailable" ? <p role="alert">ระบบข้อยกเว้นยังไม่พร้อม ข้อมูลนี้ยังใช้ยืนยันการเปลี่ยนกฎไม่ได้</p> : null}
+    {data?.unreadableRecords > 0 ? <p className="stock-exception-warning" role="status">มี {number(data.unreadableRecords)} รายการที่อ่านรายละเอียดไม่ได้ ต้องตรวจต่อ — รายการเหล่านี้ยังไม่ได้รับการอนุมัติ แสดงรายการที่อ่านได้ด้านล่าง</p> : null}
     {data ? <p className="stock-exception-asof">{reference ? "รายการอ้างอิง" : "อ่านข้อมูล"}เมื่อ {displayTime(data.asOf)} (เวลาไทย)</p> : null}
     {!csrfToken ? <p role="alert">สิทธิ์ยืนยันยังไม่พร้อม กรุณาเข้าสู่ระบบใหม่</p> : null}
     <div className="stock-exception-list" aria-busy={busy}>
       {data?.records.map(record => <ExceptionCard key={record.exceptionId} record={record}
         csrfToken={csrfToken} readOnly={readOnly || Boolean(uncertainChange && uncertainChange !== record.exceptionId)} onChanged={load} onUncertainChange={setUncertainChange} />)}
-      {data?.status === "available" && !data.records.length ? <p role="status">ไม่มีข้อยกเว้นในหน้านี้</p> : null}
+      {data?.status === "available" && !data.records.length ? <p role="status">{data.unreadableRecords > 0 ? "หน้านี้ยังไม่มีรายการที่อ่านรายละเอียดได้" : "ไม่มีข้อยกเว้นในหน้านี้"}</p> : null}
     </div>
     <nav className="stock-exception-pagination" aria-label="หน้ารายการข้อยกเว้น">
       <button type="button" disabled={busy || uncertainChange || !history.length} onClick={() => {

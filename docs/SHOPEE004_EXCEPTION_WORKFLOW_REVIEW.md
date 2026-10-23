@@ -35,6 +35,10 @@ flags, SQL readers, scheduled tasks or automations.
 - Recovery state, attempt count and next retry time are displayed from the server.
   This page never starts a worker retry itself. A pending durable rule-recovery job
   is labelled pending rather than presented as zero successfully requeued orders.
+- If the bridge omits malformed records, an explicit `unreadableRecords` count
+  warns that those entries still need review. Valid records remain actionable
+  under their own verified evidence; omitted entries have no approval action and
+  an unreadable-only page is not labelled as an empty exception queue.
 
 The branch-stock table keeps its compact number plus information disclosure.
 `confirmed`, `reference` and `unverified` displays remain distinct. A cached

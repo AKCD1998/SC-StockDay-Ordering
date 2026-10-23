@@ -149,6 +149,23 @@ describe("admin Shopee004 exception workflow", () => {
     await screen.findByText("บันทึกกฎแล้ว · รอ worker รับรายการที่เกี่ยวข้องกลับคิวเดิม");
     expect(screen.queryByText(/ให้คิวเดิมตรวจต่อ 0/)).not.toBeInTheDocument();
   });
+  it("reports omitted unreadable records while allowing only the valid evidence-backed record to be approved", async () => {
+    const user = userEvent.setup(); const fetch = mockReads(exceptionsFixture([exceptionFixture()], { unreadableRecords: 1 }));
+    render(<Shopee004ExceptionsPanel isAdminUser csrfToken="fixture-csrf" />);
+    await screen.findByText(/มี 1 รายการที่อ่านรายละเอียดไม่ได้ ต้องตรวจต่อ/);
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    await selectMapping(user); expect(screen.getByRole("button", { name: "บันทึกกฎจับคู่เท่านั้น" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "บันทึกกฎจับคู่เท่านั้น" }));
+    await waitFor(() => expect(fetch.mock.calls.filter(([, options]) => options.method === "POST")).toHaveLength(1));
+    expect(fetch.mock.calls.find(([, options]) => options.method === "POST")[0]).toContain("/fixture-exception-a/mapping");
+  });
+  it("does not call an unreadable-only page an empty exception queue", async () => {
+    mockReads(exceptionsFixture([], { unreadableRecords: 2 }));
+    render(<Shopee004ExceptionsPanel isAdminUser csrfToken="fixture-csrf" />);
+    await screen.findByText(/มี 2 รายการที่อ่านรายละเอียดไม่ได้ ต้องตรวจต่อ/);
+    expect(screen.queryByText("ไม่มีข้อยกเว้นในหน้านี้")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "บันทึกกฎจับคู่เท่านั้น" })).not.toBeInTheDocument();
+  });
   it("requires a separate reason and acknowledgement to revoke a versioned rule", async () => {
     const user = userEvent.setup(); const fetch = mockReads(exceptionsFixture([exceptionFixture({ ruleId: "fixture-rule", ruleVersion: 3,
       auditHistory: [{ action: "approved", at: "2026-10-23T09:00:00Z", ruleVersion: 3, reason: "หลักฐานแพ็ก" }] })]), async () => response({ recorded: true, duplicate: false }));

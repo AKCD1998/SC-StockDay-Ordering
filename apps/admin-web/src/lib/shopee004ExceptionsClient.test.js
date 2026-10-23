@@ -32,6 +32,7 @@ describe("Shopee 004 exception client", () => {
     { branchCode: "001" }, { asOf: "not-time" }, { records: [exceptionFixture({ revision: null })] },
     { records: [exceptionFixture({ proposedMatches: [{ productCode: "SYNTHETIC-A", quantityPerSale: 0 }] })] },
     { records: [exceptionFixture(), exceptionFixture()] }, { pagination: { hasMore: true, nextCursor: null } },
+    { unreadableRecords: -1 }, { unreadableRecords: "1" },
   ])("rejects malformed or mixed exception responses %j", overrides => {
     expect(() => validateExceptionsResponse(exceptionsFixture(undefined, overrides))).toThrow();
   });
@@ -111,6 +112,11 @@ describe("Shopee 004 exception client", () => {
   it("does not approve only part of an evidence-backed bundle", () => {
     const row = exceptionFixture(); row.proposedMatches.push({ ...row.proposedMatches[0], productCode: "SYNTHETIC-B" });
     expect(() => makeMappingRequest(row, [row.proposedMatches[0]], row.evidence.map(e => e.reference), true, "fixture-operation")).toThrow();
+  });
+  it("accepts valid records alongside an explicit unreadable count without fabricating omitted records", () => {
+    const payload = exceptionsFixture([exceptionFixture({ listingId: null, variationId: null, canApproveMapping: false })], { unreadableRecords: 1 });
+    expect(validateExceptionsResponse(payload)).toMatchObject({ unreadableRecords: 1, records: [{ listingId: null, variationId: null }] });
+    expect(validateExceptionsResponse(payload).records).toHaveLength(1);
   });
   it("bounds the explicitly disabled admin bridge as a definite no-write", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => response({ definitiveNoWrite: true, error: { code: "STOCK_EXCEPTION_ADMIN_DISABLED", definitiveNoWrite: true, detailsWithheld: true } }, 503)));
