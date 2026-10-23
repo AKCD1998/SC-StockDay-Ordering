@@ -33,6 +33,7 @@ function ExceptionCard({ record, csrfToken, readOnly, onChanged, onUncertainChan
   }, [record.revision]);
 
   const mappingAllowed = record.canApproveMapping && ["identity", "unit"].includes(record.issueClass)
+    && record.itemContext !== "reference-only" && record.itemIssueConfirmed !== false
     && record.listingId && record.variationId && record.proposedMatches.length > 0;
   const matches = record.proposedMatches.filter(match => selected[match.productCode] !== undefined)
     .map(match => ({ ...match, quantityPerSale: selected[match.productCode] }));
@@ -87,12 +88,21 @@ function ExceptionCard({ record, csrfToken, readOnly, onChanged, onUncertainChan
       <div><h3>{record.productName || "ยังระบุสินค้าไม่ได้"}</h3><p>{record.variantName || "ไม่ระบุตัวเลือก"}</p></div>
       <span className={`stock-exception-issue issue-${record.issueClass}`}>{issueLabels[record.issueClass]}</span>
     </header>
+    {record.itemContext ? <p className={record.itemContext === "reference-only" ? "stock-exception-warning" : "stock-exception-asof"}>
+      {record.itemContext === "reference-only" ? "สินค้าอ้างอิง · ยังไม่ยืนยันว่าเป็นสินค้าที่ทำให้เกิดปัญหา จึงยังอนุมัติจับคู่จากรายการนี้ไม่ได้"
+        : record.itemContext === "original-issue" ? "รายการเดิมที่พบปัญหา" : "รายการปัจจุบันที่พบปัญหา"}
+    </p> : null}
     <p className="stock-exception-reason">{stockExceptionReasonLabel(record.reasonCode)}</p>
     <dl className="stock-exception-facts">
       <div><dt>ออเดอร์ที่เกี่ยวข้อง</dt><dd>{number(record.affectedOrders)}</dd></div>
       <div><dt>หน่วยที่พบ</dt><dd>{record.observedUnit || "ยังไม่ยืนยัน"}</dd></div>
       <div><dt>รุ่นกฎ</dt><dd>{record.ruleVersion ?? "ยังไม่มีกฎ"}</dd></div>
     </dl>
+    {record.unresolvedItemCount != null || record.itemReasonCodes?.length ? <details>
+      <summary>ขอบเขตรายการที่ต้องตรวจ</summary>
+      {record.unresolvedItemCount != null ? <p>ยังมีปัญหา {number(record.unresolvedItemCount)} รายการสินค้าในออเดอร์นี้</p> : null}
+      {record.itemReasonCodes?.length ? <ul>{record.itemReasonCodes.map((code, index) => <li key={`${code}-${index}`}>{stockExceptionReasonLabel(code)}</li>)}</ul> : null}
+    </details> : null}
     {record.recovery ? <p className="stock-exception-recovery">
       {record.recovery.state === "retry_wait" ? `รอลองใหม่ตามคิวเดิม · ล้มเหลวแล้ว ${number(record.recovery.attempts)} ครั้ง · ครั้งถัดไป ${displayTime(record.recovery.nextRetryAt)}`
         : record.recovery.state === "blocked" ? `หยุดลองซ้ำ · ต้องตรวจหลักฐานหรือแก้ต้นเหตุ · ล้มเหลวแล้ว ${number(record.recovery.attempts)} ครั้ง`

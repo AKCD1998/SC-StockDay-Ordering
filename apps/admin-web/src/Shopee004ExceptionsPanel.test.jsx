@@ -166,6 +166,21 @@ describe("admin Shopee004 exception workflow", () => {
     expect(screen.queryByText("ไม่มีข้อยกเว้นในหน้านี้")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "บันทึกกฎจับคู่เท่านั้น" })).not.toBeInTheDocument();
   });
+  it("labels a reference-only item without approving it as the cause of a multi-item failure", async () => {
+    const user = userEvent.setup(); mockReads(exceptionsFixture([exceptionFixture({ itemContext: "reference-only", itemIssueConfirmed: false,
+      unresolvedItemCount: 2, itemReasonCodes: ["product_mapping_unverified", "unit_conflict"] })]));
+    render(<Shopee004ExceptionsPanel isAdminUser csrfToken="fixture-csrf" />);
+    await screen.findByText(/สินค้าอ้างอิง · ยังไม่ยืนยันว่าเป็นสินค้าที่ทำให้เกิดปัญหา/);
+    expect(screen.queryByRole("button", { name: "บันทึกกฎจับคู่เท่านั้น" })).not.toBeInTheDocument();
+    await user.click(screen.getByText("ขอบเขตรายการที่ต้องตรวจ"));
+    expect(screen.getByText("ยังมีปัญหา 2 รายการสินค้าในออเดอร์นี้")).toBeVisible();
+  });
+  it.each([["current-issue", "รายการปัจจุบันที่พบปัญหา"], ["original-issue", "รายการเดิมที่พบปัญหา"]])("labels the verified %s item context", async (itemContext, label) => {
+    mockReads(exceptionsFixture([exceptionFixture({ itemContext, itemIssueConfirmed: true, unresolvedItemCount: 1, itemReasonCodes: ["unit_conflict"] })]));
+    render(<Shopee004ExceptionsPanel isAdminUser csrfToken="fixture-csrf" />);
+    await screen.findByText(label);
+    expect(screen.getByRole("button", { name: "บันทึกกฎจับคู่เท่านั้น" })).toBeDisabled();
+  });
   it("requires a separate reason and acknowledgement to revoke a versioned rule", async () => {
     const user = userEvent.setup(); const fetch = mockReads(exceptionsFixture([exceptionFixture({ ruleId: "fixture-rule", ruleVersion: 3,
       auditHistory: [{ action: "approved", at: "2026-10-23T09:00:00Z", ruleVersion: 3, reason: "หลักฐานแพ็ก" }] })]), async () => response({ recorded: true, duplicate: false }));

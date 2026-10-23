@@ -39,6 +39,11 @@ flags, SQL readers, scheduled tasks or automations.
   warns that those entries still need review. Valid records remain actionable
   under their own verified evidence; omitted entries have no approval action and
   an unreadable-only page is not labelled as an empty exception queue.
+- Multi-item exceptions identify whether the shown product is the current failed
+  item, an original failed item, or only a reference whose role is not established.
+  Reference-only items cannot approve mapping even if an upstream applicability
+  flag is accidentally true. Item-level unresolved counts and reasons remain
+  available in a disclosure without adding text to branch-stock rows.
 
 The branch-stock table keeps its compact number plus information disclosure.
 `confirmed`, `reference` and `unverified` displays remain distinct. A cached

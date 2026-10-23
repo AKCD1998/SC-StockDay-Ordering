@@ -63,6 +63,10 @@ function validRecord(record) {
     && Array.isArray(record.evidence) && record.evidence.length <= 50 && record.evidence.every(validEvidence)
     && (record.ruleId == null || opaque(record.ruleId))
     && (record.ruleVersion == null || ruleVersion(record.ruleVersion))
+    && (record.itemContext == null || ["current-issue", "original-issue", "reference-only"].includes(record.itemContext))
+    && (record.itemIssueConfirmed == null || typeof record.itemIssueConfirmed === "boolean")
+    && (record.unresolvedItemCount == null || count(record.unresolvedItemCount))
+    && (record.itemReasonCodes == null || (Array.isArray(record.itemReasonCodes) && record.itemReasonCodes.length <= 50 && record.itemReasonCodes.every(code => text(code, 100))))
     && (record.auditHistory == null || (Array.isArray(record.auditHistory) && record.auditHistory.length <= 100
       && record.auditHistory.every(entry => entry && text(entry.action, 80) && stamp(entry.at)
         && (entry.ruleVersion == null || ruleVersion(entry.ruleVersion)) && (entry.reason == null || displayText(entry.reason, 200)))))
@@ -145,6 +149,7 @@ export async function readStockReconciliation({ signal } = {}) {
 
 export function makeMappingRequest(record, selectedMatches, evidenceRefs, acknowledgeUnitEvidence, operationId) {
   if (!record.canApproveMapping || !["identity", "unit"].includes(record.issueClass)
+    || record.itemContext === "reference-only" || record.itemIssueConfirmed === false
     || !opaque(record.listingId) || !opaque(record.variationId) || !opaque(operationId) || !acknowledgeUnitEvidence
     || !selectedMatches.length || selectedMatches.length > 20 || evidenceRefs.length < 2 || evidenceRefs.length > 50
     || selectedMatches.length !== record.proposedMatches.length

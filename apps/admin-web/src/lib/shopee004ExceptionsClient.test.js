@@ -122,6 +122,11 @@ describe("Shopee 004 exception client", () => {
     expect(validateExceptionsResponse(payload)).toMatchObject({ unreadableRecords: 1, records: [{ listingId: null, variationId: null }] });
     expect(validateExceptionsResponse(payload).records).toHaveLength(1);
   });
+  it("accepts actual failed-item context and blocks reference-only item approval", () => {
+    const row = exceptionFixture({ itemContext: "reference-only", itemIssueConfirmed: false, unresolvedItemCount: 2, itemReasonCodes: ["product_mapping_unverified", "unit-conflict"] });
+    expect(validateExceptionsResponse(exceptionsFixture([row])).records[0]).toMatchObject({ itemContext: "reference-only", unresolvedItemCount: 2 });
+    expect(() => makeMappingRequest(row, row.proposedMatches, row.evidence.map(e => e.reference), true, "fixture-operation")).toThrow();
+  });
   it("bounds the explicitly disabled admin bridge as a definite no-write", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => response({ definitiveNoWrite: true, error: { code: "STOCK_EXCEPTION_ADMIN_DISABLED", definitiveNoWrite: true, detailsWithheld: true } }, 503)));
     expect(await approveStockMapping("fixture-exception", {}, "fixture-csrf").catch(value => value)).toMatchObject({ code: "STOCK_EXCEPTION_ADMIN_DISABLED", outcomeUnknown: false });
