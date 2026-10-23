@@ -11894,3 +11894,8 @@ input[type="radio"] {
 [data-theme="dark"] .fp-month-card:hover { border-color: #3a4a5e; }
 [data-theme="dark"] .fp-month-card.selected { background: rgba(42, 52, 255, 0.12); }
 [data-theme="dark"] .fp-month-card-name { color: #f1f5f9; }
+
+.stock-shopee-shared { color: #a84906; }
+.stock-shopee-shared > strong { color: #d95d06; text-shadow: 0 0 8px #ffb45c66; }
+.stock-shopee-unknown { color: #9a3412; }
+.branch-stock-shopee-status { display: grid; gap: 4px; padding-top: 8px; }

@@ -163,6 +163,30 @@ describe("BranchStockPanel branch scope", () => {
     expect(global.fetch.mock.calls[0][0]).toContain("stockView=hourly004");
   });
 
+  it("shows 004 orange shared-stock availability with separate POS and marketplace demand", async () => {
+    const data = { records: [{ ...STOCK_RECORDS[0], qtyBranch004: 1, posQtyBranch004: 4,
+      stock004: { basis: "hourly-and-shopee", posBasis: "hourly-calculated", shopee: {
+        reservedQuantity: 2, shippedUnpostedQuantity: 1, asOf: "2026-10-22T12:00:00Z" } } }],
+      shopeeStock004: { status: "available", asOf: "2026-10-22T12:00:00Z", sourceLabelReviewOrders: 1 } };
+    renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: async () => ({ ...makeJsonResponse([]), json: async () => data }) });
+    await screen.findByText("A001");
+    const cell = productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
+    expect(cell).toHaveTextContent("แชร์กับ Shopee"); expect(cell).toHaveTextContent("POS 4.00");
+    expect(cell).toHaveTextContent("จอง 2.00"); expect(cell).toHaveTextContent("ส่งแล้วไม่ลง POS 1.00");
+    expect(cell.querySelector(".stock-shopee-shared")).not.toBeNull();
+    expect(screen.getByText(/มีรูปแบบชื่อต้นทาง/)).toBeInTheDocument();
+  });
+
+  it("keeps unknown Shopee availability unknown for branch users and scoped totals", async () => {
+    const data = { records: [{ ...STOCK_RECORDS[0], qtyBranch004: null, qtyTotalAllBranches: null, posQtyBranch004: 4,
+      stock004: { basis: "shopee-availability-unknown", posBasis: "hourly-calculated", shopee: {} } }],
+      shopeeStock004: { status: "projection-unavailable" } };
+    renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: async () => ({ ...makeJsonResponse([]), json: async () => data }) });
+    await screen.findByText("A001");
+    const cell = productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
+    expect(cell).toHaveTextContent("รอตรวจ"); expect(cell.querySelector("strong")).not.toHaveTextContent("0.00");
+  });
+
   it("labels suppressed fallback quantities rather than representing the morning value as Hourly", async () => {
     renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: async () => {
       const response = hourlyResponse(); const data = await response.json();
@@ -203,6 +227,18 @@ describe("BranchStockPanel branch scope", () => {
     expect(signal.aborted).toBe(true);
     await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
     expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+  it("invalidates both the old marketplace quantity and its available banner after a failed refresh", async () => {
+    vi.useFakeTimers(); let calls=0;
+    const data={records:[{...STOCK_RECORDS[0],qtyBranch004:1,posQtyBranch004:4,stock004:{basis:'hourly-and-shopee',posBasis:'hourly-calculated',
+      shopee:{reservedQuantity:2,shippedUnpostedQuantity:1}}}],shopeeStock004:{status:'available'}};
+    renderPanel({isOnlineMarketingStaff:false,branchCode:'004',fetchImplementation:async()=>{
+      calls++;if(calls>1)throw Error('synthetic network failure');return {...makeJsonResponse([]),json:async()=>data};
+    }});
+    await act(async()=>{});expect(screen.getByText('หักยอดจอง Shopee แล้ว')).toBeInTheDocument();
+    await act(async()=>{await vi.advanceTimersByTimeAsync(60000);});
+    expect(productRow('A001').querySelector('[data-column-key="qtyBranch004"]')).toHaveTextContent('รอตรวจ');
+    expect(screen.queryByText('หักยอดจอง Shopee แล้ว')).not.toBeInTheDocument();
   });
 
   it("exports the displayed Hourly zero and includes a separate source/baseline sheet", async () => {
