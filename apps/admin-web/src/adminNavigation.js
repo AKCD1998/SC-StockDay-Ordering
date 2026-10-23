@@ -10,6 +10,7 @@ export const adminOnlyViews = [
   taxonomyReviewView,
   "sync-log",
   "pos-admin",
+  "shopee004-exceptions",
 ];
 export const adminViewKeys = [
   defaultAdminView,
@@ -35,6 +36,7 @@ const ADMIN_VIEW_ROUTE_SEGMENTS = {
   preorder: "preorder",
   members: "members",
   "pos-admin": "pos-admin",
+  "shopee004-exceptions": "shopee004-exceptions",
   [stockCostAuditView]: "stock-cost-audit",
   "category-review": "category-review",
   "ingredient-dictionary": "ingredient-dictionary",
@@ -86,6 +88,7 @@ export function getNavigationGroups(isAdminUser, hideDashboard = false) {
         { label: "Product Taxonomy", view: taxonomyView, description: "กำหนดประเภทสินค้าและจัดประเภทอัตโนมัติ" },
         { label: "Taxonomy Review", view: taxonomyReviewView, description: "ยืนยันผล AI classification และจัดคิวตรวจทาน" },
         { label: "ประวัติ Sync", view: "sync-log", description: "สถานะและประวัติการ sync ข้อมูล" },
+        { label: "ข้อยกเว้น Shopee 004", view: "shopee004-exceptions", description: "ตรวจคู่สินค้า หน่วย และยอดที่ยังต้องยืนยัน" },
         { label: "Ingredient Mapping", description: "supervision workflow ระยะถัดไป", disabled: true },
         { label: "Product Master", description: "ทะเบียนสินค้ากลาง", disabled: true },
       ],

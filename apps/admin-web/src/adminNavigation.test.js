@@ -13,6 +13,14 @@ afterEach(() => {
 });
 
 describe("admin navigation model", () => {
+  it("exposes Shopee exception approvals only in the admin quality group", () => {
+    expect(getNavigationGroups(false).flatMap(group => group.items).map(item => item.view)).not.toContain("shopee004-exceptions");
+    expect(getNavigationGroups(true).find(group => group.id === "data-quality").items.map(item => item.view)).toContain("shopee004-exceptions");
+    expect(adminOnlyViews).toContain("shopee004-exceptions");
+    expect(buildAdminViewHash("shopee004-exceptions")).toBe("#/shopee004-exceptions");
+    window.history.replaceState({}, "", "/#/shopee004-exceptions");
+    expect(readAdminViewFromLocation()).toBe("shopee004-exceptions");
+  });
   it("exposes the POS admin page only to admin accounts", () => {
     expect(getNavigationGroups(false).flatMap(group => group.items).map(item => item.view)).not.toContain("pos-admin");
     expect(getNavigationGroups(true).find(group => group.id === "customer-relations").items.map(item => item.view)).toEqual(["preorder", "members", "pos-admin"]);

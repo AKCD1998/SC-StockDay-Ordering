@@ -2057,16 +2057,9 @@ button {
 }
 
 .branch-stock-hourly-status {
-  display: grid;
-  gap: 4px;
-  margin-top: 10px;
-  padding: 10px;
-  border: 1px solid #bfd4df;
-  border-radius: 8px;
-  background: #f2f8fb;
-  color: #173f50;
-  font-size: 0.82rem;
-  overflow-wrap: anywhere;
+  margin-top: 8px;
+  color: #526779;
+  font-size: 0.78rem;
 }
 
 .branch-stock-004-quantity { display: grid; gap: 3px; }
@@ -11895,19 +11888,37 @@ input[type="radio"] {
 [data-theme="dark"] .fp-month-card.selected { background: rgba(42, 52, 255, 0.12); }
 [data-theme="dark"] .fp-month-card-name { color: #f1f5f9; }
 
-.stock-004-disclosure > summary { display: inline-flex; align-items: center; gap: 8px; width: fit-content; cursor: pointer; list-style: none; }
-.stock-004-disclosure > summary::-webkit-details-marker { display: none; }
-.stock-004-disclosure > summary::marker { content: ""; }
-.stock-004-disclosure > summary:focus-visible { outline: 2px solid #f59e0b; outline-offset: 4px; border-radius: 3px; }
-.stock-004-disclosure > summary > strong,
+.stock-004-disclosure { display: inline-flex; align-items: center; gap: 7px; width: fit-content; white-space: nowrap; }
 .stock-004-primary { font-size: 1.05rem; font-weight: 700; line-height: 1.4; font-variant-numeric: tabular-nums; }
-.stock-004-info-icon { color: #64748b; font-size: 0.8rem; font-weight: 400; }
-.stock-004-expanded-details { display: grid; gap: 4px; margin-top: 8px; max-width: 260px; white-space: normal; color: #526170; }
-[data-theme="dark"] .stock-004-info-icon { color: #adc1d4; }
-[data-theme="dark"] .stock-004-expanded-details { color: #b4c4d8; }
-.stock-shopee-shared > summary > strong { color: #b65000; text-shadow: 0 0 8px #ffb45c44; }
-[data-theme="dark"] .stock-shopee-shared > summary > strong { color: #ffad55; }
+.stock-004-info-button { display: inline-grid; place-items: center; width: 24px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #64748b; font-size: 0.85rem; cursor: pointer; box-shadow: none; }
+.stock-004-info-button:hover, .stock-004-info-button[aria-expanded="true"] { background: #f59e0b1a; color: #a7500b; }
+.stock-004-info-button:focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
+.stock-004-popover { position: fixed; z-index: 1600; box-sizing: border-box; width: min(310px, calc(100vw - 24px)); padding: 13px 15px 16px; border: 1px solid #e1ba7a; border-radius: 16px; background: #fffdf7; color: #24374b; text-align: left; box-shadow: 0 12px 38px #15233330, 0 2px 6px #15233312; }
+.stock-004-popover::after { content: ""; position: absolute; left: calc(var(--stock-bubble-arrow, 50%) - 7px); width: 12px; height: 12px; background: inherit; transform: rotate(45deg); }
+.stock-004-popover.above::after { bottom: -7px; border-right: 1px solid #e1ba7a; border-bottom: 1px solid #e1ba7a; }
+.stock-004-popover.below::after { top: -7px; border-left: 1px solid #e1ba7a; border-top: 1px solid #e1ba7a; }
+.stock-004-popover-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; padding-bottom: 9px; border-bottom: 1px solid #e1ba7a55; font-size: 0.85rem; }
+.stock-004-popover-heading > button { width: 25px; height: 25px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #718096; font-size: 1.2rem; cursor: pointer; box-shadow: none; }
+.stock-004-popover-heading > button:hover { background: #f59e0b1a; }
+.stock-004-expanded-details { display: grid; gap: 8px; max-height: calc(100dvh - 110px); overflow: auto; white-space: normal; color: #526170; font-size: 0.85rem; line-height: 1.65; }
+.stock-004-expanded-details > small { font-size: 0.8rem; }
+[data-theme="dark"] .stock-004-info-button { color: #adc1d4; }
+[data-theme="dark"] .stock-004-popover { background: #162537; border-color: #63758a; color: #edf2f8; box-shadow: 0 16px 42px #0006; }
+[data-theme="dark"] .stock-004-popover::after { border-color: #63758a; }
+[data-theme="dark"] .stock-004-popover-heading { border-color: #63758a55; }
+[data-theme="dark"] .stock-004-expanded-details { color: #c5d3e2; }
+.stock-shopee-shared > strong { color: #b65000; text-shadow: 0 0 8px #ffb45c44; }
+[data-theme="dark"] .stock-shopee-shared > strong { color: #ffad55; }
 .stock-shopee-unknown { color: #9a3412; }
-[data-theme="dark"] .stock-shopee-unknown > summary > strong { color: #fbbf24; }
+[data-theme="dark"] .stock-shopee-unknown > strong { color: #fbbf24; }
 .stock-pos-reference { font-weight: 600; font-size: 0.85rem; }
 .branch-stock-shopee-status { display: grid; gap: 4px; padding-top: 8px; }
+.branch-stock-hourly-status > .stock-004-disclosure { display: flex; flex-wrap: wrap; max-width: 100%; white-space: normal; gap: 5px 8px; }
+.branch-stock-hourly-status .stock-004-primary { font-size: 0.78rem; font-weight: 500; color: #526779; }
+.branch-stock-hourly-status .stock-004-reference-label { font-size: 0.76rem; }
+.branch-stock-source-labels { display: inline-flex; flex-wrap: wrap; gap: 4px 9px; }
+.branch-stock-source-labels .is-healthy { color: #28785c; }
+.branch-stock-source-labels .is-warning { color: #9a5b0b; }
+[data-theme="dark"] .branch-stock-hourly-status .stock-004-primary { color: #a9bbcf; }
+[data-theme="dark"] .branch-stock-source-labels .is-healthy { color: #91cdb4; }
+[data-theme="dark"] .branch-stock-source-labels .is-warning { color: #efc575; }

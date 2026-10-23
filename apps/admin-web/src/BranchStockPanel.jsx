@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import BranchStockRecommendationSuggestion from "./BranchStockRecommendationSuggestion";
-import { shopee004StockStatusMessage } from "./lib/shopee004StockStatus.js";
+import { shopee004StockStatusMessage, shopee004StockStatusShortMessage } from "./lib/shopee004StockStatus.js";
+import { stock004DisplayView } from "./lib/stock004DisplayView.js";
+import StockQuantityPopover from "./StockQuantityPopover.jsx";
 import {
   createBranchStockScopeWorkbook,
   getBranchStockScopeOptions,
@@ -126,7 +128,9 @@ const STOCK_COST_COMPARE_BRANCHES = [
 ];
 
 function getBranchStockQty(row, branchCode) {
-  if (branchCode === "004" && row?.stock004?.basis === "shopee-availability-unknown") return null;
+  if (branchCode === "004" && (row?.stock004?.basis === "shopee-availability-unknown"
+    || row?.stock004?.viewStatus === "reference" || row?.stock004?.viewStatus === "unverified" && row?.stock004?.basis !== "hourly-and-shopee-known-only")) return null;
+  if (branchCode === "004" && row?.stock004?.basis === "hourly-and-shopee-known-only" && !Number.isFinite(row.qtyBranch004)) return null;
   return Number(row?.[`qtyBranch${branchCode}`] || 0);
 }
 
@@ -276,6 +280,7 @@ export function BranchStockPanel({
   const [records, setRecords] = useState([]);
   const [hourlyStock004, setHourlyStock004] = useState(null);
   const [shopeeStock004, setShopeeStock004] = useState(null);
+  const [openStockDetails, setOpenStockDetails] = useState(null);
   const [matchReport, setMatchReport] = useState(null);
   const [matchPreview, setMatchPreview] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -1206,39 +1211,44 @@ export function BranchStockPanel({
     }
     if (column.type === "number") {
       if (column.key === "qtyBranch004" && row.stock004) {
+        const display = stock004DisplayView(row);
+        const popup = { open: openStockDetails === row.productCode,
+          onOpenChange: next => setOpenStockDetails(current => next ? row.productCode : current === row.productCode ? null : current),
+          label: `รายละเอียดสต็อกสาขา 004 · ${row.productNameThai || row.productCode}` };
+        if (["reference", "unverified"].includes(row.stock004.viewStatus) && display.status !== "known-only") {
+          const reference = display.lastConfirmed;
+          return <StockQuantityPopover {...popup} className="stock-shopee-unknown"
+            quantity={display.status === "reference" ? formatNumber(reference.quantity, 2) : "รอตรวจ"}
+            badge={display.status === "reference" ? "อ้างอิง" : null}>
+              <small>ยังยืนยันยอดพร้อมใช้ปัจจุบันไม่ได้</small>
+              {reference ? <small>ยอดอ้างอิงล่าสุด {formatNumber(reference.quantity, 2)} · ข้อมูลเมื่อ {hourlyTime(reference.observedAt)} · อ่านสำเร็จเมื่อ {hourlyTime(reference.fetchedAt)} · ไม่ใช่ยอดพร้อมใช้ปัจจุบัน</small> : null}
+              <span className="stock-pos-reference">POS {formatNumber(row.posQtyBranch004, 2)} ก่อนหัก Shopee</span>
+              <small>ยอดจองอ้างอิง {formatNumber(reference?.reservedQuantity, 2)} · ส่งแล้วไม่ลง POS อ้างอิง {formatNumber(reference?.shippedUnpostedQuantity, 2)}</small>
+              <small>บัญชีจองอ้างอิง {hourlyTime(reference?.observedAt)} · ต้องอ่านล่าสุดก่อนใช้ยืนยันยอด</small>
+          </StockQuantityPopover>;
+        }
         if (["hourly-and-shopee", "hourly-and-shopee-known-only", "shopee-availability-unknown"].includes(row.stock004.basis)) {
           const estimated=row.stock004.basis==='hourly-and-shopee-known-only';
           const known = row.stock004.basis !== "shopee-availability-unknown";
-          return <details className={`branch-stock-004-quantity stock-004-disclosure ${known ? "stock-shopee-shared" : "stock-shopee-unknown"}`}>
-            <summary title={estimated?"ยอดชั่วคราว · ยังไม่รวมออเดอร์ค้างจับคู่ · กดดูรายละเอียด":"ดูรายละเอียดสต็อกสาขา 004"}>
-              <strong>{known ? formatNumber(row.qtyBranch004, 2) : "รอตรวจ"}</strong>
-              <span className="stock-004-info-icon" aria-hidden="true">ⓘ</span>
-            </summary>
-            <div className="stock-004-expanded-details">
-            <small>{estimated?"ยอดชั่วคราว · หักเฉพาะออเดอร์ที่ยืนยันแล้ว":known ? "พร้อมใช้ · แชร์กับ Shopee" : "ยังยืนยันยอดพร้อมใช้ไม่ได้"}</small>
+          return <StockQuantityPopover {...popup} className={known ? "stock-shopee-shared" : "stock-shopee-unknown"}
+            quantity={known ? formatNumber(row.qtyBranch004, 2) : "รอตรวจ"} badge={estimated ? "ชั่วคราว" : null}>
+            <small>{estimated?"ยอดชั่วคราว · ใช้ POS และยอดจองที่ทราบ ยังไม่ใช่ยอดพร้อมขายที่ยืนยันแล้ว":known ? "พร้อมใช้ · แชร์กับ Shopee" : "ยังยืนยันยอดพร้อมใช้ไม่ได้"}</small>
             {estimated?<small>ยังไม่รวมออเดอร์ Shopee ที่รอจับคู่สินค้า</small>:null}
             {!known ? <span className="stock-pos-reference">POS {formatNumber(row.posQtyBranch004, 2)} ก่อนหัก Shopee</span> : null}
             <small>{known ? `POS ${formatNumber(row.posQtyBranch004, 2)} · ` : ""}จอง {formatNumber(row.stock004.shopee?.reservedQuantity, 2)} · ส่งแล้วไม่ลง POS {formatNumber(row.stock004.shopee?.shippedUnpostedQuantity, 2)}</small>
             <small>บัญชีจอง {hourlyTime(row.stock004.shopee?.asOf)} · POS {row.stock004.posBasis === "hourly-calculated" ? "Hourly" : "Full Sync"}</small>
-            </div>
-          </details>;
+          </StockQuantityPopover>;
         }
         const hourly = row.stock004.basis === "hourly-calculated";
         const detail = hourly
           ? `อ่าน ${hourlyTime(row.stock004.capturedAt)} · Full Sync เดิม ${formatNumber(row.fullSyncQtyBranch004, 2)}`
           : hourlyFallbackLabel(row.stock004.reason);
-        return <details className="branch-stock-004-quantity stock-004-disclosure">
-          <summary title="ดูรายละเอียดสต็อกสาขา 004">
-            <span className="stock-004-primary">{formatNumber(row.qtyBranch004, 2)}</span>
-            <span className="stock-004-info-icon" aria-hidden="true">ⓘ</span>
-          </summary>
-          <div className="stock-004-expanded-details">
+        return <StockQuantityPopover {...popup} quantity={formatNumber(row.qtyBranch004, 2)}>
           <small className={hourly ? "stock-source-hourly" : "stock-source-fallback"} title={detail}>
             {hourly ? "Hourly คำนวณ" : "Full Sync"}
           </small>
           <small className="branch-stock-004-detail">{detail}</small>
-          </div>
-        </details>;
+        </StockQuantityPopover>;
       }
       return formatNumber(row[column.key], 2);
     }
@@ -1247,6 +1257,11 @@ export function BranchStockPanel({
     }
     return row[column.key] || "-";
   }
+
+  const hourlyAvailable = hourlyStock004?.status === "available";
+  const compactSlot = hourlyStock004?.plannedSlot || (hourlyStock004?.capturedAt && Number.isFinite(Date.parse(hourlyStock004.capturedAt))
+    ? new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" }).format(new Date(hourlyStock004.capturedAt)) : "");
+  const showShopeeStatus = shopeeStock004 && shopeeStock004.status !== "disabled";
 
   return (
     <section className="panel branch-stock-panel">
@@ -1258,6 +1273,14 @@ export function BranchStockPanel({
           <p>ติดตามยอดแต่ละสาขา พร้อมแหล่งข้อมูลและเวลาที่อ่าน</p>
           {visibleBranchStockColumns.some(column => column.key === "qtyBranch004") ? (
             <div className="branch-stock-hourly-status" role="region" aria-live="polite" aria-label="แหล่งข้อมูลสต็อกสาขา 004">
+              <StockQuantityPopover open={openStockDetails === "$source004"}
+                onOpenChange={next => setOpenStockDetails(current => next ? "$source004" : current === "$source004" ? null : current)}
+                label="ดูรายละเอียดแหล่งข้อมูลสาขา 004" heading="แหล่งข้อมูลสาขา 004" dialogLabel="รายละเอียดแหล่งข้อมูลสาขา 004"
+                quantity={hourlyAvailable ? `004 · Hourly${compactSlot ? ` ${compactSlot}` : ""}` : "004 · Full Sync"}
+                badge={<span className="branch-stock-source-labels">
+                  {hourlyAvailable && hourlyStock004.pageFallbackProducts > 0 ? <span className="is-warning">Full Sync {formatNumber(hourlyStock004.pageFallbackProducts)}</span> : null}
+                  {showShopeeStatus ? <span className={shopeeStock004.status === "available" ? "is-healthy" : "is-warning"}>{shopee004StockStatusShortMessage(shopeeStock004)}</span> : null}
+                </span>}>
               {hourlyStock004?.status === "available" ? <>
                 <strong>004 · ยอดคำนวณ Hourly {formatNumber(hourlyStock004.availableProducts)} รายการ</strong>
                 <span>{hourlyStock004.plannedSlot ? `รอบ ${hourlyStock004.plannedSlot} · ` : ""}อ่านเมื่อ {hourlyTime(hourlyStock004.capturedAt)} (เวลาไทย)</span>
@@ -1271,9 +1294,11 @@ export function BranchStockPanel({
               {shopeeStock004 && shopeeStock004.status !== "disabled" ? <div className="branch-stock-shopee-status">
                 <strong>{shopee004StockStatusMessage(shopeeStock004)}</strong>
                 <span>บัญชีจอง {hourlyTime(shopeeStock004.asOf)} · รับอีเมลล่าสุด {hourlyTime(shopeeStock004.lastEmailIngestedAt)}</span>
+                {shopeeStock004.pageReferenceProducts > 0 ? <small>ดูยอดอ้างอิงล่าสุดได้ {formatNumber(shopeeStock004.pageReferenceProducts)} รายการ กด ⓘ ดูเวลา — ยังไม่ใช่ยอดพร้อมใช้ปัจจุบัน</small> : null}
                 {shopeeStock004.sourceLabelReviewOrders > 0 ? <small>มีรูปแบบชื่อต้นทางที่ใช้การยืนยันจับคู่เฉพาะจากผู้ดูแล {formatNumber(shopeeStock004.sourceLabelReviewOrders)} ออเดอร์</small> : null}
                 <small>ใช้เฉพาะออเดอร์ที่ระบบรับจากอีเมล การคืนเงินยังไม่ถือว่าได้รับสินค้ากลับ</small>
               </div> : null}
+              </StockQuantityPopover>
             </div>
           ) : null}
         </div>

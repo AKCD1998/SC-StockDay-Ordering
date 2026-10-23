@@ -14,6 +14,7 @@ import IngredientDictionaryPanel from "./IngredientDictionaryPanel.jsx";
 import PreorderPanel from "./preorders/PreorderPanel";
 import PosAdminPanel from "./PosAdminPanel.jsx";
 import MembersPanel from "./MembersPanel.jsx";
+import Shopee004ExceptionsPanel from "./Shopee004ExceptionsPanel.jsx";
 import LoginScreen from "./LoginScreen.jsx";
 import AdminNavigation from "./AdminNavigation.jsx";
 import AdminAccountActions from "./AdminAccountActions.jsx";
@@ -1987,6 +1988,8 @@ export default function App() {
         <ProductTaxonomyPanel csrfToken={session.csrfToken} />
       ) : view === taxonomyReviewView && isAdminUser ? (
         <TaxonomyReviewPanel csrfToken={session.csrfToken} />
+      ) : view === "shopee004-exceptions" && isAdminUser ? (
+        <Shopee004ExceptionsPanel isAdminUser={isAdminUser} csrfToken={session.csrfToken} />
       ) : view === "sync-log" && isAdminUser ? (
         <SyncLogPanel onUnauthorized={handleUnauthorized} />
       ) : view === "preorder" ? (

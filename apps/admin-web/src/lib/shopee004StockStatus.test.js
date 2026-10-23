@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { shopee004StockStatusMessage } from "./shopee004StockStatus.js";
+import { shopee004StockStatusMessage, shopee004StockStatusShortMessage } from "./shopee004StockStatus.js";
 describe("Shopee source diagnostics",()=>{
   it.each([
     [{status:"available"},"หักยอดจอง Shopee แล้ว"],
@@ -16,5 +16,11 @@ describe("Shopee source diagnostics",()=>{
   });
   it("does not render invalid counts or undefined",()=>{
     expect(shopee004StockStatusMessage({status:"shopee-orders-need-review",reviewOrders:-1})).not.toMatch(/-1|undefined/);
+  });
+  it("keeps incomplete and unavailable summaries explicit in the compact header",()=>{
+    expect(shopee004StockStatusShortMessage({status:'available'})).toBe('Shopee หักจองแล้ว');
+    expect(shopee004StockStatusShortMessage({status:'partial-known-commitments',unallocatedOrders:2})).toBe('Shopee ยังไม่ครบ · 2 ออเดอร์');
+    expect(shopee004StockStatusShortMessage({status:'partial'})).toContain('บางรายการ');
+    for(const status of ['projection-timeout','projection-unavailable','unexpected'])expect(shopee004StockStatusShortMessage({status})).toBe('Shopee ยังไม่พร้อม');
   });
 });
