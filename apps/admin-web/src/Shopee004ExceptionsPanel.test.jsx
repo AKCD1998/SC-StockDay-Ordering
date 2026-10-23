@@ -182,8 +182,25 @@ describe("admin Shopee004 exception workflow", () => {
     await screen.findByRole("heading", { name: "สินค้าแพ็กตัวอย่าง" });
     await user.click(screen.getByText("เตรียมสะสางยอดก่อนนับสต็อก"));
     expect(screen.getByText("ยอดตั้งต้นยังไม่ใช่ผลนับสต็อกจริง")).toBeInTheDocument();
+    expect(screen.getByText(/สถานะสะสางเมื่อ/)).not.toHaveTextContent("ยังไม่ยืนยันเวลา");
     expect(screen.getByText(/ระบบจะไม่ rebaseline/)).toBeInTheDocument();
     expect(fetch.mock.calls.filter(([, options]) => options.method === "POST")).toHaveLength(0);
+  });
+  it("retains reconciliation as a timestamped reference if its next read fails independently", async () => {
+    const user = userEvent.setup(); let failed = false;
+    vi.stubGlobal("fetch", vi.fn(async url => {
+      if (url.includes("stock-reconciliation")) return failed ? response({}, 503) : response(reconciliationFixture);
+      return response(exceptionsFixture());
+    }));
+    render(<Shopee004ExceptionsPanel isAdminUser csrfToken="fixture-csrf" />);
+    await screen.findByRole("heading", { name: "สินค้าแพ็กตัวอย่าง" });
+    await user.click(screen.getByText("เตรียมสะสางยอดก่อนนับสต็อก"));
+    failed = true; await user.click(screen.getByRole("button", { name: "อ่านใหม่" }));
+    await screen.findByText(/ยังอ่านสถานะสะสางล่าสุดไม่ได้/);
+    expect(screen.getByText(/สถานะสะสางเมื่อ/)).toHaveTextContent("ข้อมูลอ้างอิงเดิม");
+    expect(screen.getByText(/สถานะสะสางเมื่อ/)).not.toHaveTextContent("ยังไม่ยืนยันเวลา");
+    await selectMapping(user);
+    expect(screen.getByRole("button", { name: "บันทึกกฎจับคู่เท่านั้น" })).toBeEnabled();
   });
   it("reads cursor pages without losing the previous page route", async () => {
     const user = userEvent.setup(); const fetch = mockReads(url => url.includes("cursor=")

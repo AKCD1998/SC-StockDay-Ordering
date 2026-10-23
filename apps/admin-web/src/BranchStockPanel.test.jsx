@@ -206,9 +206,9 @@ describe("BranchStockPanel branch scope", () => {
   });
   it("keeps last-confirmed stock clearly labelled as a closed reference disclosure and never a current total",async()=>{
     const data={records:[{...STOCK_RECORDS[0],qtyBranch004:null,qtyTotalAllBranches:null,posQtyBranch004:4,
-      stock004:{basis:"shopee-availability-unknown",viewStatus:"reference",posBasis:"hourly-calculated",shopee:{reservedQuantity:1,shippedUnpostedQuantity:0,asOf:"2026-10-23T09:00:00Z"},
-        lastConfirmed:{quantity:3,observedAt:"2026-10-23T09:00:00Z",fetchedAt:"2026-10-23T09:01:00Z",stale:true,reasonCode:"projection-timeout"}}}],
-      shopeeStock004:{status:"reference"}};
+      stock004:{basis:"shopee-availability-unknown",viewStatus:"reference",posBasis:"hourly-calculated",shopee:{reservedQuantity:null,shippedUnpostedQuantity:null,asOf:null},
+        lastConfirmed:{quantity:3,reservedQuantity:1,shippedUnpostedQuantity:0,observedAt:"2026-10-23T09:00:00Z",fetchedAt:"2026-10-23T09:01:00Z",stale:true,reasonCode:"projection-timeout"}}}],
+      shopeeStock004:{status:"projection-timeout",pageReferenceProducts:1}};
     renderPanel({isOnlineMarketingStaff:false,branchCode:"004",fetchImplementation:async()=>({...makeJsonResponse([]),json:async()=>data})});
     await screen.findByText("A001"); const cell=productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
     expect(cell.querySelector("summary strong")).toHaveTextContent("3.00");
@@ -217,6 +217,9 @@ describe("BranchStockPanel branch scope", () => {
     await userEvent.click(cell.querySelector("summary"));
     expect(cell).toHaveTextContent("ไม่ใช่ยอดพร้อมใช้ปัจจุบัน");
     expect(cell).toHaveTextContent("POS 4.00 ก่อนหัก Shopee");
+    expect(cell).toHaveTextContent("ยอดจองอ้างอิง 1.00");
+    expect(cell).toHaveTextContent("ส่งแล้วไม่ลง POS อ้างอิง 0.00");
+    expect(screen.getByText(/ดูยอดอ้างอิงล่าสุดได้ 1 รายการ/)).toBeInTheDocument();
     expect(cell).not.toHaveTextContent("พร้อมใช้ · แชร์กับ Shopee");
   });
   it("does not display a malformed reference as a ready-to-sell zero",async()=>{
@@ -240,11 +243,12 @@ describe("BranchStockPanel branch scope", () => {
   });
   it("shows temporary quantities with an explicit incomplete-order banner and compact details",async()=>{
     const data={records:[{...STOCK_RECORDS[0],qtyBranch004:2,posQtyBranch004:4,
-      stock004:{basis:"hourly-and-shopee-known-only",posBasis:"hourly-calculated",shopee:{reservedQuantity:2,shippedUnpostedQuantity:0,unallocatedOrders:1,allOrdersAllocated:false}}}],
+      stock004:{basis:"hourly-and-shopee-known-only",viewStatus:"unverified",posBasis:"hourly-calculated",shopee:{reservedQuantity:2,shippedUnpostedQuantity:0,unallocatedOrders:1,allOrdersAllocated:false}}}],
       shopeeStock004:{status:"partial-known-commitments",unallocatedOrders:1}};
     renderPanel({isOnlineMarketingStaff:false,branchCode:"004",fetchImplementation:async()=>({...makeJsonResponse([]),json:async()=>data})});
     await screen.findByText("A001");const cell=productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
     expect(cell.querySelector('summary strong')).toHaveTextContent('2.00');expect(cell).not.toHaveTextContent('พร้อมใช้ · แชร์กับ Shopee');
+    expect(cell).toHaveTextContent('ยังไม่ใช่ยอดพร้อมขายที่ยืนยันแล้ว');expect(cell.querySelector('summary')).not.toHaveTextContent('รอตรวจ');
     expect(screen.getByText('ยอดชั่วคราว — ยังไม่รวม 1 ออเดอร์ที่รอจับคู่สินค้า')).toBeInTheDocument();
     expect(cell.querySelector('.stock-004-expanded-details')).not.toBeVisible();
   });

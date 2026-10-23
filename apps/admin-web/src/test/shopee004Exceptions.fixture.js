@@ -18,5 +18,5 @@ export function exceptionsFixture(records = [exceptionFixture()], overrides = {}
     records, pagination: { hasMore: false, nextCursor: null }, ...overrides };
 }
 
-export const reconciliationFixture = { openingBoundaryPreserved: true, cutoverAt: "2026-10-23T06:26:56Z", openingBasisQuality: "owner-accepted-estimate",
+export const reconciliationFixture = { asOf: "2026-10-23T10:00:00Z", openingBoundaryPreserved: true, cutoverAt: "2026-10-23T06:26:56Z", openingBasisQuality: "owner-accepted-estimate",
   physicalStockVerified: false, reservedOrders: 3, shippedUnpostedOrders: 2, reviewOrders: 1, requiresCountReconciliation: true };

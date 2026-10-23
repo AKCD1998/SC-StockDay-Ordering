@@ -219,6 +219,7 @@ export default function Shopee004ExceptionsPanel({ isAdminUser, csrfToken }) {
       <summary>เตรียมสะสางยอดก่อนนับสต็อก</summary>
       {reconciliationError ? <p role="alert">ยังอ่านสถานะสะสางล่าสุดไม่ได้{reconciliation ? " · ค่าด้านล่างเป็นข้อมูลอ้างอิงเดิม" : ""}</p> : null}
       {reconciliation ? <>
+        <p>สถานะสะสางเมื่อ {displayTime(reconciliation.asOf)} (เวลาไทย){reconciliationError ? " · ข้อมูลอ้างอิงเดิม" : ""}</p>
         <p>จุดเริ่มถาวร {displayTime(reconciliation.cutoverAt)} · {reconciliation.openingBoundaryPreserved ? "คงจุดเริ่มเดิม" : "ต้องตรวจจุดเริ่มเดิมก่อนดำเนินการ"}</p>
         <dl className="stock-exception-facts">
           <div><dt>กำลังจอง</dt><dd>{number(reconciliation.reservedOrders)} ออเดอร์</dd></div>

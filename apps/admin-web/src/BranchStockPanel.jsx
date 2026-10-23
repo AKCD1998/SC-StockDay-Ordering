@@ -128,7 +128,8 @@ const STOCK_COST_COMPARE_BRANCHES = [
 
 function getBranchStockQty(row, branchCode) {
   if (branchCode === "004" && (row?.stock004?.basis === "shopee-availability-unknown"
-    || ["reference", "unverified"].includes(row?.stock004?.viewStatus))) return null;
+    || row?.stock004?.viewStatus === "reference" || row?.stock004?.viewStatus === "unverified" && row?.stock004?.basis !== "hourly-and-shopee-known-only")) return null;
+  if (branchCode === "004" && row?.stock004?.basis === "hourly-and-shopee-known-only" && !Number.isFinite(row.qtyBranch004)) return null;
   return Number(row?.[`qtyBranch${branchCode}`] || 0);
 }
 
@@ -1209,7 +1210,7 @@ export function BranchStockPanel({
     if (column.type === "number") {
       if (column.key === "qtyBranch004" && row.stock004) {
         const display = stock004DisplayView(row);
-        if (["reference", "unverified"].includes(row.stock004.viewStatus)) {
+        if (["reference", "unverified"].includes(row.stock004.viewStatus) && display.status !== "known-only") {
           const reference = display.lastConfirmed;
           return <details className="branch-stock-004-quantity stock-004-disclosure stock-shopee-unknown">
             <summary title={display.status === "reference" ? "ยอดอ้างอิงล่าสุด · ไม่ใช่ยอดพร้อมใช้ปัจจุบัน" : "ยังยืนยันยอดพร้อมใช้ไม่ได้"}>
@@ -1221,8 +1222,8 @@ export function BranchStockPanel({
               <small>ยังยืนยันยอดพร้อมใช้ปัจจุบันไม่ได้</small>
               {reference ? <small>ยอดอ้างอิงล่าสุด {formatNumber(reference.quantity, 2)} · ข้อมูลเมื่อ {hourlyTime(reference.observedAt)} · อ่านสำเร็จเมื่อ {hourlyTime(reference.fetchedAt)} · ไม่ใช่ยอดพร้อมใช้ปัจจุบัน</small> : null}
               <span className="stock-pos-reference">POS {formatNumber(row.posQtyBranch004, 2)} ก่อนหัก Shopee</span>
-              <small>จองที่ยืนยันแล้ว {formatNumber(row.stock004.shopee?.reservedQuantity, 2)} · ส่งแล้วไม่ลง POS {formatNumber(row.stock004.shopee?.shippedUnpostedQuantity, 2)}</small>
-              <small>บัญชีจองอ้างอิง {hourlyTime(row.stock004.shopee?.asOf)} · ต้องอ่านล่าสุดก่อนใช้ยืนยันยอด</small>
+              <small>ยอดจองอ้างอิง {formatNumber(reference?.reservedQuantity, 2)} · ส่งแล้วไม่ลง POS อ้างอิง {formatNumber(reference?.shippedUnpostedQuantity, 2)}</small>
+              <small>บัญชีจองอ้างอิง {hourlyTime(reference?.observedAt)} · ต้องอ่านล่าสุดก่อนใช้ยืนยันยอด</small>
             </div>
           </details>;
         }
@@ -1235,7 +1236,7 @@ export function BranchStockPanel({
               <span className="stock-004-info-icon" aria-hidden="true">ⓘ</span>
             </summary>
             <div className="stock-004-expanded-details">
-            <small>{estimated?"ยอดชั่วคราว · หักเฉพาะออเดอร์ที่ยืนยันแล้ว":known ? "พร้อมใช้ · แชร์กับ Shopee" : "ยังยืนยันยอดพร้อมใช้ไม่ได้"}</small>
+            <small>{estimated?"ยอดชั่วคราว · ใช้ POS และยอดจองที่ทราบ ยังไม่ใช่ยอดพร้อมขายที่ยืนยันแล้ว":known ? "พร้อมใช้ · แชร์กับ Shopee" : "ยังยืนยันยอดพร้อมใช้ไม่ได้"}</small>
             {estimated?<small>ยังไม่รวมออเดอร์ Shopee ที่รอจับคู่สินค้า</small>:null}
             {!known ? <span className="stock-pos-reference">POS {formatNumber(row.posQtyBranch004, 2)} ก่อนหัก Shopee</span> : null}
             <small>{known ? `POS ${formatNumber(row.posQtyBranch004, 2)} · ` : ""}จอง {formatNumber(row.stock004.shopee?.reservedQuantity, 2)} · ส่งแล้วไม่ลง POS {formatNumber(row.stock004.shopee?.shippedUnpostedQuantity, 2)}</small>
@@ -1291,6 +1292,7 @@ export function BranchStockPanel({
               {shopeeStock004 && shopeeStock004.status !== "disabled" ? <div className="branch-stock-shopee-status">
                 <strong>{shopee004StockStatusMessage(shopeeStock004)}</strong>
                 <span>บัญชีจอง {hourlyTime(shopeeStock004.asOf)} · รับอีเมลล่าสุด {hourlyTime(shopeeStock004.lastEmailIngestedAt)}</span>
+                {shopeeStock004.pageReferenceProducts > 0 ? <small>ดูยอดอ้างอิงล่าสุดได้ {formatNumber(shopeeStock004.pageReferenceProducts)} รายการ กด ⓘ ดูเวลา — ยังไม่ใช่ยอดพร้อมใช้ปัจจุบัน</small> : null}
                 {shopeeStock004.sourceLabelReviewOrders > 0 ? <small>มีรูปแบบชื่อต้นทางที่ใช้การยืนยันจับคู่เฉพาะจากผู้ดูแล {formatNumber(shopeeStock004.sourceLabelReviewOrders)} ออเดอร์</small> : null}
                 <small>ใช้เฉพาะออเดอร์ที่ระบบรับจากอีเมล การคืนเงินยังไม่ถือว่าได้รับสินค้ากลับ</small>
               </div> : null}

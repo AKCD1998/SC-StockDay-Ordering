@@ -10,6 +10,7 @@ describe("stock004 current and last confirmed views", () => {
   });
   it("never upgrades a known-only balance to confirmed", () => {
     expect(stock004DisplayView({ qtyBranch004: 7, stock004: { viewStatus: "confirmed", basis: "hourly-and-shopee-known-only" } }).status).toBe("known-only");
+    expect(stock004DisplayView({ qtyBranch004: 7, stock004: { viewStatus: "unverified", basis: "hourly-and-shopee-known-only" } })).toMatchObject({ status: "known-only", quantity: 7 });
   });
   it("preserves legitimate current zero and negative stock", () => {
     for (const quantity of [0, -2]) expect(stock004DisplayView({ qtyBranch004: quantity, stock004: { viewStatus: "confirmed" } })).toMatchObject({ status: "confirmed", quantity });

@@ -45,8 +45,14 @@ The branch-stock table keeps its compact number plus information disclosure.
 `lastConfirmed` value appears only as a labelled, timestamped reference and never
 becomes `qtyBranch004`, a current total, or a current export value. Unknown values
 are not converted to zero. The export source sheet can hold reference values in
-separate labelled columns. Existing known-only Shopee balances remain explicitly
-incomplete when unallocated orders exist.
+separate labelled columns; qualified 004 exports also include an explicit status
+column. Existing known-only Shopee balances remain explicitly incomplete when
+unallocated orders exist. The API intentionally gives these known-only balances
+`viewStatus:unverified`: the UI retains the known numeric calculation and its
+temporary qualification rather than treating every product as a hard unknown.
+A missing known-only quantity still remains unknown. Cached reservation and
+shipped-unposted quantities are disclosed from `lastConfirmed` with their own
+reference time; they never replace current commitments.
 
 ## API contract
 
@@ -85,6 +91,8 @@ other valid exceptions.
 
 The read-only reconciliation section displays the preserved cutover, reserved,
 shipped-unposted and review counts, and whether physical stock was verified.
+Its separate `asOf` timestamp remains visible when a later failed read leaves the
+previous reconciliation available as a stale reference.
 Before a new stock count is adopted, the operator must reconcile which previous
 commitments were included in that count and approve a separate boundary change.
 There is no rebaseline or POS-write button, automatic opening adjustment, or

@@ -83,6 +83,7 @@ export function validateExceptionsResponse(value) {
 
 export function validateReconciliationResponse(value) {
   if (!value || typeof value.openingBoundaryPreserved !== "boolean" || !stamp(value.cutoverAt)
+    || (value.asOf != null && !stamp(value.asOf))
     || !text(value.openingBasisQuality, 100) || typeof value.physicalStockVerified !== "boolean"
     || ![value.reservedOrders, value.shippedUnpostedOrders, value.reviewOrders].every(count)
     || typeof value.requiresCountReconciliation !== "boolean") throw new StockExceptionError("INVALID_RESPONSE");

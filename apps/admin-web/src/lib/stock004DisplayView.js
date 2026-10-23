@@ -9,9 +9,11 @@ export function stock004DisplayView(row) {
     ? reference : null;
   const status = stock?.viewStatus;
   if (status === "reference") return { status: lastConfirmed ? "reference" : "unverified", quantity: null, lastConfirmed };
-  if (status === "unverified" || stock?.basis === "shopee-availability-unknown") return { status: "unverified", quantity: null, lastConfirmed };
   const quantity = typeof row?.qtyBranch004 === "number" && Number.isFinite(row.qtyBranch004) ? row.qtyBranch004 : null;
+  // The API intentionally marks an incomplete known-only balance unverified.
+  // It is still readable as a temporary calculation, never as confirmed stock.
+  if (stock?.basis === "hourly-and-shopee-known-only" && quantity !== null) return { status: "known-only", quantity, lastConfirmed: null };
+  if (status === "unverified" || stock?.basis === "shopee-availability-unknown") return { status: "unverified", quantity: null, lastConfirmed };
   if (quantity === null) return { status: "unverified", quantity: null, lastConfirmed };
-  if (stock?.basis === "hourly-and-shopee-known-only") return { status: "known-only", quantity, lastConfirmed: null };
   return { status: "confirmed", quantity, lastConfirmed: null };
 }

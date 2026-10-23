@@ -18,6 +18,10 @@ describe("Shopee 004 exception client", () => {
     vi.stubGlobal("fetch", vi.fn(async () => response({ ...reconciliationFixture, reservedOrders: null })));
     await expect(readStockReconciliation()).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
   });
+  it("does not accept an invalid reconciliation timestamp as a current reference", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => response({ ...reconciliationFixture, asOf: "invalid" })));
+    await expect(readStockReconciliation()).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
   it.each([
     [401, { error: { code: "private stack or customer payload" } }, "UNAUTHORIZED"],
     [403, {}, "FORBIDDEN"], [409, {}, "REVISION_CONFLICT"],
