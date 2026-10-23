@@ -113,6 +113,9 @@ export function buildBranchStockExportMatrix(records, columns, getColumnValue = 
       if (row.stock004?.basis === "shopee-availability-unknown"
         && ["qtyBranch004", "qtyTotalAllBranches"].includes(column.key)) return "ไม่ทราบ";
       const numericValue = Number(value);
+      if(row.stock004?.basis==='hourly-and-shopee-known-only'&&Number.isFinite(numericValue)
+        &&(column.key==='qtyBranch004'||column.key==='qtyTotalAllBranches'&&columns.some(c=>c.key==='qtyBranch004')))
+        return `${numericValue} (ยังไม่รวมออเดอร์ค้างจับคู่)`;
       return Number.isFinite(numericValue) ? numericValue : 0;
     })),
   ];

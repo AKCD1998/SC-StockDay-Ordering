@@ -9,6 +9,7 @@ describe("Shopee source diagnostics",()=>{
     [{status:"projection-unavailable"},"ติดต่อข้อมูล Shopee ไม่สำเร็จ"],
     [{status:"reservation-paused-holds-retained"},"พักอยู่"],
     [{status:"partial"},"บางรายการ"],
+    [{status:"partial-known-commitments",unallocatedOrders:2},"ยอดชั่วคราว — ยังไม่รวม 2 ออเดอร์"],
     [{status:"unknown-new-code"},"ข้อมูล Shopee ยังไม่พร้อม"],
   ])("explains each source state without claiming POS failed",(input,text)=>{
     expect(shopee004StockStatusMessage(input)).toContain(text);

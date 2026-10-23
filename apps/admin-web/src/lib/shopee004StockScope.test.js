@@ -14,4 +14,9 @@ describe('unknown marketplace quantities in branch scope',()=>{
     expect(buildBranchStockExportMatrix([row],columns)[1][0]).toBe('ไม่ทราบ');
     expect(buildBranchStockExportMatrix([{qtyBranch004:0},{qtyBranch004:-2}],columns).slice(1)).toEqual([[0],[-2]]);
   });
+  it('labels temporary 004 quantities in exports while preserving other branch numbers',()=>{
+    const columns=[{key:'qtyBranch004',label:'004',type:'number'},{key:'qtyBranch001',label:'001',type:'number'}];
+    const estimate={...row,qtyBranch004:2,stock004:{basis:'hourly-and-shopee-known-only'}};
+    expect(buildBranchStockExportMatrix([estimate],columns)[1]).toEqual(['2 (ยังไม่รวมออเดอร์ค้างจับคู่)',3]);
+  });
 });

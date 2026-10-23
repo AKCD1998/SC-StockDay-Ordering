@@ -8,6 +8,7 @@ export function shopee004StockStatusMessage(summary) {
     case "reservation-paused-holds-retained": return "ระบบจอง Shopee พักอยู่ — ยังไม่แสดงยอดพร้อมใช้";
     case "projection-unavailable": return "ติดต่อข้อมูล Shopee ไม่สำเร็จ — ยอด POS ยังแสดงแยกไว้";
     case "partial": return "ยอดพร้อมใช้บางรายการยังยืนยันไม่ได้ — ดูรายการที่รอตรวจ";
+    case "partial-known-commitments": return `ยอดชั่วคราว — ยังไม่รวม ${count(summary.unallocatedOrders) ?? "บาง"} ออเดอร์ที่รอจับคู่สินค้า`;
     default: return "ข้อมูล Shopee ยังไม่พร้อม — ดูยอด POS แยกใต้แต่ละรายการ";
   }
 }
