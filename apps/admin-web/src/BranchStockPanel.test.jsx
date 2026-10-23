@@ -156,9 +156,11 @@ describe("BranchStockPanel branch scope", () => {
     renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: async () => hourlyResponse() });
     await screen.findByText("A001");
     const cell = productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
-    expect(cell.querySelector("span")).toHaveTextContent("0.00");
-    expect(cell).toHaveTextContent("Hourly คำนวณ");
-    expect(cell).toHaveTextContent("Full Sync เดิม 4.00");
+    expect(cell.querySelector("strong")).toHaveTextContent("0.00");
+    expect(screen.queryByRole("dialog", {name:"รายละเอียดสต็อกสาขา 004"})).not.toBeInTheDocument();
+    await userEvent.click(within(cell).getByRole("button"));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Hourly คำนวณ");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Full Sync เดิม 4.00");
     expect(screen.getByRole("region", { name: "แหล่งข้อมูลสต็อกสาขา 004" })).toHaveTextContent("6,835");
     expect(global.fetch.mock.calls[0][0]).toContain("stockView=hourly004");
   });
@@ -171,14 +173,16 @@ describe("BranchStockPanel branch scope", () => {
     renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: async () => ({ ...makeJsonResponse([]), json: async () => data }) });
     await screen.findByText("A001");
     const cell = productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
-    expect(cell).toHaveTextContent("แชร์กับ Shopee"); expect(cell).toHaveTextContent("POS 4.00");
-    expect(cell).toHaveTextContent("จอง 2.00"); expect(cell).toHaveTextContent("ส่งแล้วไม่ลง POS 1.00");
+    expect(cell).not.toHaveTextContent("แชร์กับ Shopee"); expect(cell).not.toHaveTextContent("POS 4.00");
     expect(cell.querySelector(".stock-shopee-shared")).not.toBeNull();
-    const details=cell.querySelector("details"),breakdown=cell.querySelector(".stock-004-expanded-details");
-    expect(details).not.toHaveAttribute("open");expect(breakdown).not.toBeVisible();
-    expect(cell.querySelector("summary strong")).toBeVisible();
-    await userEvent.click(cell.querySelector("summary"));
-    expect(details).toHaveAttribute("open");expect(breakdown).toBeVisible();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(cell.querySelector("strong")).toBeVisible();
+    await userEvent.click(within(cell).getByRole("button"));
+    const breakdown=screen.getByRole("dialog",{name:"รายละเอียดสต็อกสาขา 004"});
+    expect(breakdown).toBeVisible();expect(breakdown).toHaveTextContent("พร้อมใช้ · แชร์กับ Shopee");
+    expect(breakdown).toHaveTextContent("POS 4.00");expect(breakdown).toHaveTextContent("จอง 2.00");expect(breakdown).toHaveTextContent("ส่งแล้วไม่ลง POS 1.00");
+    expect(cell).not.toContainElement(breakdown);
+    await userEvent.keyboard("{Escape}");expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByText(/มีรูปแบบชื่อต้นทาง/)).toBeInTheDocument();
   });
 
@@ -190,8 +194,9 @@ describe("BranchStockPanel branch scope", () => {
     await screen.findByText("A001");
     const cell = productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
     expect(cell).toHaveTextContent("รอตรวจ"); expect(cell.querySelector("strong")).not.toHaveTextContent("0.00");
-    expect(cell).toHaveTextContent("POS 4.00 ก่อนหัก Shopee");
-    expect(cell.querySelector(".stock-004-expanded-details")).not.toBeVisible();
+    expect(cell).not.toHaveTextContent("POS 4.00 ก่อนหัก Shopee");
+    await userEvent.click(within(cell).getByRole("button"));
+    expect(screen.getByRole("dialog")).toHaveTextContent("POS 4.00 ก่อนหัก Shopee");
     expect(screen.getByText("ติดต่อข้อมูล Shopee ไม่สำเร็จ — ยอด POS ยังแสดงแยกไว้")).toBeInTheDocument();
   });
   it("explains a Shopee review count without hiding the separately labelled POS reference",async()=>{
@@ -202,7 +207,8 @@ describe("BranchStockPanel branch scope", () => {
     await screen.findByText("A001");
     expect(screen.getByText("Shopee รอตรวจ 2 ออเดอร์ — ยอด POS ยังแสดงแยกไว้")).toBeInTheDocument();
     const cell=productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
-    expect(cell).toHaveTextContent("POS 4.00 ก่อนหัก Shopee");expect(cell.querySelector("strong")).toHaveTextContent("รอตรวจ");
+    expect(cell.querySelector("strong")).toHaveTextContent("รอตรวจ");await userEvent.click(within(cell).getByRole("button"));
+    expect(screen.getByRole("dialog")).toHaveTextContent("POS 4.00 ก่อนหัก Shopee");
   });
   it("keeps last-confirmed stock clearly labelled as a closed reference disclosure and never a current total",async()=>{
     const data={records:[{...STOCK_RECORDS[0],qtyBranch004:null,qtyTotalAllBranches:null,posQtyBranch004:4,
@@ -211,21 +217,21 @@ describe("BranchStockPanel branch scope", () => {
       shopeeStock004:{status:"projection-timeout",pageReferenceProducts:1}};
     renderPanel({isOnlineMarketingStaff:false,branchCode:"004",fetchImplementation:async()=>({...makeJsonResponse([]),json:async()=>data})});
     await screen.findByText("A001"); const cell=productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
-    expect(cell.querySelector("summary strong")).toHaveTextContent("3.00");
-    expect(cell.querySelector("summary")).toHaveTextContent("อ้างอิง");
-    expect(cell.querySelector(".stock-004-expanded-details")).not.toBeVisible();
-    await userEvent.click(cell.querySelector("summary"));
-    expect(cell).toHaveTextContent("ไม่ใช่ยอดพร้อมใช้ปัจจุบัน");
-    expect(cell).toHaveTextContent("POS 4.00 ก่อนหัก Shopee");
-    expect(cell).toHaveTextContent("ยอดจองอ้างอิง 1.00");
-    expect(cell).toHaveTextContent("ส่งแล้วไม่ลง POS อ้างอิง 0.00");
+    expect(cell.querySelector("strong")).toHaveTextContent("3.00");
+    expect(cell).toHaveTextContent("อ้างอิง");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await userEvent.click(within(cell).getByRole("button"));
+    const bubble=screen.getByRole("dialog");expect(bubble).toHaveTextContent("ไม่ใช่ยอดพร้อมใช้ปัจจุบัน");
+    expect(bubble).toHaveTextContent("POS 4.00 ก่อนหัก Shopee");
+    expect(bubble).toHaveTextContent("ยอดจองอ้างอิง 1.00");
+    expect(bubble).toHaveTextContent("ส่งแล้วไม่ลง POS อ้างอิง 0.00");
     expect(screen.getByText(/ดูยอดอ้างอิงล่าสุดได้ 1 รายการ/)).toBeInTheDocument();
     expect(cell).not.toHaveTextContent("พร้อมใช้ · แชร์กับ Shopee");
   });
   it("does not display a malformed reference as a ready-to-sell zero",async()=>{
     const data={records:[{...STOCK_RECORDS[0],qtyBranch004:null,stock004:{basis:"shopee-availability-unknown",viewStatus:"reference",lastConfirmed:{quantity:null}}}]};
     renderPanel({isOnlineMarketingStaff:false,branchCode:"004",fetchImplementation:async()=>({...makeJsonResponse([]),json:async()=>data})});
-    await screen.findByText("A001"); const summary=productRow("A001").querySelector('[data-column-key="qtyBranch004"] summary');
+    await screen.findByText("A001"); const summary=productRow("A001").querySelector('[data-column-key="qtyBranch004"] strong');
     expect(summary).toHaveTextContent("รอตรวจ");expect(summary).not.toHaveTextContent("0.00");
   });
 
@@ -247,10 +253,29 @@ describe("BranchStockPanel branch scope", () => {
       shopeeStock004:{status:"partial-known-commitments",unallocatedOrders:1}};
     renderPanel({isOnlineMarketingStaff:false,branchCode:"004",fetchImplementation:async()=>({...makeJsonResponse([]),json:async()=>data})});
     await screen.findByText("A001");const cell=productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
-    expect(cell.querySelector('summary strong')).toHaveTextContent('2.00');expect(cell).not.toHaveTextContent('พร้อมใช้ · แชร์กับ Shopee');
-    expect(cell).toHaveTextContent('ยังไม่ใช่ยอดพร้อมขายที่ยืนยันแล้ว');expect(cell.querySelector('summary')).not.toHaveTextContent('รอตรวจ');
+    expect(cell.querySelector('strong')).toHaveTextContent('2.00');expect(cell).not.toHaveTextContent('พร้อมใช้ · แชร์กับ Shopee');
+    expect(cell).toHaveTextContent('ชั่วคราว');expect(cell).not.toHaveTextContent('รอตรวจ');
     expect(screen.getByText('ยอดชั่วคราว — ยังไม่รวม 1 ออเดอร์ที่รอจับคู่สินค้า')).toBeInTheDocument();
-    expect(cell.querySelector('.stock-004-expanded-details')).not.toBeVisible();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();await userEvent.click(within(cell).getByRole('button'));
+    expect(screen.getByRole('dialog')).toHaveTextContent('ยังไม่ใช่ยอดพร้อมขายที่ยืนยันแล้ว');
+  });
+  it("keeps breakdowns out of table rows and opens only one speech bubble at a time",async()=>{
+    const data={records:[1,2].map(i=>({...STOCK_RECORDS[0],productCode:`BUBBLE00${i}`,qtyBranch004:i,posQtyBranch004:4,
+      stock004:{basis:'hourly-and-shopee',posBasis:'hourly-calculated',shopee:{reservedQuantity:1,shippedUnpostedQuantity:0}}}))};
+    renderPanel({isOnlineMarketingStaff:false,branchCode:'004',fetchImplementation:async()=>({...makeJsonResponse([]),json:async()=>data})});
+    await screen.findByText('BUBBLE001');const first=productRow('BUBBLE001').querySelector('[data-column-key="qtyBranch004"]'),second=productRow('BUBBLE002').querySelector('[data-column-key="qtyBranch004"]');
+    const firstText=first.textContent,secondText=second.textContent;
+    await userEvent.click(within(first).getByRole('button'));await userEvent.click(within(second).getByRole('button'));
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);expect(within(first).getByRole('button')).toHaveAttribute('aria-expanded','false');
+    expect(within(second).getByRole('button')).toHaveAttribute('aria-expanded','true');
+    expect(first.textContent).toBe(firstText);expect(second.textContent).toBe(secondText);
+    await userEvent.click(screen.getByRole('heading',{name:'สต็อกแยกตามสาขา'}));expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+  it("keeps a hovered speech bubble readable while moving from its icon to the content",async()=>{
+    renderPanel({isOnlineMarketingStaff:false,branchCode:'004',fetchImplementation:async()=>hourlyResponse()});await screen.findByText('A001');
+    const cell=productRow('A001').querySelector('[data-column-key="qtyBranch004"]'),button=within(cell).getByRole('button');
+    await userEvent.hover(button);const bubble=screen.getByRole('dialog');await userEvent.unhover(button);await userEvent.hover(bubble);
+    expect(bubble).toBeVisible();await userEvent.unhover(bubble);await waitFor(()=>expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
   it("labels suppressed fallback quantities rather than representing the morning value as Hourly", async () => {
     renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: async () => {
@@ -262,8 +287,9 @@ describe("BranchStockPanel branch scope", () => {
     } });
     await screen.findByText("A001");
     const cell = productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
-    expect(cell).toHaveTextContent("ข้อมูลเปลี่ยนระหว่างอ่าน");
-    expect(cell).not.toHaveTextContent("Hourly คำนวณ");
+    await userEvent.click(within(cell).getByRole("button"));
+    expect(screen.getByRole("dialog")).toHaveTextContent("ข้อมูลเปลี่ยนระหว่างอ่าน");
+    expect(screen.getByRole("dialog")).not.toHaveTextContent("Hourly คำนวณ");
     expect(screen.getByRole("region", { name: "แหล่งข้อมูลสต็อกสาขา 004" })).toHaveTextContent("ใช้ Full Sync 1 รายการ");
   });
 

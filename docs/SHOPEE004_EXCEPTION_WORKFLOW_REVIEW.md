@@ -117,6 +117,13 @@ it does not prove production write permissions, actual approval recovery or a
 natural Hourly cycle. Production approval routes are intentionally fail-closed
 until the separately reviewed privileged bridge is authorized and configured.
 
+The stock table shows the primary number and an information button. Breakdown
+details open in a speech bubble outside the table's layout, on hover, keyboard
+focus or click. Only one bubble opens at a time; Escape/outside-click closes it.
+The portal avoids clipping by the scrolling table and preserves compact row
+heights. Temporary/reference badges remain visible beside qualified quantities.
+This presentation change does not alter quantities, exports or backend behavior.
+
 ## Release and rollback
 
 Review together with the StockDay API bridge and SC producer changes before any
