@@ -1,7 +1,6 @@
 /* Keep the register palette local so its controls follow the site theme without
    changing the stock view or relying on the global input/button cascade. */
-.ky9-documents,
-.ky9-tabs {
+.ky9-documents {
   color-scheme: light;
   --ky9-text: #203c32;
   --ky9-muted: #52675d;
@@ -30,8 +29,7 @@
   --ky9-error-border: #d19aa6;
 }
 
-[data-theme="dark"] .ky9-documents,
-[data-theme="dark"] .ky9-tabs {
+[data-theme="dark"] .ky9-documents {
   color-scheme: dark;
   --ky9-text: #e5edf5;
   --ky9-muted: #aabac9;
@@ -60,16 +58,12 @@
   --ky9-error-border: #874957;
 }
 
-.ky9-tabs { display:flex; gap:8px; margin-bottom:20px; border-bottom:1px solid var(--ky9-border); padding:0 0 12px; }
-.ky9-tabs button { padding:10px 22px; border:1px solid var(--ky9-control-border); background:var(--ky9-surface); border-radius:12px; color:var(--ky9-text); font:inherit; cursor:pointer; }
-.ky9-tabs button:hover:not([aria-selected="true"]):not(:disabled) { background:var(--ky9-ghost-hover); }
-.ky9-tabs button[aria-selected="true"] { background:var(--ky9-button); color:var(--ky9-on-button); border-color:var(--ky9-button); }
 .ky9-documents { color:var(--ky9-text); display:grid; gap:18px; font-family:"Leelawadee UI",Tahoma,sans-serif; font-size:15px; line-height:1.6; }
 .ky9-documents button.ghost-button { color:var(--ky9-ghost-text); background:var(--ky9-ghost); border-color:var(--ky9-control-border); cursor:pointer; }
 .ky9-documents button.ghost-button:hover:not(:disabled) { color:var(--ky9-ghost-text); background:var(--ky9-ghost-hover); border-color:var(--ky9-focus); }
 .ky9-documents button.primary-button { color:var(--ky9-on-button); background:var(--ky9-button); border-color:var(--ky9-button); cursor:pointer; }
 .ky9-documents button.primary-button:hover:not(:disabled) { background:var(--ky9-button-hover); border-color:var(--ky9-button-hover); }
-.ky9-documents button:disabled,.ky9-tabs button:disabled { color:var(--ky9-muted); background:var(--ky9-inset); border-color:var(--ky9-border); cursor:default; opacity:1; }
+.ky9-documents button:disabled { color:var(--ky9-muted); background:var(--ky9-inset); border-color:var(--ky9-border); cursor:default; opacity:1; }
 .ky9-document-hero { display:flex; justify-content:space-between; align-items:center; gap:24px; padding:28px; border:1px solid var(--ky9-hero-border); border-radius:22px; background:var(--ky9-hero); }
 .ky9-document-hero h2 { margin:8px 0; font-size:30px; }
 .ky9-document-hero p { margin:0; }
@@ -91,7 +85,7 @@
 .ky9-field textarea { resize:vertical; }
 .ky9-documents input[type="checkbox"] { accent-color:var(--ky9-button); }
 .ky9-documents fieldset { border:0; padding:0; margin:0; min-width:0; }
-.ky9-documents button:focus-visible,.ky9-documents input:focus-visible,.ky9-documents select:focus-visible,.ky9-documents textarea:focus-visible,.ky9-documents summary:focus-visible,.ky9-documents a:focus-visible,.ky9-tabs button:focus-visible { outline:3px solid var(--ky9-focus); outline-offset:3px; }
+.ky9-documents button:focus-visible,.ky9-documents input:focus-visible,.ky9-documents select:focus-visible,.ky9-documents textarea:focus-visible,.ky9-documents summary:focus-visible,.ky9-documents a:focus-visible { outline:3px solid var(--ky9-focus); outline-offset:3px; }
 .ky9-documents a { color:var(--ky9-accent); text-underline-offset:3px; }
 .ky9-actions,.ky9-section-heading { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
 .ky9-section-heading { justify-content:space-between; margin-bottom:16px; }

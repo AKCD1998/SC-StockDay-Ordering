@@ -4,6 +4,7 @@ import FocusProductsPanel from "./FocusProductsPanel";
 import BranchStockHistoryPanel from "./BranchStockHistoryPanel";
 import StockRecommendationsPanel from "./StockRecommendationsPanel";
 import { BranchStockPanel } from "./BranchStockPanel.jsx";
+import Ky9DocumentsPanel from "./ky9-documents/Ky9DocumentsPanel.jsx";
 import { IncomingRequestsTab, MyRequestsTab, StockRequestsPanel } from "./StockRequestsPanel.jsx";
 import ProductTaxonomyPanel from "./ProductTaxonomyPanel";
 import TaxonomyReviewPanel from "./TaxonomyReviewPanel";
@@ -1951,6 +1952,8 @@ export default function App() {
           setRequestDraftItems={setRequestDraftItems}
           onClearDraft={handleClearDraft}
         />
+      ) : view === "ky9-documents" && isAdminUser ? (
+        <Ky9DocumentsPanel isAdminUser={isAdminUser} csrfToken={session.csrfToken} />
       ) : view === "branch-stock-history" ? (
         <BranchStockHistoryPanel />
       ) : view === "stock-recommendations" ? (

@@ -3,7 +3,6 @@ import BranchStockRecommendationSuggestion from "./BranchStockRecommendationSugg
 import { shopee004StockStatusMessage, shopee004StockStatusShortMessage } from "./lib/shopee004StockStatus.js";
 import { stock004DisplayView } from "./lib/stock004DisplayView.js";
 import StockQuantityPopover from "./StockQuantityPopover.jsx";
-import Ky9DocumentsPanel from "./ky9-documents/Ky9DocumentsPanel.jsx";
 import {
   createBranchStockScopeWorkbook,
   getBranchStockScopeOptions,
@@ -256,35 +255,7 @@ const BRANCH_LABELS = {
   "005": "สาขา 005",
 };
 
-export function BranchStockPanel(props) {
-  const [tab, setTab] = useState("stock");
-  const stockTab = useRef(null);
-  const documentsTab = useRef(null);
-  const documentsActive = props.isAdminUser && tab === "documents";
-  function handleTabKey(event) {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    event.preventDefault();
-    const next = event.key === "Home" ? "stock" : event.key === "End" ? "documents" : documentsActive ? "stock" : "documents";
-    setTab(next);
-    (next === "stock" ? stockTab : documentsTab).current?.focus();
-  }
-  return <>
-    {props.isAdminUser ? <nav className="ky9-tabs" role="tablist" aria-label="สต็อกและเอกสาร">
-      <button ref={stockTab} type="button" id="branch-stock-tab" role="tab" aria-selected={!documentsActive}
-        tabIndex={documentsActive ? -1 : 0} onKeyDown={handleTabKey}
-        aria-controls="branch-stock-content" onClick={() => setTab("stock")}>สินค้าและสต็อก</button>
-      <button ref={documentsTab} type="button" id="branch-documents-tab" role="tab" aria-selected={documentsActive}
-        tabIndex={documentsActive ? 0 : -1} onKeyDown={handleTabKey}
-        aria-controls="branch-stock-content" onClick={() => setTab("documents")}>เอกสาร</button>
-    </nav> : null}
-    <div id="branch-stock-content" role={props.isAdminUser ? "tabpanel" : undefined}
-      aria-labelledby={props.isAdminUser ? documentsActive ? "branch-documents-tab" : "branch-stock-tab" : undefined}>
-      {documentsActive ? <Ky9DocumentsPanel isAdminUser csrfToken={props.csrfToken} /> : <BranchStockContent {...props} />}
-    </div>
-  </>;
-}
-
-function BranchStockContent({
+export function BranchStockPanel({
   csrfToken,
   isAdminUser,
   userId,
