@@ -5,7 +5,7 @@ $fixture=Join-Path $parent ('hourly-update-fixture-'+[guid]::NewGuid().ToString(
 $null=New-Item -ItemType Directory -Path $fixture
 $passed=0
 try{
-  foreach($case in @('success','replace-failure','postflight-failure','foreign-change','preflight-denied','legacy-acl-success','legacy-acl-rollback','legacy-acl-foreign-change','existing-backup','existing-pending')){
+  foreach($case in @('success','replace-failure','postflight-failure','foreign-change','preflight-denied','legacy-acl-success','legacy-acl-rollback','legacy-acl-foreign-change','existing-backup','existing-pending','snapshot-callbacks','legacy-acl-snapshot-callbacks')){
     $dir=Join-Path $fixture $case;$null=New-Item -ItemType Directory -Path $dir
     $target=Join-Path $dir 'launcher.mjs';$candidate=Join-Path $dir 'candidate.mjs';$backup=Join-Path $dir 'backup.mjs'
     [IO.File]::WriteAllText($target,'original fixture bytes');[IO.File]::WriteAllText($candidate,'candidate fixture bytes')
@@ -20,6 +20,12 @@ try{
     }
     $acl=(Get-Acl -LiteralPath $target).Sddl
     $pre={};$post={};$fault={}
+    if($case -like '*snapshot-callbacks'){
+      $before=@{Files=@{fixture=[byte[]]@(1,2)};Acl=@{fixture='fixture-acl'};Tasks=@{fixture=@{Xml='fixture-xml';Sddl='fixture-sddl'}};Timezone='fixture-zone'}
+      $expectedSnapshot=@{Files=@{fixture=[byte[]]@(1,2)};Acl=@{fixture='fixture-acl'};Tasks=@{fixture=@{Xml='fixture-xml';Sddl='fixture-sddl'}};Timezone='fixture-zone'}
+      $pre={Assert-HourlyDefinitionsEqual $before $expectedSnapshot}
+      $post={Assert-HourlyDefinitionsEqual $before $expectedSnapshot}
+    }
     if($case -eq 'replace-failure'){$fault={throw 'INJECTED_FIXTURE_FAILURE'}}
     if($case -eq 'postflight-failure'){$post={throw 'INJECTED_FIXTURE_FAILURE'}}
     if($case -eq 'legacy-acl-rollback'){$post={throw 'INJECTED_FIXTURE_FAILURE'}}
@@ -31,7 +37,7 @@ try{
     $failed=$false;$transactionReason=$null
     try{Invoke-HourlyLauncherTransaction $target $candidate $backup $pre $post $fault}catch{$failed=$true;if($_.Exception.Message -in @('ACTIVATION_VERIFY_FAILED','ROLLBACK_VERIFY_FAILED','ORIGINAL_BACKUP_UNVERIFIED','PATH_TYPE_UNEXPECTED')){$transactionReason=$_.Exception.Message}}
     $text=[IO.File]::ReadAllText($target)
-    if($case -in @('success','legacy-acl-success')){
+    if($case -in @('success','legacy-acl-success','snapshot-callbacks','legacy-acl-snapshot-callbacks')){
       Assert-HourlyUpdate (-not $failed -and $text -ceq 'candidate fixture bytes' -and [IO.File]::ReadAllText($backup) -ceq 'original fixture bytes') 'FIXTURE_SUCCESS_FAILED'
       $restored=Join-Path $dir 'rollback-copy.mjs';[IO.File]::WriteAllText($restored,'original fixture bytes')
       Invoke-HourlyLauncherTransaction $target $restored (Join-Path $dir 'candidate-backup.mjs') {} {}

@@ -133,7 +133,9 @@ function Write-HourlyOwnedTransactionFile([string]$Path,[byte[]]$Bytes,$Permissi
 function Invoke-HourlyLauncherTransaction([string]$Target,[string]$Candidate,[string]$Backup,[scriptblock]$AssertBefore,[scriptblock]$AssertAfter,[scriptblock]$FaultAfterReplace={}) {
   & $AssertBefore
   Initialize-HourlyFileTransactionNative
-  $before=[IO.File]::ReadAllBytes($Target);$next=[IO.File]::ReadAllBytes($Candidate);$permissions=Get-Acl -LiteralPath $Target
+  # Callback scriptblocks resolve caller variables dynamically in PowerShell.
+  # Keep transaction locals distinct from the controller's protected snapshot.
+  $transactionBeforeBytes=[IO.File]::ReadAllBytes($Target);$transactionNextBytes=[IO.File]::ReadAllBytes($Candidate);$transactionPermissions=Get-Acl -LiteralPath $Target
   Assert-HourlyUpdate (-not(Test-Path -LiteralPath $Backup)) 'BACKUP_ALREADY_EXISTS'
   $pending=$Target+'.update-pending'
   Assert-HourlyUpdate (-not(Test-Path -LiteralPath $pending)) 'PENDING_UPDATE_REQUIRES_REVIEW'
@@ -141,25 +143,25 @@ function Invoke-HourlyLauncherTransaction([string]$Target,[string]$Candidate,[st
   $switched=$false
   $pendingOwned=$false
   try{
-    Write-HourlyOwnedTransactionFile $Backup $before $permissions
+    Write-HourlyOwnedTransactionFile $Backup $transactionBeforeBytes $transactionPermissions
     Assert-HourlyUpdate (-not(Test-Path -LiteralPath $pending)) 'PENDING_UPDATE_REQUIRES_REVIEW'
-    Write-HourlyOwnedTransactionFile $pending $next $permissions
+    Write-HourlyOwnedTransactionFile $pending $transactionNextBytes $transactionPermissions
     $pendingOwned=$true
     & $AssertBefore
-    Assert-HourlyUpdate ((Test-HourlyBytes ([IO.File]::ReadAllBytes($Target)) $before) -and (Get-Acl -LiteralPath $Target).Sddl -ceq $permissions.Sddl) 'ACTIVATION_VERIFY_FAILED'
+    Assert-HourlyUpdate ((Test-HourlyBytes ([IO.File]::ReadAllBytes($Target)) $transactionBeforeBytes) -and (Get-Acl -LiteralPath $Target).Sddl -ceq $transactionPermissions.Sddl) 'ACTIVATION_VERIFY_FAILED'
     # Same-directory rename, replacement + write-through only (no cross-volume
     # copy or delayed reboot). ReplaceFile changes legacy auto-inherit flags.
     Assert-HourlyUpdate ([Hourly004FileTransactionNative]::MoveFileEx($pending,$Target,9)) 'ACTIVATION_VERIFY_FAILED'
     $switched=$true;$pendingOwned=$false
     & $FaultAfterReplace
-    Assert-HourlyUpdate ((Test-HourlyBytes ([IO.File]::ReadAllBytes($Target)) $next) -and (Get-Acl -LiteralPath $Target).Sddl -ceq $permissions.Sddl) 'ACTIVATION_VERIFY_FAILED'
+    Assert-HourlyUpdate ((Test-HourlyBytes ([IO.File]::ReadAllBytes($Target)) $transactionNextBytes) -and (Get-Acl -LiteralPath $Target).Sddl -ceq $transactionPermissions.Sddl) 'ACTIVATION_VERIFY_FAILED'
     & $AssertAfter
   }catch{
     if($switched){
-      Assert-HourlyUpdate ((Test-HourlyBytes ([IO.File]::ReadAllBytes($Target)) $next) -and (Get-Acl -LiteralPath $Target).Sddl -ceq $permissions.Sddl) 'ROLLBACK_REFUSED_FOREIGN_CHANGE'
-      Assert-HourlyUpdate ((Test-HourlyBytes ([IO.File]::ReadAllBytes($Backup)) $before) -and (Get-Acl -LiteralPath $Backup).Sddl -ceq $permissions.Sddl) 'ORIGINAL_BACKUP_UNVERIFIED'
+      Assert-HourlyUpdate ((Test-HourlyBytes ([IO.File]::ReadAllBytes($Target)) $transactionNextBytes) -and (Get-Acl -LiteralPath $Target).Sddl -ceq $transactionPermissions.Sddl) 'ROLLBACK_REFUSED_FOREIGN_CHANGE'
+      Assert-HourlyUpdate ((Test-HourlyBytes ([IO.File]::ReadAllBytes($Backup)) $transactionBeforeBytes) -and (Get-Acl -LiteralPath $Backup).Sddl -ceq $transactionPermissions.Sddl) 'ORIGINAL_BACKUP_UNVERIFIED'
       Assert-HourlyUpdate ([Hourly004FileTransactionNative]::MoveFileEx($Backup,$Target,9)) 'ROLLBACK_VERIFY_FAILED'
-      Assert-HourlyUpdate ((Test-HourlyBytes ([IO.File]::ReadAllBytes($Target)) $before) -and (Get-Acl -LiteralPath $Target).Sddl -ceq $permissions.Sddl) 'ROLLBACK_VERIFY_FAILED'
+      Assert-HourlyUpdate ((Test-HourlyBytes ([IO.File]::ReadAllBytes($Target)) $transactionBeforeBytes) -and (Get-Acl -LiteralPath $Target).Sddl -ceq $transactionPermissions.Sddl) 'ROLLBACK_VERIFY_FAILED'
     }
     throw
   }finally{if($pendingOwned -and (Test-Path -LiteralPath $pending)){[IO.File]::Delete($pending)}}
