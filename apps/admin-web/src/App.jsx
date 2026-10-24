@@ -2000,7 +2000,7 @@ export default function App() {
       ) : view === "pos-admin" && isAdminUser ? (
         <PosAdminPanel />
       ) : view === "members" ? (
-        <MembersPanel isAdmin={isAdminUser} />
+        <MembersPanel isAdmin={isAdminUser} csrfToken={session.csrfToken} />
       ) : (
         <>
           <section className="kpis">
