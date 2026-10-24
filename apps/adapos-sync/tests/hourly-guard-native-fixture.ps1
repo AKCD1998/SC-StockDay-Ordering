@@ -5,10 +5,10 @@ if($errors.Count){throw 'fixture parse failed'}
 foreach($function in $ast.EndBlock.Statements | Where-Object {$_ -is [Management.Automation.Language.FunctionDefinitionAst]}) {
   . ([scriptblock]::Create($function.Extent.Text))
 }
-$cases=@('ready','wrong-host','wrong-zone','missing-task','disabled-task','running-task','within-15','boundary-15','busy-process','unreadable-process','own-process','missing-cpu','cpu-70','cpu-69','cpu-nan','access-denied','provider-timeout')
+$cases=@('ready','wrong-host','wrong-zone','wrong-identity','missing-task','disabled-task','running-task','within-15','boundary-15','busy-process','unreadable-process','own-process','missing-cpu','cpu-70','cpu-69','cpu-nan','access-denied','provider-timeout')
 $passed=0
 foreach($case in $cases) {
-  function Get-HourlyGuardHost { [pscustomobject]@{name=$(if($case -eq 'wrong-host'){'OTHER'}else{'SERVER004'});offset=$(if($case -eq 'wrong-zone'){0}else{420})} }
+  function Get-HourlyGuardHost { [pscustomobject]@{name=$(if($case -eq 'wrong-host'){'OTHER'}else{'SERVER004'});offset=$(if($case -eq 'wrong-zone'){0}else{420});isSystem=($case -ne 'wrong-identity')} }
   function Get-HourlyGuardTasks {
     if($case -eq 'missing-task'){return @()}
     @([pscustomobject]@{enabled=($case -ne 'disabled-task');running=($case -eq 'running-task');nextRunMinutes=$(if($case -eq 'within-15'){14}elseif($case -eq 'boundary-15'){15}else{500})},[pscustomobject]@{enabled=$true;running=$false;nextRunMinutes=1000})
@@ -32,6 +32,7 @@ foreach($case in $cases) {
   $events=@($records | Where-Object {$_ -is [string]} | ForEach-Object {$_ | ConvertFrom-Json})
   if($events[-1].kind -ne 'result' -or $events[0].stage -ne 'host'){throw 'fixture progress missing'}
   if($case -eq 'cpu-70' -and $events[-1].reason -ne 'CPU_LIMIT'){throw 'fixture reason missing'}
+  if($case -eq 'cpu-70' -and $events[-1].systemCpuPercent -ne 70){throw 'fixture stopped CPU sample missing'}
   if($case -eq 'access-denied' -and $events[-1].reason -ne 'ACCESS_DENIED'){throw 'fixture access classification'}
   if($case -eq 'provider-timeout' -and $events[-1].reason -ne 'PROVIDER_TIMEOUT'){throw 'fixture timeout classification'}
   $passed++

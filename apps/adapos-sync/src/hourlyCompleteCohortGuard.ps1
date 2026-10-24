@@ -1,7 +1,7 @@
 param([Parameter(Mandatory=$true)][int]$ObserverProcessId)
 $ErrorActionPreference='Stop'
 
-function Get-HourlyGuardHost { [pscustomobject]@{name=[Environment]::MachineName;offset=[TimeZoneInfo]::Local.BaseUtcOffset.TotalMinutes} }
+function Get-HourlyGuardHost { [pscustomobject]@{name=[Environment]::MachineName;offset=[TimeZoneInfo]::Local.BaseUtcOffset.TotalMinutes;isSystem=[Security.Principal.WindowsIdentity]::GetCurrent().IsSystem} }
 function Get-HourlyGuardTasks {
   $service=New-Object -ComObject Schedule.Service
   try {
@@ -25,6 +25,7 @@ function Invoke-HourlyCompleteGuard([int]$ObserverProcessId) {
     Write-GuardEvent 'progress' @{}
     $hostInfo=Get-HourlyGuardHost
     if($hostInfo.name -ine 'SERVER004' -or $hostInfo.offset -ne 420){throw 'stop'}
+    if($hostInfo.isSystem -ne $true){$reason='IDENTITY_UNVERIFIED';throw 'stop'}
     $stage='tasks';$reason='TASKS_UNAVAILABLE';Write-GuardEvent 'progress' @{}
     $tasks=@(Get-HourlyGuardTasks)
     if($tasks.Count -ne 2){throw 'stop'}
@@ -48,7 +49,9 @@ function Invoke-HourlyCompleteGuard([int]$ObserverProcessId) {
   } catch {
     if($_.Exception -is [UnauthorizedAccessException] -or $_.Exception.HResult -eq -2147024891){$reason='ACCESS_DENIED'}
     elseif($_.Exception -is [TimeoutException]){$reason='PROVIDER_TIMEOUT'}
-    Write-GuardEvent 'result' @{status='guard-stopped';reason=$reason;detailsWithheld=$true}
+    $fields=@{status='guard-stopped';reason=$reason;detailsWithheld=$true}
+    if($reason -eq 'CPU_LIMIT' -and [double]::IsNaN($percent) -eq $false -and [double]::IsInfinity($percent) -eq $false -and $percent -ge 0 -and $percent -le 100){$fields.systemCpuPercent=$percent}
+    Write-GuardEvent 'result' $fields
     return $false
   }
 }

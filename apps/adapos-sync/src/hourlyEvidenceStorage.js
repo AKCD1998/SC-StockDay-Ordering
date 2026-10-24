@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
+import { hourlyStage, emitHourlyDiagnostic, safeHourlyFailureCode } from "./hourlyAttemptDiagnostics.js";
 import { buildHourlyEvidencePayload } from "./hourlyStockEvidenceClient.js";
 import { buildHourlyIntradayPayload } from "./hourlyDerivedObservation.js";
 import { HOURLY_COMPLETE_COHORT_MAX_BODY_BYTES } from "./hourlyCohortCoverage.js";
@@ -122,14 +123,14 @@ export function hourlyEvidenceDeliveryBounds(evidence) {
 }
 
 export async function flushHourlyEvidenceOutbox({ cacheDir, branchCode, token, apiBaseUrl, uploadEvidence, maxUploads = 12,
-  maxDurationMs = null, monotonic = () => performance.now() }) {
+  maxDurationMs = null, monotonic = () => performance.now(), onDiagnostic }) {
   if (!Number.isSafeInteger(maxUploads) || maxUploads < 1 || maxUploads > 24
       || (maxDurationMs != null && (!Number.isSafeInteger(maxDurationMs) || maxDurationMs < 1 || maxDurationMs > 60_000))) {
     throw Object.assign(new Error("Invalid Hourly delivery bounds."), { code: "CONFIG_ERROR" });
   }
   const deadline = maxDurationMs == null ? Infinity : monotonic() + maxDurationMs;
-  const release = acquireHourlyEvidenceLock({ cacheDir, branchCode, purpose: "delivery" });
-  if (!release) return { status: "busy", delivered: 0 };
+  const release = await hourlyStage(onDiagnostic, "delivery-lock", () => acquireHourlyEvidenceLock({ cacheDir, branchCode, purpose: "delivery" }));
+  if (!release) { emitHourlyDiagnostic(onDiagnostic, { stage: "delivery-lock", kind: "failure", code: "HOURLY_EVIDENCE_BUSY" }); return { status: "busy", delivered: 0 }; }
   try {
     const dir = directory(cacheDir, branchCode);
     const pending = fs.readdirSync(dir).filter((name) => /^[a-f0-9]{64}\.json$/.test(name)).map((name) => {
@@ -140,17 +141,20 @@ export async function flushHourlyEvidenceOutbox({ cacheDir, branchCode, token, a
       const body = fs.readFileSync(file, "utf8");
       return { file, body, payload: validateBody(body, branchCode) };
     }).sort((a, b) => a.payload.capturedAt.localeCompare(b.payload.capturedAt));
+    emitHourlyDiagnostic(onDiagnostic, { stage: "outbox-scan", kind: "success", pending: pending.length });
     let delivered = 0;
     for (const entry of pending.slice(0, maxUploads)) {
       const remainingMs = Math.floor(deadline - monotonic());
       if (remainingMs < 1) return { status: "pending", delivered, pending: pending.length - delivered, errorCode: "HOURLY_DELIVERY_BUDGET_EXHAUSTED" };
       try {
-        const ack = await uploadEvidence({ apiBaseUrl, branchCode, token, body: entry.body,
-          ...(maxDurationMs == null ? {} : { timeoutMs: Math.min(30_000, remainingMs), maxAttempts: 1 }) });
-        assertHourlyAcknowledgement(ack, entry.payload);
+        const ack = await hourlyStage(onDiagnostic, "upload", () => uploadEvidence({ apiBaseUrl, branchCode, token, body: entry.body,
+          ...(maxDurationMs == null ? {} : { timeoutMs: Math.min(30_000, remainingMs), maxAttempts: 1 }) }), { sentProducts: entry.payload.records.length });
+        await hourlyStage(onDiagnostic, "acknowledgement", () => assertHourlyAcknowledgement(ack, entry.payload));
+        emitHourlyDiagnostic(onDiagnostic, { stage: "acknowledgement", kind: "progress", acceptedProducts: ack.accepted });
         fs.unlinkSync(entry.file);
         delivered++;
       } catch (error) {
+        emitHourlyDiagnostic(onDiagnostic, { stage: "upload", kind: "failure", code: safeHourlyFailureCode(error), pending: pending.length - delivered });
         return { status: "pending", delivered, pending: pending.length - delivered, errorCode: error.code || "HOURLY_UPLOAD_FAILED" };
       }
     }

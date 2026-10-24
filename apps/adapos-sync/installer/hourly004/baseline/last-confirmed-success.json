@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "hourly004-handoff-success-v1",
+  "status": "captured-and-acknowledged",
+  "expectedProducts": 6835,
+  "observedProducts": 6835,
+  "readBatchCount": 35,
+  "backendAcceptedRecords": 6835,
+  "outboxPending": 0,
+  "slot": "11:00",
+  "finishedAt": "2026-10-24T04:01:49.705Z",
+  "sourceAndCentralAggregatesChecked": true,
+  "centralAuditDate": "2026-10-24",
+  "sourceFreshnessQualified": false,
+  "atomicSnapshotQualified": false
+}

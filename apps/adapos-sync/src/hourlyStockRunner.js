@@ -20,8 +20,10 @@ import { readHourlyCompleteCohort } from "./hourlyCompleteCohort.js";
 import { resolveHourlyCohortConfig } from "./hourlyCohortManifest.js";
 import { assertHourlyCompleteCohortGuard } from "./hourlyCompleteCohortGuard.js";
 import { HOURLY_COMPLETE_COHORT_MAX_RECORDS } from "./hourlyCohortCoverage.js";
+import { hourlyStage, emitHourlyDiagnostic } from "./hourlyAttemptDiagnostics.js";
 
 export async function runHourlyStockIntraday(dependencies = {}) {
+  const observe = dependencies.onDiagnostic;
   const originalConfig = dependencies.syncConfig ?? defaultSyncConfig;
   const config = originalConfig.hourlyStockEvidence?.enabled === true && originalConfig.hourlyStockEvidence.completeCohortEnabled === true
     ? { ...originalConfig, hourlyStockEvidence: resolveHourlyCohortConfig(originalConfig.hourlyStockEvidence) } : originalConfig;
@@ -68,22 +70,23 @@ export async function runHourlyStockIntraday(dependencies = {}) {
   let pool;
 
   const captureLock = dependencies.withHourlyCaptureLock ?? withHourlyCaptureLock;
-  const captured = await captureLock({
+  const captured = await hourlyStage(observe, "capture-lock", () => captureLock({
     cacheDir: evidenceConfig.cacheDir, branchCode: config.branchCode,
   }, async () => {
     try {
-      pool = await connectSqlWithRetry({
+      pool = await hourlyStage(observe, "sql-connect", () => connectSqlWithRetry({
         ...retryOptions,
         connect: connectSql,
         config: dependencies.sqlServerConfig ?? buildSqlServerConfig(config),
         onRetry: (event) => {
           sqlConnectionRetryCount += 1;
+          emitHourlyDiagnostic(observe, { stage: "sql-connect", kind: "retry", retryCount: sqlConnectionRetryCount });
           callerOnRetry?.(event);
         },
-      });
+      }));
 
       const queryStartedAt = performance.now();
-      const snapshot = await getRows(pool, evidenceConfig.productCodes, { branchCode: config.branchCode });
+      const snapshot = await getRows(pool, evidenceConfig.productCodes, { branchCode: config.branchCode, ...(observe ? { onDiagnostic: observe } : {}) });
       const rows = Array.isArray(snapshot) ? snapshot : snapshot.rows;
       const sourceRead = Array.isArray(snapshot) ? null : snapshot.sourceRead;
       const derivedObservation = Array.isArray(snapshot) ? null : snapshot.derivedObservation;
@@ -91,7 +94,7 @@ export async function runHourlyStockIntraday(dependencies = {}) {
       const queryDurationMs = Math.ceil(performance.now() - queryStartedAt);
       const observedAt = now();
       const scanned = scanHourlyStockEvidence(rows, config.branchCode);
-      const { body } = buildHourlyIntradayPayload({
+      const { body } = await hourlyStage(observe, "payload", () => buildHourlyIntradayPayload({
         branchCode: config.branchCode,
         observationKind: evidenceConfig.observationKind,
         plannedSlot: evidenceConfig.plannedSlot,
@@ -105,8 +108,8 @@ export async function runHourlyStockIntraday(dependencies = {}) {
           sqlConnectionRetryCount,
           ...(sourceRead ? { sourceRead } : {}),
         },
-      }, derivedObservation);
-      enqueueHourlyEvidence({ cacheDir: evidenceConfig.cacheDir, branchCode: config.branchCode, body });
+      }, derivedObservation), { readProducts: rows.length });
+      await hourlyStage(observe, "outbox-enqueue", () => enqueueHourlyEvidence({ cacheDir: evidenceConfig.cacheDir, branchCode: config.branchCode, body }));
       let shadow;
       try { shadow = runShadow({
         branchCode: config.branchCode,
@@ -141,13 +144,14 @@ export async function runHourlyStockIntraday(dependencies = {}) {
         ...shadow,
       };
     } finally {
-      if (pool) await pool.close();
+      if (pool) await hourlyStage(observe, "sql-close", () => pool.close());
     }
-  });
+  }));
   const upload = await flushHourlyEvidenceOutbox({
     cacheDir: evidenceConfig.cacheDir, branchCode: config.branchCode,
     apiBaseUrl: config.apiBaseUrl, token: evidenceConfig.uploadToken, uploadEvidence,
     ...hourlyEvidenceDeliveryBounds(evidenceConfig),
+    ...(observe ? { onDiagnostic: observe } : {}),
   });
   return { ...captured, upload };
 }
