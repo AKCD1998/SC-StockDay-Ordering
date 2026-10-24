@@ -41,4 +41,20 @@
 .member-items { min-width: 650px; }
 .member-items td, .member-items th { padding: 12px; }
 .member-refund { color: var(--member-muted); background: var(--member-soft); border-radius: 8px; padding: 10px; font-size: .7rem; }
+.ada-linking { margin-top: 20px; padding: 20px; border: 1px solid var(--member-line); border-radius: 12px; background: var(--member-soft); }
+.ada-linking h3 { margin: 0; font-size: 1rem; }
+.ada-pending-member { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--member-line); }
+.ada-pending-member p { margin: 6px 0; color: var(--member-muted); }
+.ada-candidates { display: grid; gap: 12px; border: 0; padding: 0; margin: 20px 0; }
+.ada-candidates legend { margin-bottom: 12px; font-weight: 700; }
+.ada-candidate { display: flex; align-items: start; gap: 12px; padding: 16px; border: 1px solid var(--member-line); border-radius: 12px; cursor: pointer; }
+.ada-candidate.selected { border-color: var(--member-blue); background: var(--member-soft); }
+.ada-candidate > span { display: grid; gap: 7px; line-height: 1.6; }
+.ada-candidate input, .ada-link-confirm input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--member-blue); }
+.ada-candidate-name { font-size: 1rem; }
+.ada-link-notice, .ada-link-confirm { background: var(--member-soft); border: 1px solid var(--member-line); border-radius: 10px; padding: 16px; line-height: 1.8; }
+.ada-link-confirm label { display: flex; gap: 10px; align-items: center; font-weight: 600; }
+.ada-link-warning { color: var(--member-ink); font-weight: 700; }
+.ada-link-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: flex-end; padding: 8px 0; }
+@media (max-width: 640px) { .ada-pending-member { align-items: start; flex-direction: column; } .ada-linking { padding: 12px; } .ada-link-actions { justify-content: flex-start; } }
 @media (max-width: 640px) { .members-header { align-items: start; flex-direction: column; gap: 12px; } .members-search { gap: 8px; } .members-backdrop { padding: 8px; } .members-history { max-height: 96vh; border-radius: 12px; } .members-history-header, .members-history-body { padding: 16px; } .member-receipt { padding: 12px; } .member-receipt > header { flex-direction: column; gap: 10px; } .member-receipt-total { text-align: left; } }

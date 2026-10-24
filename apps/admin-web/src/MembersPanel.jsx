@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "./lib/apiClient.js";
 import "./MembersPanel.css";
+import AdaMemberLinking from './AdaMemberLinking.jsx';
 
 const base = "/api/admin/sccrm-members";
 const number = value => Number(value || 0).toLocaleString("th-TH", { maximumFractionDigits: 6 });
@@ -80,13 +81,15 @@ function PurchaseHistory({ member, onClose, onAccessDenied }) {
   </div>;
 }
 
-export default function MembersPanel({ isAdmin }) {
+export default function MembersPanel({ isAdmin, csrfToken }) {
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState({ search: "", page: 1, refresh: 0 });
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
   const [denied, setDenied] = useState(false);
+  const [showLinking, setShowLinking] = useState(false);
+  const refreshMembers = useCallback(() => setQuery(value => ({ ...value, page: 1, refresh: value.refresh + 1 })), []);
   const close = useCallback(() => setSelected(null), []);
   const accessDenied = useCallback(message => { setDenied(true); setSelected(null); setData(null); setError(message); }, []);
   useEffect(() => {
@@ -100,7 +103,8 @@ export default function MembersPanel({ isAdmin }) {
   }, [query, isAdmin, accessDenied]);
   if (!isAdmin) return <section className="panel"><h2>สมาชิก</h2><p>ตารางสมาชิกและประวัติการซื้อเปิดดูได้ด้วยบัญชีแอดมิน</p></section>;
   return <section className="panel members-panel" aria-labelledby="members-title">
-    <header className="members-header"><div><span className="members-eyebrow">SCCRM · สมาชิกส่วนกลาง</span><h2 id="members-title">ข้อมูลสมาชิก</h2><p>สมาชิกที่สมัครผ่าน QR และพนักงาน · ข้อมูลชุดเดียวกับหน้าร้าน</p></div><button type="button" className="ghost-button" onClick={() => { setSelected(null); setQuery(value => ({ ...value, refresh: value.refresh + 1 })); }}>โหลดข้อมูลใหม่</button></header>
+    <header className="members-header"><div><span className="members-eyebrow">SCCRM · สมาชิกส่วนกลาง</span><h2 id="members-title">ข้อมูลสมาชิก</h2><p>สมาชิกที่สมัครผ่าน QR และพนักงาน · ข้อมูลชุดเดียวกับหน้าร้าน</p></div><div className="ada-link-actions"><button className="member-history-button" type="button" aria-expanded={showLinking} onClick={() => setShowLinking(value => !value)}>{showLinking ? 'ซ่อนรายการรอผูก Ada' : 'จัดการรหัส Ada'}</button><button type="button" className="ghost-button" onClick={() => { setSelected(null); setQuery(value => ({ ...value, refresh: value.refresh + 1 })); }}>โหลดข้อมูลใหม่</button></div></header>
+    {showLinking && !denied && <AdaMemberLinking csrfToken={csrfToken} onLinked={refreshMembers} onAccessDenied={accessDenied} />}
     <form className="members-search" onSubmit={event => { event.preventDefault(); setQuery({ search: search.trim(), page: 1, refresh: query.refresh + 1 }); }}><label htmlFor="members-search-input">ค้นหาสมาชิก<input id="members-search-input" type="search" maxLength={100} placeholder="ชื่อ เบอร์โทร หรือรหัสสมาชิก" value={search} onChange={event => setSearch(event.target.value)} /></label><button className="members-primary" type="submit">ค้นหา</button></form>
     {error && <p className="notice error" role="alert">{error}</p>}
     {!data && !error && <p role="status">กำลังโหลดสมาชิก…</p>}

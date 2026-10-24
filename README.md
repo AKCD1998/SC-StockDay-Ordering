@@ -1,5 +1,12 @@
 # SC-StockDay-Ordering
 
+SCCRM admin member linking: open **สมาชิก → จัดการรหัส Ada**, select a pending
+member, compare native code/name/phone and purchase dates, select a code, confirm
+the identity checkbox, then press **ยืนยันผูกรหัส Ada**. Only admins can approve;
+already-bound codes cannot be reassigned. The operation links existing history
+without editing/deleting native Ada customers, bills or points. The three
+previously approved members stay linked and do not appear in the pending list.
+
 Internal pharmacy stock-ordering scaffold for replacing manual Excel-based branch ordering with:
 
 - a branch ordering web app
