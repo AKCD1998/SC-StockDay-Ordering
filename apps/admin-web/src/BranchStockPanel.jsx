@@ -1217,14 +1217,22 @@ export function BranchStockPanel({
           label: `รายละเอียดสต็อกสาขา 004 · ${row.productNameThai || row.productCode}` };
         if (["reference", "unverified"].includes(row.stock004.viewStatus) && display.status !== "known-only") {
           const reference = display.lastConfirmed;
-          return <StockQuantityPopover {...popup} className="stock-shopee-unknown"
-            quantity={display.status === "reference" ? formatNumber(reference.quantity, 2) : "รอตรวจ"}
-            badge={display.status === "reference" ? "อ้างอิง" : null}>
-              <small>ยังยืนยันยอดพร้อมใช้ปัจจุบันไม่ได้</small>
-              {reference ? <small>ยอดอ้างอิงล่าสุด {formatNumber(reference.quantity, 2)} · ข้อมูลเมื่อ {hourlyTime(reference.observedAt)} · อ่านสำเร็จเมื่อ {hourlyTime(reference.fetchedAt)} · ไม่ใช่ยอดพร้อมใช้ปัจจุบัน</small> : null}
+          const isReference = display.status === "reference";
+          const referenceLabel = isReference
+            ? `ยอดครั้งล่าสุดที่อ่านสำเร็จ ${formatNumber(reference.quantity, 2)} · รอบนี้ยังยืนยันยอดพร้อมใช้ไม่ได้`
+            : undefined;
+          return <StockQuantityPopover {...popup} className={isReference ? "stock-004-reference" : "stock-shopee-unknown"}
+            label={referenceLabel ? `${popup.label} · ${referenceLabel}` : popup.label}
+            quantity={isReference ? formatNumber(reference.quantity, 2) : "รอตรวจ"} quantityLabel={referenceLabel}>
+              {reference ? <>
+                <strong>ยอดครั้งล่าสุดที่อ่านสำเร็จ {formatNumber(reference.quantity, 2)} · อ้างอิง</strong>
+                <small>ข้อมูลเมื่อ {hourlyTime(reference.observedAt)}</small>
+                <small>อ่านสำเร็จเมื่อ {hourlyTime(reference.fetchedAt)} (เวลาไทย)</small>
+              </> : null}
+              <small>รอบนี้ยังยืนยันยอดพร้อมใช้ไม่ได้</small>
               <span className="stock-pos-reference">POS {formatNumber(row.posQtyBranch004, 2)} ก่อนหัก Shopee</span>
               <small>ยอดจองอ้างอิง {formatNumber(reference?.reservedQuantity, 2)} · ส่งแล้วไม่ลง POS อ้างอิง {formatNumber(reference?.shippedUnpostedQuantity, 2)}</small>
-              <small>บัญชีจองอ้างอิง {hourlyTime(reference?.observedAt)} · ต้องอ่านล่าสุดก่อนใช้ยืนยันยอด</small>
+              <small>ต้องอ่านรอบล่าสุดสำเร็จก่อนใช้ยืนยันยอด</small>
           </StockQuantityPopover>;
         }
         if (["hourly-and-shopee", "hourly-and-shopee-known-only", "shopee-availability-unknown"].includes(row.stock004.basis)) {

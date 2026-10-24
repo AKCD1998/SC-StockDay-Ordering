@@ -1,7 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-export default function StockQuantityPopover({ open, onOpenChange, className = "", label, quantity, badge,
+export default function StockQuantityPopover({ open, onOpenChange, className = "", label, quantity, quantityLabel, badge,
   heading = "สต็อกสาขา 004", dialogLabel = "รายละเอียดสต็อกสาขา 004", children }) {
   const id = useId();
   const trigger = useRef(null), bubble = useRef(null), closeTimer = useRef(null), pinned = useRef(false);
@@ -49,7 +49,10 @@ export default function StockQuantityPopover({ open, onOpenChange, className = "
   }, [open]);
 
   return <span className={`branch-stock-004-quantity stock-004-disclosure ${className}`}>
-    <strong className="stock-004-primary">{quantity}</strong>
+    <strong className="stock-004-primary">{quantityLabel ? <>
+      <span aria-hidden="true">{quantity}</span>
+      <span className="stock-004-visually-hidden">{quantityLabel}</span>
+    </> : quantity}</strong>
     {badge ? <small className="stock-004-reference-label">{badge}</small> : null}
     <button ref={trigger} type="button" className="stock-004-info-button" aria-label={label}
       aria-expanded={open} aria-controls={open ? id : undefined} aria-haspopup="dialog"
