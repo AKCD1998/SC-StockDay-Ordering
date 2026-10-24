@@ -1,8 +1,8 @@
-# Hourly 004 checkpoint v3: ชุดตรวจรับก่อนติดตั้ง
+# Hourly 004 checkpoint v4: ชุดตรวจรับก่อนติดตั้ง
 
-ชุดเดียวนี้มี Preflight, Update, Status และ Rollback สำหรับ Task เดิมบน SERVER004 ยังไม่ติดตั้งอัตโนมัติ ไม่สร้างหรือสั่ง Task ไม่เรียก production entrypoint เพื่อทดสอบ และไม่สั่ง capture/replay จริง
+ชุดเดียวนี้มี Preflight, Update, Status, Rollback และ Recover สำหรับ Task เดิมบน SERVER004 ยังไม่ติดตั้งอัตโนมัติ ไม่สร้างหรือสั่ง Task ไม่เรียก production entrypoint เพื่อทดสอบ และไม่สั่ง capture/replay จริง
 
-รุ่นนี้ต่อจาก stability-20261024 ที่ติดตั้งแล้ว ใช้ release แยก stability-20261024-checkpoint-v3 และ backup pointer ชื่อใหม่ ไม่เขียนทับ release v1, backup ดั้งเดิม หรือ staging ที่ค้าง รับเฉพาะ pointer/core/guard/source และต้นไม้ release v1 ที่ตรง baseline รุ่นอื่นหรือไฟล์เปลี่ยนต้องหยุดให้ตรวจทาน ห้ามใช้ทับ guard 30 วินาทีที่พักไว้
+รุ่นนี้ต่อจาก stability-20261024 ที่ติดตั้งแล้ว ใช้ release แยก stability-20261024-checkpoint-v4 และ backup pointer ชื่อใหม่ ไม่เขียนทับ release v1, backup ดั้งเดิม หรือ staging ที่ค้าง รับเฉพาะ pointer/core/guard/source และต้นไม้ release v1 ที่ตรง baseline รุ่นอื่นหรือไฟล์เปลี่ยนต้องหยุดให้ตรวจทาน ห้ามใช้ทับ guard 30 วินาทีที่พักไว้
 
 ## เกณฑ์เดิม
 
@@ -37,7 +37,7 @@ Status เป็น reader อย่างเดียว ไม่ import confi
 
 Preflight ตรวจ host/timezone/สิทธิ์เดิม, processes, locks, CPU, Task/Full Sync window, source และ integrity ของ release/แพ็กเกจ ไม่ query สินค้า หาก denied หยุดเฉพาะส่วนนั้น ห้ามเปลี่ยนบัญชี ACL credentials หรือช่องทาง
 
-หลังเจ้าของตรวจรับ diff ผลทดสอบ ผลกระทบและ rollback ของ v3 แล้วจึงใช้:
+หลังเจ้าของตรวจรับ diff ผลทดสอบ ผลกระทบและ rollback ของ v4 แล้วจึงใช้:
 
 ```powershell
 .\hourly004-update.ps1 -Action Update -ReleaseApproved
@@ -59,7 +59,7 @@ Rollback รับเฉพาะ v3 ของชุดนี้ คืน point
 
 รอบธรรมชาติ 15:00 วันที่ 24 ตุลาคมหยุดหลัง 1,400/6,835 รายการจาก writer เดิม โดย sticky persistenceFailed และ EACCES ที่ runtime สร้างเองทำให้เสียเหตุเดิม Last success 14:00 ยังอยู่ ผลตรวจส่วนกลางเดิมมี capture 15:00 จำนวน 0 สาเหตุระดับ Windows ของรอบนั้นยังไม่พิสูจน์ ห้ามสรุป ACL ผิดหรือโทษ reader รายใด
 
-Tests ใช้ synthetic payload, SQL/network stubs และ filesystem fixtures แยกจาก production มี reader ค้างจริงบน Windows ทั้งมี/ไม่มี delete sharing, rename ล้มชั่วคราว/ถาวร, disk full/denied, deadline, process restart, torn receipt, ACK หาย/ซ้ำ และ controller จริงบน PowerShell 5.1 ทั้ง Update/Status/Rollback รวม postflight rollback ไม่ใช้ production entrypoint/Task ผลจำลองไม่ใช่ผลธรรมชาติของ v3 จำนวน tests ไม่รับรองความเสถียร
+Tests ใช้ synthetic payload, SQL/network stubs และ filesystem fixtures แยกจาก production มี reader ค้างจริงบน Windows ทั้งมี/ไม่มี delete sharing, rename ล้มชั่วคราว/ถาวร, disk full/denied, deadline, process restart, torn receipt, ACK หาย/ซ้ำ และ controller จริงบน PowerShell 5.1 ทั้ง Update/Status/Rollback รวม postflight rollback ไม่ใช้ production entrypoint/Task ผลจำลองไม่ใช่ผลธรรมชาติของ v4 จำนวน tests ไม่รับรองความเสถียร
 
 Critical OS write/fsync ไม่สามารถ preempt กลาง system call ด้วย JavaScript จึงยังอาศัย execution limit 20 นาทีเดิมของ Task ตรวจ budget ก่อน/หลัง critical call ไม่เริ่ม retry เมื่อหมดเวลา งบ display เป็น deadline สำหรับการรอ/เริ่ม operation ไม่ใช่คำรับรอง kernel I/O จบในเวลานั้น EACCES/ENOSPC ใช้ fault injection ไม่แก้ ACL หรือทำดิสก์ production เต็มจริง
 
@@ -76,12 +76,35 @@ CPU เป็น samples ไม่ต่อเนื่อง SQL IO เป็�
 
 ก่อนเปลี่ยน namespace เปิด Windows handle ที่กันการเขียน/rename ของผู้อื่น ตรวจ pin อีกครั้ง แล้วย้ายไฟล์เดิมทั้ง object เป็น before-image backup ผ่าน handle ของมัน การเผยแพร่ candidate และการคืน before-image ใช้ rename แบบ ReplaceIfExists=false ทุกครั้ง หากมี foreign file แทรกให้หยุดและรักษาไฟล์นั้น ไม่ทับ ไม่แก้ ACL เดิม Candidate ถูกยึดด้วย handle ระหว่าง postflight จึงปฏิเสธการเขียน/replace ที่ขัดกับ sharing; ถ้า postflight ล้มให้กู้เฉพาะ object ที่ transaction เป็นเจ้าของ และใช้หลักไม่แทนที่ชื่อปลายทางเช่นเดิม
 
-ข้อแลกเปลี่ยน: นี่เป็น rename สองขั้น ไม่ใช่ atomic replacement เดียว มีช่วงสั้นที่ชื่อ launcher ว่าง หาก process/เครื่องล้มในช่วงนั้นอาจเหลือ pointer ว่างกับ before-image ที่ตรวจแล้ว ต้องหยุดให้ผู้ดูแลตรวจ ห้ามเติม pointer หรือย้อน production อัตโนมัติ ชุดนี้ยังไม่ติดตั้งและข้อจำกัดนี้ต้องอยู่ในการตรวจรับ ไม่ลบ failed pending/backup เพื่อทำให้รอบถัดไปผ่าน
+ข้อแลกเปลี่ยน: rename สองขั้นยังมีช่วงที่ชื่อ launcher ว่าง หาก process ล้ม Task ถัดไปอาจหา entrypoint ไม่พบจนผู้ดูแลกู้สำเร็จ รุ่นนี้เพิ่ม Recover ในชุดเดียวตามหลักฐานที่เขียนเสร็จก่อนย้ายไฟล์ ไม่เติม pointer หรือย้อน production อัตโนมัติ และไม่ลบ pending/backup เพื่อให้ผ่าน
 
 Guard ใช้ absolute monotonic deadline ตั้งแต่ก่อน lease/diagnostics/spawn รวม preparation ทั้งหมด ตั้ง timer ด้วยเวลาที่เหลือ ตรวจ deadline ก่อน spawn ก่อนรับ Ready/close และก่อน resolve success แม้ timer callback ยังไม่ทำงาน Cleanup child สูงสุด 2 วินาทีแยกจาก deadline เดิม ถ้ายังไม่ยืนยัน child จบให้เก็บ lease ไม่เพิ่ม retry
 
-Status หลัง Rollback ใช้ status/slot/start/inspection/finish จาก v1 view และ Task attempt เดียวกัน ไม่ยืม slot จาก receipt ของ v2/v3 ที่เก็บไว้ Receipts เดิมเป็นประวัติ/last success เท่านั้น Current attempt ต้องตรงวัน/slot ไทย ไม่อยู่อนาคตเกิน tolerance 2 วินาที และจบใน Task window 20 นาที Task metadata ต้อง verified และไม่เก่าเกิน 1 ชั่วโมง + tolerance สำหรับการฉาย latest attempt; เกณฑ์นี้ไม่ขยาย capture/acceptance window v3 ต้องตรง receipt attempt ภายใน 2 วินาที v1 อนุญาตเวลาตั้งต้นถึง inspection ภายใน Task window เพื่อรวม guard startup ของ v1 หากกำลังรัน อ่านไม่ได้ หรือหลักฐานไม่ตรง ให้ unknown พร้อม null สำหรับ slot/เวลา/จำนวนปัจจุบัน
+Status หลัง Rollback ใช้ status/slot/start/inspection/finish จาก v1 view และ Task attempt เดียวกัน ไม่ยืม slot จาก receipt ของ v2/v3 ที่เก็บไว้ Receipts เดิมเป็นประวัติ/last success เท่านั้น Current attempt ต้องตรงวัน/slot ไทย ไม่อยู่อนาคตเกิน tolerance 2 วินาที และจบใน Task window 20 นาที Task metadata ต้อง verified และไม่เก่าเกิน 1 ชั่วโมง + tolerance สำหรับการฉาย latest attempt; เกณฑ์นี้ไม่ขยาย capture/acceptance window v4 ต้องตรง receipt attempt ภายใน 2 วินาที v1 อนุญาตเวลาตั้งต้นถึง inspection ภายใน Task window เพื่อรวม guard startup ของ v1 หากกำลังรัน อ่านไม่ได้ หรือหลักฐานไม่ตรง ให้ unknown พร้อม null สำหรับ slot/เวลา/จำนวนปัจจุบัน
 
 ถ้า v1 view เสียทั้งไฟล์ ผล v1 ล่าสุดที่มีอยู่เฉพาะไฟล์นั้นอาจกู้ไม่ได้ Status อ่านอย่างเดียวจึงไม่สร้าง receipt ใหม่หรือเดาข้อมูล ให้ unknown สำหรับ current และแสดงได้เพียงผลในอดีตที่ยังตรวจรูปแบบได้ ไม่ถือว่าประวัติที่เหลือครบ
 
 อ้างอิง Windows API: https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_rename_info และ https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea เงื่อนไข sharing และ no-replace ใช้ร่วมกับ native PowerShell 5.1 fixtures ไม่ใช้เอกสารแทนการทดสอบ
+
+## กู้การติดตั้งค้างจากชุดนี้ หลังอนุมัติแยกเท่านั้น
+
+Recover เป็นการกู้ **การติดตั้ง** ไม่เปิด upload recovery ซึ่งยัง OFF และไม่มีสิทธิ์ใช้ production จากการส่งตรวจครั้งนี้ คำสั่งสำหรับผู้ดูแลหลังได้รับอนุมัติใหม่ เรียงลำดับดังนี้:
+
+```powershell
+.\hourly004-update.ps1 -Action Status
+# อ่าน installationTransaction: ต้อง recoverable และ owner orphan-proven
+.\hourly004-update.ps1 -Action Recover -ReleaseApproved
+.\hourly004-update.ps1 -Action Status
+```
+
+ใช้ controller จาก ZIP เดิมทั้งสามคำสั่ง ไม่แก้/ลบ lock, pending, before-image หรือ metadata ด้วยมือ และไม่รัน Task/Sync/capture เพื่อทดสอบ ผู้ดูแลรอรอบธรรมชาติเมื่อได้รับอนุมัติแล้ว ถ้า Status เป็น unverified หรือ lock owner unknown/active ให้หยุดรักษาหลักฐาน ไม่เปลี่ยนบัญชี/ACL เพื่อให้ผ่าน
+
+ก่อน rename แรก เขียน prepared record แบบ CreateNew + Flush(true) พร้อม owner PID/เวลาเริ่ม process, location, bytes/file identity/security descriptor ของ predecessor และ candidate ที่ถือ handle ไว้ ตรวจ pointer bytes กับ baseline ในชุดก่อนใช้ ไม่เชื่อชื่อ backup อย่างเดียว Terminal records ผูกกับ prepared record ใช้บอก completion/restoration ที่ตรวจแล้ว และเก็บหลักฐานทุก transaction ไว้ Lock ตรวจ PID พร้อมเวลาเริ่มเพื่อแยก PID reuse; query ไม่ได้เป็น unknown ไม่ฆ่า/แย่ง process ใช้ quiet checks เดิมก่อนกู้
+
+หากขาดก่อนเผยแพร่ candidate จะคืน before-image ที่พิสูจน์ได้ด้วย no-replace หาก candidate เผยแพร่แล้วแต่ยังไม่ผ่าน postflight/บันทึก completion จะย้ายเฉพาะ candidate object ที่ตรง pin ไปชื่อ failed ที่ตรึงไว้แล้วคืน predecessor การกู้ Rollback ที่ค้างจึงคืน **v4 ก่อนเริ่ม Rollback** ไม่ใช่ข้ามขั้นเปิด v1 Candidate ที่มี verified completion อยู่แล้วคงไว้หลังตรวจหลักฐานและ release ไม่เปิด candidate ที่ยังไม่ผ่านตรวจให้เอง หาก launcher เป็น foreign file/ before-image เปลี่ยน/metadata ไม่พอ ให้หยุดโดยไม่ overwrite
+
+Recover มี intent ที่ flush ก่อนย้ายไฟล์ รองรับเริ่ม controller ใหม่หลัง crash ทั้งก่อน/หลัง candidate ถูกย้ายออก และหลังคืน predecessor ก่อนบันทึกจบ กู้ซ้ำได้โดยไม่เปลี่ยน predecessor ซ้ำ Lock ที่พิสูจน์ว่า orphan และ lock ของตนที่ปิดปกติถูกย้ายทั้ง object ไปชื่อ archive ใหม่แบบ no-replace ไม่ลบหลักฐาน เก็บ outbox/receipts/lastSuccess และ config/ACL/Tasks เดิม
+
+Status อ่านอย่างเดียว แยก installed runtime ออกจาก installationTransaction: updating, recoverable/interrupted, unverified และ idle พร้อม lock owner และสถานะ metadata/objects ที่ปลอดภัย หาก launcher หายหรือไม่รู้จัก/metadata ขาด เสีย อ่านไม่ได้ ยังคืนผลสรุปและประวัติ lastSuccess ที่อ่านได้ Current attempt เป็น unknown/null หาก installation หรือ Task/attempt ยืนยันไม่ได้ ไม่มี raw exception/path/identity/integrity ในผลลัพธ์
+
+ข้อจำกัด: Flush(true) และ checksum ไม่รับรองความคงทนของ directory entry/อุปกรณ์เมื่อไฟดับจริง ไม่ได้ทดสอบ reboot/power loss และ checksum ไม่ใช่ลายเซ็นป้องกัน administrator แก้ข้อมูล การกู้ต้องอาศัย prepared record ที่ยังครบและ trusted protected directory เดิม หาก record หาย/ขาดก่อนเขียนเสร็จ หรือ lock เก่าจากแพ็กเกจ v3 ไม่มี owner proof ให้ unverified และต้องตรวจหลักฐานเพิ่มเติม ไม่เดา pointer ใหม่ Pending/staging ที่ไม่ผ่านตรวจเก็บไว้ จึงอาจไม่ยอม Update ซ้ำจนตรวจรับชุดถัดไป ไม่มีอัตโนมัติล้างให้ผ่าน

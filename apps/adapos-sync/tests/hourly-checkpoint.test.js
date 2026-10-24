@@ -120,7 +120,7 @@ test('a real process restart reclaims only its confirmed-dead receipt lease and 
 test('the real pointer exits only its fixture child on a critical error with outstanding display I/O',t=>{
   const f=fixture(t),source=path.resolve(here,'../installer/hourly004/runtime/hourly-complete-launcher.mjs');
   const helpers=pathToFileURL(path.resolve(here,'../src/hourlyAttemptDiagnostics.js')).href,storage=pathToFileURL(path.resolve(here,'../src/hourlyStatusStore.js')).href;
-  const pointer=fs.readFileSync(source,'utf8').replace("'./stability-20261024-checkpoint-v3/installer/hourly004/runtime/hourly-runtime.mjs'","'./runtime-stub.mjs'").replace("'./stability-20261024-checkpoint-v3/src/hourlyAttemptDiagnostics.js'",JSON.stringify(helpers)).replace("'./stability-20261024-checkpoint-v3/src/hourlyStatusStore.js'",JSON.stringify(storage));
+  const pointer=fs.readFileSync(source,'utf8').replace("'./stability-20261024-checkpoint-v4/installer/hourly004/runtime/hourly-runtime.mjs'","'./runtime-stub.mjs'").replace("'./stability-20261024-checkpoint-v4/src/hourlyAttemptDiagnostics.js'",JSON.stringify(helpers)).replace("'./stability-20261024-checkpoint-v4/src/hourlyStatusStore.js'",JSON.stringify(storage));
   fs.writeFileSync(path.join(f.dir,'pointer.mjs'),pointer);fs.writeFileSync(path.join(f.dir,'runtime-stub.mjs'),`export async function main(){setInterval(()=>{},1000);throw Object.assign(new Error('DO-NOT-OUTPUT'),{code:'HOURLY_RECEIPT_PERSISTENCE_FAILED',hourlyDisplayIoPending:true,storageFailure:{code:'ENOSPC',stage:'receipt-sync'}})}`);
   const child=spawnSync(process.execPath,[path.join(f.dir,'pointer.mjs')],{encoding:'utf8',windowsHide:true,timeout:3000});assert.equal(child.status,1);assert.equal(child.signal,null);const result=JSON.parse(child.stdout);assert.equal(result.status,'launch-stopped');assert.equal(result.failure.code,'HOURLY_RECEIPT_PERSISTENCE_FAILED');assert.equal(result.failure.storageFailure.code,'ENOSPC');assert.ok(!child.stdout.includes('DO-NOT-OUTPUT'));
 });
@@ -129,7 +129,7 @@ function makeControllerFixture(t){
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hourly-controller-'));t.after(()=>{assert.ok(path.resolve(dir).startsWith(path.resolve(os.tmpdir())+path.sep)&&path.basename(dir).startsWith('hourly-controller-'));fs.rmSync(dir,{recursive:true,force:true});});
   const source=path.resolve(here,'../installer/hourly004'),pkg=path.join(dir,'package');fs.mkdirSync(pkg,{recursive:true});
   const put=(relative,contents)=>{const name=path.join(dir,relative);fs.mkdirSync(path.dirname(name),{recursive:true});fs.writeFileSync(name,contents);};
-  for(const name of ['hourly004-update.ps1','baseline/hourly-complete-launcher.mjs','baseline/runtime-core.mjs','baseline/runtime-guard.ps1','baseline/previous-launcher.mjs','runtime/hourly-complete-launcher.mjs'])put('package/'+name,fs.readFileSync(path.join(source,name)));
+  for(const name of ['hourly004-update.ps1','hourly004-install-recovery.ps1','baseline/hourly-complete-launcher.mjs','baseline/runtime-core.mjs','baseline/runtime-guard.ps1','baseline/previous-launcher.mjs','runtime/hourly-complete-launcher.mjs'])put('package/'+name,fs.readFileSync(path.join(source,name)));
   put('app/.env','FIXTURE_ONLY=1');put('app/package-lock.json','{"fixture":true}');put('app/src/fixture.js','// fixture source');
   const hash=data=>createHash('sha256').update(data).digest('hex').toUpperCase();
   put('package/baseline/installed-source-manifest.json',JSON.stringify({files:[{path:'fixture.js',integrity:hash('// fixture source')}]}));
@@ -159,4 +159,12 @@ test('native controller rejects concurrent foreign changes and keeps post-rollba
   const dir=makeControllerFixture(t),exe=path.join(process.env.SystemRoot,'System32/WindowsPowerShell/v1.0/powershell.exe');
   const result=spawnSync(exe,['-NoProfile','-NonInteractive','-ExecutionPolicy','RemoteSigned','-File',path.join(here,'hourly-controller-acceptance-native-fixture.ps1'),'-FixtureRoot',dir],{encoding:'utf8',windowsHide:true,timeout:90000});
   assert.equal(result.status,0,result.stdout||'Native acceptance fixture unavailable; details withheld.');const report=JSON.parse(result.stdout.replace(/^\uFEFF/,''));assert.equal(report.failed,0);assert.equal(report.passed,29);assert.equal(report.nativeHandleRenameInvoked,true);assert.equal(report.productionFilesChanged,0);t.diagnostic(JSON.stringify(report));
+});
+
+test('native controller survives its own fixture child crash and recovers only proven installation objects',{skip:process.platform!=='win32'},t=>{
+  const dir=makeControllerFixture(t),exe=path.join(process.env.SystemRoot,'System32/WindowsPowerShell/v1.0/powershell.exe');
+  const seed=spawnSync(process.execPath,[path.join(dir,'seed-receipt.mjs'),path.join(dir,'secure')],{encoding:'utf8',windowsHide:true,timeout:5000});assert.equal(seed.status,0,'Synthetic durable receipt seed unavailable.');
+  const result=spawnSync(exe,['-NoProfile','-NonInteractive','-ExecutionPolicy','RemoteSigned','-File',path.join(here,'hourly-controller-crash-native-fixture.ps1'),'-FixtureRoot',dir],{encoding:'utf8',windowsHide:true,timeout:300000});
+  assert.equal(result.status,0,result.stdout||'Native crash fixture unavailable; details withheld.');
+  const report=JSON.parse(result.stdout.replace(/^\uFEFF/,''));assert.equal(report.failed,0);assert.ok(report.passed>=31);assert.ok(report.abruptChildProcessTerminations>=25);assert.equal(report.realAbruptChildCrashes,true);assert.equal(report.productionFilesChanged,0);assert.equal(report.taskRuns,0);t.diagnostic(JSON.stringify(report));
 });

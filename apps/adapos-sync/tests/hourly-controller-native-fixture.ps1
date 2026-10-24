@@ -34,14 +34,14 @@ try {
   $denied=$false;try{$null=Invoke-FixtureAction 'Update' $false}catch{$denied=$_.Exception.Message -eq 'RELEASE_APPROVAL_REQUIRED'}
   Assert-HourlyUpdate $denied 'FIXTURE_APPROVAL_GATE';$passed++;$report.cases+='Update-approval-required'
   $updated=Invoke-FixtureAction 'Update'
-  Assert-HourlyUpdate ($updated.installation -eq 'checkpoint-v3-installed') 'FIXTURE_UPDATE'
+  Assert-HourlyUpdate ($updated.installation -eq 'checkpoint-v4-installed') 'FIXTURE_UPDATE'
   Assert-HourlyDefinitionsEqual $baseline (Get-HourlyDefinitionSnapshot)
   $passed++;$report.cases+='Update-stages-verifies-and-switches'
   $status=Invoke-FixtureAction 'Status'
   Assert-HourlyUpdate ($status.availability -eq 'unknown' -and $status.latestAttempt.status -eq 'unknown' -and $status.lastSuccess.slot -eq '14:00') 'FIXTURE_STATUS_FALSE_SUCCESS'
   $passed++;$report.cases+='Status-new-runtime-does-not-relabel-old-success'
   $repeat=Invoke-FixtureAction 'Update'
-  Assert-HourlyUpdate ($repeat.installation -eq 'checkpoint-v3-installed') 'FIXTURE_IDEMPOTENT_UPDATE';$passed++;$report.cases+='Update-idempotent'
+  Assert-HourlyUpdate ($repeat.installation -eq 'checkpoint-v4-installed') 'FIXTURE_IDEMPOTENT_UPDATE';$passed++;$report.cases+='Update-idempotent'
   # This helper imports only the status store and writes synthetic receipt
   # metadata. It never imports/calls the protected runtime or a SQL runner.
   $seedOutput=@(& $script:HourlyNode (Join-Path $resolved 'seed-receipt.mjs') $script:HourlySecure)
