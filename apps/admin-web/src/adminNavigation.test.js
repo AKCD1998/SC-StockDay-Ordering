@@ -46,7 +46,7 @@ describe("admin navigation model", () => {
 
   it("shows admin-only navigation to admins and can hide the dashboard group", () => {
     const groups = getNavigationGroups(true, true);
-    expect(groups.map((group) => group.id)).toEqual(["product-data", "data-quality", "customer-relations"]);
+    expect(groups.map((group) => group.id)).toEqual(["product-data", "documents", "data-quality", "customer-relations"]);
     expect(groups.flatMap((group) => group.items).map((item) => item.view)).toContain("stock-cost-audit");
   });
 

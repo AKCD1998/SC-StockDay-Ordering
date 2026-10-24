@@ -11,6 +11,7 @@ export const adminOnlyViews = [
   "sync-log",
   "pos-admin",
   "shopee004-exceptions",
+  "ky9-documents",
 ];
 export const adminViewKeys = [
   defaultAdminView,
@@ -37,6 +38,7 @@ const ADMIN_VIEW_ROUTE_SEGMENTS = {
   members: "members",
   "pos-admin": "pos-admin",
   "shopee004-exceptions": "shopee004-exceptions",
+  "ky9-documents": "ky9-documents",
   [stockCostAuditView]: "stock-cost-audit",
   "category-review": "category-review",
   "ingredient-dictionary": "ingredient-dictionary",
@@ -75,6 +77,15 @@ export function getNavigationGroups(isAdminUser, hideDashboard = false) {
           view: stockCostAuditView,
           description: "ดูต้นทุนเฉลี่ยและมูลค่าคงเหลือต่อสาขา",
         }] : []),
+      ],
+    },
+    {
+      id: "documents",
+      label: "เอกสาร ขย.9",
+      shortLabel: "DC",
+      adminOnly: true,
+      items: [
+        { label: "เอกสาร ขย.9", view: "ky9-documents", description: "ติดตามงวดเอกสารและข้อยุติของแต่ละสาขา" },
       ],
     },
     {

@@ -5033,6 +5033,26 @@ input[type="radio"] {
   line-height: 1.35;
 }
 
+@media (min-width: 761px) and (max-width: 1440px) {
+  .hero-nav-mark {
+    display: none;
+  }
+
+  .hero-nav-trigger {
+    padding-inline: 8px;
+    gap: 6px;
+  }
+
+  .hero-nav > .hero-nav-trigger {
+    width: auto;
+    flex: 0 1 auto;
+  }
+
+  .hero-nav-group {
+    flex: 1 1 auto;
+  }
+}
+
 @media (max-width: 760px) {
   .hero-nav {
     display: grid;
