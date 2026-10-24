@@ -6,4 +6,5 @@ import {safeStorageFailure} from './stability-20261024-checkpoint-v2/src/hourlyS
 main().catch(error=>{
   console.log(JSON.stringify({status:'launch-stopped',failure:{code:safeHourlyFailureCode(error),...(error.storageFailure?{storageFailure:safeStorageFailure({code:error.storageFailure.code},error.storageFailure.stage)}:{})},detailsWithheld:true}));
   process.exitCode=1;
+  if(error.hourlyDisplayIoPending===true)process.exit(1);
 });

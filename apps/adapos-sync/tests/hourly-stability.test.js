@@ -89,6 +89,16 @@ test('critical outbox disk full stops before upload, closes SQL, and exposes onl
   const f=fixture(t,{fault:'outbox-full'}),result=await runObservedHourly004({slot:'11:00',load:async observe=>f.dependencies(observe),writeStatus:createStatusWriter(path.join(f.dir,'result.json')),now:f.now,readPending:()=>pendingCount(f.dir)});
   assert.equal(result.status,'stopped-no-partial-capture');assert.equal(result.failure.code,'HOURLY_OUTBOX_PERSISTENCE_FAILED');assert.equal(result.failure.storageFailure.code,'ENOSPC');assert.equal(result.failure.storageFailure.stage,'outbox-write');assert.equal(result.lastSuccess,null);assert.equal(result.outboxPending,0);assert.equal(f.counts().uploads,0);assert.equal(f.counts().closes,1);assert.ok(!JSON.stringify(result).includes('DO-NOT-OUTPUT'));
 });
+
+test('critical completion failure with stalled display I/O requests only an own-process exit after source cleanup',async t=>{
+  const f=fixture(t),file=path.join(f.dir,'result.json'),handles=new Set();let syncs=0,unblock,entered;
+  const started=new Promise(resolve=>{entered=resolve}),blocked=new Promise(resolve=>{unblock=resolve});
+  const io={...fs,openSync:(name,...args)=>{const fd=fs.openSync(name,...args);if(/\.receipt-[01]\.json$/.test(name))handles.add(fd);return fd;},closeSync:fd=>{handles.delete(fd);return fs.closeSync(fd);},fsyncSync:fd=>{if(handles.has(fd)&&++syncs===3)throw Object.assign(new Error('DO-NOT-OUTPUT'),{code:'ENOSPC'});return fs.fsyncSync(fd);}};
+  const store=createStatusWriter(file,{io,viewIo:{...fs.promises,open:async(...args)=>{entered();await blocked;return fs.promises.open(...args);}}});
+  await assert.rejects(runObservedHourly004({slot:'11:00',load:async observe=>{await started;return f.dependencies(observe);},writeStatus:store,now:f.now,readPending:()=>pendingCount(f.dir)}),error=>error.code==='HOURLY_RECEIPT_PERSISTENCE_FAILED'&&error.storageFailure.code==='ENOSPC'&&error.hourlyDisplayIoPending===true);
+  assert.equal(f.counts().closes,1);assert.equal(f.counts().uploads,1);assert.equal(pendingCount(f.dir),0);assert.equal(store.snapshot().ioPending,1);assert.equal(inspectHourlyStatus(file,{latestTaskStartedAt:f.now()}).latestAttempt.status,'unknown');
+  unblock();for(let i=0;i<100&&store.snapshot().ioPending;i++)await new Promise(resolve=>setTimeout(resolve,10));await store.close();assert.equal(store.snapshot().ioPending,0);
+});
 test('diagnostics are bounded, preserve unknown values and never retain arbitrary child/error/payload fields',()=>{
   let time=0,last;const d=createHourlyAttemptDiagnostics({monotonic:()=>time,maxEvents:3,checkpoint:value=>{last=value;}});
   for(let i=0;i<20;i++){time++;d.observe({stage:'sql-batch',kind:'failure',code:'SECRET',message:'DO-NOT-OUTPUT',records:[{qty:12}],pending:null});}

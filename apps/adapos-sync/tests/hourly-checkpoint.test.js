@@ -108,6 +108,14 @@ test('a real process restart reclaims only its confirmed-dead receipt lease and 
   const restarted=createHourlyStatusStore(f.file);restarted.begin({slot:'16:00',startedAt:'2026-10-24T09:00:02.000Z'});assert.equal(readHourlyDurableState(f.file).state.lastSuccess.slot,'14:00');assert.equal(inspectHourlyStatus(f.file,{latestTaskStartedAt:'2026-10-24T09:00:02.000Z'}).latestAttempt.status,'unknown');await restarted.close();
 });
 
+test('the real pointer exits only its fixture child on a critical error with outstanding display I/O',t=>{
+  const f=fixture(t),source=path.resolve(here,'../installer/hourly004/runtime/hourly-complete-launcher.mjs');
+  const helpers=pathToFileURL(path.resolve(here,'../src/hourlyAttemptDiagnostics.js')).href,storage=pathToFileURL(path.resolve(here,'../src/hourlyStatusStore.js')).href;
+  const pointer=fs.readFileSync(source,'utf8').replace("'./stability-20261024-checkpoint-v2/installer/hourly004/runtime/hourly-runtime.mjs'","'./runtime-stub.mjs'").replace("'./stability-20261024-checkpoint-v2/src/hourlyAttemptDiagnostics.js'",JSON.stringify(helpers)).replace("'./stability-20261024-checkpoint-v2/src/hourlyStatusStore.js'",JSON.stringify(storage));
+  fs.writeFileSync(path.join(f.dir,'pointer.mjs'),pointer);fs.writeFileSync(path.join(f.dir,'runtime-stub.mjs'),`export async function main(){setInterval(()=>{},1000);throw Object.assign(new Error('DO-NOT-OUTPUT'),{code:'HOURLY_RECEIPT_PERSISTENCE_FAILED',hourlyDisplayIoPending:true,storageFailure:{code:'ENOSPC',stage:'receipt-sync'}})}`);
+  const child=spawnSync(process.execPath,[path.join(f.dir,'pointer.mjs')],{encoding:'utf8',windowsHide:true,timeout:3000});assert.equal(child.status,1);assert.equal(child.signal,null);const result=JSON.parse(child.stdout);assert.equal(result.status,'launch-stopped');assert.equal(result.failure.code,'HOURLY_RECEIPT_PERSISTENCE_FAILED');assert.equal(result.failure.storageFailure.code,'ENOSPC');assert.ok(!child.stdout.includes('DO-NOT-OUTPUT'));
+});
+
 function makeControllerFixture(t){
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hourly-controller-'));t.after(()=>{assert.ok(path.resolve(dir).startsWith(path.resolve(os.tmpdir())+path.sep)&&path.basename(dir).startsWith('hourly-controller-'));fs.rmSync(dir,{recursive:true,force:true});});
   const source=path.resolve(here,'../installer/hourly004'),pkg=path.join(dir,'package');fs.mkdirSync(pkg,{recursive:true});

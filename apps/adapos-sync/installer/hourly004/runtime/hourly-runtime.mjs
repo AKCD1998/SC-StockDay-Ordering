@@ -52,7 +52,15 @@ export async function runObservedHourly004({slot,load,writeStatus,now=()=>new Da
   summary.measurementLimitations=['host-cpu-samples-not-continuous','sql-session-metrics-not-server-total','sql-physical-writes-not-business-dml-count','elapsed-guard-time-not-sql-duration','clock-observation-not-synchronization','acknowledgement-not-independent-central-row-audit'];
   summary.recovery={newUploadRecoveryEnabled:false,sqlConnectMaxAttempts:1,guardMaxAttempts:1,partialReadResumeEnabled:false};
   writeStatus.setRemaining(()=>1200000-(monotonic()-collectionStartedAt));
-  try{return await writeStatus.finish(summary);}finally{await writeStatus.close();}
+  let completionFailure;
+  try{return await writeStatus.finish(summary);}
+  catch(error){completionFailure=error;throw error;}
+  finally{
+    await writeStatus.close();
+    // The pointer may exit only its own process after this cleanup. Preserve
+    // the critical error code; do not let unrelated display I/O keep it alive.
+    if(completionFailure&&writeStatus.snapshot().ioPending>0)completionFailure.hourlyDisplayIoPending=true;
+  }
 }
 
 export async function main() {
