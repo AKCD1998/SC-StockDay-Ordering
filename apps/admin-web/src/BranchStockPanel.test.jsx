@@ -157,6 +157,8 @@ describe("BranchStockPanel branch scope", () => {
     await screen.findByText("A001");
     const cell = productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
     expect(cell.querySelector("strong")).toHaveTextContent("0.00");
+    expect(cell.querySelector(".stock-004-reference")).toBeNull();
+    expect(within(cell).getByRole("button")).not.toHaveAccessibleName(/ยอดครั้งล่าสุดที่อ่านสำเร็จ/);
     expect(screen.queryByRole("dialog", {name:"รายละเอียดสต็อกสาขา 004"})).not.toBeInTheDocument();
     await userEvent.click(within(cell).getByRole("button"));
     expect(screen.getByRole("dialog")).toHaveTextContent("Hourly คำนวณ");
@@ -217,24 +219,55 @@ describe("BranchStockPanel branch scope", () => {
     expect(cell.querySelector("strong")).toHaveTextContent("รอตรวจ");await userEvent.click(within(cell).getByRole("button"));
     expect(screen.getByRole("dialog")).toHaveTextContent("POS 4.00 ก่อนหัก Shopee");
   });
-  it("keeps last-confirmed stock clearly labelled as a closed reference disclosure and never a current total",async()=>{
+  it.each([3, 0])("keeps last-confirmed %s compact with its reference label and timestamps inside the bubble",async(quantity)=>{
     const data={records:[{...STOCK_RECORDS[0],qtyBranch004:null,qtyTotalAllBranches:null,posQtyBranch004:4,
       stock004:{basis:"shopee-availability-unknown",viewStatus:"reference",posBasis:"hourly-calculated",shopee:{reservedQuantity:null,shippedUnpostedQuantity:null,asOf:null},
-        lastConfirmed:{quantity:3,reservedQuantity:1,shippedUnpostedQuantity:0,observedAt:"2026-10-23T09:00:00Z",fetchedAt:"2026-10-23T09:01:00Z",stale:true,reasonCode:"projection-timeout"}}}],
+        lastConfirmed:{quantity,reservedQuantity:1,shippedUnpostedQuantity:0,observedAt:"2026-10-23T09:00:00Z",fetchedAt:"2026-10-23T09:01:00Z",stale:true,reasonCode:"projection-timeout"}}}],
       shopeeStock004:{status:"projection-timeout",pageReferenceProducts:1}};
     renderPanel({isOnlineMarketingStaff:false,branchCode:"004",fetchImplementation:async()=>({...makeJsonResponse([]),json:async()=>data})});
     await screen.findByText("A001"); const cell=productRow("A001").querySelector('[data-column-key="qtyBranch004"]');
-    expect(cell.querySelector("strong")).toHaveTextContent("3.00");
-    expect(cell).toHaveTextContent("อ้างอิง");
+    const formattedQuantity = quantity.toFixed(2);
+    const referenceLabel = `ยอดครั้งล่าสุดที่อ่านสำเร็จ ${formattedQuantity} · รอบนี้ยังยืนยันยอดพร้อมใช้ไม่ได้`;
+    expect(cell.querySelector(".stock-004-reference .stock-004-primary > [aria-hidden='true']")).toHaveTextContent(formattedQuantity);
+    expect(cell.querySelector(".stock-004-reference-label")).toBeNull();
+    expect(cell).not.toHaveTextContent("อ้างอิง");
+    expect(within(cell).getByText(referenceLabel)).toHaveClass("stock-004-visually-hidden");
+    const trigger = within(cell).getByRole("button", { name: new RegExp(referenceLabel) });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    await userEvent.click(within(cell).getByRole("button"));
-    const bubble=screen.getByRole("dialog");expect(bubble).toHaveTextContent("ไม่ใช่ยอดพร้อมใช้ปัจจุบัน");
+    await userEvent.click(trigger);
+    const bubble=screen.getByRole("dialog");
+    expect(bubble).toHaveTextContent(`ยอดครั้งล่าสุดที่อ่านสำเร็จ ${formattedQuantity} · อ้างอิง`);
+    expect(bubble).toHaveTextContent("รอบนี้ยังยืนยันยอดพร้อมใช้ไม่ได้");
+    expect(bubble).toHaveTextContent(`ข้อมูลเมื่อ ${new Date("2026-10-23T09:00:00Z").toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}`);
+    expect(bubble).toHaveTextContent(`อ่านสำเร็จเมื่อ ${new Date("2026-10-23T09:01:00Z").toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })} (เวลาไทย)`);
     expect(bubble).toHaveTextContent("POS 4.00 ก่อนหัก Shopee");
     expect(bubble).toHaveTextContent("ยอดจองอ้างอิง 1.00");
     expect(bubble).toHaveTextContent("ส่งแล้วไม่ลง POS อ้างอิง 0.00");
+    expect(productRow("A001")).not.toContainElement(bubble);
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
     await userEvent.click(screen.getByRole("button",{name:"ดูรายละเอียดแหล่งข้อมูลสาขา 004"}));
     expect(screen.getByText(/ดูยอดอ้างอิงล่าสุดได้ 1 รายการ/)).toBeInTheDocument();
     expect(cell).not.toHaveTextContent("พร้อมใช้ · แชร์กับ Shopee");
+  });
+  it("keeps compact reference quantities out of current totals and exports while preserving other branches",async()=>{
+    const data={records:[{...STOCK_RECORDS[0],qtyBranch004:999,qtyTotalAllBranches:1000,posQtyBranch004:4,
+      stock004:{basis:"shopee-availability-unknown",viewStatus:"reference",
+        lastConfirmed:{quantity:7,observedAt:"2026-10-23T09:00:00Z",fetchedAt:"2026-10-23T09:01:00Z",stale:true}}}]};
+    renderPanel({isOnlineMarketingStaff:false,branchCode:"004",fetchImplementation:async()=>({...makeJsonResponse([]),json:async()=>data})});
+    await screen.findByText("A001");
+    await userEvent.click(screen.getByRole("button",{name:"แสดงสต็อกทุกสาขา"}));
+    expect(productRow("A001").querySelector('[data-column-key="qtyBranch004"] .stock-004-primary > [aria-hidden="true"]')).toHaveTextContent("7.00");
+    expect(scopedTotal("A001")).toBe("-");
+    expect(scopedColumnValue("A001","qtyBranch001")).toBe("2.00");
+    await userEvent.click(screen.getByRole("button",{name:"ส่งออก Excel ตามขอบเขตสต็อกที่เลือก"}));
+    await waitFor(()=>expect(xlsxMock.aoaToSheet).toHaveBeenCalled());
+    const matrix=xlsxMock.aoaToSheet.mock.calls[0][0];
+    expect(matrix[1][matrix[0].indexOf("สาขา 004")]).toBe("ไม่ทราบ");
+    expect(matrix[1][matrix[0].indexOf("รวม")]).toBe("ไม่ทราบ");
+    expect(matrix[1][matrix[0].indexOf("สาขา 001")]).toBe(2);
+    expect(matrix[1][matrix[0].indexOf("สถานะยอด 004")]).toBe("ยอดอ้างอิงเดิม · ยอดพร้อมใช้ปัจจุบันไม่ทราบ");
   });
   it("does not display a malformed reference as a ready-to-sell zero",async()=>{
     const data={records:[{...STOCK_RECORDS[0],qtyBranch004:null,stock004:{basis:"shopee-availability-unknown",viewStatus:"reference",lastConfirmed:{quantity:null}}}]};
