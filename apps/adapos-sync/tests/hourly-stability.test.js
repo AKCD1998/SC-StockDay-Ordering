@@ -12,6 +12,8 @@ import {createHourlyAttemptDiagnostics,safeHourlyDiagnostic} from '../src/hourly
 import {createHourlyUploadRecovery} from '../src/hourlyUploadRecovery.js';
 import {createHourlyGuardLease} from '../src/hourlyGuardLease.js';
 import {createStatusWriter,runObservedHourly004,pendingCount} from '../installer/hourly004/runtime/hourly-runtime.mjs';
+import {inspectHourlyStatus,readHourlyDurableState} from '../src/hourlyStatusStore.js';
+import {enqueueHourlyEvidence} from '../src/hourlyEvidenceStorage.js';
 
 function fixture(t,{missing=0,fault}={}) {
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hourly-stability-'));
@@ -28,7 +30,8 @@ function fixture(t,{missing=0,fault}={}) {
     if(text.includes(' AS source_available'))return {recordset:bound.map(product_code=>({product_code,source_available:missing&&product_code===codes.at(-1)?0:1}))};
     assert.fail('The fixture never permits a real product query or unrecognized SQL.');
   }};}};
-  const dependencies=observe=>({config,runner:options=>runHourlyStockIntraday({...options,sqlServerConfig:{},runHourlyStockShadow:()=>({})}),
+  const dependencies=observe=>({config,runner:options=>runHourlyStockIntraday({...options,sqlServerConfig:{},runHourlyStockShadow:()=>({}),
+    ...(fault==='outbox-full'?{enqueueHourlyEvidence:options=>enqueueHourlyEvidence({...options,io:{...fs,writeFileSync:()=>{throw Object.assign(new Error('DO-NOT-OUTPUT'),{code:'ENOSPC',path:'DO-NOT-OUTPUT'});}}})}:{})}),
     connectSql:async()=>{connects++;if(fault==='connect')throw Object.assign(new Error('DO-NOT-OUTPUT'),{code:'ELOGIN'});return pool;},
     guard:async()=>{if(fault==='guard')throw Object.assign(new Error('DO-NOT-OUTPUT'),{code:'HOST_CPU_AT_OR_ABOVE_70_PERCENT'});return {systemCpuPercent:5};},
     collector:(p,c,options)=>readHourlyCompleteCohort(p,c,{...options,now,monotonic:()=>elapsed,readBatch:async(_p,selected)=>{
@@ -66,8 +69,25 @@ test('lost acknowledgement and restarted worker keep exactly one payload identit
   const f=fixture(t,{fault:'upload'});await runObservedHourly004({slot:'11:00',load:async observe=>f.dependencies(observe),writeStatus:createStatusWriter(path.join(f.dir,'result.json')),now:f.now,readPending:()=>pendingCount(f.dir)});
   const folder=path.join(f.dir,'hourly-evidence-outbox','004'),queued=fs.readdirSync(folder).find(n=>n.endsWith('.json')),original=fs.readFileSync(path.join(folder,queued),'utf8');
   let acceptedIdentities=new Set([JSON.parse(original).idempotencyKey]);
-  const r=await replayHourlyEvidence({syncConfig:f.config,uploadHourlyEvidence:async({body})=>{assert.equal(body,original);const p=JSON.parse(body);acceptedIdentities.add(p.idempotencyKey);return {accepted:6835,branchCode:'004',capturedAt:p.capturedAt,captureId:'1',duplicate:true};}});
-  assert.equal(r.pending,0);assert.equal(f.counts().reads,35);assert.equal(acceptedIdentities.size,1);
+  const restarted=createStatusWriter(path.join(f.dir,'result.json'));restarted.begin({slot:'11:00',startedAt:f.now()});
+  const r=await replayHourlyEvidence({syncConfig:f.config,persistAcknowledgement:options=>restarted.acknowledge(options),uploadHourlyEvidence:async({body})=>{assert.equal(body,original);const p=JSON.parse(body);acceptedIdentities.add(p.idempotencyKey);return {accepted:6835,branchCode:'004',capturedAt:p.capturedAt,captureId:'1',duplicate:true};}});
+  assert.equal(r.pending,0);assert.equal(f.counts().reads,35);assert.equal(acceptedIdentities.size,1);assert.equal(readHourlyDurableState(path.join(f.dir,'result.json')).state.lastAck.key,JSON.parse(original).idempotencyKey);await restarted.close();
+});
+
+for(const code of ['ENOSPC','EACCES'])test(`critical acknowledgement receipt ${code} retains the exact outbox body and cannot report success`,async t=>{
+  const f=fixture(t),file=path.join(f.dir,'result.json');const handles=new Set();let syncs=0;
+  const io={...fs,openSync:(name,...args)=>{const fd=fs.openSync(name,...args);if(/\.receipt-[01]\.json$/.test(name))handles.add(fd);return fd;},closeSync:fd=>{handles.delete(fd);return fs.closeSync(fd);},fsyncSync:fd=>{if(handles.has(fd)&&++syncs===2)throw Object.assign(new Error('DO-NOT-OUTPUT'),{code,path:'DO-NOT-OUTPUT'});return fs.fsyncSync(fd);}};
+  const result=await runObservedHourly004({slot:'11:00',load:async observe=>f.dependencies(observe),writeStatus:createStatusWriter(file,{io}),now:f.now,readPending:()=>pendingCount(f.dir)});
+  assert.equal(result.status,'pending-or-incomplete');assert.equal(result.lastAttemptComplete,false);assert.equal(result.lastSuccess,null);assert.equal(result.outboxPending,1);assert.equal(result.deliveryFailure.code,'HOURLY_RECEIPT_PERSISTENCE_FAILED');assert.equal(result.deliveryFailure.storageFailure.code,code);assert.equal(result.deliveryFailure.storageFailure.stage,'receipt-sync');assert.equal(f.counts().closes,1);assert.equal(f.counts().uploads,1);
+  const folder=path.join(f.dir,'hourly-evidence-outbox','004'),name=fs.readdirSync(folder).find(n=>/^[a-f0-9]{64}\.json$/.test(n)),original=fs.readFileSync(path.join(folder,name),'utf8');
+  const restarted=createStatusWriter(file);restarted.begin({slot:'11:00',startedAt:f.now()});let duplicateUploads=0;
+  const replay=await replayHourlyEvidence({syncConfig:f.config,persistAcknowledgement:options=>restarted.acknowledge(options),uploadHourlyEvidence:async({body})=>{duplicateUploads++;assert.equal(body,original);const p=JSON.parse(body);return {accepted:6835,branchCode:'004',capturedAt:p.capturedAt,captureId:'1',duplicate:true};}});
+  assert.equal(replay.pending,0);assert.equal(duplicateUploads,1);assert.equal(f.counts().reads,35);assert.equal(readHourlyDurableState(file).state.lastAck.accepted,6835);await restarted.close();assert.ok(!JSON.stringify(result).includes('DO-NOT-OUTPUT'));
+});
+
+test('critical outbox disk full stops before upload, closes SQL, and exposes only typed stage/code',async t=>{
+  const f=fixture(t,{fault:'outbox-full'}),result=await runObservedHourly004({slot:'11:00',load:async observe=>f.dependencies(observe),writeStatus:createStatusWriter(path.join(f.dir,'result.json')),now:f.now,readPending:()=>pendingCount(f.dir)});
+  assert.equal(result.status,'stopped-no-partial-capture');assert.equal(result.failure.code,'HOURLY_OUTBOX_PERSISTENCE_FAILED');assert.equal(result.failure.storageFailure.code,'ENOSPC');assert.equal(result.failure.storageFailure.stage,'outbox-write');assert.equal(result.lastSuccess,null);assert.equal(result.outboxPending,0);assert.equal(f.counts().uploads,0);assert.equal(f.counts().closes,1);assert.ok(!JSON.stringify(result).includes('DO-NOT-OUTPUT'));
 });
 test('diagnostics are bounded, preserve unknown values and never retain arbitrary child/error/payload fields',()=>{
   let time=0,last;const d=createHourlyAttemptDiagnostics({monotonic:()=>time,maxEvents:3,checkpoint:value=>{last=value;}});
@@ -81,22 +101,22 @@ test('launch and SQL connection time consume the same fifteen-minute collection 
   const r=await runObservedHourly004({slot:'11:00',monotonic:()=>time,now:f.now,writeStatus:createStatusWriter(path.join(f.dir,'result.json')),readPending:()=>pendingCount(f.dir),load:async observe=>{time=900000;return f.dependencies(observe);}});
   assert.equal(r.status,'stopped-no-partial-capture');assert.equal(r.failure.code,'HOURLY_COMPLETE_COHORT_WINDOW_EXCEEDED');assert.equal(f.counts().connects,0);assert.equal(f.counts().uploads,0);
 });
-test('verified handoff receipt survives an already-overwritten old failure and never replaces newer local success',t=>{
+test('verified handoff receipt survives an already-overwritten old failure and never replaces newer local success',async t=>{
   const f=fixture(t),file=path.join(f.dir,'status.json');
   const receipt={status:'captured-and-acknowledged',expectedProducts:6835,observedProducts:6835,readBatchCount:35,backendAcceptedRecords:6835,outboxPending:0,slot:'11:00',finishedAt:'2026-10-24T04:01:49.705Z'};
   fs.writeFileSync(file,JSON.stringify({status:'stopped-no-partial-capture'}));
   const write=createStatusWriter(file,{handoffReceipt:receipt,now:()=> '2026-10-24T05:00:00.000Z'});
-  const failed=write({status:'launch-stopped'});assert.equal(failed.lastSuccess.slot,'11:00');assert.equal(failed.lastSuccess.origin,'verified-handoff-receipt');assert.ok(failed.lastSuccess.ageMs>0);
+  write.begin({slot:'12:00',startedAt:'2026-10-24T05:00:00.000Z'});
+  const failed=await write.finish({status:'launch-stopped',slot:'12:00',finishedAt:'2026-10-24T05:00:00.000Z'});await write.close();assert.equal(failed.lastSuccess.slot,'11:00');assert.equal(failed.lastSuccess.status,'captured-and-acknowledged');assert.ok(failed.lastSuccess.ageMs>0);
   fs.writeFileSync(file,JSON.stringify({...receipt,slot:'13:00',finishedAt:'2026-10-24T06:01:00.000Z'}));
-  const newer=createStatusWriter(file,{handoffReceipt:receipt,now:()=> '2026-10-24T05:00:00.000Z'})({status:'launch-stopped'});
+  const next=createStatusWriter(file,{handoffReceipt:receipt,now:()=> '2026-10-24T05:00:00.000Z'});next.begin({slot:'14:00',startedAt:'2026-10-24T05:00:00.000Z'});const newer=await next.finish({status:'launch-stopped',slot:'14:00',finishedAt:'2026-10-24T05:00:00.000Z'});await next.close();
   assert.equal(newer.lastSuccess.slot,'13:00');assert.equal(newer.lastSuccess.ageMs,null);assert.equal(newer.lastSuccess.timestampInFuture,true);
 });
-test('an unwritable SQL-connect checkpoint stops further source reads and still closes the acquired pool',async t=>{
-  const f=fixture(t),write=createStatusWriter(path.join(f.dir,'status.json'));let injected=false;
-  const result=await runObservedHourly004({slot:'11:00',now:f.now,readPending:()=>pendingCount(f.dir),load:async observe=>f.dependencies(observe),writeStatus:value=>{
-    const last=value.diagnostics?.events.at(-1);if(!injected&&last?.stage==='sql-connect'&&last.kind==='success'){injected=true;throw Object.assign(new Error('DO-NOT-OUTPUT'),{code:'EACCES'});}return write(value);
-  }});
-  assert.equal(result.lastAttemptComplete,false);assert.equal(result.diagnostics.persistenceFailed,true);assert.equal(f.counts().closes,1);assert.equal(f.counts().reads,0);assert.equal(f.counts().uploads,0);
+test('a denied display checkpoint does not abort capture and cannot claim the current view is successful',async t=>{
+  const f=fixture(t),file=path.join(f.dir,'status.json'),write=createStatusWriter(file,{viewIo:{...fs.promises,rename:async()=>{throw Object.assign(new Error('DO-NOT-OUTPUT'),{code:'EACCES'});}}});
+  const result=await runObservedHourly004({slot:'11:00',now:f.now,readPending:()=>pendingCount(f.dir),load:async observe=>f.dependencies(observe),writeStatus:write});
+  assert.equal(result.status,'status-unavailable');assert.equal(result.captureOutcome,'captured-and-acknowledged');assert.equal(result.lastAttemptComplete,false);assert.equal(f.counts().closes,1);assert.equal(f.counts().reads,35);assert.equal(f.counts().uploads,1);assert.equal(result.statusPersistence.lastFailure.code,'EACCES');
+  const status=inspectHourlyStatus(file,{latestTaskStartedAt:'2026-10-24T04:00:00.000Z',taskRunning:false});assert.equal(status.latestAttempt.status,'unknown');assert.equal(status.lastSuccess.slot,'11:00');assert.equal(status.lastSuccess.backendAcceptedRecords,6835);
 });
 test('an initial guard failure retains its whitelisted stage and failed CPU sample without raw details',async t=>{
   const f=fixture(t);const result=await runObservedHourly004({slot:'11:00',now:f.now,readPending:()=>pendingCount(f.dir),writeStatus:createStatusWriter(path.join(f.dir,'status.json')),load:async()=>{throw Object.assign(new Error('DO-NOT-OUTPUT'),{code:'HOURLY_SOURCE_GUARD_UNAVAILABLE',guardSummary:{stage:'cpu',reason:'CPU_LIMIT',elapsedMs:1000,budgetMs:12000,cpuPercent:70,raw:'DO-NOT-OUTPUT'}});}});

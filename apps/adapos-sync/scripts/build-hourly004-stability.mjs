@@ -15,7 +15,7 @@ const release=path.join(target,'release');fs.mkdirSync(release);
 fs.cpSync(path.join(app,'src'),path.join(release,'src'),{recursive:true});
 fs.copyFileSync(path.join(source,'baseline/last-confirmed-success.json'),path.join(release,'hourly004-handoff-success.json'));
 fs.mkdirSync(path.join(release,'installer/hourly004/runtime'),{recursive:true});
-for(const name of ['hourly-runtime.mjs','runtime-core.mjs'])fs.copyFileSync(path.join(source,'runtime',name),path.join(release,'installer/hourly004/runtime',name));
+for(const name of ['hourly-runtime.mjs','runtime-core.mjs','hourly-status.mjs'])fs.copyFileSync(path.join(source,'runtime',name),path.join(release,'installer/hourly004/runtime',name));
 const lock=JSON.parse(fs.readFileSync(path.join(app,'package-lock.json'),'utf8'));
 // Reuse the committed standalone lock, with no new dependencies or lifecycle
 // scripts. The build process never loads .env or a production entrypoint.
@@ -31,6 +31,6 @@ function walk(dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
   if(relative.split('/').includes('.env'))throw new Error('Configuration must never enter a release.');
   files.push({path:relative,integrity:createHash('sha256').update(fs.readFileSync(full)).digest('hex').toUpperCase()});
 }}}
-walk(release);files.sort((a,b)=>a.path.localeCompare(b.path));
-fs.writeFileSync(path.join(target,'release-manifest.json'),JSON.stringify({version:'hourly004-stability-20261024',files},null,2));
+walk(release);files.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
+fs.writeFileSync(path.join(target,'release-manifest.json'),JSON.stringify({version:'hourly004-checkpoint-v2-20261024',files},null,2));
 console.log(JSON.stringify({status:'review-package-built',fileCount:files.length,guardBudgetMs:12000,newRecoveryEnabled:false,productionFilesChanged:0,configurationIncluded:false}));

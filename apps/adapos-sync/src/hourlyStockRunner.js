@@ -109,7 +109,8 @@ export async function runHourlyStockIntraday(dependencies = {}) {
           ...(sourceRead ? { sourceRead } : {}),
         },
       }, derivedObservation), { readProducts: rows.length });
-      await hourlyStage(observe, "outbox-enqueue", () => enqueueHourlyEvidence({ cacheDir: evidenceConfig.cacheDir, branchCode: config.branchCode, body }));
+      await hourlyStage(observe, "outbox-enqueue", () => (dependencies.enqueueHourlyEvidence ?? enqueueHourlyEvidence)({ cacheDir: evidenceConfig.cacheDir, branchCode: config.branchCode, body,
+        ...(dependencies.persistAcknowledgement ? {durableReceiptRequired:true} : {}) }));
       let shadow;
       try { shadow = runShadow({
         branchCode: config.branchCode,
@@ -151,6 +152,7 @@ export async function runHourlyStockIntraday(dependencies = {}) {
     cacheDir: evidenceConfig.cacheDir, branchCode: config.branchCode,
     apiBaseUrl: config.apiBaseUrl, token: evidenceConfig.uploadToken, uploadEvidence,
     ...hourlyEvidenceDeliveryBounds(evidenceConfig),
+    ...(dependencies.persistAcknowledgement?{persistAcknowledgement:dependencies.persistAcknowledgement}:{}),
     ...(observe ? { onDiagnostic: observe } : {}),
   });
   return { ...captured, upload };
@@ -166,6 +168,7 @@ export async function replayHourlyEvidence(dependencies = {}) {
     apiBaseUrl: config.apiBaseUrl, token: config.hourlyStockEvidence.uploadToken,
     uploadEvidence: dependencies.uploadHourlyEvidence ?? defaultUploadHourlyEvidence,
     ...hourlyEvidenceDeliveryBounds(config.hourlyStockEvidence),
+    ...(dependencies.persistAcknowledgement?{persistAcknowledgement:dependencies.persistAcknowledgement}:{}),
   });
 }
 

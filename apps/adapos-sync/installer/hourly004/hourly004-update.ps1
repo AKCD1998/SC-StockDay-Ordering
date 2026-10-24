@@ -11,6 +11,10 @@ if($PSVersionTable.PSEdition -eq 'Desktop'){Import-Module (Join-Path $PSHOME 'Mo
 $script:HourlyApp='C:\Users\Administrator\Desktop\RxAuu\apps\adapos-sync'
 $script:HourlySecure='C:\ProgramData\SC-StockDay-Ordering\hourly-stock-evidence-004\complete-on-20261022'
 $script:HourlyCache=Split-Path $script:HourlySecure -Parent
+$script:HourlyReleaseName='stability-20261024-checkpoint-v2'
+$script:HourlyPreviousReleaseName='stability-20261024'
+$script:HourlyPointerBackup='checkpoint-v2-previous-launcher.mjs'
+$script:HourlyNode='C:\Program Files\nodejs\node.exe'
 
 function Stop-HourlyUpdate([string]$Code) {throw [InvalidOperationException]::new($Code)}
 function Assert-HourlyUpdate([bool]$Condition,[string]$Code) {if(-not $Condition){Stop-HourlyUpdate $Code}}
@@ -50,7 +54,8 @@ function Get-HourlyInstalledState {
   $target=Join-Path $script:HourlySecure 'hourly-complete-launcher.mjs';Assert-HourlyRegular $target
   $current=[IO.File]::ReadAllBytes($target)
   if(Test-HourlyBytes $current ([IO.File]::ReadAllBytes((Join-Path $PSScriptRoot 'baseline\hourly-complete-launcher.mjs')))){return 'original-12-second-guard'}
-  if(Test-HourlyBytes $current ([IO.File]::ReadAllBytes((Join-Path $PSScriptRoot 'runtime\hourly-complete-launcher.mjs')))){return 'stability-candidate-installed'}
+  if(Test-HourlyBytes $current ([IO.File]::ReadAllBytes((Join-Path $PSScriptRoot 'baseline\previous-launcher.mjs')))){return 'stability-candidate-installed'}
+  if(Test-HourlyBytes $current ([IO.File]::ReadAllBytes((Join-Path $PSScriptRoot 'runtime\hourly-complete-launcher.mjs')))){return 'checkpoint-v2-installed'}
   return 'unrecognized-baseline'
 }
 function Get-HourlyUpdateHost {
@@ -198,43 +203,59 @@ function Assert-HourlyInstalledSource {
     Assert-HourlyUpdate ((Get-HourlyFileIntegrity $file $hasher) -ceq $entry.integrity) 'INSTALLED_SOURCE_REQUIRES_REVIEW'
   }}finally{$hasher.Dispose()}
 }
+function Get-HourlyTaskAttemptInfo {
+  $service=$null
+  try {
+    $service=New-Object -ComObject Schedule.Service
+    $service.Connect();$folder=$service.GetFolder('\');$latest=$null
+    foreach($hour in 9..19){$task=$folder.GetTask(('Hourly Stock Evidence (Branch 004) - {0:00}00' -f $hour));if($task.LastRunTime.Year -ge 2000 -and ($null -eq $latest -or $task.LastRunTime -gt $latest.LastRunTime)){$latest=$task}}
+    if($null -eq $latest){return @{verified=$false;startedAt=$null;running=$null}}
+    return @{verified=$true;startedAt=([datetimeoffset]$latest.LastRunTime).ToString('o');running=[int]$latest.State -eq 4}
+  } catch {return @{verified=$false;startedAt=$null;running=$null}}
+  finally {if($null -ne $service){[void][Runtime.InteropServices.Marshal]::ReleaseComObject($service)}}
+}
 function Get-HourlySafeStatus {
   $state=Get-HourlyInstalledState
-  $report=[ordered]@{schemaVersion='hourly004-update-status-v1';installation=$state;guardBudgetMs=12000;newRecoveryEnabled=$false;productionEntryInvoked=$false;currentStockCertified=$false}
-  $report.stagedReleaseExists=Test-Path -LiteralPath (Join-Path $script:HourlySecure 'stability-20261024')
-  $report.originalBackupExists=Test-Path -LiteralPath (Join-Path $script:HourlySecure 'stability-original-launcher.mjs')
+  $report=[ordered]@{schemaVersion='hourly004-update-status-v2';installation=$state;guardBudgetMs=12000;newRecoveryEnabled=$false;productionEntryInvoked=$false;currentStockCertified=$false}
+  $report.stagedReleaseExists=Test-Path -LiteralPath (Join-Path $script:HourlySecure $script:HourlyReleaseName)
+  $report.previousReleaseExists=Test-Path -LiteralPath (Join-Path $script:HourlySecure $script:HourlyPreviousReleaseName)
+  $report.previousPointerBackupExists=Test-Path -LiteralPath (Join-Path $script:HourlySecure $script:HourlyPointerBackup)
   $report.queueNow=@{pending=$null;checkedAt=[datetimeoffset]::Now.ToString('o')}
-  try{$folder=Join-Path $script:HourlyCache 'hourly-evidence-outbox\004';$report.queueNow.pending=@(Get-ChildItem -LiteralPath $folder -File | Where-Object {$_.Name -cmatch '^[a-f0-9]{64}\.json$'}).Count}catch{}
-  $file=Join-Path $script:HourlySecure 'latest-slot-result.json'
-  if(Test-Path -LiteralPath $file){
-    $value=Get-Content -LiteralPath $file -Raw | ConvertFrom-Json
-    $status=if($value.status -in @('starting','captured-and-acknowledged','pending-or-incomplete','stopped-no-partial-capture','launch-stopped')){$value.status}else{'unknown'}
-    $attempt=[ordered]@{status=$status;slot=$(if($value.slot -match '^(09|1[0-9]):00$'){$value.slot}else{$null});outboxPending=$null;observedProducts=$null;backendAcceptedRecords=$null}
-    foreach($key in @('outboxPending','observedProducts','backendAcceptedRecords')){if($null -ne $value.$key -and $value.$key -is [ValueType] -and [double]$value.$key -ge 0 -and [double]$value.$key -le 10000){$attempt[$key]=$value.$key}}
-    $report.latestAttempt=$attempt
-    $allowedReasons=@('HOURLY_SOURCE_GUARD_UNAVAILABLE','HOURLY_SOURCE_TIMEOUT','HOURLY_SOURCE_ACCESS_DENIED','HOURLY_SOURCE_READ_FAILED','HOURLY_SOURCE_READONLY_BOUNDARY_UNVERIFIED','HOURLY_SOURCE_COHORT_INCOMPLETE','HOURLY_SOURCE_COHORT_CHANGED','HOURLY_COMPLETE_COHORT_WINDOW_EXCEEDED','HOURLY_OBSERVER_CLOCK_STEP_DETECTED','HOURLY_EVIDENCE_BUSY','HOURLY_EVIDENCE_HTTP_ERROR','HOURLY_EVIDENCE_TIMEOUT','HOURLY_EVIDENCE_ACK_INVALID','HOURLY_OUTBOX_CORRUPT','HOURLY_OUTBOX_FULL','HOURLY_DELIVERY_BUDGET_EXHAUSTED','HOURLY_COMPLETE_CONFIG_INVALID','HOST_CPU_AT_OR_ABOVE_70_PERCENT','EXISTING_AGENT_OR_FULL_SYNC_WORK','GUARD_PROCESS_IDENTITY_UNREADABLE','ETIMEOUT','ELOGIN','ESOCKET','ECONNRESET','EACCES','EPERM','HOURLY_OPERATION_FAILED_DETAILS_WITHHELD')
-    $report.failureCode=if($value.failure.code -in $allowedReasons){$value.failure.code}elseif($null -ne $value.failure){'HOURLY_OPERATION_FAILED_DETAILS_WITHHELD'}else{$null}
-    $guardReasons=@('HOST_UNVERIFIED','IDENTITY_UNVERIFIED','FULL_SYNC_BUSY','PROCESS_UNREADABLE','CPU_UNREADABLE','CPU_LIMIT','PROVIDER_TIMEOUT','ACCESS_DENIED','TASKS_UNAVAILABLE','PROCESSES_UNAVAILABLE','CPU_UNAVAILABLE','PLATFORM_UNAVAILABLE','BUDGET_EXHAUSTED','START_FAILED','DEADLINE','OUTPUT_LIMIT','INVALID_OUTPUT','CHILD_EXIT','READY_UNVERIFIED','CHILD_STILL_RUNNING','GUARD_LEASE_UNVERIFIED')
-    $report.guardReason=if($value.failure.guard.reason -in $guardReasons){$value.failure.guard.reason}else{$null}
-    $last=$value.lastSuccess
-    if($null -eq $last -and $status -eq 'captured-and-acknowledged'){$last=$value}
-    $report.lastSuccess=$null
-    $stamp=[datetimeoffset]::MinValue
-    if($null -ne $last -and $last.observedProducts -eq 6835 -and $last.backendAcceptedRecords -eq 6835 -and [datetimeoffset]::TryParse([string]$last.finishedAt,[ref]$stamp)){
-      $age=([datetimeoffset]::Now-$stamp).TotalMinutes
-      $report.lastSuccess=@{finishedAt=$stamp.ToString('o');ageMinutes=$(if($age -ge 0){[math]::Floor($age)}else{$null});timestampInFuture=$age -lt 0;observedProducts=6835;backendAcceptedRecords=6835;currentStockCertified=$false}
-    }
-    $allowedStages=@('launch','powershell-startup','host-identity','task-scheduler','processes','cpu-provider','capture-lock','sql-connect','readonly-boundary','sql-batch','payload','outbox-enqueue','sql-close','delivery-lock','outbox-scan','upload','acknowledgement')
-    $report.lastStage=$null
-    if($value.diagnostics.events.Count -gt 0){$stage=$value.diagnostics.events[-1];if($stage.stage -in $allowedStages -and $stage.kind -in @('start','success','failure','progress','retry')){$report.lastStage=@{stage=$stage.stage;kind=$stage.kind}}}
-  }
+  try{$folder=Join-Path $script:HourlyCache 'hourly-evidence-outbox\004';$report.queueNow.pending=@(Get-ChildItem -LiteralPath $folder -File -ErrorAction Stop | Where-Object {$_.Name -cmatch '^[a-f0-9]{64}\.json$'}).Count}catch{}
+  $report.availability='unknown';$report.latestAttempt=@{status='unknown';slot=$null;observedProducts=$null;backendAcceptedRecords=$null;outboxPending=$null};$report.lastSuccess=$null;$report.failureCode=$null
+  $meta=Get-HourlyTaskAttemptInfo
+  $request=@{file=(Join-Path $script:HourlySecure 'latest-slot-result.json');legacyMode=$state -ne 'checkpoint-v2-installed';latestTaskStartedAt=$meta.startedAt;taskRunning=$meta.running}|ConvertTo-Json -Compress
+  $reader=Join-Path $PSScriptRoot 'release\installer\hourly004\runtime\hourly-status.mjs'
+  if(-not(Test-Path -LiteralPath $reader)){$reader=Join-Path $PSScriptRoot 'runtime\hourly-status.mjs'}
+  try {
+    $reply=@($request | & $script:HourlyNode $reader 2>$null)
+    if($LASTEXITCODE -eq 0){$view=($reply -join [Environment]::NewLine)|ConvertFrom-Json;if($view.schemaVersion -eq 'hourly004-status-view-v2'){
+      foreach($key in @('availability','latestAttempt','lastSuccess','failureCode','guardReason','lastStage','storageFailure','receiptState','progressObservation')){$report[$key]=$view.$key}
+    }}
+  } catch { }
   return [pscustomobject]$report
+}
+function Assert-HourlyPreviousRelease {
+  $expected=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'baseline\previous-release-integrity.json') -Raw|ConvertFrom-Json
+  $root=Join-Path $script:HourlySecure $script:HourlyPreviousReleaseName
+  $dirs=New-Object 'Collections.Generic.Stack[string]';$dirs.Push($root);$files=New-Object 'Collections.Generic.List[string]'
+  while($dirs.Count){$dir=$dirs.Pop();Assert-HourlyUpdate (-not([IO.File]::GetAttributes($dir) -band [IO.FileAttributes]::ReparsePoint)) 'PATH_TYPE_UNEXPECTED';foreach($child in [IO.Directory]::GetDirectories($dir)){$dirs.Push($child)};foreach($child in [IO.Directory]::GetFiles($dir)){$files.Add($child);Assert-HourlyUpdate ($files.Count -le 15000) 'RELEASE_FILE_SET_CHANGED'}}
+  Assert-HourlyUpdate ($files.Count -eq $expected.files) 'INSTALLED_BASELINE_REQUIRES_REVIEW'
+  $relativeFiles=New-Object 'Collections.Generic.List[string]';foreach($entry in $files){$relativeFiles.Add($entry.Substring($root.Length+1).Replace('\','/'))}
+  $ordered=$relativeFiles.ToArray();[Array]::Sort($ordered,[StringComparer]::Ordinal)
+  $hash=[Security.Cryptography.SHA256]::Create();$tree=[Security.Cryptography.SHA256]::Create()
+  try {
+    foreach($relative in $ordered){$integrity=Get-HourlyFileIntegrity (Join-Path $root $relative) $hash;$record=[Text.Encoding]::UTF8.GetBytes($relative+[char]0+$integrity+[char]10);[void]$tree.TransformBlock($record,0,$record.Length,$null,0)}
+    [void]$tree.TransformFinalBlock([byte[]]@(),0,0)
+    Assert-HourlyUpdate ([BitConverter]::ToString($tree.Hash).Replace('-','') -ceq $expected.integrity) 'INSTALLED_BASELINE_REQUIRES_REVIEW'
+  } finally {$hash.Dispose();$tree.Dispose()}
 }
 function Invoke-HourlyUpdateController {
   if($Action -eq 'Status'){return Get-HourlySafeStatus}
   Assert-HourlyQuiet
   $state=Get-HourlyInstalledState
-  Assert-HourlyUpdate ($state -ne 'unrecognized-baseline') 'INSTALLED_BASELINE_REQUIRES_REVIEW'
+  Assert-HourlyUpdate ($state -in @('stability-candidate-installed','checkpoint-v2-installed')) 'INSTALLED_BASELINE_REQUIRES_REVIEW'
+  Assert-HourlyPreviousRelease
   Assert-HourlyInstalledSource
   if($Action -eq 'Preflight'){
     Assert-HourlyRelease (Join-Path $PSScriptRoot 'release')
@@ -247,9 +268,9 @@ function Invoke-HourlyUpdateController {
     $before=Get-HourlyDefinitionSnapshot
     $target=Join-Path $script:HourlySecure 'hourly-complete-launcher.mjs'
     if($Action -eq 'Update'){
-      if($state -eq 'stability-candidate-installed'){Assert-HourlyRelease (Join-Path $script:HourlySecure 'stability-20261024');return Get-HourlySafeStatus}
+      if($state -eq 'checkpoint-v2-installed'){Assert-HourlyRelease (Join-Path $script:HourlySecure $script:HourlyReleaseName);return Get-HourlySafeStatus}
       $source=Join-Path $PSScriptRoot 'release';Assert-HourlyRelease $source
-      $release=Join-Path $script:HourlySecure 'stability-20261024'
+      $release=Join-Path $script:HourlySecure $script:HourlyReleaseName
       Assert-HourlyUpdate (-not(Test-Path -LiteralPath $release)) 'EXISTING_RELEASE_REQUIRES_REVIEW'
       $watch=[Diagnostics.Stopwatch]::StartNew()
       $null=New-Item -ItemType Directory -Path $release
@@ -261,12 +282,12 @@ function Invoke-HourlyUpdateController {
       }
       Assert-HourlyRelease $release;Assert-HourlyQuiet
       $candidate=Join-Path $PSScriptRoot 'runtime\hourly-complete-launcher.mjs'
-      Invoke-HourlyLauncherTransaction $target $candidate (Join-Path $script:HourlySecure 'stability-original-launcher.mjs') {Assert-HourlyDefinitionsEqual $before (Get-HourlyDefinitionSnapshot)} {Assert-HourlyDefinitionsEqual $before (Get-HourlyDefinitionSnapshot)}
+      Invoke-HourlyLauncherTransaction $target $candidate (Join-Path $script:HourlySecure $script:HourlyPointerBackup) {Assert-HourlyDefinitionsEqual $before (Get-HourlyDefinitionSnapshot)} {Assert-HourlyDefinitionsEqual $before (Get-HourlyDefinitionSnapshot)}
     }else{
-      Assert-HourlyUpdate ($state -eq 'stability-candidate-installed') 'ROLLBACK_REFUSED_NOT_OWN_INSTALLATION'
-      $original=Join-Path $script:HourlySecure 'stability-original-launcher.mjs'
-      Assert-HourlyUpdate (Test-HourlyBytes ([IO.File]::ReadAllBytes($original)) ([IO.File]::ReadAllBytes((Join-Path $PSScriptRoot 'baseline\hourly-complete-launcher.mjs')))) 'ORIGINAL_BACKUP_UNVERIFIED'
-      Invoke-HourlyLauncherTransaction $target $original (Join-Path $script:HourlySecure ('stability-rollback-'+[guid]::NewGuid().ToString()+'.mjs')) {Assert-HourlyDefinitionsEqual $before (Get-HourlyDefinitionSnapshot)} {Assert-HourlyDefinitionsEqual $before (Get-HourlyDefinitionSnapshot)}
+      Assert-HourlyUpdate ($state -eq 'checkpoint-v2-installed') 'ROLLBACK_REFUSED_NOT_OWN_INSTALLATION'
+      $original=Join-Path $script:HourlySecure $script:HourlyPointerBackup
+      Assert-HourlyUpdate (Test-HourlyBytes ([IO.File]::ReadAllBytes($original)) ([IO.File]::ReadAllBytes((Join-Path $PSScriptRoot 'baseline\previous-launcher.mjs')))) 'ORIGINAL_BACKUP_UNVERIFIED'
+      Invoke-HourlyLauncherTransaction $target $original (Join-Path $script:HourlySecure ('checkpoint-v2-rollback-'+[guid]::NewGuid().ToString()+'.mjs')) {Assert-HourlyDefinitionsEqual $before (Get-HourlyDefinitionSnapshot)} {Assert-HourlyDefinitionsEqual $before (Get-HourlyDefinitionSnapshot)}
     }
     return Get-HourlySafeStatus
   }finally{$handle.Dispose();[IO.File]::Delete($lock)}
