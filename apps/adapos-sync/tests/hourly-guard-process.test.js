@@ -23,6 +23,22 @@ function fixture(extra = {}) {
 }
 const reasonIs = reason => error => error.code === "HOURLY_SOURCE_GUARD_UNAVAILABLE" && error.guardSummary?.reason === reason;
 
+test('one absolute deadline includes lease, diagnostics and spawn preparation',async()=>{
+  let released=0,f;f=fixture({childLease:{acquire(){f.advance(5000);return {release(){released++}}}}});const p=f.guard();assert.equal(f.deadline(),7000);f.advance(6999);f.ready();f.child.emit('close',0);assert.equal((await p).guardElapsedMs,11999);assert.equal(released,1);
+  let g;g=fixture({childLease:{acquire(){g.advance(12000);return {release(){released++}}}}});await assert.rejects(g.guard(),reasonIs('DEADLINE'));assert.equal(g.spawns(),0);assert.equal(released,2);
+  let h;h=fixture({childLease:{acquire(){h.advance(2500);return {release(){}}}}});const q=h.guard({remainingMs:3000});assert.equal(h.deadline(),500);h.advance(500);h.ready();h.child.emit('close',0);await assert.rejects(q,reasonIs('DEADLINE'));
+  let s,spawned=0;s=fixture({spawnProcess(){spawned++;s.advance(4000);return s.child;}});const r=s.guard();assert.equal(s.deadline(),8000);s.ready();s.child.emit('close',0);await r;assert.equal(spawned,1);
+});
+test('late Ready and late close fail even when the event loop has not dispatched the timeout',async()=>{
+  const f=fixture(),p=f.guard();f.advance(13000);f.ready();f.child.emit('close',0);await assert.rejects(p,reasonIs('DEADLINE'));assert.equal(f.spawns(),1);
+  const g=fixture(),q=g.guard();g.advance(11999);g.ready();g.advance(2);g.child.emit('close',0);await assert.rejects(q,reasonIs('DEADLINE'));
+});
+test('diagnostic and child-registration delays consume the same deadline and preserve an unconfirmed lease',async()=>{
+  let f,starts=0,released=0;f=fixture({onDiagnostic:event=>{if(event.kind==='start'&&++starts===1)f.advance(12000)},childLease:{acquire(){return {release(){released++}}}}});await assert.rejects(f.guard(),reasonIs('DEADLINE'));assert.equal(f.spawns(),0);assert.equal(released,1);
+  let g;g=fixture({childLease:{acquire(){return {setChild(){g.advance(12000)},release(){released++}}}}});g.child.pid=444;g.child.kill=()=>false;const p=g.guard();assert.equal(g.deadline(),2000);g.advance(2000);g.expire();await assert.rejects(p,reasonIs('DEADLINE'));assert.equal(released,1);
+  let h;h=fixture({onDiagnostic:event=>{if(event.childTerminationConfirmed===true)h.advance(1000)}});const q=h.guard();h.advance(11500);h.ready();h.child.emit('close',0);await assert.rejects(q,reasonIs('DEADLINE'));
+});
+
 test("diagnostics preserve the installed twelve-second deadline and reject slow startup", async () => {
   const f = fixture(), promise = f.guard();assert.equal(f.deadline(), 12000);
   f.advance(12000);f.expire();

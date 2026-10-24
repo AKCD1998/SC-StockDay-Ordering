@@ -32,5 +32,5 @@ function walk(dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
   files.push({path:relative,integrity:createHash('sha256').update(fs.readFileSync(full)).digest('hex').toUpperCase()});
 }}}
 walk(release);files.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
-fs.writeFileSync(path.join(target,'release-manifest.json'),JSON.stringify({version:'hourly004-checkpoint-v2-20261024',files},null,2));
+fs.writeFileSync(path.join(target,'release-manifest.json'),JSON.stringify({version:'hourly004-checkpoint-v3-20261024',files},null,2));
 console.log(JSON.stringify({status:'review-package-built',fileCount:files.length,guardBudgetMs:12000,newRecoveryEnabled:false,productionFilesChanged:0,configurationIncluded:false}));

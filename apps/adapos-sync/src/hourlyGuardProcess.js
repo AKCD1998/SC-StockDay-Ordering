@@ -23,6 +23,7 @@ export function createHourlyGuard({ executable, script, spawnProcess = spawn, pl
   observerProcessId = process.pid, now = () => performance.now(), setTimer = setTimeout, clearTimer = clearTimeout, onDiagnostic, childLease } = {}) {
   return async function hourlyGuard({ remainingMs = HOURLY_GUARD_BUDGET_MS } = {}) {
     const start = now(), budgetMs = Number.isFinite(remainingMs) ? Math.max(0, Math.floor(Math.min(HOURLY_GUARD_BUDGET_MS, remainingMs))) : 0;
+    const deadline = start + budgetMs, remaining = () => Math.max(0, deadline - now());
     let stage = "starting", stageStart = start, startupMs = null, cpuPercent = null;
     const diagnosticStage = () => ({ starting: "powershell-startup", host: "host-identity", tasks: "task-scheduler", processes: "processes", cpu: "cpu-provider", complete: "cpu-provider" })[stage];
     const report = (kind, reason, extra = {}) => emitHourlyDiagnostic(onDiagnostic, { stage: diagnosticStage(), kind, ...(reason ? { code: reason } : {}), durationMs: Math.max(0, now() - stageStart), remainingMs: Math.max(0, budgetMs - (now() - start)), budgetMs, ...extra });
@@ -32,14 +33,17 @@ export function createHourlyGuard({ executable, script, spawnProcess = spawn, pl
     if (platform !== "win32") throw failure("PLATFORM_UNAVAILABLE");
     if (budgetMs < 1) throw failure("BUDGET_EXHAUSTED");
     let lease;
-    try { lease = childLease?.acquire(); } catch (error) { throw failure(error.code === "CHILD_STILL_RUNNING" ? error.code : "GUARD_LEASE_UNVERIFIED"); }
+    try { lease = childLease?.acquire(); } catch (error) { throw failure(remaining()<=0?'DEADLINE':error.code === "CHILD_STILL_RUNNING" ? error.code : "GUARD_LEASE_UNVERIFIED"); }
     report("start");
+    if(remaining()<=0){lease?.release();throw failure('DEADLINE');}
     return await new Promise((resolve, reject) => {
       let child, timer, killTimer, buffer = "", bytes = 0, terminal, ended = false, pendingFailure;
       const finish = (error, result, closed = false) => {
         if (ended) return; ended = true; clearTimer(timer); clearTimer(killTimer);
         if (closed || !child?.pid) lease?.release();
+        if(!error&&remaining()<=0)error=failure('DEADLINE');
         report(error ? "failure" : "success", error?.guardSummary?.reason, { ...(startupMs == null ? {} : { startupMs }), ...(cpuPercent == null ? {} : { cpuPercent }), childTerminationConfirmed: closed || !child?.pid });
+        if(!error&&remaining()<=0)error=failure('DEADLINE');
         error ? reject(error) : resolve(result);
       };
       // An unresponsive child aborts collection. There is no retry, capture or upload after failure.
@@ -56,6 +60,7 @@ export function createHourlyGuard({ executable, script, spawnProcess = spawn, pl
       };
       const line = text => {
         if (pendingFailure || ended) return;
+        if(remaining()<=0){stop('DEADLINE');return;}
         let value; try { value = JSON.parse(text.replace(/^\uFEFF/, "")); } catch { stop("INVALID_OUTPUT"); return; }
         if (!value || typeof value !== "object" || Array.isArray(value) || value.schemaVersion !== "hourly-source-guard-v2" || !stages.has(value.stage) || !integer(value.elapsedMs) || terminal) { stop("INVALID_OUTPUT"); return; }
         if (value.stage !== stage) {
@@ -69,6 +74,7 @@ export function createHourlyGuard({ executable, script, spawnProcess = spawn, pl
         if (stage === 'cpu' && Number.isFinite(value.systemCpuPercent) && value.systemCpuPercent >= 0 && value.systemCpuPercent <= 100) cpuPercent = value.systemCpuPercent;
       };
       try {
+        if(remaining()<=0)return finish(failure('DEADLINE'),null,true);
         child = spawnProcess(executable, ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "RemoteSigned", "-File", script,
           "-ObserverProcessId", String(observerProcessId)], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
         if (child.pid) lease?.setChild(child.pid);
@@ -85,6 +91,7 @@ export function createHourlyGuard({ executable, script, spawnProcess = spawn, pl
         child.once("close", code => {
           if (ended) { lease?.release(); return; }
           if (pendingFailure) return finish(pendingFailure, null, true);
+          if(remaining()<=0)return finish(failure('DEADLINE'),null,true);
           if (buffer.trim()) line(buffer.trim());
           if (pendingFailure) return finish(pendingFailure, null, true);
           if (terminal?.status === "guard-stopped" && reasons.has(terminal.reason)) return finish(failure(terminal.reason), null, true);
@@ -93,10 +100,12 @@ export function createHourlyGuard({ executable, script, spawnProcess = spawn, pl
               || terminal.existingWorkQuiet !== true || terminal.hostVerified !== true || !Number.isFinite(terminal.systemCpuPercent)
               || terminal.systemCpuPercent < 0 || terminal.systemCpuPercent >= 70) return finish(failure("READY_UNVERIFIED"), null, true);
           emitHourlyDiagnostic(onDiagnostic, { stage: "cpu-provider", kind: "success", cpuPercent: terminal.systemCpuPercent });
+          if(remaining()<=0)return finish(failure('DEADLINE'),null,true);
           finish(null, { status: "ready", hostVerified: true, existingWorkQuiet: true, cpuBelowThreshold: true,
             systemCpuPercent: terminal.systemCpuPercent, guardElapsedMs: Math.max(0, Math.ceil(now() - start)) }, true);
         });
-        timer = setTimer(() => stop("DEADLINE"), budgetMs);
+        if(remaining()<=0)stop('DEADLINE');
+        else timer = setTimer(() => stop("DEADLINE"), remaining());
       } catch { if (child) stop("START_FAILED"); else finish(failure("START_FAILED")); }
     });
   };

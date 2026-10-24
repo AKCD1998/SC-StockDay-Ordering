@@ -10,23 +10,21 @@ $script:HourlyCache=Join-Path $resolved 'cache'
 $script:HourlyNode=(Get-Command node.exe -ErrorAction Stop).Source
 $script:FixtureCorruptAfterSwitch=$false
 $script:FixtureTaskStartedAt='2026-10-24T07:00:00.000Z'
+$script:FixtureNow='2026-10-24T08:03:00.000Z'
+function Get-HourlyStatusNow {return $script:FixtureNow}
 function Get-HourlyUpdateHost {return @{Name='SERVER004';Zone='SE Asia Standard Time';Admin=$true}}
 function Get-HourlyUpdateSchedule {foreach($i in 0..12){[pscustomobject]@{Kind=$(if($i -lt 2){'full'}else{'hourly'});Enabled=$true;Running=$false;NextMinutes=120;LastMinutes=120;DefinitionVerified=$true}}}
 function Get-HourlyUpdateProcesses {return @()}
 function Get-HourlyUpdateCpu {[pscustomobject]@{PercentProcessorTime=5}}
 function Get-HourlyTaskAttemptInfo {return @{verified=$true;startedAt=$script:FixtureTaskStartedAt;running=$false}}
-function Get-HourlyDefinitionSnapshot {
-  $fixtureFiles=@((Join-Path $script:HourlyApp '.env'),(Join-Path $script:HourlyApp 'package-lock.json'),(Join-Path $script:HourlyApp 'src\fixture.js'),(Join-Path $script:HourlySecure 'approved-cohort-fixture.json'))
-  $snapshotFiles=@{};$snapshotAcl=@{}
-  foreach($fixtureFile in $fixtureFiles){$snapshotFiles[$fixtureFile]=[IO.File]::ReadAllBytes($fixtureFile);$snapshotAcl[$fixtureFile]=(Get-Acl -LiteralPath $fixtureFile).Sddl}
-  foreach($name in @('hourly-complete-launcher.mjs','runtime-core.mjs','runtime-guard.ps1')){$fixtureFile=Join-Path $script:HourlySecure $name;$snapshotAcl[$fixtureFile]=(Get-Acl -LiteralPath $fixtureFile).Sddl}
+function Get-HourlyProtectedTaskDefinitions {
   $taskXml='fixture-task-definition'
-  if($script:FixtureCorruptAfterSwitch -and (Get-HourlyInstalledState) -eq 'checkpoint-v2-installed'){$taskXml='fixture-changed-task-definition'}
-  return @{Files=$snapshotFiles;Acl=$snapshotAcl;Tasks=@{fixture=@{Xml=$taskXml;Sddl='fixture-task-security'}};Timezone='fixture-zone'}
+  if($script:FixtureCorruptAfterSwitch -and $script:FixtureLastPhase -eq 'before-postflight'){$taskXml='fixture-changed-task-definition'}
+  return @{fixture=@{Xml=$taskXml;Sddl='fixture-task-security'}}
 }
 $passed=0
 $report=[ordered]@{simulation=$true;nativePowerShell=$PSVersionTable.PSVersion.ToString();productionQueries=0;productionFilesChanged=0;taskRuns=0;realControllerInvoked=$true;fixtureProviderSubstitutions=@('host','task-scheduler','process-provider','cpu-provider');cases=@()}
-function Invoke-FixtureAction([string]$RequestedAction,[bool]$Approved=$true){$Action=$RequestedAction;$ReleaseApproved=$Approved;Invoke-HourlyUpdateController}
+function Invoke-FixtureAction([string]$RequestedAction,[bool]$Approved=$true){$Action=$RequestedAction;$ReleaseApproved=$Approved;Invoke-HourlyUpdateController -OnPhase {param($phase);$script:FixtureLastPhase=$phase}}
 try {
   $baseline=Get-HourlyDefinitionSnapshot
   Assert-HourlyUpdate ((Get-HourlyInstalledState) -eq 'stability-candidate-installed') 'FIXTURE_INITIAL_STATE'
@@ -36,14 +34,14 @@ try {
   $denied=$false;try{$null=Invoke-FixtureAction 'Update' $false}catch{$denied=$_.Exception.Message -eq 'RELEASE_APPROVAL_REQUIRED'}
   Assert-HourlyUpdate $denied 'FIXTURE_APPROVAL_GATE';$passed++;$report.cases+='Update-approval-required'
   $updated=Invoke-FixtureAction 'Update'
-  Assert-HourlyUpdate ($updated.installation -eq 'checkpoint-v2-installed') 'FIXTURE_UPDATE'
+  Assert-HourlyUpdate ($updated.installation -eq 'checkpoint-v3-installed') 'FIXTURE_UPDATE'
   Assert-HourlyDefinitionsEqual $baseline (Get-HourlyDefinitionSnapshot)
   $passed++;$report.cases+='Update-stages-verifies-and-switches'
   $status=Invoke-FixtureAction 'Status'
   Assert-HourlyUpdate ($status.availability -eq 'unknown' -and $status.latestAttempt.status -eq 'unknown' -and $status.lastSuccess.slot -eq '14:00') 'FIXTURE_STATUS_FALSE_SUCCESS'
   $passed++;$report.cases+='Status-new-runtime-does-not-relabel-old-success'
   $repeat=Invoke-FixtureAction 'Update'
-  Assert-HourlyUpdate ($repeat.installation -eq 'checkpoint-v2-installed') 'FIXTURE_IDEMPOTENT_UPDATE';$passed++;$report.cases+='Update-idempotent'
+  Assert-HourlyUpdate ($repeat.installation -eq 'checkpoint-v3-installed') 'FIXTURE_IDEMPOTENT_UPDATE';$passed++;$report.cases+='Update-idempotent'
   # This helper imports only the status store and writes synthetic receipt
   # metadata. It never imports/calls the protected runtime or a SQL runner.
   $seedOutput=@(& $script:HourlyNode (Join-Path $resolved 'seed-receipt.mjs') $script:HourlySecure)
@@ -85,7 +83,12 @@ try {
 } catch {
   $report.passed=$passed;$report.status='failed';$report.failed=1
   $known=@('FIXTURE_INITIAL_STATE','FIXTURE_PREFLIGHT','FIXTURE_APPROVAL_GATE','FIXTURE_UPDATE','FIXTURE_STATUS_FALSE_SUCCESS','FIXTURE_IDEMPOTENT_UPDATE','FIXTURE_RECEIPT_SEED','FIXTURE_STATUS_RECEIPT','FIXTURE_STATUS_CORRUPT_VIEW','FIXTURE_ROLLBACK','FIXTURE_RECEIPT_CHANGED','FIXTURE_PREDECESSOR_CHANGE','FIXTURE_ACTIVATION_ROLLBACK','FIXTURE_PRODUCTION_ENTRY_INVOKED','INSTALLED_BASELINE_REQUIRES_REVIEW','RELEASE_INTEGRITY_FAILED','TASK_DEFINITION_OR_PERMISSIONS_CHANGED','PROTECTED_STATE_CHANGED','PROTECTED_PERMISSIONS_CHANGED')
-  $report.reason=if($_.Exception.Message -in $known){$_.Exception.Message}else{'FIXTURE_UNAVAILABLE_DETAILS_WITHHELD'}
+  $known+=@('PREDECESSOR_CHANGED','PREDECESSOR_PIN_REQUIRED','TRANSACTION_RENAME_REFUSED','TRANSACTION_FILE_BUSY','TRANSACTION_FILE_UNAVAILABLE','ACTIVATION_VERIFY_FAILED','ROLLBACK_VERIFY_FAILED','ROLLBACK_REFUSED_FOREIGN_CHANGE')
+  $exception=$_.Exception;$reason=$null;while($null -ne $exception){if($exception.Message -in $known){$reason=$exception.Message};$exception=$exception.InnerException}
+  $report.reason=if($null -ne $reason){$reason}else{'FIXTURE_UNAVAILABLE_DETAILS_WITHHELD'}
+  $report.failureLine=$_.InvocationInfo.ScriptLineNumber
+  $report.phase=$script:FixtureLastPhase
+  $report.imageChecks=@{};foreach($key in @('PathIdentity','ObjectIdentity','Bytes','Permissions')){if($_.Exception.Data.Contains($key)){$report.imageChecks[$key]=[bool]$_.Exception.Data[$key]}}
   $report.failureType=$_.Exception.GetType().Name
 }
 $report|ConvertTo-Json -Depth 6 -Compress

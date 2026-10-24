@@ -6,7 +6,8 @@ import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
-import {createHourlyStatusStore,inspectHourlyStatus,readHourlyDurableState,STATUS_BOUNDS} from '../src/hourlyStatusStore.js';
+import {createHourlyStatusStore,inspectHourlyStatus as inspectStatus,readHourlyDurableState,STATUS_BOUNDS} from '../src/hourlyStatusStore.js';
+const inspectHourlyStatus=(file,options={})=>inspectStatus(file,{now:'2026-10-24T08:03:00.000Z',taskRunning:false,...options});
 import {createHourlyAttemptDiagnostics} from '../src/hourlyAttemptDiagnostics.js';
 import {createHourlyGuard,HOURLY_GUARD_BUDGET_MS} from '../src/hourlyGuardProcess.js';
 import {EventEmitter} from 'node:events';
@@ -69,6 +70,14 @@ test('a final critical receipt failure stops safely and never manufactures a com
 test('duplicate acknowledgement does not create a second durable acknowledgement generation',async t=>{
   const f=fixture(t),store=createHourlyStatusStore(f.file);store.begin({slot:'15:00',startedAt:start});acknowledge(store);const generation=readHourlyDurableState(f.file).state.generation;acknowledge(store);assert.equal(readHourlyDurableState(f.file).state.generation,generation);await store.close();
 });
+
+test('Status rejects stale, future, mismatched and unverified legacy attempt evidence without borrowing durable labels',async t=>{
+  const f=fixture(t),store=createHourlyStatusStore(f.file);store.begin({slot:'15:00',startedAt:start});acknowledge(store);await store.finish(summary);await store.close();
+  const success={...summary,slot:'16:00',inspectionTime:'2026-10-24T09:00:12.000Z',finishedAt:'2026-10-24T09:02:00.000Z'};fs.writeFileSync(f.file,JSON.stringify(success));
+  const options={legacyMode:true,now:'2026-10-24T09:03:00.000Z',latestTaskStartedAt:'2026-10-24T09:00:02.000Z',taskRunning:false};const valid=inspectHourlyStatus(f.file,options);assert.equal(valid.latestAttempt.slot,'16:00');assert.equal(valid.latestAttempt.finishedAt,success.finishedAt);assert.equal(valid.lastSuccess.slot,'16:00');
+  for(const override of [{now:'2026-10-24T11:03:00.000Z'},{now:'2026-10-24T09:01:00.000Z'},{latestTaskStartedAt:null},{taskRunning:null},{latestTaskStartedAt:'2026-10-24T10:00:02.000Z'}]){const view=inspectHourlyStatus(f.file,{...options,...override});assert.equal(view.latestAttempt.status,'unknown');assert.equal(view.latestAttempt.slot,null);assert.equal(view.latestAttempt.finishedAt,null);assert.equal(view.latestAttempt.backendAcceptedRecords,null);}
+  fs.writeFileSync(f.file,JSON.stringify({...success,slot:'17:00'}));assert.equal(inspectHourlyStatus(f.file,options).latestAttempt.status,'unknown');
+});
 test('a blocked asynchronous display operation does not postpone the guard deadline',async t=>{
   const f=fixture(t);let releaseRename,entered;const enteredPromise=new Promise(resolve=>{entered=resolve});const pending=new Promise(resolve=>{releaseRename=resolve});const store=createHourlyStatusStore(f.file,{viewIo:{...fs.promises,rename:async(...args)=>{entered();await pending;return fs.promises.rename(...args);}}});store.begin({slot:'15:00',startedAt:start});store.offer({status:'starting',slot:'15:00',inspectionTime:start});await enteredPromise;
   const child=new EventEmitter();child.pid=123;child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.stderr.resume=()=>{};child.kill=()=>{setImmediate(()=>child.emit('close',1));return true};
@@ -111,7 +120,7 @@ test('a real process restart reclaims only its confirmed-dead receipt lease and 
 test('the real pointer exits only its fixture child on a critical error with outstanding display I/O',t=>{
   const f=fixture(t),source=path.resolve(here,'../installer/hourly004/runtime/hourly-complete-launcher.mjs');
   const helpers=pathToFileURL(path.resolve(here,'../src/hourlyAttemptDiagnostics.js')).href,storage=pathToFileURL(path.resolve(here,'../src/hourlyStatusStore.js')).href;
-  const pointer=fs.readFileSync(source,'utf8').replace("'./stability-20261024-checkpoint-v2/installer/hourly004/runtime/hourly-runtime.mjs'","'./runtime-stub.mjs'").replace("'./stability-20261024-checkpoint-v2/src/hourlyAttemptDiagnostics.js'",JSON.stringify(helpers)).replace("'./stability-20261024-checkpoint-v2/src/hourlyStatusStore.js'",JSON.stringify(storage));
+  const pointer=fs.readFileSync(source,'utf8').replace("'./stability-20261024-checkpoint-v3/installer/hourly004/runtime/hourly-runtime.mjs'","'./runtime-stub.mjs'").replace("'./stability-20261024-checkpoint-v3/src/hourlyAttemptDiagnostics.js'",JSON.stringify(helpers)).replace("'./stability-20261024-checkpoint-v3/src/hourlyStatusStore.js'",JSON.stringify(storage));
   fs.writeFileSync(path.join(f.dir,'pointer.mjs'),pointer);fs.writeFileSync(path.join(f.dir,'runtime-stub.mjs'),`export async function main(){setInterval(()=>{},1000);throw Object.assign(new Error('DO-NOT-OUTPUT'),{code:'HOURLY_RECEIPT_PERSISTENCE_FAILED',hourlyDisplayIoPending:true,storageFailure:{code:'ENOSPC',stage:'receipt-sync'}})}`);
   const child=spawnSync(process.execPath,[path.join(f.dir,'pointer.mjs')],{encoding:'utf8',windowsHide:true,timeout:3000});assert.equal(child.status,1);assert.equal(child.signal,null);const result=JSON.parse(child.stdout);assert.equal(result.status,'launch-stopped');assert.equal(result.failure.code,'HOURLY_RECEIPT_PERSISTENCE_FAILED');assert.equal(result.failure.storageFailure.code,'ENOSPC');assert.ok(!child.stdout.includes('DO-NOT-OUTPUT'));
 });
@@ -144,4 +153,10 @@ test('Windows PowerShell 5.1 real controller Preflight/Update/Status/Rollback us
   const result=spawnSync(exe,['-NoProfile','-NonInteractive','-ExecutionPolicy','RemoteSigned','-File',path.join(here,'hourly-controller-native-fixture.ps1'),'-FixtureRoot',dir],{encoding:'utf8',windowsHide:true,timeout:40000});
   assert.equal(result.status,0,result.stdout||'Native fixture unavailable; details withheld.');const report=JSON.parse(result.stdout.replace(/^\uFEFF/,''));assert.equal(report.realControllerInvoked,true);assert.equal(report.passed,10);assert.equal(report.productionQueries,0);assert.equal(report.productionFilesChanged,0);assert.equal(report.taskRuns,0);
   t.diagnostic(JSON.stringify({simulation:true,nativeController:true,nativePowerShell:report.nativePowerShell,passed:report.passed,failed:report.failed,realControllerInvoked:true,productionQueries:0,productionFilesChanged:0,taskRuns:0}));
+});
+
+test('native controller rejects concurrent foreign changes and keeps post-rollback Status in one runtime attempt',{skip:process.platform!=='win32'},t=>{
+  const dir=makeControllerFixture(t),exe=path.join(process.env.SystemRoot,'System32/WindowsPowerShell/v1.0/powershell.exe');
+  const result=spawnSync(exe,['-NoProfile','-NonInteractive','-ExecutionPolicy','RemoteSigned','-File',path.join(here,'hourly-controller-acceptance-native-fixture.ps1'),'-FixtureRoot',dir],{encoding:'utf8',windowsHide:true,timeout:90000});
+  assert.equal(result.status,0,result.stdout||'Native acceptance fixture unavailable; details withheld.');const report=JSON.parse(result.stdout.replace(/^\uFEFF/,''));assert.equal(report.failed,0);assert.equal(report.passed,29);assert.equal(report.nativeHandleRenameInvoked,true);assert.equal(report.productionFilesChanged,0);t.diagnostic(JSON.stringify(report));
 });

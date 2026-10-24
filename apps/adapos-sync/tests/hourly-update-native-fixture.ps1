@@ -19,6 +19,7 @@ try{
       Assert-HourlyUpdate (-not (([Security.AccessControl.RawSecurityDescriptor]::new((Get-Acl -LiteralPath $target).Sddl)).ControlFlags -band [Security.AccessControl.ControlFlags]::DiscretionaryAclAutoInherited)) 'FIXTURE_LEGACY_ACL_NOT_REPRODUCED'
     }
     $acl=(Get-Acl -LiteralPath $target).Sddl
+    $pin=Get-HourlyLauncherImage $target ([IO.File]::ReadAllBytes($target))
     $pre={};$post={};$fault={}
     if($case -like '*snapshot-callbacks'){
       $before=@{Files=@{fixture=[byte[]]@(1,2)};Acl=@{fixture='fixture-acl'};Tasks=@{fixture=@{Xml='fixture-xml';Sddl='fixture-sddl'}};Timezone='fixture-zone'}
@@ -35,15 +36,16 @@ try{
     if($case -eq 'existing-backup'){[IO.File]::WriteAllText($backup,'foreign backup')}
     if($case -eq 'existing-pending'){[IO.File]::WriteAllText(($target+'.update-pending'),'foreign pending')}
     $failed=$false;$transactionReason=$null
-    try{Invoke-HourlyLauncherTransaction $target $candidate $backup $pre $post $fault}catch{$failed=$true;if($_.Exception.Message -in @('ACTIVATION_VERIFY_FAILED','ROLLBACK_VERIFY_FAILED','ORIGINAL_BACKUP_UNVERIFIED','PATH_TYPE_UNEXPECTED')){$transactionReason=$_.Exception.Message}}
+    try{Invoke-HourlyLauncherTransaction $target $candidate $backup $pre $post $fault -ExpectedImage $pin}catch{$failed=$true;if($_.Exception.Message -in @('ACTIVATION_VERIFY_FAILED','ROLLBACK_VERIFY_FAILED','ORIGINAL_BACKUP_UNVERIFIED','PATH_TYPE_UNEXPECTED')){$transactionReason=$_.Exception.Message}}
     $text=[IO.File]::ReadAllText($target)
     if($case -in @('success','legacy-acl-success','snapshot-callbacks','legacy-acl-snapshot-callbacks')){
       Assert-HourlyUpdate (-not $failed -and $text -ceq 'candidate fixture bytes' -and [IO.File]::ReadAllText($backup) -ceq 'original fixture bytes') 'FIXTURE_SUCCESS_FAILED'
       $restored=Join-Path $dir 'rollback-copy.mjs';[IO.File]::WriteAllText($restored,'original fixture bytes')
-      Invoke-HourlyLauncherTransaction $target $restored (Join-Path $dir 'candidate-backup.mjs') {} {}
+      $rollbackPin=Get-HourlyLauncherImage $target ([IO.File]::ReadAllBytes($candidate))
+      Invoke-HourlyLauncherTransaction $target $restored (Join-Path $dir 'candidate-backup.mjs') {} {} -ExpectedImage $rollbackPin
       Assert-HourlyUpdate ([IO.File]::ReadAllText($target) -ceq 'original fixture bytes') 'FIXTURE_ROLLBACK_FAILED'
     }elseif($case -in @('foreign-change','legacy-acl-foreign-change')){
-      Assert-HourlyUpdate ($failed -and $text -ceq 'foreign fixture bytes') 'FIXTURE_FOREIGN_CHANGE_OVERWRITTEN'
+      Assert-HourlyUpdate ($failed -and $text -ceq 'original fixture bytes') 'FIXTURE_FOREIGN_WRITE_NOT_BLOCKED'
     }else{
       Assert-HourlyUpdate ($failed -and $text -ceq 'original fixture bytes') 'FIXTURE_PARTIAL_INSTALL_NOT_RESTORED'
     }
