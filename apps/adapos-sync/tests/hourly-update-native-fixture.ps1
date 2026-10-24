@@ -5,29 +5,44 @@ $fixture=Join-Path $parent ('hourly-update-fixture-'+[guid]::NewGuid().ToString(
 $null=New-Item -ItemType Directory -Path $fixture
 $passed=0
 try{
-  foreach($case in @('success','replace-failure','postflight-failure','foreign-change','preflight-denied')){
+  foreach($case in @('success','replace-failure','postflight-failure','foreign-change','preflight-denied','legacy-acl-success','legacy-acl-rollback','legacy-acl-foreign-change','existing-backup','existing-pending')){
     $dir=Join-Path $fixture $case;$null=New-Item -ItemType Directory -Path $dir
     $target=Join-Path $dir 'launcher.mjs';$candidate=Join-Path $dir 'candidate.mjs';$backup=Join-Path $dir 'backup.mjs'
     [IO.File]::WriteAllText($target,'original fixture bytes');[IO.File]::WriteAllText($candidate,'candidate fixture bytes')
+    if($case -like 'legacy-acl-*'){
+      Initialize-HourlyFileTransactionNative
+      $security=Get-Acl -LiteralPath $target
+      $descriptor=[Security.AccessControl.RawSecurityDescriptor]::new($security.Sddl)
+      $descriptor.SetFlags([Security.AccessControl.ControlFlags]([int]$descriptor.ControlFlags -band (-bnot 1024)))
+      $bytes=New-Object byte[] $descriptor.BinaryLength;$descriptor.GetBinaryForm($bytes,0)
+      Assert-HourlyUpdate ([Hourly004FileTransactionNative]::SetFileSecurity($target,4,$bytes)) 'FIXTURE_LEGACY_ACL_SETUP_FAILED'
+      Assert-HourlyUpdate (-not (([Security.AccessControl.RawSecurityDescriptor]::new((Get-Acl -LiteralPath $target).Sddl)).ControlFlags -band [Security.AccessControl.ControlFlags]::DiscretionaryAclAutoInherited)) 'FIXTURE_LEGACY_ACL_NOT_REPRODUCED'
+    }
     $acl=(Get-Acl -LiteralPath $target).Sddl
     $pre={};$post={};$fault={}
     if($case -eq 'replace-failure'){$fault={throw 'INJECTED_FIXTURE_FAILURE'}}
     if($case -eq 'postflight-failure'){$post={throw 'INJECTED_FIXTURE_FAILURE'}}
+    if($case -eq 'legacy-acl-rollback'){$post={throw 'INJECTED_FIXTURE_FAILURE'}}
     if($case -eq 'preflight-denied'){$pre={throw [UnauthorizedAccessException]::new('DO-NOT-OUTPUT')}}
     if($case -eq 'foreign-change'){$fault={[IO.File]::WriteAllText($target,'foreign fixture bytes');throw 'INJECTED_FIXTURE_FAILURE'}}
-    $failed=$false
-    try{Invoke-HourlyLauncherTransaction $target $candidate $backup $pre $post $fault}catch{$failed=$true}
+    if($case -eq 'legacy-acl-foreign-change'){$fault={[IO.File]::WriteAllText($target,'foreign fixture bytes');throw 'INJECTED_FIXTURE_FAILURE'}}
+    if($case -eq 'existing-backup'){[IO.File]::WriteAllText($backup,'foreign backup')}
+    if($case -eq 'existing-pending'){[IO.File]::WriteAllText(($target+'.update-pending'),'foreign pending')}
+    $failed=$false;$transactionReason=$null
+    try{Invoke-HourlyLauncherTransaction $target $candidate $backup $pre $post $fault}catch{$failed=$true;if($_.Exception.Message -in @('ACTIVATION_VERIFY_FAILED','ROLLBACK_VERIFY_FAILED','ORIGINAL_BACKUP_UNVERIFIED','PATH_TYPE_UNEXPECTED')){$transactionReason=$_.Exception.Message}}
     $text=[IO.File]::ReadAllText($target)
-    if($case -eq 'success'){
+    if($case -in @('success','legacy-acl-success')){
       Assert-HourlyUpdate (-not $failed -and $text -ceq 'candidate fixture bytes' -and [IO.File]::ReadAllText($backup) -ceq 'original fixture bytes') 'FIXTURE_SUCCESS_FAILED'
       $restored=Join-Path $dir 'rollback-copy.mjs';[IO.File]::WriteAllText($restored,'original fixture bytes')
       Invoke-HourlyLauncherTransaction $target $restored (Join-Path $dir 'candidate-backup.mjs') {} {}
       Assert-HourlyUpdate ([IO.File]::ReadAllText($target) -ceq 'original fixture bytes') 'FIXTURE_ROLLBACK_FAILED'
-    }elseif($case -eq 'foreign-change'){
+    }elseif($case -in @('foreign-change','legacy-acl-foreign-change')){
       Assert-HourlyUpdate ($failed -and $text -ceq 'foreign fixture bytes') 'FIXTURE_FOREIGN_CHANGE_OVERWRITTEN'
     }else{
       Assert-HourlyUpdate ($failed -and $text -ceq 'original fixture bytes') 'FIXTURE_PARTIAL_INSTALL_NOT_RESTORED'
     }
+    if($case -eq 'existing-backup'){Assert-HourlyUpdate ([IO.File]::ReadAllText($backup) -ceq 'foreign backup') 'FIXTURE_FOREIGN_BACKUP_CHANGED'}
+    if($case -eq 'existing-pending'){Assert-HourlyUpdate ([IO.File]::ReadAllText(($target+'.update-pending')) -ceq 'foreign pending') 'FIXTURE_FOREIGN_PENDING_CHANGED'}
     Assert-HourlyUpdate ((Get-Acl -LiteralPath $target).Sddl -ceq $acl) 'FIXTURE_ACL_CHANGED'
     $passed++
   }
@@ -60,7 +75,7 @@ try{
   }
   [pscustomobject]@{simulation=$true;nativePowerShellVersion=$PSVersionTable.PSVersion.ToString();passed=$passed;failed=0;productionQueries=0;taskRuns=0;productionFilesChanged=0}|ConvertTo-Json -Compress
 }catch{
-  [pscustomobject]@{simulation=$true;status='fixture-failed';case=$case;failureType=$_.Exception.GetType().Name;productionFilesChanged=0}|ConvertTo-Json -Compress
+  [pscustomobject]@{simulation=$true;status='fixture-failed';case=$case;transactionReason=$transactionReason;failureType=$_.Exception.GetType().Name;productionFilesChanged=0}|ConvertTo-Json -Compress
   exit 1
 }finally{
   $resolved=[IO.Path]::GetFullPath($fixture)

@@ -104,27 +104,65 @@ function Assert-HourlyQuiet {
 
 # The transaction is also exercised in native PS 5.1 fixtures. Its injected
 # assertions operate only on fixture files; no production entrypoint is run.
+function Initialize-HourlyFileTransactionNative {
+  if('Hourly004FileTransactionNative' -as [type]){return}
+  Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class Hourly004FileTransactionNative {
+  [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+  [return: MarshalAs(UnmanagedType.Bool)]
+  public static extern bool SetFileSecurity(string name, uint information, byte[] descriptor);
+  [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+  [return: MarshalAs(UnmanagedType.Bool)]
+  public static extern bool MoveFileEx(string source, string destination, uint flags);
+}
+'@
+}
+function Write-HourlyOwnedTransactionFile([string]$Path,[byte[]]$Bytes,$Permissions) {
+  $stream=[IO.File]::Open($Path,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+  try{$stream.Write($Bytes,0,$Bytes.Length);$stream.Flush($true)}finally{$stream.Dispose()}
+  # Initialize only this newly created file. Never rewrite the target's ACL or
+  # normalize its descriptor to make a comparison pass. Owner/group must also
+  # match without changing identity or enabling privileges.
+  if((Get-Acl -LiteralPath $Path).Sddl -cne $Permissions.Sddl){
+    Assert-HourlyUpdate ([Hourly004FileTransactionNative]::SetFileSecurity($Path,4,$Permissions.GetSecurityDescriptorBinaryForm())) 'ACTIVATION_VERIFY_FAILED'
+  }
+  Assert-HourlyUpdate ((Get-Acl -LiteralPath $Path).Sddl -ceq $Permissions.Sddl -and (Test-HourlyBytes ([IO.File]::ReadAllBytes($Path)) $Bytes)) 'ACTIVATION_VERIFY_FAILED'
+}
 function Invoke-HourlyLauncherTransaction([string]$Target,[string]$Candidate,[string]$Backup,[scriptblock]$AssertBefore,[scriptblock]$AssertAfter,[scriptblock]$FaultAfterReplace={}) {
   & $AssertBefore
-  $before=[IO.File]::ReadAllBytes($Target);$next=[IO.File]::ReadAllBytes($Candidate);$permissions=(Get-Acl -LiteralPath $Target).Sddl
+  Initialize-HourlyFileTransactionNative
+  $before=[IO.File]::ReadAllBytes($Target);$next=[IO.File]::ReadAllBytes($Candidate);$permissions=Get-Acl -LiteralPath $Target
   Assert-HourlyUpdate (-not(Test-Path -LiteralPath $Backup)) 'BACKUP_ALREADY_EXISTS'
   $pending=$Target+'.update-pending'
   Assert-HourlyUpdate (-not(Test-Path -LiteralPath $pending)) 'PENDING_UPDATE_REQUIRES_REVIEW'
+  Assert-HourlyUpdate ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($Target)) -ieq [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($Backup))) 'PATH_TYPE_UNEXPECTED'
   $switched=$false
+  $pendingOwned=$false
   try{
-    [IO.File]::WriteAllBytes($pending,$next)
-    [IO.File]::Replace($pending,$Target,$Backup);$switched=$true
+    Write-HourlyOwnedTransactionFile $Backup $before $permissions
+    Assert-HourlyUpdate (-not(Test-Path -LiteralPath $pending)) 'PENDING_UPDATE_REQUIRES_REVIEW'
+    Write-HourlyOwnedTransactionFile $pending $next $permissions
+    $pendingOwned=$true
+    & $AssertBefore
+    Assert-HourlyUpdate ((Test-HourlyBytes ([IO.File]::ReadAllBytes($Target)) $before) -and (Get-Acl -LiteralPath $Target).Sddl -ceq $permissions.Sddl) 'ACTIVATION_VERIFY_FAILED'
+    # Same-directory rename, replacement + write-through only (no cross-volume
+    # copy or delayed reboot). ReplaceFile changes legacy auto-inherit flags.
+    Assert-HourlyUpdate ([Hourly004FileTransactionNative]::MoveFileEx($pending,$Target,9)) 'ACTIVATION_VERIFY_FAILED'
+    $switched=$true;$pendingOwned=$false
     & $FaultAfterReplace
-    Assert-HourlyUpdate ((Test-HourlyBytes ([IO.File]::ReadAllBytes($Target)) $next) -and (Get-Acl -LiteralPath $Target).Sddl -ceq $permissions) 'ACTIVATION_VERIFY_FAILED'
+    Assert-HourlyUpdate ((Test-HourlyBytes ([IO.File]::ReadAllBytes($Target)) $next) -and (Get-Acl -LiteralPath $Target).Sddl -ceq $permissions.Sddl) 'ACTIVATION_VERIFY_FAILED'
     & $AssertAfter
   }catch{
     if($switched){
-      Assert-HourlyUpdate (Test-HourlyBytes ([IO.File]::ReadAllBytes($Target)) $next) 'ROLLBACK_REFUSED_FOREIGN_CHANGE'
-      [IO.File]::WriteAllBytes($pending,$before);[IO.File]::Replace($pending,$Target,($Backup+'.failed-candidate'))
-      Assert-HourlyUpdate ((Test-HourlyBytes ([IO.File]::ReadAllBytes($Target)) $before) -and (Get-Acl -LiteralPath $Target).Sddl -ceq $permissions) 'ROLLBACK_VERIFY_FAILED'
+      Assert-HourlyUpdate ((Test-HourlyBytes ([IO.File]::ReadAllBytes($Target)) $next) -and (Get-Acl -LiteralPath $Target).Sddl -ceq $permissions.Sddl) 'ROLLBACK_REFUSED_FOREIGN_CHANGE'
+      Assert-HourlyUpdate ((Test-HourlyBytes ([IO.File]::ReadAllBytes($Backup)) $before) -and (Get-Acl -LiteralPath $Backup).Sddl -ceq $permissions.Sddl) 'ORIGINAL_BACKUP_UNVERIFIED'
+      Assert-HourlyUpdate ([Hourly004FileTransactionNative]::MoveFileEx($Backup,$Target,9)) 'ROLLBACK_VERIFY_FAILED'
+      Assert-HourlyUpdate ((Test-HourlyBytes ([IO.File]::ReadAllBytes($Target)) $before) -and (Get-Acl -LiteralPath $Target).Sddl -ceq $permissions.Sddl) 'ROLLBACK_VERIFY_FAILED'
     }
     throw
-  }finally{if(Test-Path -LiteralPath $pending){[IO.File]::Delete($pending)}}
+  }finally{if($pendingOwned -and (Test-Path -LiteralPath $pending)){[IO.File]::Delete($pending)}}
 }
 function Assert-HourlyRelease([string]$Root) {
   $manifest=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'release-manifest.json') -Raw | ConvertFrom-Json
