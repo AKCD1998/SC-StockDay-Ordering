@@ -2,6 +2,10 @@
 .ky9-tabs button { padding:10px 22px; border:1px solid #cedbd5; background:white; border-radius:12px; color:#244d3c; font:inherit; cursor:pointer; }
 .ky9-tabs button[aria-selected="true"] { background:#155b46; color:white; border-color:#155b46; }
 .ky9-documents { color:#203c32; display:grid; gap:18px; font-family:"Leelawadee UI",Tahoma,sans-serif; font-size:15px; line-height:1.6; }
+.ky9-documents .ghost-button,
+[data-theme="dark"] .ky9-documents .ghost-button { color:#244d3c; background:#f4f8f5; border-color:#b7cbbf; }
+.ky9-documents .ghost-button:hover:not(:disabled),
+[data-theme="dark"] .ky9-documents .ghost-button:hover:not(:disabled) { color:#163b2b; background:#e5efe9; border-color:#8dab9b; }
 .ky9-document-hero { display:flex; justify-content:space-between; align-items:center; gap:24px; padding:28px; border:1px solid #c8ded3; border-radius:22px; background:linear-gradient(120deg,#edf8f1,#f8f9ef); }
 .ky9-document-hero h2 { margin:8px 0; font-size:30px; }
 .ky9-document-hero p { margin:0; }
