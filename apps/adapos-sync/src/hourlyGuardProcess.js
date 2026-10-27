@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { emitHourlyDiagnostic } from "./hourlyAttemptDiagnostics.js";
-import {safeProviderFailure,validCpuMeasurement,safeCpuEvidence} from './hourlyGuardEvidence.js';
+import {safeProviderFailure,validCpuMeasurement,safeCpuEvidence,safeCpuObservation} from './hourlyGuardEvidence.js';
 
 // The installed production deadline is twelve seconds. Diagnostics do not
 // authorize the thirty-second proposal from the original PR.
@@ -17,6 +17,7 @@ export function safeHourlyGuardSummary(value) {
   return { stage: value.stage, reason: value.reason, elapsedMs: value.elapsedMs, budgetMs: value.budgetMs,
     ...(typeof value.cpuPercent === 'number' && Number.isFinite(value.cpuPercent) && value.cpuPercent >= 0 && value.cpuPercent <= 100 ? { cpuPercent: value.cpuPercent } : {}),
     ...(safeProviderFailure(value.providerFailure)?{providerFailure:safeProviderFailure(value.providerFailure)}:{}),
+    ...(safeCpuObservation(value.cpuObservation)?{cpuObservation:safeCpuObservation(value.cpuObservation)}:{}),
     timeout: value.reason === "DEADLINE", retryAttempted: false };
 }
 
@@ -27,11 +28,11 @@ export function createHourlyGuard({ executable, script, spawnProcess = spawn, pl
   return async function hourlyGuard({ remainingMs = HOURLY_GUARD_BUDGET_MS } = {}) {
     const start = now(), budgetMs = Number.isFinite(remainingMs) ? Math.max(0, Math.floor(Math.min(HOURLY_GUARD_BUDGET_MS, remainingMs))) : 0;
     const deadline = start + budgetMs, remaining = () => Math.max(0, deadline - now());
-    let stage = "starting", stageStart = start, startupMs = null, cpuPercent = null, providerFailure=null;
+    let stage = "starting", stageStart = start, startupMs = null, cpuPercent = null, providerFailure=null,cpuObservation=null;
     const diagnosticStage = () => ({ starting: "powershell-startup", host: "host-identity", tasks: "task-scheduler", processes: "processes", cpu: "cpu-provider", complete: "cpu-provider" })[stage];
     const report = (kind, reason, extra = {}) => emitHourlyDiagnostic(onDiagnostic, { stage: diagnosticStage(), kind, ...(reason ? { code: reason } : {}), durationMs: Math.max(0, now() - stageStart), remainingMs: Math.max(0, budgetMs - (now() - start)), budgetMs, ...extra });
     const failure = reason => Object.assign(new Error("Hourly source guard stopped before another batch."), {
-      code: "HOURLY_SOURCE_GUARD_UNAVAILABLE", guardSummary: safeHourlyGuardSummary({ stage, reason, elapsedMs: Math.max(0, Math.ceil(now() - start)), budgetMs, cpuPercent,providerFailure }),
+      code: "HOURLY_SOURCE_GUARD_UNAVAILABLE", guardSummary: safeHourlyGuardSummary({ stage, reason, elapsedMs: Math.max(0, Math.ceil(now() - start)), budgetMs, cpuPercent,providerFailure,cpuObservation }),
     });
     if (platform !== "win32") throw failure("PLATFORM_UNAVAILABLE");
     if (budgetMs < 1) throw failure("BUDGET_EXHAUSTED");
@@ -46,7 +47,7 @@ export function createHourlyGuard({ executable, script, spawnProcess = spawn, pl
         if (closed || !child?.pid) lease?.release();
         if(!error&&remaining()<=0)error=failure('DEADLINE');
         if(!error&&!validCpuMeasurement(terminal?.cpuMeasurement,now(),terminal?.systemCpuPercent,start))error=failure('READY_UNVERIFIED');
-        report(error ? "failure" : "success", error?.guardSummary?.reason, { ...(startupMs == null ? {} : { startupMs }), ...(cpuPercent == null ? {} : { cpuPercent }), ...(providerFailure?{providerFailure}:{}),childTerminationConfirmed: closed || !child?.pid });
+        report(error ? "failure" : "success", error?.guardSummary?.reason, { ...(startupMs == null ? {} : { startupMs }), ...(cpuPercent == null ? {} : { cpuPercent }), ...(providerFailure?{providerFailure}:{}),...(cpuObservation?{cpuObservation}:{}),childTerminationConfirmed: closed || !child?.pid });
         if(!error&&remaining()<=0)error=failure('DEADLINE');
         if(!error&&!validCpuMeasurement(terminal?.cpuMeasurement,now(),terminal?.systemCpuPercent,start))error=failure('READY_UNVERIFIED');
         error ? reject(error) : resolve(result);
@@ -77,6 +78,7 @@ export function createHourlyGuard({ executable, script, spawnProcess = spawn, pl
         if (value.kind !== "result") { stop("INVALID_OUTPUT"); return; }
         terminal = value;
         providerFailure=safeProviderFailure(value.providerFailure);
+        if(validCpuMeasurement(value.cpuMeasurement,now(),value.systemCpuPercent,start))cpuObservation=safeCpuEvidence(value.cpuMeasurement,now());
         if (stage === 'cpu' && Number.isFinite(value.systemCpuPercent) && value.systemCpuPercent >= 0 && value.systemCpuPercent <= 100) cpuPercent = value.systemCpuPercent;
       };
       try {
@@ -105,7 +107,8 @@ export function createHourlyGuard({ executable, script, spawnProcess = spawn, pl
           if (terminal?.status !== "ready" || terminal.stage !== "complete" || terminal.cpuBelowThreshold !== true
               || terminal.existingWorkQuiet !== true || terminal.hostVerified !== true || !Number.isFinite(terminal.systemCpuPercent)
               || terminal.systemCpuPercent < 0 || terminal.systemCpuPercent >= 70 || !validCpuMeasurement(terminal.cpuMeasurement,now(),terminal.systemCpuPercent,start)) return finish(failure("READY_UNVERIFIED"), null, true);
-          emitHourlyDiagnostic(onDiagnostic, { stage: "cpu-provider", kind: "success", cpuPercent: terminal.systemCpuPercent });
+          cpuObservation=safeCpuEvidence(terminal.cpuMeasurement,now());
+          emitHourlyDiagnostic(onDiagnostic, { stage: "cpu-provider", kind: "success", cpuPercent: terminal.systemCpuPercent,cpuObservation });
           if(remaining()<=0)return finish(failure('DEADLINE'),null,true);
           finish(null, { status: "ready", hostVerified: true, existingWorkQuiet: true, cpuBelowThreshold: true,
             systemCpuPercent: terminal.systemCpuPercent,cpuMeasurement:safeCpuEvidence(terminal.cpuMeasurement,now()),guardElapsedMs: Math.max(0, Math.ceil(now() - start)) }, true);

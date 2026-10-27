@@ -14,5 +14,9 @@ export function validCpuMeasurement(value,now,percent,started=0){
 }
 export function safeCpuEvidence(value,now){
  if(!validCpuMeasurement(value,now,value?.PercentProcessorTime))return null;
- return {provider:value.provider,hostWide:true,rawSamples:2,windowMs:value.windowMs,ageMs:now-value.endedMs,groups:1,processors:value.processors};
+ return {provider:value.provider,hostWide:true,rawSamples:2,windowMs:value.windowMs,ageMsAtGuard:now-value.endedMs,groups:1,processors:value.processors};
+}
+export function safeCpuObservation(value){
+ if(!value||value.provider!=='windows-system-times-v1'||value.hostWide!==true||value.rawSamples!==2||value.groups!==1||!int(value.processors,1,64)||!Number.isFinite(value.windowMs)||value.windowMs<1000||value.windowMs>1500||!Number.isFinite(value.ageMsAtGuard)||value.ageMsAtGuard<0||value.ageMsAtGuard>1000)return null;
+ return {provider:value.provider,hostWide:true,rawSamples:2,windowMs:value.windowMs,ageMsAtGuard:value.ageMsAtGuard,groups:1,processors:value.processors};
 }

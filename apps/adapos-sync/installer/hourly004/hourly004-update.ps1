@@ -330,7 +330,7 @@ function Get-HourlySafeStatus {
   try {
     $reply=@($request | & $script:HourlyNode $reader 2>$null)
     if($LASTEXITCODE -eq 0){$view=($reply -join [Environment]::NewLine)|ConvertFrom-Json;if($view.schemaVersion -eq 'hourly004-status-view-v2'){
-      foreach($key in @('availability','latestAttempt','lastSuccess','failureCode','guardReason','lastStage','storageFailure','receiptState','progressObservation','providerFailure')){$report[$key]=$view.$key}
+      foreach($key in @('availability','latestAttempt','lastSuccess','failureCode','guardReason','lastStage','storageFailure','receiptState','progressObservation','providerFailure','cpuObservation')){$report[$key]=$view.$key}
     }}
   } catch { }
   return [pscustomobject]$report

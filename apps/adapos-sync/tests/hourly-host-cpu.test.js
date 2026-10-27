@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import path from 'node:path';import {fileURLToPath} from 'node:url';import {spawnSync} from 'node:child_process';
-import {safeProviderFailure,validCpuMeasurement} from '../src/hourlyGuardEvidence.js';
+import {safeProviderFailure,validCpuMeasurement,safeCpuEvidence,safeCpuObservation} from '../src/hourlyGuardEvidence.js';
 import {safeHourlyGuardSummary} from '../src/hourlyGuardProcess.js';
 import {safeHourlyDiagnostic,createHourlyAttemptDiagnostics} from '../src/hourlyAttemptDiagnostics.js';
 const here=path.dirname(fileURLToPath(import.meta.url));
@@ -17,6 +17,12 @@ test('safe provider errors retain actual bounded codes and strip all arbitrary c
  const summary=safeHourlyGuardSummary({stage:'cpu',reason:'CPU_UNAVAILABLE',elapsedMs:10,budgetMs:12000,providerFailure:raw});assert.deepEqual(summary.providerFailure,safe);
  const event=safeHourlyDiagnostic({stage:'cpu-provider',kind:'failure',providerFailure:raw});assert.deepEqual(event.providerFailure,safe);
  const d=createHourlyAttemptDiagnostics();d.observe(event);const snap=d.snapshot();snap.events[0].providerFailure.exceptions[0].message='DO-NOT-OUTPUT';assert.ok(!JSON.stringify(d.snapshot()).includes('DO-NOT-OUTPUT'));
+});
+test('sampling metadata is safe historical evidence at the guard, not a reusable current CPU sample',()=>{
+ const observation=safeCpuEvidence(cpu(),2100);assert.equal(observation.ageMsAtGuard,100);assert.equal(observation.windowMs,1000);assert.equal(observation.rawSamples,2);assert.equal(observation.startedMs,undefined);assert.equal(observation.endedMs,undefined);
+ const event=safeHourlyDiagnostic({stage:'cpu-provider',kind:'success',cpuObservation:{...observation,raw:'DO-NOT-OUTPUT'}});assert.deepEqual(event.cpuObservation,observation);assert.ok(!JSON.stringify(event).includes('DO-NOT-OUTPUT'));
+ assert.equal(safeCpuObservation({...observation,ageMsAtGuard:1001}),null);assert.equal(safeCpuObservation({...observation,provider:'cim'}),null);
+ assert.equal(validCpuMeasurement(observation,2100,5),false);
 });
 test('native PS5.1 CPU math, timeout, invalid, stale, warm-up and budget fault fixtures use no real CPU reads',{skip:process.platform!=='win32'},t=>{
  const exe=path.join(process.env.SystemRoot,'System32/WindowsPowerShell/v1.0/powershell.exe');

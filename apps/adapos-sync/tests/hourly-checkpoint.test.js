@@ -10,7 +10,7 @@ import {createHourlyStatusStore,inspectHourlyStatus as inspectStatus,readHourlyD
 const inspectHourlyStatus=(file,options={})=>inspectStatus(file,{now:'2026-10-24T08:03:00.000Z',taskRunning:false,...options});
 import {createHourlyAttemptDiagnostics} from '../src/hourlyAttemptDiagnostics.js';
 import {createHourlyGuard,HOURLY_GUARD_BUDGET_MS} from '../src/hourlyGuardProcess.js';
-import {safeProviderFailure} from '../src/hourlyGuardEvidence.js';
+import {safeProviderFailure,safeCpuObservation} from '../src/hourlyGuardEvidence.js';
 import {EventEmitter} from 'node:events';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
@@ -25,8 +25,10 @@ function ioFault(stage,code,failCount=Infinity){let calls=0;return {...fs.promis
 
 test('Status projects only safe provider fields from the same completed durable attempt',async t=>{
  const f=fixture(t),store=createHourlyStatusStore(f.file),raw={exceptions:[{type:'Microsoft.Management.Infrastructure.CimException',hresult:-2146233088,cimStatusCode:1,message:'DO-NOT-OUTPUT',TargetObject:'DO-NOT-OUTPUT'}],category:'OperationTimeout',qualifiedErrorIdParts:['HRESULT 0x80338029','DO-NOT-OUTPUT'],validation:'CPU_SAMPLE_STALE'};
- store.begin({slot:'15:00',startedAt:start});await store.finish({slot:'15:00',inspectionTime:start,finishedAt:end,status:'launch-stopped',failure:{code:'HOURLY_SOURCE_GUARD_UNAVAILABLE',guard:{stage:'cpu',reason:'CPU_UNAVAILABLE',elapsedMs:1000,budgetMs:12000,providerFailure:raw}}});await store.close();
+ const observation={provider:'windows-system-times-v1',hostWide:true,rawSamples:2,groups:1,processors:4,windowMs:1000,ageMsAtGuard:100,raw:'DO-NOT-OUTPUT'};
+ store.begin({slot:'15:00',startedAt:start});await store.finish({slot:'15:00',inspectionTime:start,finishedAt:end,status:'launch-stopped',failure:{code:'HOURLY_SOURCE_GUARD_UNAVAILABLE',guard:{stage:'cpu',reason:'CPU_UNAVAILABLE',elapsedMs:1000,budgetMs:12000,providerFailure:raw,cpuObservation:observation}}});await store.close();
  const value=inspectHourlyStatus(f.file,{latestTaskStartedAt:start});assert.deepEqual(value.providerFailure,safeProviderFailure(raw));assert.equal(value.latestAttempt.status,'launch-stopped');assert.equal(value.lastSuccess.slot,'14:00');assert.ok(!JSON.stringify(value).includes('DO-NOT-OUTPUT'));
+ assert.deepEqual(value.cpuObservation,safeCpuObservation(observation));assert.equal(inspectHourlyStatus(f.file,{latestTaskStartedAt:start,taskRunning:true}).cpuObservation,null);
  assert.equal(inspectHourlyStatus(f.file,{latestTaskStartedAt:start,taskRunning:true}).providerFailure,null);
  assert.equal(inspectHourlyStatus(f.file,{latestTaskStartedAt:'2026-10-24T09:00:02.000Z'}).providerFailure,null);
 });
