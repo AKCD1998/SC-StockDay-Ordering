@@ -6,6 +6,7 @@ import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHourlyGuard, safeHourlyGuardSummary } from "../src/hourlyGuardProcess.js";
+import {safeProviderFailure} from '../src/hourlyGuardEvidence.js';
 
 function fixture(extra = {}) {
   const child = new EventEmitter();child.stdout = new PassThrough();child.stderr = new PassThrough();
@@ -17,8 +18,8 @@ function fixture(extra = {}) {
   });
   return { child, guard, advance: ms => { duration += ms; }, deadline: () => deadline, expire: () => timer(), kills: () => kills, spawns: () => spawns,
     send: value => child.stdout.write(JSON.stringify({ schemaVersion: "hourly-source-guard-v2", elapsedMs: duration, ...value }) + "\r\n"),
-    ready: (extra = {}) => child.stdout.write(JSON.stringify({ schemaVersion: "hourly-source-guard-v2", kind: "result", stage: "complete", elapsedMs: duration,
-      status: "ready", hostVerified: true, existingWorkQuiet: true, cpuBelowThreshold: true, systemCpuPercent: 5, ...extra }) + "\r\n"),
+    ready: (extra = {}) => {if(duration<1000)duration=1000;return child.stdout.write(JSON.stringify({ schemaVersion: "hourly-source-guard-v2", kind: "result", stage: "complete", elapsedMs: duration,
+      status: "ready", hostVerified: true, existingWorkQuiet: true, cpuBelowThreshold: true, systemCpuPercent: 5,cpuMeasurement:{provider:'windows-system-times-v1',hostWide:true,rawSamples:2,groups:1,processors:4,PercentProcessorTime:5,startedMs:duration-1000,endedMs:duration,windowMs:1000,ageMs:0}, ...extra }) + "\r\n");},
   };
 }
 const reasonIs = reason => error => error.code === "HOURLY_SOURCE_GUARD_UNAVAILABLE" && error.guardSummary?.reason === reason;
@@ -51,7 +52,7 @@ test("remaining collection budget wins over the guard ceiling; expired budget ne
   await assert.rejects(promise,error=>reasonIs("DEADLINE")(error)&&error.guardSummary.stage==="cpu");assert.equal(f.spawns(),1);assert.equal(f.kills(),1);
   const g=fixture();await assert.rejects(g.guard({remainingMs:0}),reasonIs("BUDGET_EXHAUSTED"));assert.equal(g.spawns(),0);
 });
-for (const [stage,reason] of [["host","HOST_UNVERIFIED"],["tasks","FULL_SYNC_BUSY"],["processes","PROCESS_UNREADABLE"],["processes","ACCESS_DENIED"],["cpu","CPU_LIMIT"],["cpu","CPU_UNREADABLE"],["cpu","CPU_UNAVAILABLE"],["cpu","PROVIDER_TIMEOUT"]]) {
+for (const [stage,reason] of [["host","HOST_UNVERIFIED"],["tasks","FULL_SYNC_BUSY"],["processes","PROCESS_UNREADABLE"],["processes","ACCESS_DENIED"],["cpu","CPU_LIMIT"],["cpu","CPU_UNREADABLE"],["cpu","CPU_UNAVAILABLE"],["cpu","PROVIDER_TIMEOUT"],['cpu','BUDGET_EXHAUSTED']]) {
   test(`${reason} stops once without retry or raw output`,async()=>{
     const f=fixture(), promise=f.guard();f.send({kind:"progress",stage});f.send({kind:"result",stage,status:"guard-stopped",reason,privateMessage:"DO-NOT-OUTPUT"});f.child.emit("close",1);
     await assert.rejects(promise,error=>{assert.ok(!JSON.stringify(error).includes("DO-NOT-OUTPUT"));return reasonIs(reason)(error);});assert.equal(f.spawns(),1);
@@ -105,13 +106,27 @@ test("native Windows PowerShell 5.1 provider fixtures preserve guard boundaries"
   const executable=path.join(process.env.SystemRoot,"System32","WindowsPowerShell","v1.0","powershell.exe");
   const harness=fileURLToPath(new URL("./hourly-guard-native-fixture.ps1",import.meta.url));
   const result=spawnSync(executable,["-NoProfile","-NonInteractive","-ExecutionPolicy","RemoteSigned","-File",harness],{encoding:"utf8",timeout:20000,windowsHide:true});
-  assert.equal(result.status,0,result.stdout+result.stderr);const summary=JSON.parse(result.stdout.replace(/^\uFEFF/,""));assert.equal(summary.simulation,true);assert.equal(summary.failed,0);assert.ok(summary.passed>=14);assert.equal(summary.productionQueries,0);
+  assert.equal(result.status,0,result.stdout||'Native fixture unavailable; details withheld.');const summary=JSON.parse(result.stdout.replace(/^\uFEFF/,""));assert.equal(summary.simulation,true);assert.equal(summary.failed,0);assert.ok(summary.passed>=14);assert.equal(summary.productionQueries,0);
 });
 test("startup and provider time are measured separately without retaining raw child fields",async()=>{
   const events=[],f=fixture({onDiagnostic:event=>events.push(event)}),p=f.guard();
   f.advance(1100);f.send({kind:'progress',stage:'host',message:'DO-NOT-OUTPUT'});f.advance(200);f.send({kind:'progress',stage:'tasks'});f.advance(300);f.send({kind:'progress',stage:'processes'});f.advance(400);f.send({kind:'progress',stage:'cpu'});f.advance(500);f.ready();f.child.emit('close',0);await p;
   assert.ok(events.some(e=>e.stage==='powershell-startup'&&e.kind==='success'&&e.durationMs===1100));
   assert.ok(events.some(e=>e.stage==='cpu-provider'&&e.durationMs===500));assert.ok(!JSON.stringify(events).includes('DO-NOT-OUTPUT'));
+});
+test('a single fresh canonical measurement is required; stale and pre-guard low samples never approve',async()=>{
+ for(const variant of ['missing','old-provider','warmup','stale-at-close','old-before-start','multiple']){
+  const f=fixture(),p=f.guard();f.advance(2000);
+  const m={provider:'windows-system-times-v1',hostWide:true,rawSamples:2,groups:1,processors:4,PercentProcessorTime:5,startedMs:1000,endedMs:2000,windowMs:1000,ageMs:0};
+  if(variant==='old-provider')m.provider='cim';if(variant==='warmup')m.rawSamples=1;if(variant==='old-before-start'){m.startedMs=-1;m.endedMs=999;}
+  f.ready({cpuMeasurement:variant==='missing'?undefined:variant==='multiple'?[m,m]:m});if(variant==='stale-at-close')f.advance(1001);f.child.emit('close',0);
+  await assert.rejects(p,reasonIs('READY_UNVERIFIED'));assert.equal(f.spawns(),1);
+ }
+});
+test('provider exception fields survive a failed child, diagnostics and summary without raw fields',async()=>{
+ const events=[],f=fixture({onDiagnostic:event=>events.push(event)}),p=f.guard(),raw={exceptions:[{type:'Microsoft.Management.Infrastructure.CimException',hresult:-2146233088,cimStatusCode:1,message:'DO-NOT-OUTPUT'}],category:'OperationTimeout',qualifiedErrorIdParts:['HRESULT 0x80338029','DO-NOT-OUTPUT'],raw:'DO-NOT-OUTPUT'};
+ f.send({kind:'result',stage:'cpu',status:'guard-stopped',reason:'CPU_UNAVAILABLE',providerFailure:raw});f.child.emit('close',1);
+ await assert.rejects(p,error=>{assert.deepEqual(error.guardSummary.providerFailure,safeProviderFailure(raw));assert.ok(!JSON.stringify(error).includes('DO-NOT-OUTPUT'));return true;});assert.ok(events.some(e=>e.providerFailure?.exceptions[0].cimStatusCode===1));assert.ok(!JSON.stringify(events).includes('DO-NOT-OUTPUT'));assert.equal(f.spawns(),1);
 });
 test("native PowerShell slow startup and stalled provider abort with one child and bounded termination",{skip:process.platform!=="win32"},async()=>{
   const executable=path.join(process.env.SystemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe');

@@ -10,6 +10,7 @@ import {createHourlyStatusStore,inspectHourlyStatus as inspectStatus,readHourlyD
 const inspectHourlyStatus=(file,options={})=>inspectStatus(file,{now:'2026-10-24T08:03:00.000Z',taskRunning:false,...options});
 import {createHourlyAttemptDiagnostics} from '../src/hourlyAttemptDiagnostics.js';
 import {createHourlyGuard,HOURLY_GUARD_BUDGET_MS} from '../src/hourlyGuardProcess.js';
+import {safeProviderFailure} from '../src/hourlyGuardEvidence.js';
 import {EventEmitter} from 'node:events';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
@@ -21,6 +22,14 @@ const ack={accepted:6835,branchCode:'004',capturedAt:'2026-10-24T08:01:59.000Z',
 const payload={branchCode:'004',records:Array.from({length:6835},()=>({})),plannedSlot:'15:00',capturedAt:ack.capturedAt,idempotencyKey:'a'.repeat(64)};
 function acknowledge(store){store.acknowledge({ack,payload,remainingMs:60000});}
 function ioFault(stage,code,failCount=Infinity){let calls=0;return {...fs.promises,[stage]:async(...args)=>{calls++;if(calls<=failCount)throw Object.assign(new Error('DO-NOT-OUTPUT'),{code,path:'DO-NOT-OUTPUT'});return fs.promises[stage](...args);},calls:()=>calls};}
+
+test('Status projects only safe provider fields from the same completed durable attempt',async t=>{
+ const f=fixture(t),store=createHourlyStatusStore(f.file),raw={exceptions:[{type:'Microsoft.Management.Infrastructure.CimException',hresult:-2146233088,cimStatusCode:1,message:'DO-NOT-OUTPUT',TargetObject:'DO-NOT-OUTPUT'}],category:'OperationTimeout',qualifiedErrorIdParts:['HRESULT 0x80338029','DO-NOT-OUTPUT'],validation:'CPU_SAMPLE_STALE'};
+ store.begin({slot:'15:00',startedAt:start});await store.finish({slot:'15:00',inspectionTime:start,finishedAt:end,status:'launch-stopped',failure:{code:'HOURLY_SOURCE_GUARD_UNAVAILABLE',guard:{stage:'cpu',reason:'CPU_UNAVAILABLE',elapsedMs:1000,budgetMs:12000,providerFailure:raw}}});await store.close();
+ const value=inspectHourlyStatus(f.file,{latestTaskStartedAt:start});assert.deepEqual(value.providerFailure,safeProviderFailure(raw));assert.equal(value.latestAttempt.status,'launch-stopped');assert.equal(value.lastSuccess.slot,'14:00');assert.ok(!JSON.stringify(value).includes('DO-NOT-OUTPUT'));
+ assert.equal(inspectHourlyStatus(f.file,{latestTaskStartedAt:start,taskRunning:true}).providerFailure,null);
+ assert.equal(inspectHourlyStatus(f.file,{latestTaskStartedAt:'2026-10-24T09:00:02.000Z'}).providerFailure,null);
+});
 
 test('transient rename failure retries the same display operation and clears current failure after success',async t=>{
   const f=fixture(t),io=ioFault('rename','EPERM',1),store=createHourlyStatusStore(f.file,{viewIo:io});store.begin({slot:'15:00',startedAt:start});acknowledge(store);
@@ -141,6 +150,7 @@ function makeControllerFixture(t){
   const previous=hash('marker.txt\0'+hash('old release fixture')+'\n');put('package/baseline/previous-release-integrity.json',JSON.stringify({files:1,integrity:previous}));
   for(const name of ['hourly-status.mjs'])put('package/release/installer/hourly004/runtime/'+name,fs.readFileSync(path.join(source,'runtime',name)));
   put('package/release/src/hourlyStatusStore.js',fs.readFileSync(path.join(here,'../src/hourlyStatusStore.js')));
+  put('package/release/src/hourlyGuardEvidence.js',fs.readFileSync(path.join(here,'../src/hourlyGuardEvidence.js')));
   put('package/release/installer/hourly004/runtime/hourly-runtime.mjs',`import fs from 'node:fs';fs.writeFileSync(${JSON.stringify(path.join(dir,'capture-entry-executed'))},'unexpected');throw new Error('FIXTURE_CAPTURE_FORBIDDEN');`);
   for(let i=0;i<10;i++)put('package/release/marker-'+i+'.txt','fixture');
   const entries=[];function walk(root){for(const item of fs.readdirSync(root,{withFileTypes:true})){const name=path.join(root,item.name);if(item.isDirectory())walk(name);else entries.push({path:path.relative(path.join(pkg,'release'),name).replaceAll('\\','/'),integrity:hash(fs.readFileSync(name))});}}walk(path.join(pkg,'release'));put('package/release-manifest.json',JSON.stringify({files:entries}));

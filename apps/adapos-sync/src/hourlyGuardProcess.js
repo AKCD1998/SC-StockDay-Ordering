@@ -1,12 +1,12 @@
 import { spawn } from "node:child_process";
-import { performance } from "node:perf_hooks";
 import { emitHourlyDiagnostic } from "./hourlyAttemptDiagnostics.js";
+import {safeProviderFailure,validCpuMeasurement,safeCpuEvidence} from './hourlyGuardEvidence.js';
 
 // The installed production deadline is twelve seconds. Diagnostics do not
 // authorize the thirty-second proposal from the original PR.
 export const HOURLY_GUARD_BUDGET_MS = 12_000;
 const stages = new Set(["starting", "host", "tasks", "processes", "cpu", "complete"]);
-const reasons = new Set(["HOST_UNVERIFIED", "IDENTITY_UNVERIFIED", "FULL_SYNC_BUSY", "PROCESS_UNREADABLE", "CPU_UNREADABLE", "CPU_LIMIT", "PROVIDER_TIMEOUT", "ACCESS_DENIED", "TASKS_UNAVAILABLE", "PROCESSES_UNAVAILABLE", "CPU_UNAVAILABLE"]);
+const reasons = new Set(["HOST_UNVERIFIED", "IDENTITY_UNVERIFIED", "FULL_SYNC_BUSY", "PROCESS_UNREADABLE", "CPU_UNREADABLE", "CPU_LIMIT", "PROVIDER_TIMEOUT", "ACCESS_DENIED", "TASKS_UNAVAILABLE", "PROCESSES_UNAVAILABLE", "CPU_UNAVAILABLE",'DEADLINE','BUDGET_EXHAUSTED']);
 const integer = value => Number.isSafeInteger(value) && value >= 0;
 
 // Never copy raw child output, exception messages, command lines or stderr into evidence.
@@ -16,19 +16,22 @@ export function safeHourlyGuardSummary(value) {
   if (!reasons.has(value.reason) && !parentReasons.includes(value.reason)) return null;
   return { stage: value.stage, reason: value.reason, elapsedMs: value.elapsedMs, budgetMs: value.budgetMs,
     ...(typeof value.cpuPercent === 'number' && Number.isFinite(value.cpuPercent) && value.cpuPercent >= 0 && value.cpuPercent <= 100 ? { cpuPercent: value.cpuPercent } : {}),
+    ...(safeProviderFailure(value.providerFailure)?{providerFailure:safeProviderFailure(value.providerFailure)}:{}),
     timeout: value.reason === "DEADLINE", retryAttempted: false };
 }
 
 export function createHourlyGuard({ executable, script, spawnProcess = spawn, platform = process.platform,
-  observerProcessId = process.pid, now = () => performance.now(), setTimer = setTimeout, clearTimer = clearTimeout, onDiagnostic, childLease } = {}) {
+  // On Windows libuv hrtime and .NET Stopwatch use the same QPC domain. Pass
+  // that absolute deadline so child startup/preparation cannot buy extra time.
+  observerProcessId = process.pid, now = () => Number(process.hrtime.bigint())/1e6, setTimer = setTimeout, clearTimer = clearTimeout, onDiagnostic, childLease } = {}) {
   return async function hourlyGuard({ remainingMs = HOURLY_GUARD_BUDGET_MS } = {}) {
     const start = now(), budgetMs = Number.isFinite(remainingMs) ? Math.max(0, Math.floor(Math.min(HOURLY_GUARD_BUDGET_MS, remainingMs))) : 0;
     const deadline = start + budgetMs, remaining = () => Math.max(0, deadline - now());
-    let stage = "starting", stageStart = start, startupMs = null, cpuPercent = null;
+    let stage = "starting", stageStart = start, startupMs = null, cpuPercent = null, providerFailure=null;
     const diagnosticStage = () => ({ starting: "powershell-startup", host: "host-identity", tasks: "task-scheduler", processes: "processes", cpu: "cpu-provider", complete: "cpu-provider" })[stage];
     const report = (kind, reason, extra = {}) => emitHourlyDiagnostic(onDiagnostic, { stage: diagnosticStage(), kind, ...(reason ? { code: reason } : {}), durationMs: Math.max(0, now() - stageStart), remainingMs: Math.max(0, budgetMs - (now() - start)), budgetMs, ...extra });
     const failure = reason => Object.assign(new Error("Hourly source guard stopped before another batch."), {
-      code: "HOURLY_SOURCE_GUARD_UNAVAILABLE", guardSummary: safeHourlyGuardSummary({ stage, reason, elapsedMs: Math.max(0, Math.ceil(now() - start)), budgetMs, cpuPercent }),
+      code: "HOURLY_SOURCE_GUARD_UNAVAILABLE", guardSummary: safeHourlyGuardSummary({ stage, reason, elapsedMs: Math.max(0, Math.ceil(now() - start)), budgetMs, cpuPercent,providerFailure }),
     });
     if (platform !== "win32") throw failure("PLATFORM_UNAVAILABLE");
     if (budgetMs < 1) throw failure("BUDGET_EXHAUSTED");
@@ -42,8 +45,10 @@ export function createHourlyGuard({ executable, script, spawnProcess = spawn, pl
         if (ended) return; ended = true; clearTimer(timer); clearTimer(killTimer);
         if (closed || !child?.pid) lease?.release();
         if(!error&&remaining()<=0)error=failure('DEADLINE');
-        report(error ? "failure" : "success", error?.guardSummary?.reason, { ...(startupMs == null ? {} : { startupMs }), ...(cpuPercent == null ? {} : { cpuPercent }), childTerminationConfirmed: closed || !child?.pid });
+        if(!error&&!validCpuMeasurement(terminal?.cpuMeasurement,now(),terminal?.systemCpuPercent,start))error=failure('READY_UNVERIFIED');
+        report(error ? "failure" : "success", error?.guardSummary?.reason, { ...(startupMs == null ? {} : { startupMs }), ...(cpuPercent == null ? {} : { cpuPercent }), ...(providerFailure?{providerFailure}:{}),childTerminationConfirmed: closed || !child?.pid });
         if(!error&&remaining()<=0)error=failure('DEADLINE');
+        if(!error&&!validCpuMeasurement(terminal?.cpuMeasurement,now(),terminal?.systemCpuPercent,start))error=failure('READY_UNVERIFIED');
         error ? reject(error) : resolve(result);
       };
       // An unresponsive child aborts collection. There is no retry, capture or upload after failure.
@@ -71,12 +76,13 @@ export function createHourlyGuard({ executable, script, spawnProcess = spawn, pl
         if (value.kind === "progress") return;
         if (value.kind !== "result") { stop("INVALID_OUTPUT"); return; }
         terminal = value;
+        providerFailure=safeProviderFailure(value.providerFailure);
         if (stage === 'cpu' && Number.isFinite(value.systemCpuPercent) && value.systemCpuPercent >= 0 && value.systemCpuPercent <= 100) cpuPercent = value.systemCpuPercent;
       };
       try {
         if(remaining()<=0)return finish(failure('DEADLINE'),null,true);
         child = spawnProcess(executable, ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "RemoteSigned", "-File", script,
-          "-ObserverProcessId", String(observerProcessId)], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+          "-ObserverProcessId", String(observerProcessId),'-MonotonicDeadlineMs',String(deadline)], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
         if (child.pid) lease?.setChild(child.pid);
         child.on("error", () => { if (child?.pid) { if (!pendingFailure) stop("START_FAILED"); } else finish(pendingFailure ?? failure("START_FAILED")); });
         child.stdout.on("error", () => stop("INVALID_OUTPUT"));
@@ -98,11 +104,11 @@ export function createHourlyGuard({ executable, script, spawnProcess = spawn, pl
           if (code !== 0) return finish(failure("CHILD_EXIT"), null, true);
           if (terminal?.status !== "ready" || terminal.stage !== "complete" || terminal.cpuBelowThreshold !== true
               || terminal.existingWorkQuiet !== true || terminal.hostVerified !== true || !Number.isFinite(terminal.systemCpuPercent)
-              || terminal.systemCpuPercent < 0 || terminal.systemCpuPercent >= 70) return finish(failure("READY_UNVERIFIED"), null, true);
+              || terminal.systemCpuPercent < 0 || terminal.systemCpuPercent >= 70 || !validCpuMeasurement(terminal.cpuMeasurement,now(),terminal.systemCpuPercent,start)) return finish(failure("READY_UNVERIFIED"), null, true);
           emitHourlyDiagnostic(onDiagnostic, { stage: "cpu-provider", kind: "success", cpuPercent: terminal.systemCpuPercent });
           if(remaining()<=0)return finish(failure('DEADLINE'),null,true);
           finish(null, { status: "ready", hostVerified: true, existingWorkQuiet: true, cpuBelowThreshold: true,
-            systemCpuPercent: terminal.systemCpuPercent, guardElapsedMs: Math.max(0, Math.ceil(now() - start)) }, true);
+            systemCpuPercent: terminal.systemCpuPercent,cpuMeasurement:safeCpuEvidence(terminal.cpuMeasurement,now()),guardElapsedMs: Math.max(0, Math.ceil(now() - start)) }, true);
         });
         if(remaining()<=0)stop('DEADLINE');
         else timer = setTimer(() => stop("DEADLINE"), remaining());

@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+import {safeProviderFailure} from './hourlyGuardEvidence.js';
 
 const stages = new Set(["launch", "powershell-startup", "host-identity", "task-scheduler", "processes", "cpu-provider", "capture-lock", "sql-connect", "readonly-boundary", "sql-batch", "payload", "outbox-enqueue", "sql-close", "delivery-lock", "outbox-scan", "upload", "acknowledgement", "receipt-persist"]);
 const codes = new Set(["HOURLY_SOURCE_GUARD_UNAVAILABLE", "HOURLY_SOURCE_TIMEOUT", "HOURLY_SOURCE_ACCESS_DENIED", "HOURLY_SOURCE_READ_FAILED", "HOURLY_SOURCE_READONLY_BOUNDARY_UNVERIFIED", "HOURLY_SOURCE_COHORT_INCOMPLETE", "HOURLY_SOURCE_COHORT_CHANGED", "HOURLY_COMPLETE_COHORT_WINDOW_EXCEEDED", "HOURLY_OBSERVER_CLOCK_STEP_DETECTED", "HOURLY_EVIDENCE_BUSY", "HOURLY_EVIDENCE_HTTP_ERROR", "HOURLY_EVIDENCE_TIMEOUT", "HOURLY_EVIDENCE_ACK_INVALID", "HOURLY_OUTBOX_CORRUPT", "HOURLY_OUTBOX_FULL", "HOURLY_DELIVERY_BUDGET_EXHAUSTED", "HOURLY_COMPLETE_CONFIG_INVALID", "HOST_CPU_AT_OR_ABOVE_70_PERCENT", "EXISTING_AGENT_OR_FULL_SYNC_WORK", "GUARD_PROCESS_IDENTITY_UNREADABLE", "SQL_READONLY_STATEMENT_REJECTED", "OWN_SQL_METRICS_UNAVAILABLE", "ETIMEOUT", "ELOGIN", "ESOCKET", "ECONNRESET", "ECONNCLOSED", "EACCES", "EPERM", "ENETUNREACH", "ENOTFOUND", "CHILD_STILL_RUNNING", "GUARD_LEASE_UNVERIFIED", "PLATFORM_UNAVAILABLE", "BUDGET_EXHAUSTED", "START_FAILED", "DEADLINE", "OUTPUT_LIMIT", "INVALID_OUTPUT", "CHILD_EXIT", "READY_UNVERIFIED", "HOST_UNVERIFIED", "FULL_SYNC_BUSY", "PROCESS_UNREADABLE", "CPU_UNREADABLE", "CPU_LIMIT", "PROVIDER_TIMEOUT", "ACCESS_DENIED", "TASKS_UNAVAILABLE", "PROCESSES_UNAVAILABLE", "CPU_UNAVAILABLE", "IDENTITY_UNVERIFIED"]);
@@ -15,6 +16,7 @@ export function safeHourlyDiagnostic(event) {
   for (const key of numeric) if (Number.isFinite(event[key]) && event[key] >= 0 && event[key] <= Number.MAX_SAFE_INTEGER) result[key] = key === "cpuPercent" ? event[key] : Math.ceil(event[key]);
   if (typeof event.childTerminationConfirmed === "boolean") result.childTerminationConfirmed = event.childTerminationConfirmed;
   if (["system", "administrator", "other", "unknown"].includes(event.identityKind)) result.identityKind = event.identityKind;
+  const providerFailure=safeProviderFailure(event.providerFailure);if(providerFailure)result.providerFailure=providerFailure;
   return result;
 }
 export function emitHourlyDiagnostic(observer, event) {
@@ -36,7 +38,7 @@ export async function hourlyStage(observer, stage, action, fields = {}) {
 export function createHourlyAttemptDiagnostics({ monotonic = () => performance.now(), budgetMs = 1_200_000, maxEvents = 768, checkpoint } = {}) {
   if (!Number.isSafeInteger(maxEvents) || maxEvents < 1 || maxEvents > 1024 || !Number.isSafeInteger(budgetMs) || budgetMs < 1 || budgetMs > 1_200_000) throw new TypeError("Invalid diagnostic bounds.");
   const start = monotonic(), events = []; let droppedEvents = 0, persistenceFailed = false, everPersistenceFailed=false, checkpointFailures=0;
-  const snapshot = () => ({ events: events.map(event => ({ ...event })), droppedEvents, persistenceFailed, everPersistenceFailed, checkpointFailures, elapsedMs: Math.max(0, Math.ceil(monotonic() - start)), budgetMs });
+  const snapshot = () => ({ events: events.map(event => ({ ...event,...(event.providerFailure?{providerFailure:safeProviderFailure(event.providerFailure)}:{}) })), droppedEvents, persistenceFailed, everPersistenceFailed, checkpointFailures, elapsedMs: Math.max(0, Math.ceil(monotonic() - start)), budgetMs });
   const observe = event => {
     const safe = safeHourlyDiagnostic(event); if (!safe) return;
     const elapsedMs = Math.max(0, Math.ceil(monotonic() - start));
