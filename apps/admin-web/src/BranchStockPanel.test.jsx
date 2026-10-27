@@ -361,6 +361,37 @@ describe("BranchStockPanel branch scope", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
+  it("waits for a 75-second response without a timeout notice or overlapping minute poll", async () => {
+    vi.useFakeTimers();
+    let resolveRead;
+    renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: () => new Promise(resolve => { resolveRead = resolve; }) });
+    await act(async () => { await vi.advanceTimersByTimeAsync(75000); });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch.mock.calls[0][1].signal.aborted).toBe(false);
+    expect(screen.queryByText(/โหลดข้อมูลนานเกินไป กรุณาลองกด รีเฟรช/)).not.toBeInTheDocument();
+    await act(async () => { resolveRead(hourlyResponse(5)); });
+    expect(productRow("A001").querySelector('[data-column-key="qtyBranch004"] strong')).toHaveTextContent("5.00");
+    await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+    expect(screen.queryByText(/โหลดข้อมูลนานเกินไป กรุณาลองกด รีเฟรช/)).not.toBeInTheDocument();
+  });
+
+  it("aborts an unresponsive read at 90 seconds and does not poll after unmount", async () => {
+    vi.useFakeTimers();
+    const view = renderPanel({ isOnlineMarketingStaff: false, branchCode: "004", fetchImplementation: (_url, { signal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener("abort", () => reject(new DOMException("synthetic abort", "AbortError")), { once: true });
+    }) });
+    const signal = global.fetch.mock.calls[0][1].signal;
+    await act(async () => { await vi.advanceTimersByTimeAsync(89999); });
+    expect(signal.aborted).toBe(false);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(signal.aborted).toBe(true);
+    expect(screen.getByText(/โหลดข้อมูลนานเกินไป กรุณาลองกด รีเฟรช/)).toBeInTheDocument();
+    view.unmount();
+    await act(async () => { await vi.advanceTimersByTimeAsync(180000); });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("invalidates both the old marketplace quantity and its available banner after a failed refresh", async () => {
     vi.useFakeTimers(); let calls=0;
     const data={records:[{...STOCK_RECORDS[0],qtyBranch004:1,posQtyBranch004:4,stock004:{basis:'hourly-and-shopee',posBasis:'hourly-calculated',

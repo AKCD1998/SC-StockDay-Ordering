@@ -27,6 +27,8 @@ import {
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const BRANCH_STOCK_COLUMN_FEEDBACK_MS = 600;
+// Allow the API's single 60-second Shopee budget plus request/response overhead.
+const BRANCH_STOCK_LOAD_TIMEOUT_MS = 90000;
 const HQ_BRANCH_CODE = "000";
 
 function formatNumber(value, digits = 0) {
@@ -484,7 +486,7 @@ export function BranchStockPanel({
     const id = setTimeout(() => {
       setLoading(false);
       setError("โหลดข้อมูลนานเกินไป กรุณาลองกด รีเฟรช");
-    }, 45000);
+    }, BRANCH_STOCK_LOAD_TIMEOUT_MS);
     return () => clearTimeout(id);
   }, [loading]);
 
@@ -497,7 +499,7 @@ export function BranchStockPanel({
       if (pending) return;
       pending = true;
       controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 45000);
+      const timeout = setTimeout(() => controller.abort(), BRANCH_STOCK_LOAD_TIMEOUT_MS);
       if (!background) setLoading(true);
       setError("");
       try {
