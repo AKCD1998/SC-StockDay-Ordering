@@ -131,7 +131,7 @@ test('a real process restart reclaims only its confirmed-dead receipt lease and 
 test('the real pointer exits only its fixture child on a critical error with outstanding display I/O',t=>{
   const f=fixture(t),source=path.resolve(here,'../installer/hourly004/runtime/hourly-complete-launcher.mjs');
   const helpers=pathToFileURL(path.resolve(here,'../src/hourlyAttemptDiagnostics.js')).href,storage=pathToFileURL(path.resolve(here,'../src/hourlyStatusStore.js')).href;
-  const pointer=fs.readFileSync(source,'utf8').replace("'./stability-20261024-checkpoint-v4/installer/hourly004/runtime/hourly-runtime.mjs'","'./runtime-stub.mjs'").replace("'./stability-20261024-checkpoint-v4/src/hourlyAttemptDiagnostics.js'",JSON.stringify(helpers)).replace("'./stability-20261024-checkpoint-v4/src/hourlyStatusStore.js'",JSON.stringify(storage));
+  const pointer=fs.readFileSync(source,'utf8').replace("'./stability-20261028-cpu-v5/installer/hourly004/runtime/hourly-runtime.mjs'","'./runtime-stub.mjs'").replace("'./stability-20261028-cpu-v5/src/hourlyAttemptDiagnostics.js'",JSON.stringify(helpers)).replace("'./stability-20261028-cpu-v5/src/hourlyStatusStore.js'",JSON.stringify(storage));
   fs.writeFileSync(path.join(f.dir,'pointer.mjs'),pointer);fs.writeFileSync(path.join(f.dir,'runtime-stub.mjs'),`export async function main(){setInterval(()=>{},1000);throw Object.assign(new Error('DO-NOT-OUTPUT'),{code:'HOURLY_RECEIPT_PERSISTENCE_FAILED',hourlyDisplayIoPending:true,storageFailure:{code:'ENOSPC',stage:'receipt-sync'}})}`);
   const child=spawnSync(process.execPath,[path.join(f.dir,'pointer.mjs')],{encoding:'utf8',windowsHide:true,timeout:3000});assert.equal(child.status,1);assert.equal(child.signal,null);const result=JSON.parse(child.stdout);assert.equal(result.status,'launch-stopped');assert.equal(result.failure.code,'HOURLY_RECEIPT_PERSISTENCE_FAILED');assert.equal(result.failure.storageFailure.code,'ENOSPC');assert.ok(!child.stdout.includes('DO-NOT-OUTPUT'));
 });
@@ -140,30 +140,32 @@ function makeControllerFixture(t){
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hourly-controller-'));t.after(()=>{assert.ok(path.resolve(dir).startsWith(path.resolve(os.tmpdir())+path.sep)&&path.basename(dir).startsWith('hourly-controller-'));fs.rmSync(dir,{recursive:true,force:true});});
   const source=path.resolve(here,'../installer/hourly004'),pkg=path.join(dir,'package');fs.mkdirSync(pkg,{recursive:true});
   const put=(relative,contents)=>{const name=path.join(dir,relative);fs.mkdirSync(path.dirname(name),{recursive:true});fs.writeFileSync(name,contents);};
-  for(const name of ['hourly004-update.ps1','hourly004-install-recovery.ps1','baseline/hourly-complete-launcher.mjs','baseline/runtime-core.mjs','baseline/runtime-guard.ps1','baseline/previous-launcher.mjs','runtime/hourly-complete-launcher.mjs'])put('package/'+name,fs.readFileSync(path.join(source,name)));
+  for(const name of ['hourly004-update.ps1','hourly004-install-recovery.ps1','baseline/hourly-complete-launcher.mjs','baseline/runtime-core.mjs','baseline/runtime-guard.ps1','baseline/previous-launcher.mjs','baseline/historical-v4-previous-launcher.mjs','baseline/v4-status-store.mjs','runtime/hourly-complete-launcher.mjs'])put('package/'+name,fs.readFileSync(path.join(source,name)));
   put('app/.env','FIXTURE_ONLY=1');put('app/package-lock.json','{"fixture":true}');put('app/src/fixture.js','// fixture source');
   const hash=data=>createHash('sha256').update(data).digest('hex').toUpperCase();
   put('package/baseline/installed-source-manifest.json',JSON.stringify({files:[{path:'fixture.js',integrity:hash('// fixture source')}]}));
   for(const secure of ['secure','fault-secure']){
     put(secure+'/hourly-complete-launcher.mjs',fs.readFileSync(path.join(source,'baseline/previous-launcher.mjs')));
     for(const name of ['runtime-core.mjs','runtime-guard.ps1'])put(secure+'/'+name,fs.readFileSync(path.join(source,'baseline',name)));
-    put(secure+'/approved-cohort-fixture.json','{"fixture":true}');put(secure+'/latest-slot-result.json',JSON.stringify({...prior,inspectionTime:'2026-10-24T07:00:02.000Z'}));put(secure+'/stability-20261024/marker.txt','old release fixture');
+    put(secure+'/approved-cohort-fixture.json','{"fixture":true}');put(secure+'/latest-slot-result.json',JSON.stringify({...prior,inspectionTime:'2026-10-24T07:00:02.000Z'}));put(secure+'/stability-20261024-checkpoint-v4/marker.txt','old release fixture');
   }
   const previous=hash('marker.txt\0'+hash('old release fixture')+'\n');put('package/baseline/previous-release-integrity.json',JSON.stringify({files:1,integrity:previous}));
   for(const name of ['hourly-status.mjs'])put('package/release/installer/hourly004/runtime/'+name,fs.readFileSync(path.join(source,'runtime',name)));
   put('package/release/src/hourlyStatusStore.js',fs.readFileSync(path.join(here,'../src/hourlyStatusStore.js')));
   put('package/release/src/hourlyGuardEvidence.js',fs.readFileSync(path.join(here,'../src/hourlyGuardEvidence.js')));
+  for(const name of ['hourlyFailureHistory.js','hourlyGuardProcess.js','hourlyAttemptDiagnostics.js'])put('package/release/src/'+name,fs.readFileSync(path.join(here,'../src',name)));
   put('package/release/installer/hourly004/runtime/hourly-runtime.mjs',`import fs from 'node:fs';fs.writeFileSync(${JSON.stringify(path.join(dir,'capture-entry-executed'))},'unexpected');throw new Error('FIXTURE_CAPTURE_FORBIDDEN');`);
   for(let i=0;i<10;i++)put('package/release/marker-'+i+'.txt','fixture');
   const entries=[];function walk(root){for(const item of fs.readdirSync(root,{withFileTypes:true})){const name=path.join(root,item.name);if(item.isDirectory())walk(name);else entries.push({path:path.relative(path.join(pkg,'release'),name).replaceAll('\\','/'),integrity:hash(fs.readFileSync(name))});}}walk(path.join(pkg,'release'));put('package/release-manifest.json',JSON.stringify({files:entries}));
   fs.mkdirSync(path.join(dir,'cache/hourly-evidence-outbox/004'),{recursive:true});
   put('seed-receipt.mjs',`import path from 'node:path';import {createHourlyStatusStore} from './package/release/src/hourlyStatusStore.js';const store=createHourlyStatusStore(path.join(process.argv[2],'latest-slot-result.json'));store.begin({slot:'15:00',startedAt:${JSON.stringify(start)}});store.acknowledge({ack:${JSON.stringify(ack)},payload:{...${JSON.stringify({...payload,records:undefined})},records:Array.from({length:6835},()=>({}))},remainingMs:60000});await store.finish(${JSON.stringify(summary)});await store.close();`);
+  put('seed-following-receipt.mjs',`import fs from 'node:fs';import path from 'node:path';import {createHourlyStatusStore} from './package/baseline/v4-status-store.mjs';const summary=JSON.parse(fs.readFileSync(process.argv[3],'utf8').replace(/^\\uFEFF/,'')),store=createHourlyStatusStore(path.join(process.argv[2],'latest-slot-result.json'));store.begin({slot:summary.slot,startedAt:process.argv[4]});if(summary.status==='captured-and-acknowledged'){const capturedAt=summary.finishedAt;store.acknowledge({ack:{accepted:6835,branchCode:'004',capturedAt},payload:{branchCode:'004',records:Array.from({length:6835},()=>({})),plannedSlot:summary.slot,capturedAt,idempotencyKey:'c'.repeat(64)},remainingMs:60000});}await store.finish(summary);await store.close();`);
   return dir;
 }
 test('Windows PowerShell 5.1 real controller Preflight/Update/Status/Rollback uses isolated filesystem and fixture providers',{skip:process.platform!=='win32'},t=>{
   const dir=makeControllerFixture(t),exe=path.join(process.env.SystemRoot,'System32/WindowsPowerShell/v1.0/powershell.exe');
   const result=spawnSync(exe,['-NoProfile','-NonInteractive','-ExecutionPolicy','RemoteSigned','-File',path.join(here,'hourly-controller-native-fixture.ps1'),'-FixtureRoot',dir],{encoding:'utf8',windowsHide:true,timeout:40000});
-  assert.equal(result.status,0,result.stdout||'Native fixture unavailable; details withheld.');const report=JSON.parse(result.stdout.replace(/^\uFEFF/,''));assert.equal(report.realControllerInvoked,true);assert.equal(report.passed,10);assert.equal(report.productionQueries,0);assert.equal(report.productionFilesChanged,0);assert.equal(report.taskRuns,0);
+  assert.equal(result.status,0,result.stdout||'Native fixture unavailable; details withheld.');const report=JSON.parse(result.stdout.replace(/^\uFEFF/,''));assert.equal(report.realControllerInvoked,true);assert.equal(report.passed,11);assert.equal(report.productionQueries,0);assert.equal(report.productionFilesChanged,0);assert.equal(report.taskRuns,0);
   t.diagnostic(JSON.stringify({simulation:true,nativeController:true,nativePowerShell:report.nativePowerShell,passed:report.passed,failed:report.failed,realControllerInvoked:true,productionQueries:0,productionFilesChanged:0,taskRuns:0}));
 });
 

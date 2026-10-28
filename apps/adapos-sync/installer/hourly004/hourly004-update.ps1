@@ -11,9 +11,9 @@ if($PSVersionTable.PSEdition -eq 'Desktop'){Import-Module (Join-Path $PSHOME 'Mo
 $script:HourlyApp='C:\Users\Administrator\Desktop\RxAuu\apps\adapos-sync'
 $script:HourlySecure='C:\ProgramData\SC-StockDay-Ordering\hourly-stock-evidence-004\complete-on-20261022'
 $script:HourlyCache=Split-Path $script:HourlySecure -Parent
-$script:HourlyReleaseName='stability-20261024-checkpoint-v4'
-$script:HourlyPreviousReleaseName='stability-20261024'
-$script:HourlyPointerBackup='checkpoint-v4-previous-launcher.mjs'
+$script:HourlyReleaseName='stability-20261028-cpu-v5'
+$script:HourlyPreviousReleaseName='stability-20261024-checkpoint-v4'
+$script:HourlyPointerBackup='cpu-v5-previous-launcher.mjs'
 $script:HourlyNode='C:\Program Files\nodejs\node.exe'
 
 function Stop-HourlyUpdate([string]$Code) {throw [InvalidOperationException]::new($Code)}
@@ -62,8 +62,8 @@ function Get-HourlyInstalledState {
   Assert-HourlyRegular $target
   $current=[IO.File]::ReadAllBytes($target)
   if(Test-HourlyBytes $current ([IO.File]::ReadAllBytes((Join-Path $PSScriptRoot 'baseline\hourly-complete-launcher.mjs')))){return 'original-12-second-guard'}
-  if(Test-HourlyBytes $current ([IO.File]::ReadAllBytes((Join-Path $PSScriptRoot 'baseline\previous-launcher.mjs')))){return 'stability-candidate-installed'}
-  if(Test-HourlyBytes $current ([IO.File]::ReadAllBytes((Join-Path $PSScriptRoot 'runtime\hourly-complete-launcher.mjs')))){return 'checkpoint-v4-installed'}
+  if(Test-HourlyBytes $current ([IO.File]::ReadAllBytes((Join-Path $PSScriptRoot 'baseline\previous-launcher.mjs')))){return 'checkpoint-v4-installed'}
+  if(Test-HourlyBytes $current ([IO.File]::ReadAllBytes((Join-Path $PSScriptRoot 'runtime\hourly-complete-launcher.mjs')))){return 'cpu-v5-installed'}
   return 'unrecognized-baseline'
   }catch{return 'installation-unavailable'}
 }
@@ -315,22 +315,22 @@ function Get-HourlySafeStatus {
   $state=Get-HourlyInstalledState
   $report=[ordered]@{schemaVersion='hourly004-update-status-v3';installation=$state;guardBudgetMs=12000;newRecoveryEnabled=$false;productionEntryInvoked=$false;currentStockCertified=$false}
   $inspection=Get-HourlyInstallationInspection
-  if($inspection.state -eq 'idle' -and $state -notin @('checkpoint-v4-installed','stability-candidate-installed','original-12-second-guard')){$inspection.state='unverified';$inspection.reason='LAUNCHER_OR_BASELINE_UNVERIFIED'}
+  if($inspection.state -eq 'idle' -and $state -notin @('cpu-v5-installed','checkpoint-v4-installed','original-12-second-guard')){$inspection.state='unverified';$inspection.reason='LAUNCHER_OR_BASELINE_UNVERIFIED'}
   $report.installationTransaction=@{};foreach($key in @('state','reason','lockOwner','lockMetadata','interrupted','metadata','recoverable','beforeImage','pending','failed','transactionCount','pendingPresent','failedCandidateCount','beforeImagePresent')){$report.installationTransaction[$key]=$inspection[$key]}
   foreach($entry in @(@('stagedReleaseExists',$script:HourlyReleaseName),@('previousReleaseExists',$script:HourlyPreviousReleaseName),@('previousPointerBackupExists',$script:HourlyPointerBackup))){$report[$entry[0]]=$null;try{$report[$entry[0]]=Test-Path -LiteralPath (Join-Path $script:HourlySecure $entry[1]) -ErrorAction Stop}catch{}}
   $report.queueNow=@{pending=$null;checkedAt=[datetimeoffset]::Now.ToString('o')}
   try{$folder=Join-Path $script:HourlyCache 'hourly-evidence-outbox\004';$report.queueNow.pending=@(Get-ChildItem -LiteralPath $folder -File -ErrorAction Stop | Where-Object {$_.Name -cmatch '^[a-f0-9]{64}\.json$'}).Count}catch{}
   $report.availability='unknown';$report.latestAttempt=@{status='unknown';slot=$null;observedProducts=$null;backendAcceptedRecords=$null;outboxPending=$null};$report.lastSuccess=$null;$report.failureCode=$null
   $meta=@{verified=$false;startedAt=$null;running=$null};try{$meta=Get-HourlyTaskAttemptInfo}catch{}
-  $modeVerified=$state -in @('checkpoint-v4-installed','stability-candidate-installed','original-12-second-guard')
+  $modeVerified=$state -in @('cpu-v5-installed','checkpoint-v4-installed','original-12-second-guard')
   $modeVerified=$modeVerified -and $inspection.state -eq 'idle'
-  $request=@{file=(Join-Path $script:HourlySecure 'latest-slot-result.json');now=(Get-HourlyStatusNow);legacyMode=$state -ne 'checkpoint-v4-installed';latestTaskStartedAt=$(if($meta.verified -and $modeVerified){$meta.startedAt}else{$null});taskRunning=$meta.running}|ConvertTo-Json -Compress
+  $request=@{file=(Join-Path $script:HourlySecure 'latest-slot-result.json');now=(Get-HourlyStatusNow);legacyMode=$state -eq 'original-12-second-guard';latestTaskStartedAt=$(if($meta.verified -and $modeVerified){$meta.startedAt}else{$null});taskRunning=$meta.running}|ConvertTo-Json -Compress
   $reader=Join-Path $PSScriptRoot 'release\installer\hourly004\runtime\hourly-status.mjs'
   if(-not(Test-Path -LiteralPath $reader)){$reader=Join-Path $PSScriptRoot 'runtime\hourly-status.mjs'}
   try {
     $reply=@($request | & $script:HourlyNode $reader 2>$null)
     if($LASTEXITCODE -eq 0){$view=($reply -join [Environment]::NewLine)|ConvertFrom-Json;if($view.schemaVersion -eq 'hourly004-status-view-v2'){
-      foreach($key in @('availability','latestAttempt','lastSuccess','failureCode','guardReason','lastStage','storageFailure','receiptState','progressObservation','providerFailure','cpuObservation')){$report[$key]=$view.$key}
+      foreach($key in @('availability','latestAttempt','lastSuccess','failureCode','guardReason','lastStage','storageFailure','receiptState','progressObservation','providerFailure','cpuObservation','failureHistory')){$report[$key]=$view.$key}
     }}
   } catch { }
   return [pscustomobject]$report
@@ -357,9 +357,9 @@ function Invoke-HourlyUpdateController([scriptblock]$OnPhase={}) {
   $inspection=Get-HourlyInstallationInspection
   Assert-HourlyUpdate ($inspection.state -eq 'idle') 'INSTALLATION_REQUIRES_RECOVERY_REVIEW'
   $state=Get-HourlyInstalledState
-  Assert-HourlyUpdate ($state -in @('stability-candidate-installed','checkpoint-v4-installed')) 'INSTALLED_BASELINE_REQUIRES_REVIEW'
+  Assert-HourlyUpdate ($state -in @('checkpoint-v4-installed','cpu-v5-installed')) 'INSTALLED_BASELINE_REQUIRES_REVIEW'
   $target=Join-Path $script:HourlySecure 'hourly-complete-launcher.mjs'
-  $expectedPointer=if($state -eq 'stability-candidate-installed'){Join-Path $PSScriptRoot 'baseline\previous-launcher.mjs'}else{Join-Path $PSScriptRoot 'runtime\hourly-complete-launcher.mjs'}
+  $expectedPointer=if($state -eq 'checkpoint-v4-installed'){Join-Path $PSScriptRoot 'baseline\previous-launcher.mjs'}else{Join-Path $PSScriptRoot 'runtime\hourly-complete-launcher.mjs'}
   $pinnedPredecessor=Get-HourlyLauncherImage $target ([IO.File]::ReadAllBytes($expectedPointer))
   Assert-HourlyPreviousRelease
   Assert-HourlyInstalledSource
@@ -377,7 +377,7 @@ function Invoke-HourlyUpdateController([scriptblock]$OnPhase={}) {
     $before=Get-HourlyDefinitionSnapshot
     $target=Join-Path $script:HourlySecure 'hourly-complete-launcher.mjs'
     if($Action -eq 'Update'){
-      if($state -eq 'checkpoint-v4-installed'){
+      if($state -eq 'cpu-v5-installed'){
         Assert-HourlyRelease (Join-Path $script:HourlySecure $script:HourlyReleaseName)
         $installedHandle=[Hourly004LockedFile]::new($target)
         try{Assert-HourlyLauncherImage $installedHandle $target $pinnedPredecessor}finally{$installedHandle.Dispose()}
@@ -402,12 +402,12 @@ function Invoke-HourlyUpdateController([scriptblock]$OnPhase={}) {
       & $OnPhase 'before-switch'
       Invoke-HourlyLauncherTransaction $target $candidate (Join-Path $script:HourlySecure $script:HourlyPointerBackup) {Assert-HourlyDefinitionsEqual $before (Get-HourlyDefinitionSnapshot)} {Assert-HourlyDefinitionsEqual $before (Get-HourlyDefinitionSnapshot)} -ExpectedImage $pinnedPredecessor -OnPhase $OnPhase -TransactionContext $transactionContext
     }else{
-      Assert-HourlyUpdate ($state -eq 'checkpoint-v4-installed') 'ROLLBACK_REFUSED_NOT_OWN_INSTALLATION'
+      Assert-HourlyUpdate ($state -eq 'cpu-v5-installed') 'ROLLBACK_REFUSED_NOT_OWN_INSTALLATION'
       $original=Join-Path $script:HourlySecure $script:HourlyPointerBackup
       Assert-HourlyUpdate (Test-HourlyBytes ([IO.File]::ReadAllBytes($original)) ([IO.File]::ReadAllBytes((Join-Path $PSScriptRoot 'baseline\previous-launcher.mjs')))) 'ORIGINAL_BACKUP_UNVERIFIED'
       & $OnPhase 'rollback-candidate-validated'
       & $OnPhase 'before-switch'
-      Invoke-HourlyLauncherTransaction $target $original (Join-Path $script:HourlySecure ('checkpoint-v4-rollback-'+$transactionId+'.mjs')) {Assert-HourlyDefinitionsEqual $before (Get-HourlyDefinitionSnapshot)} {Assert-HourlyDefinitionsEqual $before (Get-HourlyDefinitionSnapshot)} -ExpectedImage $pinnedPredecessor -OnPhase $OnPhase -TransactionContext $transactionContext
+      Invoke-HourlyLauncherTransaction $target $original (Join-Path $script:HourlySecure ('cpu-v5-rollback-'+$transactionId+'.mjs')) {Assert-HourlyDefinitionsEqual $before (Get-HourlyDefinitionSnapshot)} {Assert-HourlyDefinitionsEqual $before (Get-HourlyDefinitionSnapshot)} -ExpectedImage $pinnedPredecessor -OnPhase $OnPhase -TransactionContext $transactionContext
     }
     Close-HourlyInstallLock $lock;$lock=$null
     return Get-HourlySafeStatus

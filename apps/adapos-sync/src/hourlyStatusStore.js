@@ -3,6 +3,7 @@ import path from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 import {performance} from 'node:perf_hooks';
 import {safeProviderFailure,safeCpuObservation} from './hourlyGuardEvidence.js';
+import {boundedFailureHistory,failureForAttempt,FAILURE_HISTORY_BOUNDS} from './hourlyFailureHistory.js';
 
 export const STATUS_BOUNDS=Object.freeze({attempts:3,retryDelaysMs:[10,25],totalIoMs:2000,finalReserveMs:250,progressIntervalMs:1000,maxProgressPublications:128,viewBytes:262144,receiptBytes:8192});
 const slots=/^(09|1[0-9]):00$/;
@@ -37,7 +38,8 @@ function parseReceipt(text){
   if(a.phase==='finished'&&(!iso(a.finishedAt)||!Number.isSafeInteger(a.finalViewSequence)||a.finalViewSequence<1))throw fail('HOURLY_RECEIPT_STATE_UNVERIFIED');
   const ack=value.lastAck;
   if(ack!=null&&(!/^[a-f0-9]{64}$/.test(ack.key)||!slots.test(ack.slot)||!iso(ack.capturedAt)||!iso(ack.recordedAt)||ack.accepted!==6835||!Number.isSafeInteger(ack.attemptSequence)||ack.attemptSequence<1))throw fail('HOURLY_RECEIPT_STATE_UNVERIFIED');
-  return {generation:value.generation,attempt:{sequence:a.sequence,slot:a.slot,startedAt:a.startedAt,phase:a.phase,...(a.phase==='finished'?{finishedAt:a.finishedAt,finalViewSequence:a.finalViewSequence}:{})},lastSuccess:value.lastSuccess==null?null:successReceipt(value.lastSuccess),lastAck:ack?{key:ack.key,slot:ack.slot,capturedAt:ack.capturedAt,accepted:6835,recordedAt:ack.recordedAt,attemptSequence:ack.attemptSequence}:null};
+  const recentFailures=boundedFailureHistory(value.recentFailures);
+  return {generation:value.generation,attempt:{sequence:a.sequence,slot:a.slot,startedAt:a.startedAt,phase:a.phase,...(a.phase==='finished'?{finishedAt:a.finishedAt,finalViewSequence:a.finalViewSequence}:{})},lastSuccess:value.lastSuccess==null?null:successReceipt(value.lastSuccess),lastAck:ack?{key:ack.key,slot:ack.slot,capturedAt:ack.capturedAt,accepted:6835,recordedAt:ack.recordedAt,attemptSequence:ack.attemptSequence}:null,recentFailures,failureHistoryRecorded:Array.isArray(value.recentFailures),failureHistoryIncomplete:value.failureHistoryIncomplete===true||(value.recentFailures!=null&&(!Array.isArray(value.recentFailures)||recentFailures.length!==value.recentFailures.length))};
 }
 export function readHourlyDurableState(file,{io=fs}={}){
   const valid=[],issues=[];let present=0;
@@ -76,7 +78,7 @@ export function createHourlyStatusStore(file,{now=()=>new Date().toISOString(),h
   const releaseIfIdle=()=>{if(closed&&health.ioPending===0&&release){release();release=null;}};
   function commit(next){
     if(remainingMs()<=0)throw fail('HOURLY_COMPLETE_COHORT_WINDOW_EXCEEDED');
-    const index=activeIndex===0?1:0,target=receiptFile(file,index),value={...next,generation:(state?.generation??0)+1};
+    const index=activeIndex===0?1:0,target=receiptFile(file,index),value={...next,recentFailures:boundedFailureHistory(next.recentFailures??state?.recentFailures),failureHistoryIncomplete:next.failureHistoryIncomplete===true||state?.failureHistoryIncomplete===true,generation:(state?.generation??0)+1};
     if(!Number.isSafeInteger(value.generation))throw fail('HOURLY_RECEIPT_STATE_UNVERIFIED');
     const body=JSON.stringify(value),bytes=Buffer.from(JSON.stringify({schemaVersion:'hourly004-durable-state-v2',body,digest:digest(body)}));
     if(bytes.length>STATUS_BOUNDS.receiptBytes)throw fail('HOURLY_RECEIPT_STATE_UNVERIFIED');
@@ -95,7 +97,7 @@ export function createHourlyStatusStore(file,{now=()=>new Date().toISOString(),h
       const available=budget()-(item.final?0:STATUS_BOUNDS.finalReserveMs);
       if(disabled)return;
       if(available<=0){remember({stage:'status-write',code:'STATUS_BUDGET_EXHAUSTED',category:'budget-exhausted',retryable:false,detailsWithheld:true});return;}
-      let text;try{text=JSON.stringify({...item.summary,statusAttemptSequence:state.attempt.sequence,statusViewSequence:item.sequence,statusPublishedAt:now(),lastSuccess:aged(state.lastSuccess,now()),lastAttemptComplete:item.summary.status==='captured-and-acknowledged',currentStockCertified:false,statusPersistence:{...healthSnapshot(),currentlyUnavailable:false,recoveredCount:health.recoveredCount+(health.currentlyUnavailable?1:0)}},null,2);if(Buffer.byteLength(text)>STATUS_BOUNDS.viewBytes)throw fail('HOURLY_STATUS_VIEW_TOO_LARGE');}catch{remember({stage:'status-serialize',code:'OUTPUT_LIMIT',category:'output-limit',retryable:false,detailsWithheld:true});disabled=true;return;}
+      let text;try{text=JSON.stringify({...item.summary,statusAttemptSequence:state.attempt.sequence,statusViewSequence:item.sequence,statusPublishedAt:now(),lastSuccess:aged(state.lastSuccess,now()),recentFailures:state.recentFailures,lastAttemptComplete:item.summary.status==='captured-and-acknowledged',currentStockCertified:false,statusPersistence:{...healthSnapshot(),currentlyUnavailable:false,recoveredCount:health.recoveredCount+(health.currentlyUnavailable?1:0)}},null,2);if(Buffer.byteLength(text)>STATUS_BOUNDS.viewBytes)throw fail('HOURLY_STATUS_VIEW_TOO_LARGE');}catch{remember({stage:'status-serialize',code:'OUTPUT_LIMIT',category:'output-limit',retryable:false,detailsWithheld:true});disabled=true;return;}
       let handle,stage='status-open',cancelled=false,deadlineTimer;const started=monotonic();
       const assertActive=()=>{if(cancelled)throw Object.assign(new Error('Display deadline unavailable.'),{code:'STATUS_IO_DEADLINE'});};
       let operation;
@@ -159,12 +161,13 @@ export function createHourlyStatusStore(file,{now=()=>new Date().toISOString(),h
       const success=successReceipt(summary);
       if(success&&(!state.lastAck||state.lastAck.attemptSequence!==state.attempt.sequence||state.lastAck.slot!==success.slot))throw fail('HOURLY_RECEIPT_STATE_UNVERIFIED');
       const sequence=++viewSequence;
-      commit({...state,attempt:{...state.attempt,phase:'finished',finishedAt:summary.finishedAt,finalViewSequence:sequence},lastSuccess:newer(state.lastSuccess,success)});
+      const failure=failureForAttempt(summary,state.attempt);
+      commit({...state,attempt:{...state.attempt,phase:'finished',finishedAt:summary.finishedAt,finalViewSequence:sequence},lastSuccess:newer(state.lastSuccess,success),recentFailures:failure?boundedFailureHistory([...(state.recentFailures??[]),failure]):state.recentFailures});
       if(pumpPromise)await pumpPromise;
       pending={summary,sequence,final:true};schedule();
       while(timer||pumpPromise||pending){if(pumpPromise)await pumpPromise;else await new Promise(resolve=>setTimeout(resolve,1));}
       const available=health.lastPublishedSequence===sequence;
-      return {...summary,status:available?summary.status:'status-unavailable',captureOutcome:summary.status,lastSuccess:aged(state.lastSuccess,now()),lastAttemptComplete:available&&summary.status==='captured-and-acknowledged',currentStockCertified:false,statusPersistence:healthSnapshot()};
+      return {...summary,status:available?summary.status:'status-unavailable',captureOutcome:summary.status,lastSuccess:aged(state.lastSuccess,now()),recentFailures:state.recentFailures,lastAttemptComplete:available&&summary.status==='captured-and-acknowledged',currentStockCertified:false,statusPersistence:healthSnapshot()};
     },
     snapshot:healthSnapshot,
     async close(){closed=true;if(timer){clearTimeout(timer);timer=null;}pending=null;if(pumpPromise)await pumpPromise;releaseIfIdle();},
@@ -195,5 +198,5 @@ export function inspectHourlyStatus(file,{now=new Date().toISOString(),legacyMod
   const diagnosticStages=new Set(['launch','powershell-startup','host-identity','task-scheduler','processes','cpu-provider','capture-lock','sql-connect','readonly-boundary','sql-batch','payload','outbox-enqueue','sql-close','delivery-lock','outbox-scan','upload','acknowledgement','receipt-persist']);
   const last=value?.diagnostics?.events?.at?.(-1),lastStage=known&&diagnosticStages.has(last?.stage)&&['start','success','failure','progress','retry'].includes(last.kind)?{stage:last.stage,kind:last.kind}:null;
   const guardReasons=new Set(['HOST_UNVERIFIED','IDENTITY_UNVERIFIED','FULL_SYNC_BUSY','PROCESS_UNREADABLE','CPU_UNREADABLE','CPU_LIMIT','PROVIDER_TIMEOUT','ACCESS_DENIED','TASKS_UNAVAILABLE','PROCESSES_UNAVAILABLE','CPU_UNAVAILABLE','PLATFORM_UNAVAILABLE','BUDGET_EXHAUSTED','START_FAILED','DEADLINE','OUTPUT_LIMIT','INVALID_OUTPUT','CHILD_EXIT','READY_UNVERIFIED','CHILD_STILL_RUNNING','GUARD_LEASE_UNVERIFIED']);
-  return {schemaVersion:'hourly004-status-view-v2',availability:known?'published':'unknown',latestAttempt:{status:known?value.status:'unknown',slot:known?value.slot:null,startedAt:known?new Date(latest).toISOString():null,inspectionTime:known?new Date(inspection).toISOString():null,finishedAt:known?new Date(finished).toISOString():null,evidenceMode:known?(legacyMode?'legacy-v1':'durable-receipt'):null,observedProducts:known?number(value.observedProducts):null,backendAcceptedRecords:known?number(value.backendAcceptedRecords):null,outboxPending:known?number(value.outboxPending):null},progressObservation:progress,lastSuccess:aged(prior,now),failureCode:known&&failure?(codes.has(failure.code)?failure.code:'HOURLY_OPERATION_FAILED_DETAILS_WITHHELD'):null,lastStage,cpuObservation:known?safeCpuObservation(failure?.guard?.cpuObservation??value?.diagnostics?.events?.findLast?.(e=>e.cpuObservation)?.cpuObservation):null,providerFailure:known?safeProviderFailure(failure?.guard?.providerFailure):null,guardReason:known&&guardReasons.has(failure?.guard?.reason)?failure.guard.reason:null,storageFailure:storage?safeStorageFailure({code:storage.code},storage.stage):null,receiptState:durable.present===0?'not-initialized':durable.issues.length||durable.conflict?'degraded':'verified',currentStockCertified:false};
+  return {schemaVersion:'hourly004-status-view-v2',availability:known?'published':'unknown',latestAttempt:{status:known?value.status:'unknown',slot:known?value.slot:null,startedAt:known?new Date(latest).toISOString():null,inspectionTime:known?new Date(inspection).toISOString():null,finishedAt:known?new Date(finished).toISOString():null,evidenceMode:known?(legacyMode?'legacy-v1':'durable-receipt'):null,observedProducts:known?number(value.observedProducts):null,backendAcceptedRecords:known?number(value.backendAcceptedRecords):null,outboxPending:known?number(value.outboxPending):null},progressObservation:progress,lastSuccess:aged(prior,now),failureCode:known&&failure?(codes.has(failure.code)?failure.code:'HOURLY_OPERATION_FAILED_DETAILS_WITHHELD'):null,lastStage,cpuObservation:known?safeCpuObservation(failure?.guard?.cpuObservation??value?.diagnostics?.events?.findLast?.(e=>e.cpuObservation)?.cpuObservation):null,providerFailure:known?safeProviderFailure(failure?.guard?.providerFailure):null,guardReason:known&&guardReasons.has(failure?.guard?.reason)?failure.guard.reason:null,storageFailure:storage?safeStorageFailure({code:storage.code},storage.stage):null,receiptState:durable.present===0?'not-initialized':durable.issues.length||durable.conflict?'degraded':'verified',failureHistory:{availability:!state||durable.conflict||durable.issues.length?'unknown':state.failureHistoryRecorded?'verified':'not-recorded-by-predecessor',records:state&&!durable.conflict&&!durable.issues.length?state.recentFailures:[],incomplete:state?.failureHistoryIncomplete===true,coversAllAttempts:false,maximumEntries:FAILURE_HISTORY_BOUNDS.entries,maximumBytes:FAILURE_HISTORY_BOUNDS.bytes},currentStockCertified:false};
 }

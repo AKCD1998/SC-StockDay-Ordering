@@ -65,13 +65,19 @@ try {
  $receiptFiles=@(Get-ChildItem -LiteralPath $script:HourlySecure -Filter '*.receipt-*.json' -File);$receiptBytes=@{};foreach($f in $receiptFiles){$receiptBytes[$f.FullName]=[IO.File]::ReadAllBytes($f.FullName)}
  $outbox=Join-Path $script:HourlyCache ('hourly-evidence-outbox\004\'+('b'*64)+'.json');[IO.File]::WriteAllText($outbox,'fixture-unsent-body');$outboxBytes=[IO.File]::ReadAllBytes($outbox)
  $null=Action 'Rollback'
+ foreach($f in $receiptFiles){Assert-HourlyUpdate (Test-HourlyBytes $receiptBytes[$f.FullName] ([IO.File]::ReadAllBytes($f.FullName))) 'FIXTURE_RECEIPT_CHANGED'}
  $statusFile=Join-Path $script:HourlySecure 'latest-slot-result.json'
  $success=[ordered]@{status='captured-and-acknowledged';slot='16:00';inspectionTime='2026-10-24T09:00:12.000Z';finishedAt='2026-10-24T09:02:00.000Z';expectedProducts=6835;observedProducts=6835;readBatchCount=35;backendAcceptedRecords=6835;outboxPending=0}
- [IO.File]::WriteAllText($statusFile,($success|ConvertTo-Json -Compress));$script:FixtureTask='2026-10-24T09:00:02.000Z';$script:FixtureNow='2026-10-24T09:03:00.000Z'
- $status=Action 'Status';Assert-HourlyUpdate ($status.latestAttempt.status -eq 'captured-and-acknowledged' -and $status.latestAttempt.slot -eq '16:00' -and $status.latestAttempt.finishedAt -eq $success.finishedAt -and $status.lastSuccess.slot -eq '16:00' -and $status.latestAttempt.evidenceMode -eq 'legacy-v1') 'FIXTURE_V1_BORROWED_OLD_SLOT'
- $passed++;$report.cases+='Update-result-Rollback-next-v1-success-Status'
+ $script:FixtureTask='2026-10-24T09:00:02.000Z';$script:FixtureNow='2026-10-24T09:03:00.000Z'
+ $inputFile=Join-Path $resolved 'next-summary.json';[IO.File]::WriteAllText($inputFile,($success|ConvertTo-Json -Compress))
+ $null=@(& $script:HourlyNode (Join-Path $resolved 'seed-following-receipt.mjs') $script:HourlySecure $inputFile $script:FixtureTask);Assert-HourlyUpdate ($LASTEXITCODE -eq 0) 'FIXTURE_RECEIPT_SEED'
+ $status=Action 'Status';Assert-HourlyUpdate ($status.latestAttempt.status -eq 'captured-and-acknowledged' -and $status.latestAttempt.slot -eq '16:00' -and $status.latestAttempt.finishedAt -eq $success.finishedAt -and $status.lastSuccess.slot -eq '16:00' -and $status.latestAttempt.evidenceMode -eq 'durable-receipt') 'FIXTURE_V1_BORROWED_OLD_SLOT'
+ $passed++;$report.cases+='Update-result-Rollback-actual-v4-writer-next-success-Status'
  $failure=[ordered]@{status='stopped-no-partial-capture';slot='17:00';inspectionTime='2026-10-24T10:00:12.000Z';finishedAt='2026-10-24T10:00:30.000Z';observedProducts=1400;backendAcceptedRecords=$null;outboxPending=1;lastSuccess=$success}
- [IO.File]::WriteAllText($statusFile,($failure|ConvertTo-Json -Depth 4 -Compress));$script:FixtureTask='2026-10-24T10:00:02.000Z';$script:FixtureNow='2026-10-24T10:03:00.000Z'
+ $script:FixtureTask='2026-10-24T10:00:02.000Z';$script:FixtureNow='2026-10-24T10:03:00.000Z'
+ [IO.File]::WriteAllText($inputFile,($failure|ConvertTo-Json -Depth 4 -Compress))
+ $null=@(& $script:HourlyNode (Join-Path $resolved 'seed-following-receipt.mjs') $script:HourlySecure $inputFile $script:FixtureTask);Assert-HourlyUpdate ($LASTEXITCODE -eq 0) 'FIXTURE_RECEIPT_SEED'
+ $failure=Get-Content -LiteralPath $statusFile -Raw|ConvertFrom-Json
  $status=Action 'Status';Assert-HourlyUpdate ($status.latestAttempt.slot -eq '17:00' -and $status.latestAttempt.status -eq 'stopped-no-partial-capture' -and $status.lastSuccess.slot -eq '16:00') 'FIXTURE_V1_FAILURE_MIXED_ATTEMPTS';$passed++;$report.cases+='Rollback-next-v1-failure-Status'
  foreach($variant in @('running','corrupt-view','task-unavailable','stale-view','future-view')){
   $script:FixtureRunning=$false;$script:FixtureVerified=$true;$script:FixtureTask='2026-10-24T10:00:02.000Z';$script:FixtureNow='2026-10-24T10:03:00.000Z';[IO.File]::WriteAllText($statusFile,($failure|ConvertTo-Json -Depth 4 -Compress))
@@ -82,7 +88,7 @@ try {
   if($variant -eq 'future-view'){$script:FixtureNow='2026-10-24T09:03:00.000Z'}
   $status=Action 'Status';Assert-HourlyUpdate ($status.latestAttempt.status -eq 'unknown' -and $null -eq $status.latestAttempt.slot -and $null -eq $status.latestAttempt.finishedAt -and $null -eq $status.latestAttempt.observedProducts) 'FIXTURE_UNKNOWN_BORROWED_OLD_EVIDENCE';$passed++;$report.cases+='Rollback-v1-'+$variant+'-unknown'
  }
- foreach($f in $receiptFiles){Assert-HourlyUpdate (Test-HourlyBytes $receiptBytes[$f.FullName] ([IO.File]::ReadAllBytes($f.FullName))) 'FIXTURE_RECEIPT_CHANGED'}
+ Assert-HourlyUpdate ((Action 'Status').receiptState -eq 'verified') 'FIXTURE_RECEIPT_CHANGED'
  Assert-HourlyUpdate (Test-HourlyBytes $outboxBytes ([IO.File]::ReadAllBytes($outbox))) 'FIXTURE_OUTBOX_CHANGED'
  Assert-HourlyUpdate (-not [IO.File]::Exists((Join-Path $resolved 'capture-entry-executed'))) 'FIXTURE_CAPTURE_ENTRY_INVOKED'
  $report.status='passed';$report.passed=$passed

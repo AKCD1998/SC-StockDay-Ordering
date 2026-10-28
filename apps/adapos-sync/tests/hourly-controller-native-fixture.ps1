@@ -26,22 +26,35 @@ $passed=0
 $report=[ordered]@{simulation=$true;nativePowerShell=$PSVersionTable.PSVersion.ToString();productionQueries=0;productionFilesChanged=0;taskRuns=0;realControllerInvoked=$true;fixtureProviderSubstitutions=@('host','task-scheduler','process-provider','cpu-provider');cases=@()}
 function Invoke-FixtureAction([string]$RequestedAction,[bool]$Approved=$true){$Action=$RequestedAction;$ReleaseApproved=$Approved;Invoke-HourlyUpdateController -OnPhase {param($phase);$script:FixtureLastPhase=$phase}}
 try {
+  Initialize-HourlyFileTransactionNative
+  $historyId=[guid]::NewGuid().ToString('N');$target=Join-Path $script:HourlySecure 'hourly-complete-launcher.mjs';$permissions=Get-Acl -LiteralPath $target
+  $past=Join-Path $resolved 'package\baseline\historical-v4-previous-launcher.mjs'
+  $history=@{kind='prepared';id=$historyId;direction='Update';owner=(Get-HourlyInstallOwner);root=[IO.Path]::GetFullPath($script:HourlySecure);rootPermissions=(Get-Acl -LiteralPath $script:HourlySecure).Sddl;target='hourly-complete-launcher.mjs';backup='checkpoint-v4-previous-launcher.mjs';pending='hourly-complete-launcher.mjs.update-pending';failed=('hourly-complete-launcher.mjs.failed-'+$historyId+'.mjs');predecessor=@{identity=[Hourly004LockedFile]::FileIdentity($past);bytes=[Convert]::ToBase64String([IO.File]::ReadAllBytes($past));sddl=$permissions.Sddl};candidate=@{identity=[Hourly004LockedFile]::FileIdentity($target);bytes=[Convert]::ToBase64String([IO.File]::ReadAllBytes($target));sddl=$permissions.Sddl}}
+  $historicalRecord=Write-HourlyInstallRecord (Get-HourlyInstallRecordPath $historyId) $history $permissions
+  Write-HourlyInstallTerminal $historicalRecord 'complete' $permissions
+  Assert-HourlyUpdate ((Get-HourlyInstallationInspection).state -eq 'idle') 'FIXTURE_COMPLETED_PREDECESSOR_HISTORY'
+  $terminal=Get-HourlyInstallRecordPath $historyId '.complete';[IO.File]::Move($terminal,($terminal+'.retained'))
+  Assert-HourlyUpdate ((Get-HourlyInstallationInspection).state -eq 'unverified') 'FIXTURE_UNRESOLVED_PREDECESSOR_WAS_TRUSTED'
+  $blocked=$false;try{$null=Invoke-FixtureAction 'Recover'}catch{$blocked=$true}
+  Assert-HourlyUpdate ($blocked -and (Test-HourlyBytes ([IO.File]::ReadAllBytes($target)) ([Convert]::FromBase64String($history.candidate.bytes)))) 'FIXTURE_PREDECESSOR_RECOVERY_WRONG_RELEASE'
+  [IO.File]::Move(($terminal+'.retained'),$terminal)
+  $passed++;$report.cases+='completed-v4-history-retained-unresolved-predecessor-not-recovered-by-v5'
   $baseline=Get-HourlyDefinitionSnapshot
-  Assert-HourlyUpdate ((Get-HourlyInstalledState) -eq 'stability-candidate-installed') 'FIXTURE_INITIAL_STATE'
+  Assert-HourlyUpdate ((Get-HourlyInstalledState) -eq 'checkpoint-v4-installed') 'FIXTURE_INITIAL_STATE'
   $preflight=Invoke-FixtureAction 'Preflight'
   Assert-HourlyUpdate ($preflight.status -eq 'preflight-passed') 'FIXTURE_PREFLIGHT'
   $passed++;$report.cases+='Preflight-real-controller'
   $denied=$false;try{$null=Invoke-FixtureAction 'Update' $false}catch{$denied=$_.Exception.Message -eq 'RELEASE_APPROVAL_REQUIRED'}
   Assert-HourlyUpdate $denied 'FIXTURE_APPROVAL_GATE';$passed++;$report.cases+='Update-approval-required'
   $updated=Invoke-FixtureAction 'Update'
-  Assert-HourlyUpdate ($updated.installation -eq 'checkpoint-v4-installed') 'FIXTURE_UPDATE'
+  Assert-HourlyUpdate ($updated.installation -eq 'cpu-v5-installed') 'FIXTURE_UPDATE'
   Assert-HourlyDefinitionsEqual $baseline (Get-HourlyDefinitionSnapshot)
   $passed++;$report.cases+='Update-stages-verifies-and-switches'
   $status=Invoke-FixtureAction 'Status'
   Assert-HourlyUpdate ($status.availability -eq 'unknown' -and $status.latestAttempt.status -eq 'unknown' -and $status.lastSuccess.slot -eq '14:00') 'FIXTURE_STATUS_FALSE_SUCCESS'
   $passed++;$report.cases+='Status-new-runtime-does-not-relabel-old-success'
   $repeat=Invoke-FixtureAction 'Update'
-  Assert-HourlyUpdate ($repeat.installation -eq 'checkpoint-v4-installed') 'FIXTURE_IDEMPOTENT_UPDATE';$passed++;$report.cases+='Update-idempotent'
+  Assert-HourlyUpdate ($repeat.installation -eq 'cpu-v5-installed') 'FIXTURE_IDEMPOTENT_UPDATE';$passed++;$report.cases+='Update-idempotent'
   # This helper imports only the status store and writes synthetic receipt
   # metadata. It never imports/calls the protected runtime or a SQL runner.
   $seedOutput=@(& $script:HourlyNode (Join-Path $resolved 'seed-receipt.mjs') $script:HourlySecure)
@@ -57,7 +70,7 @@ try {
   Assert-HourlyUpdate ($status.latestAttempt.status -eq 'unknown' -and $status.lastSuccess.slot -eq '15:00' -and $null -eq $status.latestAttempt.observedProducts) 'FIXTURE_STATUS_CORRUPT_VIEW'
   $passed++;$report.cases+='Status-unreadable-view-unknown-with-prior-success'
   $rolled=Invoke-FixtureAction 'Rollback'
-  Assert-HourlyUpdate ($rolled.installation -eq 'stability-candidate-installed' -and $rolled.lastSuccess.slot -eq '15:00') 'FIXTURE_ROLLBACK'
+  Assert-HourlyUpdate ($rolled.installation -eq 'checkpoint-v4-installed' -and $rolled.lastSuccess.slot -eq '15:00') 'FIXTURE_ROLLBACK'
   foreach($receiptFile in $receiptFiles){Assert-HourlyUpdate (Test-HourlyBytes $receiptBytes[$receiptFile] ([IO.File]::ReadAllBytes($receiptFile))) 'FIXTURE_RECEIPT_CHANGED'}
   Assert-HourlyDefinitionsEqual $baseline (Get-HourlyDefinitionSnapshot)
   $passed++;$report.cases+='Rollback-restores-v1-and-preserves-receipts-config-tasks-permissions'
@@ -74,7 +87,7 @@ try {
   $script:FixtureCorruptAfterSwitch=$true;$failed=$false
   try{$null=Invoke-FixtureAction 'Update'}catch{$failed=$true}
   $script:FixtureCorruptAfterSwitch=$false
-  Assert-HourlyUpdate ($failed -and (Get-HourlyInstalledState) -eq 'stability-candidate-installed') 'FIXTURE_ACTIVATION_ROLLBACK'
+  Assert-HourlyUpdate ($failed -and (Get-HourlyInstalledState) -eq 'checkpoint-v4-installed') 'FIXTURE_ACTIVATION_ROLLBACK'
   Assert-HourlyDefinitionsEqual $faultBaseline (Get-HourlyDefinitionSnapshot)
   $passed++;$report.cases+='Update-postflight-failure-restores-only-owned-pointer'
   $script:HourlySecure=$oldSecure

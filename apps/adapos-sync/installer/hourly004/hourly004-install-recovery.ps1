@@ -64,14 +64,15 @@ function Test-HourlyInstallTerminal($Record,[string]$Suffix) {
   }
   return $false
 }
-function Assert-HourlyInstallPrepared($Record) {
+function Assert-HourlyInstallPrepared($Record,[switch]$CompletedPredecessor) {
   $value=$Record.Value
   Assert-HourlyUpdate ($value.kind -ceq 'prepared' -and $value.id -cmatch '^[a-f0-9]{32}$' -and $value.direction -in @('Update','Rollback') -and $value.root -ieq [IO.Path]::GetFullPath($script:HourlySecure)) 'INSTALL_METADATA_UNVERIFIED'
   Assert-HourlyUpdate ($value.rootPermissions -ceq (Get-Acl -LiteralPath $script:HourlySecure).Sddl -and $Record.Permissions -ceq $value.predecessor.sddl -and $value.candidate.sddl -ceq $value.predecessor.sddl) 'INSTALL_PERMISSIONS_UNVERIFIED'
   Assert-HourlyUpdate ($value.target -ceq 'hourly-complete-launcher.mjs' -and $value.pending -ceq 'hourly-complete-launcher.mjs.update-pending' -and $value.failed -ceq ('hourly-complete-launcher.mjs.failed-'+$value.id+'.mjs')) 'INSTALL_METADATA_UNVERIFIED'
-  $expectedBackup=if($value.direction -eq 'Update'){$script:HourlyPointerBackup}else{'checkpoint-v4-rollback-'+$value.id+'.mjs'}
+  $expectedBackup=if($CompletedPredecessor){if($value.direction -eq 'Update'){'checkpoint-v4-previous-launcher.mjs'}else{'checkpoint-v4-rollback-'+$value.id+'.mjs'}}else{if($value.direction -eq 'Update'){$script:HourlyPointerBackup}else{'cpu-v5-rollback-'+$value.id+'.mjs'}}
   Assert-HourlyUpdate ($value.backup -ceq $expectedBackup) 'INSTALL_METADATA_UNVERIFIED'
   $old=Join-Path $PSScriptRoot 'baseline\previous-launcher.mjs';$next=Join-Path $PSScriptRoot 'runtime\hourly-complete-launcher.mjs'
+  if($CompletedPredecessor){$old=Join-Path $PSScriptRoot 'baseline\historical-v4-previous-launcher.mjs';$next=Join-Path $PSScriptRoot 'baseline\previous-launcher.mjs'}
   if($value.direction -eq 'Rollback'){$swap=$old;$old=$next;$next=$swap}
   Assert-HourlyUpdate ((Test-HourlyBytes ([Convert]::FromBase64String($value.predecessor.bytes)) ([IO.File]::ReadAllBytes($old))) -and (Test-HourlyBytes ([Convert]::FromBase64String($value.candidate.bytes)) ([IO.File]::ReadAllBytes($next))) -and $value.predecessor.identity -cmatch '^[0-9]+:[0-9]+:[0-9]+$' -and $value.candidate.identity -cmatch '^[0-9]+:[0-9]+:[0-9]+$') 'INSTALL_METADATA_UNVERIFIED'
 }
@@ -140,7 +141,18 @@ function Get-HourlyInstallationInspection {
     if($files.Count){$report.metadata='unverified'}
     $unresolved=@();$selected=$null;$pendingVerified=$false
     foreach($file in $files){
-      $record=Read-HourlyInstallRecord $file.FullName;Assert-HourlyInstallPrepared $record
+      $record=Read-HourlyInstallRecord $file.FullName
+      $previousHistory=$record.Value.backup -ceq 'checkpoint-v4-previous-launcher.mjs' -or $record.Value.backup -cmatch '^checkpoint-v4-rollback-[a-f0-9]{32}\.mjs$'
+      if($previousHistory){
+        # The reviewed predecessor has its own immutable, completed records.
+        # Validate its exact pinned images and terminal, but never recover an
+        # unresolved predecessor with this release's candidate or before-image.
+        Assert-HourlyInstallPrepared $record -CompletedPredecessor
+        Assert-HourlyUpdate ((Test-HourlyInstallTerminal $record '.complete') -or (Test-HourlyInstallTerminal $record '.restored') -or (Test-HourlyInstallTerminal $record '.recovered')) 'INSTALL_METADATA_UNVERIFIED'
+        Assert-HourlyUpdate ($null -eq $lock.record -or $lock.record.Value.id -cne $record.Value.id) 'INSTALL_METADATA_UNVERIFIED'
+        continue
+      }
+      Assert-HourlyInstallPrepared $record
       if($report.pendingPresent -and (Test-HourlyInstallImageAt (Join-Path $script:HourlySecure $record.Value.pending) $record.Value.candidate) -eq 'verified'){$pendingVerified=$true}
       Assert-HourlyUpdate ($file.Name -ceq ('installation-transaction-'+$record.Value.id+'.json')) 'INSTALL_METADATA_UNVERIFIED'
       $terminal=(Test-HourlyInstallTerminal $record '.complete') -or (Test-HourlyInstallTerminal $record '.restored') -or (Test-HourlyInstallTerminal $record '.recovered')
@@ -204,7 +216,7 @@ function Invoke-HourlyInstallRecovery([scriptblock]$OnPhase={}) {
   Assert-HourlyQuiet
   $inspection=Get-HourlyInstallationInspection
   Assert-HourlyUpdate ($inspection.state -in @('idle','recoverable')) 'RECOVERY_EVIDENCE_UNVERIFIED'
-  if($inspection.state -eq 'idle'){Assert-HourlyUpdate ((Get-HourlyInstalledState) -in @('checkpoint-v4-installed','stability-candidate-installed','original-12-second-guard')) 'RECOVERY_EVIDENCE_UNVERIFIED';return Get-HourlySafeStatus}
+  if($inspection.state -eq 'idle'){Assert-HourlyUpdate ((Get-HourlyInstalledState) -in @('cpu-v5-installed','checkpoint-v4-installed','original-12-second-guard')) 'RECOVERY_EVIDENCE_UNVERIFIED';return Get-HourlySafeStatus}
   $record=$inspection.record;Assert-HourlyInstallPrepared $record;$value=$record.Value
   Assert-HourlyPreviousRelease;Assert-HourlyInstalledSource
   foreach($name in @('runtime-core.mjs','runtime-guard.ps1')){Assert-HourlyUpdate (Test-HourlyBytes ([IO.File]::ReadAllBytes((Join-Path $script:HourlySecure $name))) ([IO.File]::ReadAllBytes((Join-Path $PSScriptRoot ('baseline\'+$name))))) 'INSTALLED_BASELINE_REQUIRES_REVIEW'}

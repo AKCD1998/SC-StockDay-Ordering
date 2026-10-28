@@ -1,4 +1,8 @@
-# Hourly 004 checkpoint v4: ชุดตรวจรับก่อนติดตั้ง
+# Current review: CPU v5, 28 October 2026
+
+**ใช้ [CPU-V5-REVIEW-TH.md](CPU-V5-REVIEW-TH.md) สำหรับชุดปัจจุบัน** — แยก namespaceใหม่จากcheckpoint v4; ยังไม่อนุมัติติดตั้ง ส่วนด้านล่างคงไว้เป็นประวัติของv4 ไม่ใช้เป็นคำสั่งติดตั้งv5
+
+# Historical: Hourly 004 checkpoint v4
 
 ชุดเดียวนี้มี Preflight, Update, Status, Rollback และ Recover สำหรับ Task เดิมบน SERVER004 ยังไม่ติดตั้งอัตโนมัติ ไม่สร้างหรือสั่ง Task ไม่เรียก production entrypoint เพื่อทดสอบ และไม่สั่ง capture/replay จริง
 

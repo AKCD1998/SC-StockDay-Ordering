@@ -46,7 +46,7 @@ function History-Unchanged {
 }
 function Passed([string]$Name){$script:Cases+=,$Name}
 function Recover-Check([string]$Direction){
-  $wanted=if($Direction -eq 'Update'){'stability-candidate-installed'}else{'checkpoint-v4-installed'}
+  $wanted=if($Direction -eq 'Update'){'checkpoint-v4-installed'}else{'cpu-v5-installed'}
   $status=Action 'Status';Check ($status.installationTransaction.state -eq 'recoverable' -and $status.installationTransaction.lockOwner -eq 'orphan-proven') 'FIXTURE_NOT_RECOVERABLE'
   Check ($status.latestAttempt.status -eq 'unknown' -and $null -eq $status.latestAttempt.slot -and $status.lastSuccess.slot -eq '15:00') 'FIXTURE_FALSE_CAPTURE'
   $result=Action 'Recover';Check ((Get-HourlyInstalledState) -eq $wanted -and $result.installation -eq $wanted -and $result.installationTransaction.state -eq 'idle') 'FIXTURE_RECOVERY_WRONG_PREDECESSOR'
@@ -63,7 +63,7 @@ try{
         Check ($status.installationTransaction.state -eq 'unverified' -and $status.installation -ne 'launcher-missing') 'FIXTURE_MISSING_METADATA_STATUS'
         $stopped=$false;try{$null=Action 'Recover'}catch{$stopped=$true};Check $stopped 'FIXTURE_UNPROVEN_RECOVERY_ALLOWED';History-Unchanged
       }elseif($phase -eq 'transaction-completed'){
-        $wanted=if($direction -eq 'Update'){'checkpoint-v4-installed'}else{'stability-candidate-installed'}
+        $wanted=if($direction -eq 'Update'){'cpu-v5-installed'}else{'checkpoint-v4-installed'}
         $result=Action 'Recover';Check ((Get-HourlyInstalledState) -eq $wanted -and $result.installation -eq $wanted -and $result.installationTransaction.state -eq 'idle') 'FIXTURE_COMMITTED_TRANSACTION_REVERSED';History-Unchanged
       }else{Recover-Check $direction}
       Passed ($direction+'-abrupt-'+$phase+'-restart-status-recover-repeat')
@@ -140,7 +140,7 @@ try{
     $prepared=@(Get-ChildItem -LiteralPath $script:HourlySecure -Filter 'installation-transaction-*.json' | Where-Object {$_.Name -cmatch '^installation-transaction-[a-f0-9]{32}\.json$'})[0].FullName
     $terminal=$prepared.Substring(0,$prepared.Length-5)+'.'+$kind+'.json';[IO.File]::WriteAllText($terminal,'{"incomplete-terminal":')
     $null=Action 'Recover';$null=Action 'Recover'
-    Check ((Get-HourlyInstalledState) -eq 'stability-candidate-installed' -and [IO.File]::ReadAllText($terminal) -ceq '{"incomplete-terminal":') 'FIXTURE_TORN_TERMINAL_NOT_PRESERVED';History-Unchanged;Passed ('torn-'+$kind+'-retained-safe-recovery-fresh-terminal')
+    Check ((Get-HourlyInstalledState) -eq 'checkpoint-v4-installed' -and [IO.File]::ReadAllText($terminal) -ceq '{"incomplete-terminal":') 'FIXTURE_TORN_TERMINAL_NOT_PRESERVED';History-Unchanged;Passed ('torn-'+$kind+'-retained-safe-recovery-fresh-terminal')
   }
   foreach($kind in @('missing','foreign')){
     $dir=New-Case;$target=Join-Path $script:HourlySecure 'hourly-complete-launcher.mjs'
