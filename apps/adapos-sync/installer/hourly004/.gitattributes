@@ -1,0 +1,2 @@
+runtime/*.mjs -text
+hourly004-update.ps1 -text
