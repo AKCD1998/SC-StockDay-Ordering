@@ -319,7 +319,9 @@ function Get-HourlyTaskAttemptInfo {
       $verified=$exec[0].Command -ieq $script:HourlyNode -and $exec[0].WorkingDirectory -ieq $script:HourlyApp -and ($arguments -ceq ('"'+$entry+'" run '+$slot) -or $arguments -ceq ($entry+' run '+$slot))
     }
     $verified=$verified -and $user -in @('SYSTEM','S-1-5-18') -and $definition.SelectSingleNode('//t:ExecutionTimeLimit',$ns).InnerText -eq 'PT20M'
-    return @{verified=$true;startedAt=([datetimeoffset]$latest.LastRunTime).ToUniversalTime().ToString('o');running=[int]$latest.State -eq 4;enabled=[bool]$latest.Enabled;lastResult=[int]$latest.LastTaskResult;definitionVerified=[bool]$verified}
+    $taskState=[int]$latest.State
+    $running=if($taskState -eq 4){$true}elseif($taskState -eq 3){$false}else{$null}
+    return @{verified=$true;startedAt=([datetimeoffset]$latest.LastRunTime).ToUniversalTime().ToString('o');running=$running;enabled=[bool]$latest.Enabled;lastResult=[int]$latest.LastTaskResult;definitionVerified=[bool]$verified}
   } catch {return @{verified=$false;startedAt=$null;running=$null}}
   finally {if($null -ne $service){& $ReleaseService $service}}
 }

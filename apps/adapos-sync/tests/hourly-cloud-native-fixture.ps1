@@ -23,24 +23,24 @@ function New-FixtureService([string]$Fault=''){
   if($this.Fault -eq 'limit'){$limit='PT30M'}
   if($this.Fault -eq 'principal'){$principal='other'}
   $xml='<Task xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task"><Principals><Principal><UserId>'+ $principal+'</UserId></Principal></Principals><Settings><ExecutionTimeLimit>'+$limit+'</ExecutionTimeLimit></Settings><Actions><Exec><Command>C:\Program Files\nodejs\node.exe</Command><Arguments>'+$args+'</Arguments><WorkingDirectory>C:\fixture\adapos-sync</WorkingDirectory></Exec></Actions></Task>'
-  return [pscustomobject]@{Name=$Name;LastRunTime=$started;LastTaskResult=$(if($this.Fault -eq 'failed'){1}else{0});State=$(if($this.Fault -eq 'running'){4}else{3});Enabled=$true;Xml=$xml}
+  return [pscustomobject]@{Name=$Name;LastRunTime=$started;LastTaskResult=$(if($this.Fault -eq 'failed'){1}else{0});State=$(if($this.Fault -eq 'running'){4}elseif($this.Fault -eq 'queued'){2}else{3});Enabled=$true;Xml=$xml}
  }
  $service=[pscustomobject]@{Folder=$folder}
  $service | Add-Member ScriptMethod Connect {}
  $service | Add-Member ScriptMethod GetFolder {param($Path) if($Path -cne '\'){throw 'UNEXPECTED_FOLDER'};return $this.Folder}
  return $service
 }
-foreach($fault in @('','arguments','limit','principal','failed','running','denied')){
+foreach($fault in @('','arguments','limit','principal','failed','running','queued','denied')){
  $script:FixtureService=New-FixtureService $fault
  $r=Get-HourlyTaskAttemptInfo -CreateService {$script:FixtureService} -ReleaseService {param($s) $script:Releases++}
  if($fault -eq 'denied'){Check ($r.verified -eq $false);Check ($null -eq $r.startedAt)}else{
   Check ($r.verified -eq $true);Check ($r.enabled -eq $true)
   Check ($r.definitionVerified -eq ($fault -notin @('arguments','limit','principal')))
   Check ($r.lastResult -eq $(if($fault -eq 'failed'){1}else{0}))
-  Check ($r.running -eq ($fault -eq 'running'))
+  if($fault -eq 'queued'){Check ($null -eq $r.running)}else{Check ($r.running -eq ($fault -eq 'running'))}
   Check (([datetimeoffset]$r.startedAt).ToUniversalTime().ToString('HH:mm:ss') -eq '08:00:01')
  }
  Check (-not (($r|ConvertTo-Json -Depth 6 -Compress).Contains('SYNTHETIC-PRIVATE')))
 }
-Check ($script:Releases -eq 7)
+Check ($script:Releases -eq 8)
 [pscustomobject]@{simulation=$true;nativePowerShell51=$true;checks=$checks;sourceTaskAccess=$false;sqlQueries=0;taskRuns=0;productionChanges=$false}|ConvertTo-Json -Compress
