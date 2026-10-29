@@ -15,7 +15,11 @@ export function createHourlyUploadRecovery({ upload, guard, enabled = false, mon
     const original = Object.freeze({ ...options });
     const deadline = monotonic() + original.timeoutMs;
     try { return await upload({ ...original }); } catch (error) {
-      if (error?.code !== "ECONNRESET" && error?.cause?.code !== "ECONNRESET") throw error;
+      const plainReset = error?.code === "ECONNRESET";
+      const wrappedReset = error?.code == null && error?.cause?.code === "ECONNRESET";
+      // An inner transport cause never overrides an outer application/HTTP,
+      // authorization, timeout or acknowledgement stop reason.
+      if (error?.status != null || (!plainReset && !wrappedReset)) throw error;
       if (deadline - monotonic() < 1500) throw error;
       await wait(500);
       const remainingMs = Math.floor(deadline - monotonic());

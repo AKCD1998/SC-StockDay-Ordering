@@ -7,7 +7,7 @@ import {reconcileHourlyDelivery,sanitizeControllerObservation} from '../src/hour
 function fixture(){
  const expectedSlot='2026-10-29T08:00:00.000Z',now='2026-10-29T08:25:00.000Z';
  const controller={schemaVersion:'hourly004-update-status-v3',installation:'cpu-v5-installed',guardBudgetMs:12000,newRecoveryEnabled:false,installationTransaction:{state:'idle'},availability:'published',sourceObservation:{schemaVersion:'hourly004-source-observation-v1',observedAt:now,hostVerified:true,timeZoneVerified:true,taskAccessVerified:true,task:{startedAt:'2026-10-29T08:00:01.000Z',running:false,enabled:true,lastResult:0,definitionVerified:true},sqlQueries:0,taskRuns:0,configurationChanges:0},latestAttempt:{status:'captured-and-acknowledged',slot:'15:00',startedAt:'2026-10-29T08:00:01.000Z',finishedAt:'2026-10-29T08:02:15.000Z',observedProducts:6835,backendAcceptedRecords:6835,outboxPending:0},lastSuccess:{status:'captured-and-acknowledged',slot:'14:00',finishedAt:'2026-10-29T07:02:13.000Z',observedProducts:6835,backendAcceptedRecords:6835,outboxPending:0},queueNow:{pending:0,checkedAt:now}};
- return {expectedSlot,now,controller,deviceAccessVerified:true,central:{readOnlyVerified:true,slot:expectedSlot,captures:1,declaredRecords:6835,actualRows:6835,distinctProducts:6835},journalPersisted:true};
+ return {expectedSlot,now,controller,deviceAccessVerified:true,central:{readOnlyVerified:true,branchCode:'004',observedAt:now,slot:expectedSlot,captures:1,declaredRecords:6835,actualRows:6835,distinctProducts:6835},journalPersisted:true};
 }
 test('natural source Task, exact ACK and independent central counts agree; business freshness stays unqualified',()=>{
  const f=fixture(),before=JSON.stringify(f),r=reconcileHourlyDelivery(f);assert.equal(r.status,'PASS');assert.equal(r.reason,'SOURCE_ACK_TASK_AND_CENTRAL_COUNTS_AGREE');assert.equal(r.currentStockCertified,false);assert.equal(r.sourceFreshnessQualified,false);assert.equal(r.clockSynchronizationVerified,false);assert.equal(r.recoveryEnabled,false);assert.equal(JSON.stringify(f),before);
@@ -47,6 +47,29 @@ test('raw diagnostics, credentials, document identities and unknown error text c
 });
 test('invalid future or non-Hourly slot is rejected without a fallback schedule',()=>{
  for(const expectedSlot of ['2026-10-29T20:00:00+07:00','2026-10-29T15:01:00+07:00','2026-10-30T15:00:00+07:00','bad'])assert.throws(()=>reconcileHourlyDelivery({...fixture(),expectedSlot}),TypeError);
+});
+test('review regression: central branch and query observation time must be bound explicitly',()=>{
+ for(const mutate of [f=>f.central.branchCode='001',f=>delete f.central.branchCode,f=>delete f.central.observedAt,f=>f.central.observedAt='2026-10-29T08:22:59.999Z',f=>f.central.observedAt='2026-10-29T08:25:02.001Z']){const f=fixture();mutate(f);assert.notEqual(reconcileHourlyDelivery(f).status,'PASS');}
+});
+test('review regression: a central snapshot taken before source completion requests a fresh read, not a missing-delivery verdict',()=>{
+ const f=fixture();f.now='2026-10-29T08:03:00.000Z';f.controller.sourceObservation.observedAt=f.now;f.controller.queueNow.checkedAt=f.now;f.central.observedAt='2026-10-29T08:02:00.000Z';Object.assign(f.central,{captures:0,declaredRecords:0,actualRows:0,distinctProducts:0});
+ const r=reconcileHourlyDelivery(f);assert.equal(r.status,'PARTIAL');assert.equal(r.reason,'CENTRAL_OBSERVATION_PRECEDES_SOURCE_COMPLETION');
+ f.central.observedAt=f.now;Object.assign(f.central,{captures:1,declaredRecords:6835,actualRows:6835,distinctProducts:6835});assert.equal(reconcileHourlyDelivery(f).status,'PASS');
+});
+test('review regression: timezone-free source timestamps cannot inherit the checker timezone',()=>{
+ const f=fixture(),d=new Date(f.now),pad=x=>String(x).padStart(2,'0');
+ f.controller.sourceObservation.observedAt=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+ assert.notEqual(reconcileHourlyDelivery(f).status,'PASS');
+});
+test('review regression: an alleged success exceeding Task20min cannot be certified',()=>{
+ const f=fixture();f.controller.latestAttempt.finishedAt='2026-10-29T08:23:00.000Z';assert.notEqual(reconcileHourlyDelivery(f).status,'PASS');
+});
+test('review regression: a successful status with a current failure code is contradictory evidence',()=>{
+ const f=fixture();f.controller.failureCode='HOURLY_SOURCE_GUARD_UNAVAILABLE';assert.notEqual(reconcileHourlyDelivery(f).status,'PASS');
+});
+test('native PS5.1 timezone-explicit fractional timestamps remain accepted while normalized impossible dates are rejected',()=>{
+ const f=fixture();f.controller.sourceObservation.observedAt='2026-10-29T08:25:00.0000000+00:00';f.controller.sourceObservation.task.startedAt='2026-10-29T08:00:01.0000000+00:00';f.controller.latestAttempt.startedAt='2026-10-29T15:00:01.0000000+07:00';f.controller.latestAttempt.finishedAt='2026-10-29T15:02:15.0000000+07:00';f.controller.queueNow.checkedAt='2026-10-29T15:25:00.0000000+07:00';assert.equal(reconcileHourlyDelivery(f).status,'PASS');
+ assert.throws(()=>reconcileHourlyDelivery({...fixture(),expectedSlot:'2026-02-30T15:00:00+07:00',now:'2026-03-02T15:25:00+07:00'}),TypeError);
 });
 test('stdin adapter is bounded, handles invalid input safely and outputs no raw payload',()=>{
  const cli=fileURLToPath(new URL('../scripts/reconcile-hourly004-cloud.mjs',import.meta.url));

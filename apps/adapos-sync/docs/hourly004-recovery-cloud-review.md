@@ -46,6 +46,10 @@ central capture agree for the same slot. Multiple captures require review; do
 not sum them into one success. Historical success stays labelled historical.
 Unknown source or SQL counts stay null. Journal persistence is independent, so
 a journal outage cannot suppress a fresh central query or erase its evidence.
+All timestamps require an explicit timezone, accepting native PowerShell's seven
+fractional digits. Impossible calendar values and a completed attempt longer
+than the existing20-minute Task limit are unverified. A current failure code
+contradicting an alleged success cannot certify delivery.
 
 The existing review-only upload recovery retains original primitive delivery
 inputs before calling its provider. One explicit ECONNRESET can produce at most
@@ -59,6 +63,9 @@ high CPU are not eligible for this first recovery phase. No collection retry,
 partial-read resume, replay, backfill, new worker or Task is introduced. The
 protected runtime still passes enabled:false; there is no new env switch and
 the runtime summary remains recovery OFF.
+An inner ECONNRESET never overrides an outer application error or HTTP status.
+Only a plain reset, or a fetch wrapper with no outer stop code and an explicit
+reset cause, can enter this review-only path.
 
 ## Acceptance sequence
 
@@ -104,8 +111,19 @@ journal, resolving its exact reference through the authorized connector. No loca
 
 Calculate expected slots in Asia/Bangkok09:00–19:00 on the requested date.
 Read counts grouped PER CAPTURE before aggregating per slot. Central input is
-`{readOnlyVerified:true,slot,captures,declaredRecords,actualRows,distinctProducts}`.
+`{readOnlyVerified:true,branchCode:'004',observedAt,slot,captures,declaredRecords,actualRows,distinctProducts}`.
+Bind the branch from the query's actual branch predicate/group, not by copying
+another branch's totals. `observedAt` is the database statement snapshot time
+(for example statement_timestamp formatted explicitly as UTC), not the later
+time the caller received the response. Missing, stale or future query times
+remain unknown. Take the independent checker `now` after both reads complete.
+If a successful source finishes after the central snapshot, report PARTIAL /
+CENTRAL_OBSERVATION_PRECEDES_SOURCE_COMPLETION. The orchestrator may perform at
+most one fresh READ ONLY central query within the existing check budget, then
+report the result or unknown. Do not run another capture or create a schedule.
 Capture identity and stock rows stay private/in RAM; return counts only.
+`readOnlyVerified` must come from the actual authorized connector execution on
+the approved database, not from a source file's claim or a copied payload.
 
 Source read admission must establish actual task execution authorization on
 SERVER004 before invoking Status. No authorization means `deviceAccessVerified:

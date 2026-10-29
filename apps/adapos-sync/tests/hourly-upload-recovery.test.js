@@ -32,3 +32,10 @@ test('OFF is a single unchanged call; invalid enabled stacked attempts fail befo
  let calls=0;const o=options();const disabled=createHourlyUploadRecovery({upload:async v=>{calls++;assert.equal(v,o);return {accepted:6835};}});await disabled(o);assert.equal(calls,1);
  const enabled=createHourlyUploadRecovery({enabled:true,guard:async()=>{},upload:()=>assert.fail('must not post')});for(const bad of [{...o,maxAttempts:3},{...o,body:null},{...o,timeoutMs:60000}])await assert.rejects(enabled(bad),TypeError);
 });
+test('review regression: a reset nested under auth, HTTP, timeout or ACK failure cannot override the outer stop reason',async()=>{
+ for(const code of ['EACCES','HOURLY_EVIDENCE_HTTP_ERROR','HOURLY_EVIDENCE_TIMEOUT','HOURLY_EVIDENCE_ACK_INVALID']){let calls=0,time=0;const upload=createHourlyUploadRecovery({enabled:true,monotonic:()=>time,wait:async ms=>{time+=ms;},guard:async()=>{},upload:async()=>{calls++;if(calls===1)throw Object.assign(new Error('private'),{code,cause:{code:'ECONNRESET'}});return {accepted:6835};}});await assert.rejects(upload(options()),{code});assert.equal(calls,1);}
+});
+test('a plain fetch wrapper with no outer stop code can retry a reset; an HTTP status always blocks it',async()=>{
+ let time=0,calls=0;const upload=createHourlyUploadRecovery({enabled:true,monotonic:()=>time,wait:async ms=>{time+=ms;},guard:async()=>{},upload:async()=>{calls++;if(calls===1)throw Object.assign(new TypeError('private'),{cause:{code:'ECONNRESET'}});return {accepted:6835};}});await upload(options());assert.equal(calls,2);
+ for(const status of [401,403,429,503]){calls=0;const blocked=createHourlyUploadRecovery({enabled:true,guard:async()=>assert.fail(),upload:async()=>{calls++;throw Object.assign(reset(),{status});}});await assert.rejects(blocked(options()));assert.equal(calls,1);}
+});

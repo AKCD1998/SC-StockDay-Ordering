@@ -3,8 +3,16 @@
 import {safeHourlyFailureCode} from './hourlyAttemptDiagnostics.js';
 import {safeProviderFailure,safeCpuObservation} from './hourlyGuardEvidence.js';
 
-export const CLOUD_INSPECTION_BOUNDS=Object.freeze({products:6835,batches:35,sourceMaxAgeMs:120000,futureToleranceMs:2000,taskStartToleranceMs:2000,taskLimitMs:1200000,guardBudgetMs:12000,inputBytes:65536});
-const parseTime=x=>typeof x==='string'&&Number.isFinite(Date.parse(x))?Date.parse(x):null;
+export const CLOUD_INSPECTION_BOUNDS=Object.freeze({products:6835,batches:35,sourceMaxAgeMs:120000,centralMaxAgeMs:120000,futureToleranceMs:2000,taskStartToleranceMs:2000,taskLimitMs:1200000,guardBudgetMs:12000,inputBytes:65536});
+// Native PS5.1 uses seven fractional digits. Require an explicit timezone and
+// reject normalized impossible dates rather than inheriting a checker timezone.
+const parseTime=x=>{
+ if(typeof x!=='string')return null;
+ const m=/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.\d{1,7})?(Z|([+-])(\d{2}):(\d{2}))$/.exec(x);
+ if(!m)return null;const time=Date.parse(x);if(!Number.isFinite(time))return null;
+ const offset=m[2]==='Z'?0:(m[3]==='+'?1:-1)*(Number(m[4])*60+Number(m[5]));
+ return new Date(time+offset*60000).toISOString().slice(0,19)===m[1]?time:null;
+};
 const n=x=>Number.isSafeInteger(x)&&x>=0?x:null;
 const b=x=>typeof x==='boolean'?x:null;
 const stamp=x=>parseTime(x)==null?null:new Date(x).toISOString();
@@ -37,7 +45,7 @@ export function sanitizeControllerObservation(controller,{now,deviceAccessVerifi
  const task=o.task;
  if(o.taskAccessVerified===true&&task&&parseTime(task.startedAt)!=null&&Date.parse(task.startedAt)<=seen+CLOUD_INSPECTION_BOUNDS.futureToleranceMs&&b(task.running)!=null&&b(task.enabled)!=null&&b(task.definitionVerified)!=null&&n(task.lastResult)!=null)result.task={startedAt:stamp(task.startedAt),running:task.running,enabled:task.enabled,lastResult:task.lastResult,definitionVerified:task.definitionVerified};
  const a=controller.latestAttempt,started=parseTime(a?.startedAt),finished=parseTime(a?.finishedAt);
- if(controller.availability==='published'&&sourceStates.has(a?.status)&&started!=null&&finished!=null&&finished>=started&&finished<=seen+CLOUD_INSPECTION_BOUNDS.futureToleranceMs&&a.slot===slotAt(started)&&dayAt(started)===dayAt(finished))result.latestAttempt={status:a.status,slot:a.slot,startedAt:stamp(a.startedAt),finishedAt:stamp(a.finishedAt),observedProducts:n(a.observedProducts),backendAcceptedRecords:n(a.backendAcceptedRecords),outboxPending:n(a.outboxPending)};
+ if(controller.availability==='published'&&sourceStates.has(a?.status)&&started!=null&&finished!=null&&finished>=started&&finished-started<=CLOUD_INSPECTION_BOUNDS.taskLimitMs&&finished<=seen+CLOUD_INSPECTION_BOUNDS.futureToleranceMs&&a.slot===slotAt(started)&&dayAt(started)===dayAt(finished))result.latestAttempt={status:a.status,slot:a.slot,startedAt:stamp(a.startedAt),finishedAt:stamp(a.finishedAt),observedProducts:n(a.observedProducts),backendAcceptedRecords:n(a.backendAcceptedRecords),outboxPending:n(a.outboxPending)};
  const prior=controller.lastSuccess,priorAt=parseTime(prior?.finishedAt);
  if(prior?.status==='captured-and-acknowledged'&&priorAt!=null&&priorAt<=at+CLOUD_INSPECTION_BOUNDS.futureToleranceMs&&prior.observedProducts===6835&&prior.backendAcceptedRecords===6835&&prior.outboxPending===0)result.lastSuccess={slot:/^(09|1[0-9]):00$/.test(prior.slot)?prior.slot:null,finishedAt:stamp(prior.finishedAt),observedProducts:6835,backendAcceptedRecords:6835,outboxPending:0,historicalOnly:true};
  const queue=controller.queueNow,queueAt=parseTime(queue?.checkedAt);
@@ -51,18 +59,24 @@ export function sanitizeControllerObservation(controller,{now,deviceAccessVerifi
  return result;
 }
 
-function centralView(value,expectedSlot){
- const result={availability:'unknown',captures:null,declaredRecords:null,actualRows:null,distinctProducts:null};
- if(value?.readOnlyVerified!==true||stamp(value.slot)!==stamp(expectedSlot))return result;
+function centralView(value,expectedSlot,now){
+ const result={availability:'unknown',unavailableReason:'query-unverified',branchCode:null,observedAt:null,captures:null,declaredRecords:null,actualRows:null,distinctProducts:null};
+ if(value?.readOnlyVerified!==true)return result;
+ if(value.branchCode!=='004')return {...result,unavailableReason:'branch-unverified'};
+ if(stamp(value.slot)!==stamp(expectedSlot))return {...result,unavailableReason:'slot-unverified'};
+ const seen=parseTime(value.observedAt),checked=parseTime(now);
+ if(seen==null)return {...result,unavailableReason:'query-time-unverified'};
+ if(checked-seen>CLOUD_INSPECTION_BOUNDS.centralMaxAgeMs)return {...result,unavailableReason:'query-observation-stale'};
+ if(seen-checked>CLOUD_INSPECTION_BOUNDS.futureToleranceMs)return {...result,unavailableReason:'query-time-in-future'};
  const names=['captures','declaredRecords','actualRows','distinctProducts'];
- if(names.some(k=>n(value[k])==null))return result;
- return {availability:'available',...Object.fromEntries(names.map(k=>[k,value[k]]))};
+ if(names.some(k=>n(value[k])==null))return {...result,unavailableReason:'query-counts-unverified'};
+ return {availability:'available',unavailableReason:null,branchCode:'004',observedAt:stamp(value.observedAt),...Object.fromEntries(names.map(k=>[k,value[k]]))};
 }
 
 export function reconcileHourlyDelivery({expectedSlot,now,controller,deviceAccessVerified=false,sourceAccessReason,central,journalPersisted=null}={}){
  if(!isSlot(expectedSlot)||parseTime(now)==null||Date.parse(now)<Date.parse(expectedSlot))throw new TypeError('A completed or current Hourly004 slot and independent check time are required.');
  const source=sanitizeControllerObservation(controller,{now,deviceAccessVerified,accessReason:sourceAccessReason});
- const received=centralView(central,expectedSlot),expected=Date.parse(expectedSlot),checked=Date.parse(now);
+ const received=centralView(central,expectedSlot,now),expected=Date.parse(expectedSlot),checked=Date.parse(now);
  const result={schemaVersion:'hourly004-cloud-inspection-v1',branch:'004',expectedSlot:stamp(expectedSlot),checkedAt:stamp(now),status:'PARTIAL',reason:'EVIDENCE_INCOMPLETE',source,central:received,journalPersisted:b(journalPersisted),sourceFreshnessQualified:false,atomicSnapshotQualified:false,clockSynchronizationVerified:false,currentStockCertified:false,action:'report-only',syncRequested:false,taskRunRequested:false,recoveryEnabled:false};
  const done=(status,reason)=>({...result,status,reason});
  if(received.availability==='available'&&received.captures>1)return done('BLOCKED','MULTIPLE_CENTRAL_CAPTURES_REQUIRE_REVIEW');
@@ -79,7 +93,9 @@ export function reconcileHourlyDelivery({expectedSlot,now,controller,deviceAcces
  const a=source.latestAttempt;
  if(!a||Math.abs(Date.parse(a.startedAt)-start)>CLOUD_INSPECTION_BOUNDS.taskStartToleranceMs)return done('PARTIAL','CURRENT_STATUS_UNVERIFIED');
  if(task.lastResult!==0||a.status!=='captured-and-acknowledged')return done('BLOCKED','SOURCE_ATTEMPT_FAILED');
+ if(source.failureCode!==null)return done('BLOCKED','SOURCE_STATUS_CONTRADICTORY');
  if(a.observedProducts!==6835||a.backendAcceptedRecords!==6835||a.outboxPending!==0||source.queuePending!==0)return done('BLOCKED','SOURCE_ACK_OR_QUEUE_INCOMPLETE');
+ if(received.availability==='available'&&Date.parse(received.observedAt)<Date.parse(a.finishedAt))return done('PARTIAL','CENTRAL_OBSERVATION_PRECEDES_SOURCE_COMPLETION');
  if(!centralPass)return done(received.availability==='available'?'BLOCKED':'PARTIAL',received.availability==='available'?'CENTRAL_DELIVERY_NOT_OBSERVED':'CENTRAL_QUERY_UNAVAILABLE');
  return done('PASS','SOURCE_ACK_TASK_AND_CENTRAL_COUNTS_AGREE');
 }
