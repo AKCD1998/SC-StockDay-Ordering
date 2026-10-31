@@ -6,7 +6,7 @@ with sync_playwright() as p:
  b=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox']);ctx=b.new_context(viewport={'width':390,'height':844});page=ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
  page.goto('http://127.0.0.1:4180/',wait_until='networkidle');page.locator('#pin').fill('1111');page.locator('#loginForm button[type=submit]').click();page.wait_for_function("!document.querySelector('#loginDialog').open")
  page.evaluate('navigator.serviceWorker.ready');page.wait_for_function('navigator.serviceWorker.controller!==null')
- cache_urls=page.evaluate("caches.open('sc-pda-isolated-shell-v1').then(c=>c.keys()).then(keys=>keys.map(r=>new URL(r.url).pathname))")
+ cache_urls=page.evaluate("caches.keys().then(names=>Promise.all(names.filter(n=>n.startsWith('sc-pda-isolated-shell-')).map(n=>caches.open(n).then(c=>c.keys())))).then(groups=>groups.flat().map(r=>new URL(r.url).pathname))")
  assert not any(u.startswith('/api/') for u in cache_urls)
  page.locator('[data-count=DEMO-003]').click();page.locator('[data-key=code]').fill('OFFLINE-COLD-REOPEN');page.locator('[data-key=quantity]').fill('18');page.locator('[data-unknown=mfg]').check();page.locator('[data-unknown=exp]').check();page.locator('#completeCount').check()
  ctx.set_offline(True);page.locator('#countForm button[type=submit]').click();page.wait_for_function("!document.querySelector('#countDialog').open")
