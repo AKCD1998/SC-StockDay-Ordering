@@ -1,5 +1,10 @@
 # SC StockDay PDA preview
 
+## Isolated API integration mode
+
+A separate, opt-in loopback server now supplies real SQLite persistence, authenticated fixture assignments, receipts, source-choice history, and IndexedDB/offline retry. Start it using [the demo server instructions](../pda-demo-server/README.md). The static preview described below remains browser-only; its existing storage namespace, public fixture PINs and hosted v4 are unchanged. No production/staging count endpoint is connected. See [the current integration contract](../../docs/PDA_DEMO_INTEGRATION_CONTRACT.md).
+
+
 Interactive Thai mobile/desktop prototype. Synthetic data only. Does not call the live backend or create real staff accounts. PINs and mock sync are browser demonstrations, not real authentication or server acceptance.
 
 Run from repository root:

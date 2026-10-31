@@ -1,5 +1,6 @@
 # PDA stock count — repository review and implementation design
 
+> Current integration update: an isolated synthetic HTTP/SQLite count demo is now implemented. See [PDA_DEMO_INTEGRATION_CONTRACT.md](PDA_DEMO_INTEGRATION_CONTRACT.md) and [PDA_DEMO_INTEGRATION_STATE.md](PDA_DEMO_INTEGRATION_STATE.md). This does not implement remote staging, production stock writes, or team floor/round sessions. Earlier preview-only statements below describe the earlier milestone.
 Date: 2026-10-31. Status: architecture proposal + working, isolated browser preview.
 
 This work implements a reviewable preview, not production authentication, a native application, a stock API, or a database migration. No live inventory, AdaAcc, Render configuration, or credentials were changed. The preview stores synthetic records in the visitor's browser and simulates synchronization. The source policy module is a reference implementation; no existing stock reader imports it.

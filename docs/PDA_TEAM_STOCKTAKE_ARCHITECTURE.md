@@ -1,5 +1,6 @@
 # Practical architecture for the upcoming team stocktake
 
+> Current integration update: an isolated synthetic HTTP/SQLite count demo is now implemented. See [PDA_DEMO_INTEGRATION_CONTRACT.md](PDA_DEMO_INTEGRATION_CONTRACT.md) and [PDA_DEMO_INTEGRATION_STATE.md](PDA_DEMO_INTEGRATION_STATE.md). This does not implement remote staging, production stock writes, or team floor/round sessions. Earlier preview-only statements below describe the earlier milestone.
 Date: 2026-10-31. Status: implementation proposal. Camera scanning and individual-count correction flows are implemented in the isolated browser preview; shared multi-phone stocktake sessions are not implemented yet. This document does not authorize or perform production database changes.
 
 ## The core rule
