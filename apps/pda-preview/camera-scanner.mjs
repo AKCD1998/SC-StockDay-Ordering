@@ -36,10 +36,14 @@ export class CameraScanner {
       // Best effort; camera-specific autofocus must be verified on actual phones.
       if(caps.focusMode?.includes('continuous'))try{await track.applyConstraints({advanced:[{focusMode:'continuous'}]});}catch{}
       if(token!==this.token||!this.dialog.open)return;
-      if(this.supportsTorch)await this.setTorch(true);
+      // Ambient light is the default: a bright torch can wash out glossy labels.
+      // Browser torch control is binary; never pretend an on-screen dimmer can
+      // reduce the physical LED output. Users may turn the light on explicitly.
+      if(this.supportsTorch)await this.setTorch(false);
+      else this.q('#cameraTorch').textContent='ไฟฉาย: ไม่รองรับ';
       await decoderReady;
       if(token!==this.token||!this.dialog.open)return;
-      this.q('#cameraPlaceholder').hidden=true;this.gate.arm();this.update('aiming');this.message('เล็งบาร์โค้ดในกรอบ แล้วแตะอ่านหนึ่งครั้ง ไม่มีการรับค่าระหว่างเล็ง');
+      this.q('#cameraPlaceholder').hidden=true;this.gate.arm();this.update('aiming');this.message('เล็งบาร์โค้ดในกรอบ แล้วแตะอ่าน ใช้แสงห้องก่อน เปิดไฟฉายเฉพาะเมื่อมืดเพื่อลดแสงสะท้อน');
     }catch(error){if(token!==this.token||!this.dialog.open)return;this.release();this.gate.stop();this.update('error');this.message(cameraErrors[error.name]||error.message||'เปิดกล้องไม่ได้ กรุณาลองใหม่');}
   }
   async setTorch(enabled){const stream=this.stream;if(!stream||!this.supportsTorch)return;try{const track=stream.getVideoTracks()[0];await track.applyConstraints({advanced:[{torch:enabled}]});if(this.stream!==stream)return;this.torch=track.getSettings?.().torch??enabled;this.q('#cameraTorch').textContent='ไฟฉาย: '+(this.torch?'เปิด':'ปิด');this.q('#cameraTorch').setAttribute('aria-pressed',String(this.torch));}catch{this.supportsTorch=false;this.torch=false;this.q('#cameraTorch').textContent='ไฟฉาย: ใช้ไม่ได้บนเบราว์เซอร์นี้';this.q('#cameraTorch').disabled=true;}}
