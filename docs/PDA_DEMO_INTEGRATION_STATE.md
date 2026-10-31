@@ -1,6 +1,6 @@
 # PDA integration living state
 
-Updated: 2026-10-31, Asia/Bangkok. Owner: existing PDA conversation. Existing Transfer Delta owner was consulted once through the coordinating conversation; response received and incorporated. No replacement owner, CPU-v5/Delta work, or production changes.
+Updated: 2026-10-31, Asia/Bangkok; ScProductDev acceptance evidence received through 15:40 ICT. Owner: existing PDA conversation. Existing Transfer Delta owner was consulted once through the coordinating conversation; response received and incorporated. No replacement owner, CPU-v5/Delta work, or production changes.
 
 | Area | State | Evidence / practical limit |
 |---|---|---|
@@ -18,6 +18,10 @@ Updated: 2026-10-31, Asia/Bangkok. Owner: existing PDA conversation. Existing Tr
 | Offline queue / cold reopen | Implemented and browser-tested | IndexedDB + app-shell cache; no API/receipt caching; actual reconnect required |
 | Multiple browser clients | Tested locally | Separate authenticated contexts see same persisted records. Not a remote phone test |
 | Real server-process restart | Tested | SQLite evidence/session/receipt/source history survive a new process; UI records also reopened afterward |
+| ScProductDev integrated local run | Verified by coordinator on Windows | Exact R2 artifact/hash; Node v24.11.1 win32; read-only preflight, eight portable checks and browser receipt. [Recorded host evidence](evidence/PDA_SCPRODUCTDEV_ACCEPTANCE_2026-10-31.json) |
+| ScProductDev Windows offline / camera / HID | Not tested in host acceptance | Prior cloud browser checks remain separate; no camera permission granted |
+| Old ScProductDev port-8765 HTML | Unchanged static review | Not the integrated port-4180 API run |
+| Physical Android acceptance | Pending | No physical-phone scan, torch, Volume+ or Bluetooth acceptance claimed |
 | Real inventory / financial writes | Excluded | No production SQL, Sync, receiving, transfer or official-stock mutations |
 | Real staff enrollment / new credentials | Not performed | Original fixture PINs unchanged; no production account/key/permission operations |
 | Remote staging / APK deployment | Not performed / pending approval | No staging service was established or exposed |
@@ -25,7 +29,7 @@ Updated: 2026-10-31, Asia/Bangkok. Owner: existing PDA conversation. Existing Tr
 
 ## Actual verification
 
-Final measured results: 37 actual HTTP/SQLite assertions passed; 6 mobile-contract fixture tests passed. Integrated UI, real offline cold reopen, existing camera/torch-off controls, and static correction-flow regressions passed without browser errors. These checks were already scheduled for the implementation; the later status-only clarification did not restart work or trigger duplicate tests.
+Prior cloud-local measured results: 37 actual HTTP/SQLite assertions passed; 6 mobile-contract fixture tests passed. Integrated UI, real offline cold reopen, existing camera/torch-off controls, and static correction-flow regressions passed without browser errors. These checks were already scheduled for the implementation; the later status-only clarification did not restart work or trigger duplicate tests. ScProductDev's later bounded Windows acceptance is recorded separately below.
 
 
 - `apps/pda-demo-server/tests/api_roundtrip.py`: actual HTTP requests to a separate real Node process and isolated SQLite file, with process termination/restart. Covers authorization, role filtering in the existing handler, assignment/branch/CSRF/origin enforcement, quantity/date/unit checks, idempotency, original preservation, lost-response replay, source history, conflicts and restart.
@@ -47,10 +51,22 @@ The completed 37 HTTP/SQLite checks and 6 read-contract tests are retained as pr
 - The sample always targeted staff01's item. Samples now respect current assignments; unauthorized count/correction entry points are disabled/guarded before data entry. Backend authorization remains authoritative.
 - Delivery now includes read-only runtime/database/route-contract preflight and a portable Node-only verification command. Windows line endings are supported; missing runtime/dependencies, actual route drift, unrelated SQLite files and occupied ports are bounded failures without installation, overwrite, external binding or interference with existing listeners.
 
-Targeted evidence is recorded separately from the prior full regression results. ScProductDev execution remains **PENDING** until the coordinator runs the reviewed bundle and returns a host/platform-specific result. A cloud-local run, a generated review artifact, or the old static port-8765 page must not be reported as that result. No physical Android is needed for these startup/HTTP/browser checks.
+Targeted evidence is recorded separately from the prior full regression results. At R2 packaging, ScProductDev execution was **PENDING**; that checkpoint is superseded by the coordinator-supplied Windows acceptance below. A cloud-local run, a generated review artifact, or the old static port-8765 page is not that host result. No physical Android was needed for these startup/HTTP/browser checks.
 
 ### Targeted results for this continuation
 
 Cloud-local startup checks: 7 passed (existing-store read-only compatibility, missing backend, foreign-database refusal, route drift refusal before execution, CRLF compatibility, occupied-port preservation, forbidden network option rejection). The new portable Node verifier passed count/receipt/retry/second-client/correction/source-history checks. The targeted browser test passed integrated `/index.html`, staff02 assignment/sample, disabled unauthorized controls, direct scan guard, real receipt and offline index reopening. The existing pending-queue cold-reopen test was rechecked only because the offline cache/entry changed; it passed. No prior consultation or full 37-check suite was repeated.
 
-`style.css`, camera/capture/decoder, original count policy, API client and owner-confirmed mobile normalizer, and the durable SQLite store core remain byte-identical to the previous delivery. Startup guards and entry/assignment wiring are isolated additions. A source bundle is handed to the coordinator via `PDA_SCPRODUCTDEV_ACCEPTANCE.md`; until host evidence returns, ScProductDev execution remains PENDING.
+`style.css`, camera/capture/decoder, original count policy, API client and owner-confirmed mobile normalizer, and the durable SQLite store core remain byte-identical to the previous delivery. Startup guards and entry/assignment wiring are isolated additions. The source bundle was handed to the coordinator via `PDA_SCPRODUCTDEV_ACCEPTANCE.md`; its original packaging reports retain their historical PENDING checkpoint.
+
+### ScProductDev bounded acceptance received — 2026-10-31
+
+**VERIFIED_SC_PRODUCTDEV_LOCAL_FIXTURE_ONLY.** The coordinator supplied sanitized host evidence, checked at `2026-10-31T15:40:11.8400766+07:00`. This owner recorded the handoff without rerunning tests, opening the remote screenshot, or changing implementation. The normalized [evidence supplement](evidence/PDA_SCPRODUCTDEV_ACCEPTANCE_2026-10-31.json) identifies its provenance and remote evidence paths.
+
+- Exact artifact `SC-PDA-LOCAL-R2`: 928392 bytes, SHA-256 `449e2548bab056732c670985657b446e7f4e198fd67cfedb5c9f9b12fe87ae7c`, source commit `ae9a5aef375873d2d3f9703fe4c1e098128eaefa`; identity matched before guarded extraction of 45 members. The verified ZIP and original artifact identity remain unchanged.
+- Existing Windows Node `v24.11.1` and backend dependencies passed read-only preflight against the pinned canonical mobile route hash. The portable verifier passed all eight prescribed checks, including a durable count receipt, exact retry, second authenticated client, linked correction with two lot dates, and source-selection audit. These remain synthetic SQLite fixture results, not live API compatibility proof.
+- Normal browser `/index.html` showed `DEMO · SHARED API` as staff02. DEMO-001–003 count actions were disabled; the HOME assignment-aware sample opened DEMO-004. A partial count of 1, lot `SCPRODUCTDEV-LOCAL-CHECK`, explicit unknown manufacturing/expiry dates and complete-product unchecked produced receipt `d6788587-5b08-47c7-84b6-ec998cd4d045`, displayed as received at 15:34 ICT. The screenshot remains on ScProductDev.
+- Initial extension navigation was rejected by the existing cross-site guard; ordinary address-bar navigation succeeded with the guard unchanged. No camera permission was granted. Windows offline/camera/HID and physical-phone acceptance were outside this run.
+- Fixture staff02 logged out and only the acceptance tab was closed. Ctrl+C did not stop the listener; after checking executable, start time and ownership, the coordinator stopped only Node PID 18708. PID absence and port-4180 `ECONNREFUSED` confirmed cleanup; post-stop read-only preflight recognized the existing isolated fixture store. This is a reported cleanup outcome, not a graceful-shutdown acceptance claim.
+
+No software installation, remote exposure, production/staging deployment, official inventory write, schema/permission/auth/CORS change, or change to another repository/listener or old port 8765 was reported. Hosted v4 is unchanged. Approved reachable HTTPS staging, accepted real auth/count/product-identity contracts, deployed count/lot/receipt/offline routes, and physical-device acceptance remain pending. Recording this handoff triggers no new implementation or retest.

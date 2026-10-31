@@ -1,4 +1,14 @@
-# Bounded ScProductDev local acceptance request
+# Bounded ScProductDev local acceptance
+
+## Completed host acceptance — 2026-10-31
+
+**VERIFIED_SC_PRODUCTDEV_LOCAL_FIXTURE_ONLY**, coordinator-supplied at 15:40 ICT. Exact `SC-PDA-LOCAL-R2` ZIP/hash matched; Windows Node v24.11.1 preflight, all eight portable verifier checks, and the staff02 / DEMO-004 browser receipt flow passed. Receipt: `d6788587-5b08-47c7-84b6-ec998cd4d045`. The owned port-4180 process was stopped; the fixture account logged out and acceptance tab closed.
+
+See the [normalized sanitized host evidence](evidence/PDA_SCPRODUCTDEV_ACCEPTANCE_2026-10-31.json) and [living state](PDA_DEMO_INTEGRATION_STATE.md). Evidence provenance is the coordinator's actual host run; this owner did not independently open the remote screenshot or rerun acceptance. The exact ZIP and original packaging reports remain unchanged. Windows offline/camera/HID, staging/production compatibility and physical-phone acceptance were not added by this result.
+
+The bounded procedure below is retained as the executed acceptance scope. It is **not a pending request or instruction to repeat the run**.
+
+## Original acceptance scope
 
 Artifact identity: **SC-PDA-LOCAL-R2**. Same SC StockDay PDA owner/project; no replacement Site or engineering owner. This is an isolated review-bundle run, not deployment. The coordinating conversation may execute these routine steps with its existing local tools. No physical Android or user-operated camera step is required.
 

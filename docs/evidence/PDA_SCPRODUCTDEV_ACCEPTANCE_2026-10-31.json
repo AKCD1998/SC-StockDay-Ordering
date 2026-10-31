@@ -1,0 +1,170 @@
+{
+  "recordType": "normalized-sanitized-host-evidence-supplement",
+  "status": "VERIFIED_SC_PRODUCTDEV_LOCAL_FIXTURE_ONLY",
+  "provenance": {
+    "source": "coordinator relay of completed ScProductDev host acceptance",
+    "sourceThreadId": "01a19000-1272-7143-96a4-6491f785e03c",
+    "receivedBy": "existing SC StockDay PDA owner",
+    "recordedOn": "2026-10-31",
+    "hostActionsPerformedByRecordingOwner": false,
+    "remoteFilesIndependentlyOpenedByRecordingOwner": false,
+    "retestRequestedOrPerformedForThisHandoff": false,
+    "normalization": "Relevant sanitized fields transcribed from the supplied handoff. The garbled raw console receiptText is omitted; receipt ID, displayed time and structured count fields are preserved. The supplied raw entryMode is retained alongside the visually reported label. This is a supplement, not a rebuilt bundle."
+  },
+  "host": "SCPRODUCTDEV",
+  "checkedAt": "2026-10-31T15:40:11.8400766+07:00",
+  "artifact": {
+    "artifactId": "SC-PDA-LOCAL-R2",
+    "zip": "C:\\Users\\scgro\\Documents\\Codex\\2026-10-31\\task\\pda-r2\\sc-stockday-pda-local-r2.zip",
+    "bytes": 928392,
+    "sha256": "449e2548bab056732c670985657b446e7f4e198fd67cfedb5c9f9b12fe87ae7c",
+    "expectedIdentityMatches": true,
+    "sourceCommit": "ae9a5aef375873d2d3f9703fe4c1e098128eaefa",
+    "members": 45,
+    "unpackedBytes": 1713816,
+    "verifiedAt": "2026-10-31T15:24:26.0025098+07:00",
+    "extractedRoot": "C:\\Users\\scgro\\Documents\\Codex\\2026-10-31\\task\\pda-r2\\unpacked",
+    "originalZipAndIdentityChangedByRecording": false
+  },
+  "preflight": {
+    "ok": true,
+    "action": "read-only-preflight",
+    "backendRoot": "C:\\Users\\scgro\\Desktop\\Webapp training project\\PaaSRTSM-project",
+    "route": "C:\\Users\\scgro\\Desktop\\Webapp training project\\PaaSRTSM-project\\apps\\admin-api\\src\\routes\\mobile-products.js",
+    "routeSha256": "3ffbc9413cc9f6ca164953c1dea1dac28bd48d40929ce3b66c086e3feabf038c",
+    "lineEndingsNormalized": true,
+    "ownerRevision": "40ef239a43b7ba2104376aad296242b062ba28d1",
+    "expressPath": "C:\\Users\\scgro\\Desktop\\Webapp training project\\PaaSRTSM-project\\node_modules\\express\\index.js",
+    "node": "v24.11.1",
+    "platform": "win32",
+    "fixtureOnly": true,
+    "database": {
+      "state": "new-file",
+      "readOnlyCheck": true
+    },
+    "productionAccess": false,
+    "softwareInstalled": false
+  },
+  "portableVerifier": {
+    "ok": true,
+    "action": "portable-loopback-verification",
+    "environment": "isolated-fixture-demo",
+    "platform": "win32",
+    "node": "v24.11.1",
+    "origin": "http://127.0.0.1:4180",
+    "mobileRouteSha256": "3ffbc9413cc9f6ca164953c1dea1dac28bd48d40929ce3b66c086e3feabf038c",
+    "officialStockWrites": false,
+    "productionOrStagingVerified": false,
+    "checks": [
+      "fixture auth and exact mobile read",
+      "stock observation time not invented",
+      "UI backend entry marker available",
+      "durable count receipt",
+      "idempotent retry",
+      "second authenticated client",
+      "append-only correction and two lot dates",
+      "source-selection audit"
+    ],
+    "evidence": {
+      "eventId": "092f6a9e-6d7f-45c0-99ce-54e64c8cc396",
+      "receiptId": "da4029a0-0d0d-4242-b036-3c979e156a0a",
+      "correctionEventId": "076f294d-9c3f-49b3-9b37-e5c7ce767b4c",
+      "correctionReceiptId": "da7b6035-9596-4904-b84c-c83a48665b8e"
+    },
+    "physicalDeviceRequired": false
+  },
+  "browser": {
+    "artifactId": "SC-PDA-LOCAL-R2",
+    "host": "SCPRODUCTDEV",
+    "origin": "http://127.0.0.1:4180/index.html",
+    "checkedAt": "2026-10-31T08:36:47.368Z",
+    "entryModeRaw": "DEMO ? SHARED API",
+    "entryModeVisuallyReported": "DEMO · SHARED API",
+    "actor": "staff02",
+    "sampleEntry": "HOME assignment-aware sample",
+    "sampleProduct": "DEMO-004",
+    "unauthorizedCountProductsDisabled": ["DEMO-001", "DEMO-002", "DEMO-003"],
+    "lot": "SCPRODUCTDEV-LOCAL-CHECK",
+    "quantity": 1,
+    "manufacturingDate": "explicit-unknown",
+    "expiryDate": "explicit-unknown",
+    "completeProduct": false,
+    "receiptId": "d6788587-5b08-47c7-84b6-ec998cd4d045",
+    "serverReceivedDisplayed": "31 Oct 2026 15:34 ICT",
+    "officialStockWrites": false,
+    "physicalPhoneVerified": false,
+    "cameraPermissionGranted": false,
+    "stagingOrProductionVerified": false,
+    "screenshot": "ScProductDev-browser-receipt.jpg",
+    "notes": [
+      "Initial extension navigation was rejected as cross-site; direct normal address-bar navigation succeeded with guards unchanged.",
+      "Camera permission prompt was dismissed; final sample used the home assignment-aware sample control.",
+      "Windows preflight, portable verifier and prescribed browser receipt check completed; no claim of Windows offline/camera/HID acceptance."
+    ]
+  },
+  "remoteEvidenceReferences": {
+    "reviewDirectory": "C:\\Users\\scgro\\Documents\\Codex\\2026-10-31\\task\\pda-r2",
+    "portableVerifierReport": "C:\\Users\\scgro\\Documents\\Codex\\2026-10-31\\task\\pda-r2\\ScProductDev-verification.json",
+    "screenshotFilename": "ScProductDev-browser-receipt.jpg",
+    "availability": "Retained on ScProductDev according to coordinator; not copied or opened by the recording owner."
+  },
+  "cleanup": {
+    "fixtureStaff02LoggedOut": true,
+    "acceptanceTabClosed": true,
+    "onlyAcceptanceTabClosed": true,
+    "pid": 18708,
+    "name": "node",
+    "startedAt": "2026-10-31T15:25:48.5387457+07:00",
+    "gracefulCtrlCAttempted": true,
+    "ctrlCDidNotCloseListener": true,
+    "ownershipVerifiedBeforeStop": ["executable", "start time", "PID"],
+    "stopAction": "Stop-Process scoped to verified owned fixture PID only",
+    "stopped": true,
+    "pidAbsentAfterStop": true,
+    "checkedAt": "2026-10-31T15:38:26.82995+07:00",
+    "ptyExitedAfterward": true
+  },
+  "listenerAfterStop": {
+    "listenerReachable": false,
+    "errorCode": "ECONNREFUSED"
+  },
+  "postStopReadOnlyPreflight": {
+    "ok": true,
+    "action": "read-only-preflight",
+    "backendRoot": "C:\\Users\\scgro\\Desktop\\Webapp training project\\PaaSRTSM-project",
+    "route": "C:\\Users\\scgro\\Desktop\\Webapp training project\\PaaSRTSM-project\\apps\\admin-api\\src\\routes\\mobile-products.js",
+    "routeSha256": "3ffbc9413cc9f6ca164953c1dea1dac28bd48d40929ce3b66c086e3feabf038c",
+    "lineEndingsNormalized": true,
+    "ownerRevision": "40ef239a43b7ba2104376aad296242b062ba28d1",
+    "expressPath": "C:\\Users\\scgro\\Desktop\\Webapp training project\\PaaSRTSM-project\\node_modules\\express\\index.js",
+    "node": "v24.11.1",
+    "platform": "win32",
+    "fixtureOnly": true,
+    "database": {
+      "state": "existing-isolated-fixture-store",
+      "readOnlyCheck": true
+    },
+    "productionAccess": false,
+    "softwareInstalled": false
+  },
+  "commands": [
+    "node \"C:\\Users\\scgro\\Documents\\Codex\\2026-10-31\\task\\pda-r2\\unpacked\\SC-StockDay-Ordering\\apps\\pda-demo-server\\preflight.mjs\" --backend-root \"C:\\Users\\scgro\\Desktop\\Webapp training project\\PaaSRTSM-project\" --database \"C:\\Users\\scgro\\Documents\\Codex\\2026-10-31\\task\\pda-r2\\local-data\\pda-review.sqlite\"",
+    "node \"C:\\Users\\scgro\\Documents\\Codex\\2026-10-31\\task\\pda-r2\\unpacked\\SC-StockDay-Ordering\\apps\\pda-demo-server\\server.mjs\" --fixture-demo --backend-root \"C:\\Users\\scgro\\Desktop\\Webapp training project\\PaaSRTSM-project\" --database \"C:\\Users\\scgro\\Documents\\Codex\\2026-10-31\\task\\pda-r2\\local-data\\pda-review.sqlite\" --port 4180",
+    "node \"C:\\Users\\scgro\\Documents\\Codex\\2026-10-31\\task\\pda-r2\\unpacked\\SC-StockDay-Ordering\\apps\\pda-demo-server\\verify-local.mjs\" --fixture-demo --port 4180 --output \"C:\\Users\\scgro\\Documents\\Codex\\2026-10-31\\task\\pda-r2\\ScProductDev-verification.json\""
+  ],
+  "boundaries": {
+    "softwareInstalled": false,
+    "productionOrStagingChanges": false,
+    "officialInventoryWrites": false,
+    "oldStatic8765Changed": false,
+    "hostedV4Changed": false,
+    "otherRepositoryOrListenerChanged": false,
+    "schemaPermissionAuthOrCorsChanges": false,
+    "remoteExposure": false,
+    "windowsOfflineCameraHidAcceptanceAdded": false,
+    "physicalPhoneVerified": false,
+    "stagingOrProductionVerified": false,
+    "priorCloudEvidenceRemainsSeparate": true,
+    "noDatabaseSessionsCookiesCsrfOrBearerDataIncluded": true
+  }
+}
