@@ -56,3 +56,30 @@ test('offline concurrent counts are retained as conflicts, never last-writer-win
  const r=syncOutbox([b,a],{});
  assert.equal(r.events.find(e=>e.id==='a').status,'synced');assert.equal(r.events.find(e=>e.id==='b').status,'conflict');assert.equal(r.events.length,2);
 });
+
+test('unconfirmed discrepancy is delivered but cannot replace shared stock',()=>{
+ const event={id:'d1',productCode:'P1',quantity:3,complete:true,status:'pending',baseRevision:0,observedAt:new Date(now).toISOString()};
+ const r=syncOutbox([event],{},{getReference:()=>({quantity:6,source:'hourly',observedAt:'2026-10-31T04:50:00Z'}),now:()=>new Date(now).toISOString()});
+ assert.equal(r.events[0].status,'review');assert.equal(r.events[0].comparison.difference,-3);
+ assert.equal(resolveStock({human:{...r.events[0],eligible:true},hourly:row(6,60000),now}).source,'hourly');
+});
+test('explicit staff recheck accepts 3 against 6 with its exact comparison evidence',()=>{
+ const ref={quantity:6,source:'hourly',observedAt:'2026-10-31T04:50:00Z'};
+ const event={id:'d1',productCode:'P1',quantity:3,complete:true,status:'pending',baseRevision:0,observedAt:new Date(now).toISOString(),discrepancyConfirmation:{rechecked:true,reason:'Checked both floors',countQuantity:3,referenceQuantity:6,referenceSource:'hourly',referenceObservedAt:ref.observedAt}};
+ const r=syncOutbox([event],{},{getReference:()=>ref});assert.equal(r.events[0].status,'synced');
+ assert.deepEqual(r.events[0].discrepancyConfirmation,event.discrepancyConfirmation);
+ const changed=syncOutbox([event],{},{getReference:()=>({...ref,quantity:9})});assert.equal(changed.events[0].status,'review');
+ const timed=syncOutbox([event],{},{getReference:()=>({...ref,observedAt:'2026-10-31T04:55:00Z'})});assert.equal(timed.events[0].status,'review');
+});
+test('partial lots are not falsely compared to the full branch quantity',()=>{
+ const event={id:'p',productCode:'P1',quantity:3,complete:false,status:'pending',baseRevision:0,observedAt:new Date(now).toISOString()};
+ const r=syncOutbox([event],{},{getReference:()=>({quantity:6})});assert.equal(r.events[0].status,'synced');assert.equal(r.events[0].comparison.kind,'partial');
+});
+test('linked correction preserves the original observation and reason',()=>{
+ const original={id:'old',branchCode:'004',productCode:'P1',quantity:3,complete:true,status:'synced',baseRevision:0,observedAt:'2026-10-31T04:00:00Z'};
+ const originalCopy=structuredClone(original);
+ const correction={...original,id:'new',status:'pending',baseRevision:1,quantity:6,supersedesId:'old',incidentId:'incident-1',correctionReason:'Found second-floor lot',observedAt:'2026-10-31T05:00:00Z'};
+ const r=syncOutbox([original,correction],{P1:1});assert.deepEqual(r.events[0],originalCopy);assert.equal(r.events[1].status,'synced');assert.equal(r.events[1].quantity,6);assert.equal(r.events.length,2);
+ const wrongBranch=syncOutbox([original,{...correction,branchCode:'001'}],{P1:1});assert.equal(wrongBranch.events[1].status,'conflict');
+ const missingReason=syncOutbox([original,{...correction,correctionReason:''}],{P1:1});assert.equal(missingReason.events[1].status,'conflict');
+});

@@ -187,3 +187,21 @@ The prototype uses localStorage for review convenience; production must use the 
 4. Pilot branch 004 with stock resolver in shadow mode. Compare selected source and fallback reasons with existing display without replacing operational quantities.
 5. Enable source selection for reference display, then explicitly integrate other consumers after checking reservations/availability semantics. Roll back by feature flag to existing hourly/Full Sync reader; preserve all physical count evidence.
 6. Add post-count movement projection only after proving completeness and cutover. A full perpetual lot ledger is a separate project requiring receiving and POS support.
+
+## Follow-up: two-way comparison, confirmation and traceable corrections
+
+User clarification during the review: a staff member may count 3 while the website shows 6 because stock exists on a second floor. They must see the discrepancy, recheck, explicitly confirm, and submit immediately when online. If they later find an omitted lot, they must be able to correct the submitted observation without erasing it. The original becomes evidence in a traceable incident/discrepancy report.
+
+The preview now implements that flow:
+
+1. At scan time, retain the reference quantity, source, observation time, retrieval time, branch and unit. The demo sample product shows website quantity 6.
+2. Compare a **complete** product count to the latest available same-branch, same-unit reference at submission. Never compare a partial lot survey to the branch total. Unknown website quantity is not zero.
+3. On any nonzero difference, show both values, signed difference, source and timestamp. Let the user return to the form, or explicitly attest to checking all storage points and enter a reason before sending. An explicit confirmation does not prove that either observation is objectively right; it records the user's checked assertion and allows the stated source policy to select it.
+4. The mock sync rechecks the reference and revision. Confirmation is bound to the exact count, reference quantity, source and observation timestamp. If these change before acceptance, keep the submission as a review/conflict receipt and require rechecking instead of treating the old confirmation as blanket permission.
+5. Confirmed online saves are immediately delivered to the simulated server path. Offline saves visibly remain pending with cached reference evidence; delivery does not reset the count timestamp. This is local simulation only, not a live StockDay API connection.
+6. History exposes **Correct while retaining history**. It preloads the old lots, lets the user add an omitted lot and calculate the full corrected total, and requires a correction reason. The new event has a new UUID, `supersedesId`, `incidentId`, new actor/time and full corrected lot snapshot. It is a replacement observation, never an increment added to the old total.
+7. Both records remain in history. The linked incident view shows before/after quantities, original actor/time, correction actor/time, reason and baseline evidence, with a link to the original record. Original counts, lots and comparison confirmations remain unchanged; an accepted correction makes the previous record historical. A pending, rejected or conflicting correction never removes the old accepted source.
+
+A genuine receipt/delivery after counting is a new later count or a verified movement, not a correction claiming the earlier physical count was mistaken. If a correction refers to what was physically present at the earlier time, preserve that effective observation time separately from the correction's entry time and re-evaluate source freshness; never refresh an old observation by editing it. The preview treats correction as a fresh recount of the full product and records the original observation link.
+
+Production must implement the comparison, confirmation binding, receipt idempotency, correction lineage validation, immutable incident evidence and optimistic concurrency **server-side in a single transaction**. No new manager approval gate is assumed: the clarified workflow lets staff explicitly confirm after rechecking. Existing role/branch restrictions still apply, and managers can inspect incident reports. A receipt proving successful transmission must remain distinct from acceptance as the selected stock source.

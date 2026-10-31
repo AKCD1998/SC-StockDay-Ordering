@@ -46,15 +46,41 @@ export function validateCount({ lots, complete, observedAt }, now = Date.now()) 
 
 // The receipt represents one absolute count, never an additive stock movement.
 // Retries reuse the same event ID; optimistic revision prevents last-writer-wins.
-export function syncOutbox(events, revisions) {
+export function compareCount(count, reference) {
+  if (!count.complete) return { kind: 'partial', difference: null };
+  if (typeof reference?.quantity !== 'number' || !Number.isFinite(reference.quantity)) return { kind: 'unknown', difference: null };
+  const difference = Math.round((count.quantity - reference.quantity) * 1000) / 1000;
+  return { kind: difference === 0 ? 'match' : 'discrepancy', difference };
+}
+
+export function confirmationMatches(event, reference) {
+  const confirmation = event.discrepancyConfirmation;
+  return confirmation?.rechecked === true && !!confirmation.reason?.trim()
+    && confirmation.countQuantity === event.quantity
+    && confirmation.referenceQuantity === reference?.quantity
+    && confirmation.referenceSource === reference?.source
+    && confirmation.referenceObservedAt === reference?.observedAt;
+}
+
+export function syncOutbox(events, revisions, { getReference, now = () => new Date().toISOString() } = {}) {
   const nextRevisions = { ...revisions };
   const ordered = [...events].sort((a,b) => a.observedAt.localeCompare(b.observedAt));
   const outcomes = new Map();
   for (const event of ordered) {
     if (event.status !== 'pending') continue;
     const current = nextRevisions[event.productCode] || 0;
-    if (current !== event.baseRevision) outcomes.set(event.id, 'conflict');
-    else { nextRevisions[event.productCode] = current + 1; outcomes.set(event.id, 'synced'); }
+    const original = event.supersedesId ? events.find(e => e.id === event.supersedesId) : null;
+    const correctionInvalid = event.supersedesId && (!original || original.productCode !== event.productCode
+      || original.branchCode !== event.branchCode || !event.correctionReason?.trim()
+      || events.some(e => e.id !== event.id && e.supersedesId === original.id && e.status === 'synced'));
+    if (current !== event.baseRevision || correctionInvalid) outcomes.set(event.id, { status: 'conflict' });
+    else {
+      const reference = getReference?.(event) ?? event.referenceAtScan ?? null;
+      const comparison = compareCount(event, reference);
+      nextRevisions[event.productCode] = current + 1;
+      outcomes.set(event.id, { status: comparison.kind === 'discrepancy' && !confirmationMatches(event, reference) ? 'review' : 'synced',
+        referenceAtSubmit: reference, comparison, receivedAt: now(), receiptRevision: current + 1 });
+    }
   }
-  return { events: events.map(e => outcomes.has(e.id) ? { ...e, status: outcomes.get(e.id) } : e), revisions: nextRevisions };
+  return { events: events.map(e => outcomes.has(e.id) ? { ...e, ...outcomes.get(e.id) } : e), revisions: nextRevisions };
 }

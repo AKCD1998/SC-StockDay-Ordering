@@ -21,3 +21,5 @@ node --test apps/pda-preview/tests/domain.test.mjs
 ```
 
 See [implementation design](../../docs/PDA_STOCK_COUNT_DESIGN_2026-10-31.md) for verified source findings, existing native-app decisions, server-side auth, lot/date semantics, source-policy limits and rollout.
+
+Discrepancy flow: the sample scan shows website reference 6. Enter a complete count of 3, save, review the side-by-side comparison, confirm a full recount and provide a reason. History -> "แก้ไขโดยเก็บประวัติเดิม" preloads the original lots. Add the omitted lot, provide a correction reason and submit the full corrected total. History keeps the original and shows the linked incident evidence; no existing count is overwritten. Offline corrections remain pending and cannot change the selected quantity until simulated acceptance.
