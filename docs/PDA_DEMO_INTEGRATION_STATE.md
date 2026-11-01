@@ -1,6 +1,6 @@
 # PDA integration living state
 
-Updated: 2026-10-31, Asia/Bangkok; ScProductDev acceptance evidence received through 15:40 ICT. Owner: existing PDA conversation. Existing Transfer Delta owner was consulted once through the coordinating conversation; response received and incorporated. No replacement owner, CPU-v5/Delta work, or production changes.
+Updated: 2026-11-01, Asia/Bangkok. ScProductDev R2 acceptance remains recorded for 2026-10-31; a later branch-001 PostgreSQL pilot candidate is prepared but not activated. Owner: existing PDA conversation. Existing Transfer Delta owner was consulted once through the coordinating conversation; response received and incorporated. No replacement owner, CPU-v5/Delta work, or production changes.
 
 | Area | State | Evidence / practical limit |
 |---|---|---|
@@ -25,6 +25,7 @@ Updated: 2026-10-31, Asia/Bangkok; ScProductDev acceptance evidence received thr
 | Real inventory / financial writes | Excluded | No production SQL, Sync, receiving, transfer or official-stock mutations |
 | Real staff enrollment / new credentials | Not performed | Original fixture PINs unchanged; no production account/key/permission operations |
 | Remote staging / APK deployment | Not performed / pending approval | No staging service was established or exposed |
+| Branch-001 real-count integration candidate | Implemented and isolated-tested; production activation pending | New default-off backend PostgreSQL ledger plus real-enrollment client/screen; [activation review](PDA_001_PILOT_REVIEW_2026-11-01.md). No deployed/live count or human stock override claimed |
 | Team stocktake sessions / floor rounds | Planned only | Separate architecture document; fixed fixture product assignments are not full session management |
 
 ## Actual verification
@@ -70,3 +71,11 @@ Cloud-local startup checks: 7 passed (existing-store read-only compatibility, mi
 - Fixture staff02 logged out and only the acceptance tab was closed. Ctrl+C did not stop the listener; after checking executable, start time and ownership, the coordinator stopped only Node PID 18708. PID absence and port-4180 `ECONNREFUSED` confirmed cleanup; post-stop read-only preflight recognized the existing isolated fixture store. This is a reported cleanup outcome, not a graceful-shutdown acceptance claim.
 
 No software installation, remote exposure, production/staging deployment, official inventory write, schema/permission/auth/CORS change, or change to another repository/listener or old port 8765 was reported. Hosted v4 is unchanged. Approved reachable HTTPS staging, accepted real auth/count/product-identity contracts, deployed count/lot/receipt/offline routes, and physical-device acceptance remain pending. Recording this handoff triggers no new implementation or retest.
+
+## Branch-001 production request — 2026-11-01
+
+The user selected branch 001 for the real integration. Existing main was refreshed to `f49f7d2`; its mobile read remains Full Sync without a stock observation time or stock unit basis, independent of the branch-004 Hourly display. A candidate count ledger was prepared in an isolated worktree of the existing backend. The original main checkout, R2 archive, accepted demo/scanner/theme and hosted preview were preserved. The existing read adapter received only a fetch-receiver binding fix exposed by a real browser check.
+
+The new candidate passed 11 Node tests over actual isolated PostgreSQL/HTTP, 7 read-contract tests, and the browser receipt/second-client/correction/offline queue-to-online-reopen flow. It is not an actual ScProductDev run, a physical-phone test or production proof. After resolving missing dependencies only inside the isolated review worktree with scripts disabled, both existing full-server mobile regression files passed (13 tests, with production runtime variables excluded). No dependency install was performed in the owner checkout. PostgreSQL test containers and review-worktree dependencies are isolated cloud test resources, not installed production/ScProductDev software.
+
+Production activation is pending the exact migration/deployment/CORS/preview approval and enrolled branch-001 acceptance described in the [review](PDA_001_PILOT_REVIEW_2026-11-01.md). The hosted origin still received OPTIONS 403. Render workspace selection is also unconfirmed. The proposed pilot records real observations separately; it does not feed them into branch-stock source selection or change official inventory.

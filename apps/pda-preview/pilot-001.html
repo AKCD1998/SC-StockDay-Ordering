@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#19324a">
+  <title>SC StockDay · PDA สาขา 001</title>
+  <link rel="stylesheet" href="./style.css">
+  <style>
+    body{padding:24px 16px}.pilot-wrap{max-width:1000px;margin:auto}.pilot-heading{margin-bottom:20px}.pilot-heading h1{font-size:25px;margin:8px 0}.pilot-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:20px}.pilot-card{padding:22px;margin-bottom:20px}.pilot-card h2{margin:0 0 14px;font-size:19px}.pilot-card label{display:block;margin:12px 0 6px}.pilot-card input:not([type=checkbox]),.pilot-card select,.pilot-card textarea{width:100%;min-height:46px;border:1px solid #b8c5d1;border-radius:9px;padding:10px;font:inherit;background:white;color:#19324a}.pilot-card input[type=checkbox]{width:20px;height:20px;vertical-align:middle;margin-right:8px}.pilot-card .check-label{display:flex;align-items:center;font-size:13px}.pilot-card .button{min-height:46px;margin-top:12px}.pilot-lot{border:1px solid #d6dee5;border-radius:12px;padding:14px;margin-top:14px}.pilot-lot h3{margin:0}.pilot-quiet{font-size:13px;color:#465e72;line-height:1.6}.pilot-status{white-space:pre-wrap;overflow-wrap:anywhere}.pilot-record{padding:14px;border:1px solid #d6dee5;border-radius:12px;margin-bottom:12px}.pilot-record p{margin:6px 0;overflow-wrap:anywhere}.pilot-warning{padding:14px;background:#fff7ce;border:1px solid #d4b339;border-radius:12px;color:#3e350f;line-height:1.6}.pilot-actions{display:flex;gap:10px;flex-wrap:wrap}.pilot-review{padding:20px;max-width:520px;border:0;border-radius:16px}.pilot-review::backdrop{background:#19324a99}.pilot-badge{display:inline-block;background:#19324a;color:white;padding:8px 12px;border-radius:25px;font-size:12px}button:disabled{opacity:.55;cursor:not-allowed}@media(max-width:700px){body{padding:16px 10px}.pilot-grid{grid-template-columns:1fr}.pilot-card{padding:16px}}
+  </style>
+</head>
+<body>
+  <main class="pilot-wrap">
+    <header class="pilot-heading"><span class="eyebrow">SC STOCKDAY · PDA</span><h1>นับสต๊อกสาขา 001</h1><span class="pilot-badge" id="connectionBadge">ยังไม่เชื่อมต่อ</span></header>
+    <p class="pilot-warning" id="scopeNotice">หน้าตรวจรับการเชื่อมต่อ · API ผลนับนี้ยังไม่เปิดบนระบบจริง ผลนับจะเก็บเป็นหลักฐานแยกจากสต๊อกทางการ ไม่ใช้ Hourly 004 และไม่เปลี่ยนยอดขายหรือยอดคลัง</p>
+    <p class="pilot-quiet pilot-status" id="status" role="status" aria-live="polite"></p>
+    <div class="pilot-grid">
+      <div>
+        <section class="panel pilot-card" id="enrollmentCard">
+          <h2>เชื่อมด้วยสิทธิ์สาขา 001</h2>
+          <p class="pilot-quiet">ใช้รหัสลงทะเบียนเครื่องจากผู้ดูแลสาขาที่เข้าสู่ StockDay แล้ว ไม่ใช้ PIN ทดลอง 1111/2222/3333 รหัสลงทะเบียนเดิมมีอายุสั้นและใช้ได้ครั้งเดียว</p>
+          <label for="enrollmentCode">รหัสลงทะเบียนเครื่อง</label><input id="enrollmentCode" autocomplete="off" autocapitalize="none" spellcheck="false">
+          <button class="button secondary" id="rosterButton">ดึงรายชื่อพนักงาน</button>
+          <label for="staffSelect">ผู้ปฏิบัติงาน</label><select id="staffSelect" disabled><option value="">ดึงรายชื่อก่อน</option></select>
+          <button class="button" id="connectButton" disabled>เชื่อมเครื่องและตรวจ API ผลนับ</button>
+        </section>
+        <section class="panel pilot-card" id="scanCard" hidden>
+          <h2>สแกนหรือกรอกบาร์โค้ด</h2>
+          <label for="barcode">บาร์โค้ด</label><input id="barcode" inputmode="numeric" autocomplete="off" placeholder="คงเลขศูนย์ด้านหน้าไว้">
+          <div class="pilot-actions"><button class="button" id="lookupButton">ค้นสินค้า</button><button class="button secondary" id="cameraButton">เปิดกล้อง</button><button class="button secondary" id="disconnectButton">ออกจากการเชื่อมต่อ</button></div>
+        </section>
+        <form class="panel pilot-card" id="countForm" hidden>
+          <h2 id="productName"></h2><p class="mono pilot-quiet" id="productIdentity"></p><p class="pilot-warning" id="stockReference"></p>
+          <label for="unitSize">หน่วยที่นับจริง</label><select id="unitSize" required></select>
+          <p class="pilot-quiet">ต้องเลือกหน่วยเอง บาร์โค้ดเดิมไม่บอกว่าเป็นแพ็กใด ตัวคูณเป็นข้อมูลประกอบและยังไม่ถูกนำไปแปลงยอด</p>
+          <p id="correctionNotice" class="pilot-warning" hidden></p>
+          <div id="lots"></div><button class="button secondary" type="button" id="addLotButton">เพิ่มล็อต</button><button class="button secondary" type="button" id="zeroButton">ยืนยันว่าไม่พบสินค้า (0)</button>
+          <p><strong>รวม <span id="total">0</span></strong></p>
+          <label class="check-label"><input type="checkbox" id="complete">ตรวจครบทุกชั้นและทุกพื้นที่ของสินค้านี้แล้ว</label>
+          <label for="countNote">บันทึกเพิ่มเติม</label><textarea id="countNote" rows="2" maxlength="2000"></textarea>
+          <div id="reasonGroup" hidden><label for="correctionReason">เหตุผลที่แก้ไข</label><textarea id="correctionReason" rows="2" maxlength="1000"></textarea></div>
+          <button class="button" type="submit">ทบทวนและยืนยันผลนับ</button>
+        </form>
+      </div>
+      <section class="panel pilot-card"><h2>คิวและประวัติ</h2><p class="pilot-quiet">ใบรับแสดงเมื่อเซิร์ฟเวอร์รับจริง คิวที่ยังไม่มีใบรับคงคำขอเดิมไว้ หากปิดหน้า ต้องลงทะเบียนใหม่ด้วยคนและเครื่องเดิมเพื่อส่งต่อ</p><button class="button secondary" id="syncButton" disabled>ส่งคิว / ดึงประวัติ</button><div id="history" style="margin-top:16px"></div></section>
+    </div>
+  </main>
+  <dialog id="reviewDialog" class="pilot-review"><h2>ยืนยันผลนับนี้?</h2><div id="reviewText"></div><div class="pilot-actions"><button class="button secondary" id="reviewCancel">กลับไปตรวจ</button><button class="button" id="reviewSave">ยืนยันและส่ง</button></div></dialog>
+  <script type="module" src="./pilot-001-ui.mjs"></script>
+</body>
+</html>

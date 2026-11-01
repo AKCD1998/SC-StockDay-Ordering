@@ -16,7 +16,7 @@ export function normalizeMobileRead(raw,{branchCode,requestedBarcode,fetchedAt=n
 // Read-only future native transport. Not wired to the hosted preview: the owner
 // observed CORS 403 there. No token minting, no refresh endpoint, no proxy.
 export class ExistingMobileReadClient {
- constructor({identityProvider,fetchImpl=globalThis.fetch}){this.identityProvider=identityProvider;this.fetch=fetchImpl;}
+ constructor({identityProvider,fetchImpl=globalThis.fetch}){this.identityProvider=identityProvider;this.fetch=fetchImpl.bind(globalThis);}
  async lookup(value){
   const barcode=exactBarcode(value);const identity=await this.identityProvider();if(!identity?.token||!identity.branchCode)throw new Error('An existing enrolled mobile identity is required');
   const url='https://paasrtsm-project.onrender.com/api/mobile/products/by-barcode/'+encodeURIComponent(barcode);
