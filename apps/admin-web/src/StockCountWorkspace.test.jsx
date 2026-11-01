@@ -1,0 +1,17 @@
+import React from 'react';
+import {render,screen,waitFor,cleanup,within} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import {afterEach,it,expect,vi} from 'vitest';
+import StockCountWorkspace from './StockCountWorkspace.jsx';
+afterEach(()=>{cleanup();vi.unstubAllGlobals();});
+const original={eventId:'original',receiptId:'receipt-original',receivedAt:'2026-11-01T12:00:01Z',event:{id:'original',quantity:'3.000',unit:'ชิ้น',staffName:'Fixture Counter',complete:false,observedAt:'2026-11-01T12:00:00Z',referenceAtCapture:{quantity:6},referenceAtSubmit:{quantity:5},lots:[{code:'LOT-ONE',quantity:'3.000',unit:'ชิ้น',manufacturedOn:null,expiresOn:'2026-12-01'}]}};
+function api({expired=false}={}){vi.stubGlobal('fetch',vi.fn(async url=>{const path=String(url);let data;
+  if(path.includes('/capabilities'))data={canEnroll:true,canManageScopes:false};
+  else if(path.includes('/scopes'))data={scopes:[]};
+  else if(path.includes('/products/'))data={product:{code:'P001',name:'Fixture product'},systemReference:{quantity:0},sourceResolution:{selected:{source:'full-sync',quantity:0},human:{reasons:['partial-coverage','stock-unit-identity-unverified']}},activeObservations:[{...original,scope:{label:'Floor1',round:1}}],history:[{...original,eventId:'correction',receiptId:'receipt-correction',correctedAt:'2026-11-01T12:03:00Z',event:{...original.event,quantity:'6.000',correctionOf:'original',reason:'Found second lot'}}],sourceHistory:[],hasMore:false};
+  else if(path.includes('/events/'))data=original;
+  else if(path.includes('/expiry'))data={rows:[{event_id:'original',ordinal:0,product_code:'P001',lot_code:'LOT-ONE',quantity:'3.000',unit_name:'ชิ้น',expires_on:'2026-12-01',manufactured_on:null,scope:{label:'Floor1',round:1},observed_at:'2026-11-01T12:00:00Z',staff_name:'Fixture Counter',expiry_status:'due'}]};
+  else data={};return{ok:!expired,status:expired?401:200,json:async()=>data};}));}
+it('shows zero reference, frozen scan/submit values, partial count, dates, receipt and linked original',async()=>{api();const user=userEvent.setup();render(<StockCountWorkspace productCode="P001" csrfToken="fixture" onClose={()=>{}}/>);expect(await screen.findByText('ยอดอ้างอิงระบบ: 0')).toBeVisible();expect(await screen.findByText('Receipt receipt-correction')).toBeVisible();expect(screen.getByText(/อ้างอิงตอนเปิดนับ: 6/)).toBeVisible();expect(screen.getByText(/อ้างอิงตอนส่ง: 5/)).toBeVisible();expect(screen.getAllByText(/วันผลิต ไม่ทราบ/).length).toBeGreaterThan(0);await user.click(screen.getByRole('button',{name:'ดูต้นฉบับ original'}));expect(await screen.findByText('Receipt receipt-original')).toBeVisible();expect(fetch.mock.calls.every(([,options])=>options.credentials==='include')).toBe(true);});
+it('expiry rows explicitly describe last-observed quantities rather than live balances',async()=>{api();render(<StockCountWorkspace csrfToken="fixture" onClose={()=>{}}/>);expect(await screen.findByText(/จำนวนจากการนับล่าสุดของแต่ละขอบเขต/)).toBeVisible();expect(await screen.findByText(/ล็อต LOT-ONE/)).toBeVisible();expect(screen.getByText(/นับล่าสุดเมื่อ/)).toBeVisible();});
+it('session expiry is an authentication error and never synthesizes a receipt',async()=>{api({expired:true});render(<StockCountWorkspace productCode="P001" csrfToken="fixture" onClose={()=>{}}/>);expect(await screen.findByRole('alert')).toHaveTextContent('เซสชันหมดอายุ');expect(screen.queryByText(/Receipt/)).not.toBeInTheDocument();});

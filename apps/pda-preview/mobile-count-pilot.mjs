@@ -1,7 +1,7 @@
 // Candidate branch-001 count contract. These count routes are NOT deployed or
 // enabled by the existing demo UI. Existing mobile enrollment routes are reused.
 // Tokens stay in memory; no PIN/refresh contract, proxy, or CORS bypass is added.
-export const PILOT_CONTRACT = 'sc-pda-count-ledger-001-v1';
+export const PILOT_CONTRACT = 'sc-pda-count-ledger-001-v2';
 const LIVE_ORIGIN = 'https://paasrtsm-project.onrender.com';
 export class PilotApiError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
@@ -9,9 +9,11 @@ export class PilotApiError extends Error {
 export class MobileCountPilotClient {
   #identity = null;
   #connected = false;
-  constructor({ fetchImpl = globalThis.fetch, fixtureOrigin = null, allowLocalFixture = false } = {}) {
+  constructor({ fetchImpl = globalThis.fetch, fixtureOrigin = null, allowLocalFixture = false, apiOrigin=LIVE_ORIGIN } = {}) {
     if (fixtureOrigin && (!allowLocalFixture || !/^http:\/\/127\.0\.0\.1:\d+$/.test(fixtureOrigin))) throw new Error('Only an explicitly selected loopback fixture origin is permitted');
-    Object.defineProperty(this, 'origin', { value: fixtureOrigin || LIVE_ORIGIN, enumerable: true });
+    const configured=new URL(apiOrigin);
+    if(configured.protocol!=='https:'||configured.username||configured.password||configured.pathname!=='/'||configured.search||configured.hash)throw new Error('Reviewed HTTPS API origin required');
+    Object.defineProperty(this, 'origin', { value: fixtureOrigin || configured.origin, enumerable: true });
     this.fetch = fetchImpl.bind(globalThis);
   }
   get identity() {
@@ -24,14 +26,16 @@ export class MobileCountPilotClient {
     if (authenticated && (!this.#identity || Date.parse(this.#identity.expiresAt) <= Date.now())) {
       this.disconnect(); throw new PilotApiError(401, 'ENROLLMENT_REQUIRED', 'Existing mobile enrollment is required');
     }
+    const requestToken=this.#identity?.token;
     const response = await this.fetch(this.origin + path, { method, mode: 'cors', credentials: 'omit', cache: 'no-store', redirect: 'error',
       signal: AbortSignal.timeout(10000), headers: { ...(body ? { 'Content-Type': 'application/json' } : {}),
-        ...(authenticated ? { Authorization: 'Bearer ' + this.#identity.token } : {}) },
+        ...(authenticated ? { Authorization: 'Bearer ' + requestToken } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}) });
-    if (response.status === 401 && authenticated) this.disconnect();
+    const staleAuthentication=response.status===401&&authenticated&&this.#identity?.token!==requestToken;
+    if (response.status === 401 && authenticated&&!staleAuthentication) this.disconnect();
     let data;
     try { data = await response.json(); } catch { throw new PilotApiError(response.status, 'INVALID_RESPONSE', 'Mobile API did not return JSON'); }
-    if (!response.ok) throw new PilotApiError(response.status, data.code || 'API_REJECTED', data.error || 'Mobile API request rejected');
+    if (!response.ok) {const error=new PilotApiError(response.status, data.code || 'API_REJECTED', data.error || 'Mobile API request rejected');error.staleAuthentication=staleAuthentication;throw error;}
     return data;
   }
   async roster(code) {
@@ -58,10 +62,12 @@ export class MobileCountPilotClient {
     return data;
   }
   requireConnection() { if (!this.#connected) throw new Error('Verify the branch-001 count-service contract before sending requests'); }
-  async lookup(barcode) {
+  async scopes() { this.requireConnection();const data=await this.request('/api/mobile/counts/scopes');if(data.branchCode!=='001'||!Array.isArray(data.scopes))throw new Error('Scope response mismatch');return data.scopes; }
+  async summary(productCode) {this.requireConnection();return this.request('/api/mobile/counts/products/'+encodeURIComponent(productCode)+'/summary');}
+  async lookup(barcode,scopeId=null) {
     this.requireConnection();
     if (typeof barcode !== 'string' || !barcode.trim()) throw new Error('Barcode must be a string');
-    const data = await this.request('/api/mobile/counts/products/by-barcode/' + encodeURIComponent(barcode.trim()));
+    const data = await this.request('/api/mobile/counts/products/by-barcode/' + encodeURIComponent(barcode.trim())+(scopeId?'?scopeId='+encodeURIComponent(scopeId):''));
     if (data.barcode !== barcode.trim() || typeof data.productCode !== 'string' || data.stock?.source !== 'full-sync' || data.stock.observedAt !== null || data.comparisonAllowed !== false || data.humanOverrideEnabled !== false) throw new Error('Product lookup evidence is incompatible');
     return data;
   }

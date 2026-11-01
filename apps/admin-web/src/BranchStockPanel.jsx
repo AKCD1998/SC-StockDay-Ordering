@@ -3,6 +3,7 @@ import BranchStockRecommendationSuggestion from "./BranchStockRecommendationSugg
 import { shopee004StockStatusMessage, shopee004StockStatusShortMessage } from "./lib/shopee004StockStatus.js";
 import { stock004DisplayView } from "./lib/stock004DisplayView.js";
 import StockQuantityPopover from "./StockQuantityPopover.jsx";
+import StockCountWorkspace from "./StockCountWorkspace.jsx";
 import {
   createBranchStockScopeWorkbook,
   getBranchStockScopeOptions,
@@ -280,6 +281,8 @@ export function BranchStockPanel({
     { branchCode: "005", label: "สาขา 005", description: "ดึงเฉพาะคอลัมน์จำนวนของ สาขา 005" },
   ];
   const [records, setRecords] = useState([]);
+  const countPilotEnabled = import.meta.env.VITE_FEATURE_PDA_COUNTS_001 === 'true' && (branchCode === '001' || isAdminUser && !branchCode);
+  const [countWorkspace, setCountWorkspace] = useState(null);
   const [hourlyStock004, setHourlyStock004] = useState(null);
   const [shopeeStock004, setShopeeStock004] = useState(null);
   const [openStockDetails, setOpenStockDetails] = useState(null);
@@ -1194,7 +1197,7 @@ export function BranchStockPanel({
 
   function renderBranchStockCell(row, column) {
     if (column.key === "productCode") {
-      return <strong>{row.productCode}</strong>;
+      return <><strong>{row.productCode}</strong>{countPilotEnabled && <button type="button" className="sc-count-entry" onClick={()=>setCountWorkspace({productCode:row.productCode})} aria-label={`ล็อตและประวัตินับ ${row.productCode}`}>ล็อต / ผลนับ 001</button>}</>;
     }
     if (column.key === "category") {
       return (
@@ -1384,6 +1387,7 @@ export function BranchStockPanel({
             >
               รีเฟรช
             </button>
+            {countPilotEnabled && <button type="button" className="ghost-button" onClick={()=>setCountWorkspace({productCode:null})}>ผลนับ / ล็อตหมดอายุ 001</button>}
           </div>
           {isAdminUser ? (
             <div className="branch-stock-admin-action-row">
@@ -1414,6 +1418,7 @@ export function BranchStockPanel({
           ต้องเลือกสาขาที่จะใช้งานใน session ก่อน จึงจะเปิดใช้งานคำขอสินค้าได้อย่างปลอดภัย
         </p>
       ) : null}
+      {countWorkspace && <StockCountWorkspace productCode={countWorkspace.productCode} csrfToken={csrfToken} onClose={()=>setCountWorkspace(null)}/>}
       {(requestMode || requestDraftCount > 0) && (
         <section className="request-draft-card">
           <div>

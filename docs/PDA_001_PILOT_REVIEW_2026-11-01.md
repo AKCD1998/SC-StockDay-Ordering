@@ -1,5 +1,7 @@
 # Branch 001 count integration — production activation review
 
+Current continuation: [shared StockDay website/PDA integration](PDA_SHARED_INTEGRATION_2026-11-01.md) supersedes this earlier candidate's code/status for activation review. Original R1 ZIP/evidence remain immutable. The current candidate adds migration 078 and contract v2; no production approval is inferred.
+
 Date: 2026-11-01, Asia/Bangkok. Same PDA project and owner. User requested connection to the real backend using branch **001**. This phase prepares that integration; it has not activated or written to production.
 
 Later workflow clarification: the user supplied twice-yearly stocktake workbooks and confirmed independent recounts 1/2/3. See [workbook findings](PDA_BIANNUAL_STOCKTAKE_WORKBOOK_FINDINGS_2026-11-01.md). This candidate remains an ad hoc count-ledger pilot; it does not implement the sessions/areas/rounds and website reconciliation/export needed to replace those workbooks. The original review ZIP is unchanged, and the clarification is not activation approval.

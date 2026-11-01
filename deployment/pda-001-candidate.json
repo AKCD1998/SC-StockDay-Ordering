@@ -1,0 +1,27 @@
+{
+  "candidate": "SC-PDA-SHARED-INTEGRATION-R1",
+  "branchCode": "001",
+  "backend": {
+    "serviceName": "paasrtsm-project",
+    "apiOrigin": "https://paasrtsm-project.onrender.com",
+    "requiredFlags": {"FEATURE_MOBILE_PDA": "true", "FEATURE_MOBILE_COUNTS_001": "true"},
+    "migrations": ["077_add_pda_001_count_ledger.sql", "078_add_pda_count_scopes.sql"]
+  },
+  "website": {"repository": "AKCD1998/SC-StockDay-Ordering", "workspace": "apps/admin-web", "VITE_FEATURE_PDA_COUNTS_001": "true"},
+  "pda": {
+    "projectId": "appgprj_6ae54eda9d888191b6b2dda641eb34a7",
+    "origin": "https://sc-stockday-pda-lab.scgroup1989-it.chatgpt.site",
+    "entryPath": "/pilot-001.html"
+  },
+  "cors": {"mergeOnly": true, "addExactOrigins": ["https://sc-stockday-pda-lab.scgroup1989-it.chatgpt.site"], "preserveExistingOrigins": true, "allowWildcard": false, "changeCredentialsPolicy": false},
+  "publication": {"humanOverrideEnabled": false, "officialStockWrites": false, "newRemoteServices": false},
+  "rollback": {
+    "first": "Disable FEATURE_MOBILE_COUNTS_001 on the existing backend; retain append-only evidence tables.",
+    "website": "Rebuild/restore previous website with VITE_FEATURE_PDA_COUNTS_001=false.",
+    "pda": "Restore the previously deployed version of this same Sites project.",
+    "cors": "Restore only this activation's reviewed CORS diff, preserving concurrent changes and all pre-existing entries.",
+    "database": "Retain evidence and new tables. Do not delete counts or reverse official stock; no official stock writer is added."
+  },
+  "requiresSeparateProductionApproval": ["existing backend migration and deploy", "branch001 flag activation", "exact CORS allowlist addition if absent", "existing StockDay website and PDA preview publication"],
+  "liveWorkspaceSelectionConfirmed": false
+}

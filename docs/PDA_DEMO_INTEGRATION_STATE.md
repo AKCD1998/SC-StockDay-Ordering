@@ -26,7 +26,8 @@ Updated: 2026-11-01, Asia/Bangkok. ScProductDev R2 acceptance remains recorded f
 | Real staff enrollment / new credentials | Not performed | Original fixture PINs unchanged; no production account/key/permission operations |
 | Remote staging / APK deployment | Not performed / pending approval | No staging service was established or exposed |
 | Branch-001 real-count integration candidate | Implemented and isolated-tested; production activation pending | New default-off backend PostgreSQL ledger plus real-enrollment client/screen; [activation review](PDA_001_PILOT_REVIEW_2026-11-01.md). No deployed/live count or human stock override claimed |
-| Team stocktake sessions / floor rounds | Planned only; workbook workflow verified | User confirms twice-yearly events and independent count 1/2/3. [Workbook findings](PDA_BIANNUAL_STOCKTAKE_WORKBOOK_FINDINGS_2026-11-01.md); current ad hoc pilot is not a replacement for the formal stocktake workflow |
+| Shared StockDay website / PDA reads | Implemented and cloud-integrated | Existing product-list entry, lot/receipt/correction/expiry views and source resolver use the same PostgreSQL evidence; [current delivery](PDA_SHARED_INTEGRATION_2026-11-01.md) |
+| Team stocktake sessions / floor rounds | Scope and independent-round primitives implemented; full session workflow pending | Immutable event/area/round scopes, separate heads and same-counter rejection now work. Formal task leases, blind entry, lead reconciliation/finalization and workbook export remain outside this milestone |
 
 ## Actual verification
 
@@ -83,3 +84,11 @@ Production activation is pending the exact migration/deployment/CORS/preview app
 ### Supplied twice-yearly stocktake examples
 
 The user then provided the June-16/17 branch-001 workbooks and confirmed that count 1/2/3 are independent recounts of the same stock. The [read-only findings and architecture addendum](PDA_BIANNUAL_STOCKTAKE_WORKBOOK_FINDINGS_2026-11-01.md) preserve that requirement, blanks versus zero, identity-based matching across reordered rows, and branch/code ambiguities. No workbook was modified or operationally imported. This is workflow context, not approval to activate the earlier production candidate. Sessions, area/round ownership and main-website reconciliation/export remain unimplemented; they are required before claiming a replacement for these workbooks.
+
+## Shared web/PDA integration continuation
+
+The later pasted request explicitly authorized completing the code and integrated candidate while retaining production restrictions. [SC-PDA-SHARED-INTEGRATION-R1](PDA_SHARED_INTEGRATION_2026-11-01.md) now connects the real StockDay React app's feature-gated product entry and lot/history/expiry workspace to the same PostgreSQL count/receipt/correction records as the PDA. It adds scope/round isolation, shared source decisions, GUI enrollment, offline draft/queue cold reopen, expired-enrollment recovery and actor-safe drafts. The old original/correction and independent-round quantities are not added.
+
+Measured results: 12 HTTP/PostgreSQL tests, 18 existing-mobile/policy tests, 46 React tests, one async auth-race test, actual full-app browser roundtrips, and production-target builds passed. The isolated browser harness uses synthetic baseline product/navigation data plus actual existing auth/enrollment and candidate count/read implementations. No live authentication/write, new ScProductDev acceptance, staging or physical-phone acceptance is implied. Original R2/earlier archives and accepted scanner/theme core remain unchanged. Count receipts are live in the test database only; human operational selection remains held because real unit/movement proofs are absent.
+
+Deployment assets, a merge-only exact-origin CORS plan and rollback are prepared. Production actions and first enrolled branch-001 live acceptance remain pending. No new project, Site, remote service, permissions or credentials were created; no production or official stock changes were made.
