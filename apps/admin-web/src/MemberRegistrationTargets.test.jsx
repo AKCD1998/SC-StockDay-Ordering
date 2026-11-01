@@ -20,7 +20,9 @@ it('renders scoped progress, coverage warning and future dates without fabricate
   const card = (await screen.findByRole('heading', { name: 'สาขา 001' })).closest('article');
   expect(within(card).getByText('23')).toBeVisible(); expect(within(card).getByText('เหลือ 477 คน')).toBeVisible();
   expect(screen.getByText(/วันนี้ \+3 คน/)).toBeVisible(); expect(screen.getByText(/ยอดก่อนหน้านี้ยังไม่มีข้อมูลยืนยัน/)).toBeVisible();
-  expect(screen.getByText('ยังไม่ถึงวัน')).toBeVisible(); expect(screen.queryByText('สาขา 004')).not.toBeInTheDocument();
+  const futureRow = screen.getByRole('rowheader', { name: '4 พ.ย. 2569' }).closest('tr');
+  expect(within(futureRow).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['—', '—']);
+  expect(screen.queryByText('สาขา 004')).not.toBeInTheDocument();
   expect(fetch.mock.calls[0][1].credentials).toBe('include');
 });
 it('clears the previous report on refresh failure and can retry', async () => {
