@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from "react";
 import { summarizeBranchSales } from "./lib/salesTargetHelpers";
+import MemberRegistrationTargets from "./MemberRegistrationTargets";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
@@ -3547,6 +3548,7 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode,
       {error && <div className="fp-form-error">{error}</div>}
 
       <SalesTargetsSection csrfToken={csrfToken} isAdminUser={isAdminUser} branchCode={branchCode} />
+      <MemberRegistrationTargets />
 
       {!loading && !error && (
         <>
