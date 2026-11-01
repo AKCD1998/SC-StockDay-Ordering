@@ -2,6 +2,8 @@
 
 Date: 2026-11-01, Asia/Bangkok. Same PDA project and owner. User requested connection to the real backend using branch **001**. This phase prepares that integration; it has not activated or written to production.
 
+Later workflow clarification: the user supplied twice-yearly stocktake workbooks and confirmed independent recounts 1/2/3. See [workbook findings](PDA_BIANNUAL_STOCKTAKE_WORKBOOK_FINDINGS_2026-11-01.md). This candidate remains an ad hoc count-ledger pilot; it does not implement the sessions/areas/rounds and website reconciliation/export needed to replace those workbooks. The original review ZIP is unchanged, and the clarification is not activation approval.
+
 ## Result and admission
 
 The proposed branch-001 count API, additive PostgreSQL ledger, mobile enrollment client, navy/yellow/white connection/count/history screen and durable browser queue are implemented as a review candidate. They have run together over actual loopback HTTP and a separate PostgreSQL 16 fixture database. This is not the R2 SQLite demo, a ScProductDev run, an authenticated production read, or a physical-phone test.

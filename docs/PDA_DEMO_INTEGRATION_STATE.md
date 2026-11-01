@@ -26,7 +26,7 @@ Updated: 2026-11-01, Asia/Bangkok. ScProductDev R2 acceptance remains recorded f
 | Real staff enrollment / new credentials | Not performed | Original fixture PINs unchanged; no production account/key/permission operations |
 | Remote staging / APK deployment | Not performed / pending approval | No staging service was established or exposed |
 | Branch-001 real-count integration candidate | Implemented and isolated-tested; production activation pending | New default-off backend PostgreSQL ledger plus real-enrollment client/screen; [activation review](PDA_001_PILOT_REVIEW_2026-11-01.md). No deployed/live count or human stock override claimed |
-| Team stocktake sessions / floor rounds | Planned only | Separate architecture document; fixed fixture product assignments are not full session management |
+| Team stocktake sessions / floor rounds | Planned only; workbook workflow verified | User confirms twice-yearly events and independent count 1/2/3. [Workbook findings](PDA_BIANNUAL_STOCKTAKE_WORKBOOK_FINDINGS_2026-11-01.md); current ad hoc pilot is not a replacement for the formal stocktake workflow |
 
 ## Actual verification
 
@@ -79,3 +79,7 @@ The user selected branch 001 for the real integration. Existing main was refresh
 The new candidate passed 11 Node tests over actual isolated PostgreSQL/HTTP, 7 read-contract tests, and the browser receipt/second-client/correction/offline queue-to-online-reopen flow. It is not an actual ScProductDev run, a physical-phone test or production proof. After resolving missing dependencies only inside the isolated review worktree with scripts disabled, both existing full-server mobile regression files passed (13 tests, with production runtime variables excluded). No dependency install was performed in the owner checkout. PostgreSQL test containers and review-worktree dependencies are isolated cloud test resources, not installed production/ScProductDev software.
 
 Production activation is pending the exact migration/deployment/CORS/preview approval and enrolled branch-001 acceptance described in the [review](PDA_001_PILOT_REVIEW_2026-11-01.md). The hosted origin still received OPTIONS 403. Render workspace selection is also unconfirmed. The proposed pilot records real observations separately; it does not feed them into branch-stock source selection or change official inventory.
+
+### Supplied twice-yearly stocktake examples
+
+The user then provided the June-16/17 branch-001 workbooks and confirmed that count 1/2/3 are independent recounts of the same stock. The [read-only findings and architecture addendum](PDA_BIANNUAL_STOCKTAKE_WORKBOOK_FINDINGS_2026-11-01.md) preserve that requirement, blanks versus zero, identity-based matching across reordered rows, and branch/code ambiguities. No workbook was modified or operationally imported. This is workflow context, not approval to activate the earlier production candidate. Sessions, area/round ownership and main-website reconciliation/export remain unimplemented; they are required before claiming a replacement for these workbooks.
