@@ -9,7 +9,7 @@ Campaign start: 1 November 2026 (Asia/Bangkok). Recurring monthly targets:
 | 004 | 250 |
 | 005 | 250 |
 
-`MemberRegistrationTargets.jsx` appears above the sales targets on `#/focus-products`.
+`MemberRegistrationTargets.jsx` appears immediately after the sales targets on `#/focus-products`.
 It shows today's new members, monthly totals, remaining targets, percentages, a
 month selector and daily counts. It refreshes every minute while visible. Admins
 see all four branches; branch/staff accounts see their authenticated branch.

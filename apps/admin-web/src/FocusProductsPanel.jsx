@@ -3547,8 +3547,8 @@ export default function FocusProductsPanel({ csrfToken, isAdminUser, branchCode,
       <LoadingOverlay active={loading} onNavigateBack={onNavigateBack} />
       {error && <div className="fp-form-error">{error}</div>}
 
-      <MemberRegistrationTargets />
       <SalesTargetsSection csrfToken={csrfToken} isAdminUser={isAdminUser} branchCode={branchCode} />
+      <MemberRegistrationTargets />
 
       {!loading && !error && (
         <>
