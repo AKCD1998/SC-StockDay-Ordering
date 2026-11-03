@@ -1,0 +1,169 @@
+{
+  "agentVersion": "0.1.0",
+  "files": [
+    {
+      "path": "batching.js",
+      "integrity": "E508503A7586AFD78E1979BD0BC7CD95FB21F924458EE065DE248A86CB16A58A"
+    },
+    {
+      "path": "branch-stock-reconciliation.js",
+      "integrity": "20509973EDA08E6BED81ED576EFF4CB04A3E855A9283292F7F176C79F7EA012F"
+    },
+    {
+      "path": "client.js",
+      "integrity": "D7A54F87B0E5E94C3A5A4588C70EAFDF5FBA91C54BF63CDAAC35BDBB7910F086"
+    },
+    {
+      "path": "config.js",
+      "integrity": "BB254E46DC52E9B1A564A974302A7B4173E6704A58DD6989378259A5BD9C451A"
+    },
+    {
+      "path": "db.js",
+      "integrity": "2B54B61CBD948D07FEBED9659095BF4D3463E691B71539E2AB8DC384A09DEA5B"
+    },
+    {
+      "path": "delta/hourlyStockEvidence.js",
+      "integrity": "FADB1183417C614906B3908874683FA030CDC878739208B3B0573C628899917C"
+    },
+    {
+      "path": "delta/hourlyStockShadowCache.js",
+      "integrity": "49EE6B0CEBDDE20626805929A1D43A434142FC0DD38CDFCE1996F2DA958542E4"
+    },
+    {
+      "path": "delta/hourlyStockShadow.js",
+      "integrity": "9A06C358EDB7446BC97CE267DEF6A1844632D585CA4846932D049B564541CF4F"
+    },
+    {
+      "path": "delta/salesFingerprint.js",
+      "integrity": "5FA45A4191349CDDD94C2028B8A8F76E5D8D5C8BB598999764AC6558BA3B47C9"
+    },
+    {
+      "path": "delta/salesShadowCache.js",
+      "integrity": "D70BBCC84E149D3FDCC8731F25598BF5309A0FCE5213AB3B7BC5C76AFD0529CC"
+    },
+    {
+      "path": "delta/salesShadow.js",
+      "integrity": "5CF49BAA5A1732C8627A1196BB971DE955F1315810AF083A009062612DD0086B"
+    },
+    {
+      "path": "delta/salesShadowProjection.js",
+      "integrity": "9509ADC7DD839E4D48B006A58119D91DF3DA96EFED27D1A4E26F48BF4D638DD6"
+    },
+    {
+      "path": "delta/transferDeliveryState.js",
+      "integrity": "4551CDECEFE62410A4A79A1D7C8580FD19BC4A7BB71359A31456CB4A0B1319BA"
+    },
+    {
+      "path": "delta/transferDeltaDelivery.js",
+      "integrity": "4FA9B11796DF9EBE23E7175F4B8488ABF9B800F8C552891D03C01739DA010453"
+    },
+    {
+      "path": "delta/transferDiagnostics.js",
+      "integrity": "1C64E20AEE84D6EA735C1DFFBFBD3B97D31C418962608518A70F029496554EE7"
+    },
+    {
+      "path": "delta/transferFingerprint.js",
+      "integrity": "32822871F5276DB3F4BC0402031A21186E618F4FAE904154B102A286191FDBAF"
+    },
+    {
+      "path": "delta/transferShadowCache.js",
+      "integrity": "FA9DC0E5EB4D365E126488CB400CCAA74B706B31A23686BA36CDE03AED78E503"
+    },
+    {
+      "path": "delta/transferShadow.js",
+      "integrity": "891E57A2CFA8C8BE2F33CA9CF77234F27E762DC96BD8AB3493708886D87746FC"
+    },
+    {
+      "path": "delta/transferShadowProjection.js",
+      "integrity": "EFB7C763FCD07C01B6945E88D4CCD16A60C825F677B75E94939BDB216E036EF8"
+    },
+    {
+      "path": "hourlyCohortCoverage.js",
+      "integrity": "133F2D202E39789965E0A835A797A6B96B9399F91035A5D6B28C7D101D877AB2"
+    },
+    {
+      "path": "hourlyCohortManifest.js",
+      "integrity": "07D9213ACE8C78B569D4671A3BD783143F2D86AC0B64081BB06D6BD4CD0BA94F"
+    },
+    {
+      "path": "hourlyCompleteCohortGuard.js",
+      "integrity": "EDFC85362E08487BE7C4F7C2B42E3722B9073267E69A4BFF55C8A6F0746D3396"
+    },
+    {
+      "path": "hourlyCompleteCohortGuard.ps1",
+      "integrity": "A5E9573BDB61325E6113CD60F073E9D122286DD6A5A8ED35460940EC9582863D"
+    },
+    {
+      "path": "hourlyCompleteCohort.js",
+      "integrity": "84BB1947BA2357BD1C53C1BAC8054DD71256BA5E8D2EC182AA62562868E89D27"
+    },
+    {
+      "path": "hourlyDerivedObservation.js",
+      "integrity": "0D8DC3CF16C5BB7E0C6A027E54EFAC3A16EA6ACF351C6467CBAAF0AD1502D2DD"
+    },
+    {
+      "path": "hourlyEvidenceStorage.js",
+      "integrity": "DDD9C2BA1C4B2A179888EB00FD06B3FBDFC4934503162F614EECF1F7AEBBB850"
+    },
+    {
+      "path": "hourlyMorningAnchor.js",
+      "integrity": "77BF5EFE018949C0888FA862FD208E6964B83DBAC496487492D4F6C95FF38FFD"
+    },
+    {
+      "path": "hourlyPosEligibility.js",
+      "integrity": "693157B416E367DCE1AA5E65838CC161F6D23AB9A0786411DEA5A68006DA5AAE"
+    },
+    {
+      "path": "hourlySourceClock.js",
+      "integrity": "71F4683B3FC3DDD932FAE886285D4A0FFA10DC95AB5D4239BF515D9E666E1700"
+    },
+    {
+      "path": "hourlyStockDerivedSource.js",
+      "integrity": "9D09288E314C8462604B58A8A693C2A88AD152AFBE67FA37CB8026005AD19574"
+    },
+    {
+      "path": "hourlyStockEvidenceClient.js",
+      "integrity": "26906AB59C71EC18D4E55DC92DFA9BE27ACD22C809723D988C3B3EE92F5D6B71"
+    },
+    {
+      "path": "hourlyStockRunner.js",
+      "integrity": "68DF042970BC4781412D3F640F04B14ED5D19FBC69ECEBF6DFDCE1E44ADF2190"
+    },
+    {
+      "path": "hourlyStockSource.js",
+      "integrity": "B86D8CF37E8BFE9BB72EE19F49A24C4C0206F8C22CF73CFD67736D7D23303687"
+    },
+    {
+      "path": "index.js",
+      "integrity": "6B650FF3DA55D6E8CA8B9F4D638D344C7F40EB5A836BACFE4A0925C04104D410"
+    },
+    {
+      "path": "mockPayloads.js",
+      "integrity": "E0A6C068EBE0AD8407BAFEF6D5A9FB5655F0D88B5B8657427276E4B683F9FE19"
+    },
+    {
+      "path": "prepareHourlyCohortManifest.js",
+      "integrity": "FA497AB180267FF02F7C9A3EA256B830E9AFFE1F6711CC1490CD1783AD686F9F"
+    },
+    {
+      "path": "queries.js",
+      "integrity": "E076A9389601C1BF5B099F9A721FD1FF15FDB4B51230DEB4A7FAAE37D4C9860C"
+    },
+    {
+      "path": "sqlConnection.js",
+      "integrity": "300E9319FDE7AE83B0163CECD855F1BFC308ABD4483CF038B5AA653D62217553"
+    },
+    {
+      "path": "sqlServerConfig.js",
+      "integrity": "690CFCE341275A98D17368AD37954A25EA533E28B479616E1076EB233BC9D836"
+    },
+    {
+      "path": "sync-v2.js",
+      "integrity": "0A2AAB21485C30452D69EF7DBA78BA70385371EDA5EE32FCA09A653CABD93F08"
+    },
+    {
+      "path": "transform.js",
+      "integrity": "E20254E29563A8D39E7246A00B21846621CD866F7AD95C8733758B6FC446CF6C"
+    }
+  ]
+}
