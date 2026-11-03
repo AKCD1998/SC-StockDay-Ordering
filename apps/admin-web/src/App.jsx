@@ -16,6 +16,7 @@ import PreorderPanel from "./preorders/PreorderPanel";
 import PosAdminPanel from "./PosAdminPanel.jsx";
 import MembersPanel from "./MembersPanel.jsx";
 import Shopee004ExceptionsPanel from "./Shopee004ExceptionsPanel.jsx";
+import SpecialVigilantProducts from "./SpecialVigilantProducts.jsx";
 import LoginScreen from "./LoginScreen.jsx";
 import AdminNavigation from "./AdminNavigation.jsx";
 import AdminAccountActions from "./AdminAccountActions.jsx";
@@ -1929,6 +1930,7 @@ export default function App() {
         />
       </div>
 
+      <SpecialVigilantProducts branchCode={branchCode} userId={session.user.id} onNavigate={setView} />
       {error && <div className="notice error">{error}</div>}
       {branchContextError && <div className="notice warning">{branchContextError}</div>}
 
