@@ -1,5 +1,7 @@
 # Practical architecture for the upcoming team stocktake
 
+> Design extension, 4 November 2026: [AI auditor with Ada movement evidence and staff-observed lot lineage](PDA_AI_AUDITOR_MOVEMENT_AND_LOT_DESIGN_2026-11-04.md). This is a proposal; it does not activate Ada access or a model service. System stock remains visible for replenishment. Older milestone descriptions below remain historical.
+
 > Current integration update: an isolated synthetic HTTP/SQLite count demo is now implemented. See [PDA_DEMO_INTEGRATION_CONTRACT.md](PDA_DEMO_INTEGRATION_CONTRACT.md) and [PDA_DEMO_INTEGRATION_STATE.md](PDA_DEMO_INTEGRATION_STATE.md). This does not implement remote staging, production stock writes, or team floor/round sessions. Earlier preview-only statements below describe the earlier milestone.
 Date: 2026-10-31. Status: implementation proposal. Camera scanning and individual-count correction flows are implemented in the isolated browser preview; shared multi-phone stocktake sessions are not implemented yet. This document does not authorize or perform production database changes.
 
