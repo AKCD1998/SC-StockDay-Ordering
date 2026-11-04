@@ -78,3 +78,7 @@ Removed the persistent operator-name / branch / disconnect footer. The avatar no
 ## Default phone workspace — 2026-11-04
 
 The default scan card now fills the available mobile viewport: a larger camera action occupies the spare middle space and manual/HID barcode entry stays at the bottom. Small screens and reduced keyboard-height layouts can scroll naturally. The page background covers the viewport, removing the previous lower background band. Expanded scanning controls use a view-only flex layout; selected-product/counting forms retain their compact layout. No explanatory copy, automatic camera start, API or counting behavior was added.
+
+## Avatar finish / future settings cue — 2026-11-04
+
+Replaced the thin outlined person with an original filled profile: white face, light-blue shoulders/collar, navy gradient disc and a small yellow gear badge. The existing 48 px account button, operator code and account dialog remain unchanged. The gear is a visual cue for future account/settings development; no new settings screen, permissions or backend capability is claimed. Only SVG markup/styles and this note changed.
