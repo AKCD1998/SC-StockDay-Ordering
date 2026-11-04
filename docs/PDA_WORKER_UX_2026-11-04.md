@@ -58,3 +58,7 @@ Removed the connection/fixture badge and yellow environment/details notice from 
 ## Requested title/navigation cleanup — 2026-11-04
 
 Removed the visible “นับสต๊อก สาขา 001” title and the “ผู้ใช้งาน” navigation button. The existing SC/StockDay branding remains and the two remaining navigation actions fill the row. Enrollment remains available before work and for cached-draft reauthentication; the existing operator name/logout controls are a compact footer. Authentication, branch scope, API, outbox and counting semantics are unchanged. The local review is updated; hosted v4 is unchanged.
+
+## Requested scan-copy cleanup — 2026-11-04
+
+Removed the round-explanation disclosure, the scan-section heading/intro and the Bluetooth/Enter help sentence from the scan card. Scope selection, independent-round rules, camera/manual/HID lookup and backend/auth/count code are unchanged. Only markup and this note changed; the local review was refreshed without publishing.
