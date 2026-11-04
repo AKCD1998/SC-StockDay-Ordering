@@ -1,0 +1,36 @@
+{
+  "artifactKind": "review-only-task-configuration",
+  "contract": "sc-pda-codex-audit-plan-v1",
+  "title": "SC PDA Ada audit",
+  "schedule": "BEGIN:VEVENT\nRRULE:FREQ=HOURLY\nEND:VEVENT",
+  "timing_mode": "exact_schedule",
+  "default_timezone": "Asia/Bangkok",
+  "promptFile": "deployment/pda-codex-hourly-audit.prompt.txt",
+  "executionIntent": "Codex scheduled task using the existing subscription and an authorized Ada-capable execution environment",
+  "externalLlmApiRequired": false,
+  "pilotBranchCode": "001",
+  "relatedTransferBranchScope": "source/destination branches of evidence for the authorized branch-001 audit case",
+  "taskCreated": false,
+  "taskEnabled": false,
+  "automationId": null,
+  "executionEnvironmentVerified": false,
+  "productionOrStagingAccessVerified": false,
+  "officialAdaWritesAuthorized": false,
+  "activationGates": [
+    "Verify the scheduled execution environment can access the approved Ada movement read path without expanding access",
+    "Accept the common identity, unit, movement completeness, lot provenance and auth contracts with the existing reconciliation owner",
+    "Provide reachable authenticated count/lot evidence and a durable audit-case/checkpoint API; these are not established in production by fixture tests",
+    "Verify one bounded end-to-end read and durable audit result in that same execution environment",
+    "Bind one task to the existing project/owner; do not create a competing reconciliation scheduler or change existing Hourly/Delta jobs"
+  ],
+  "defaultRunAuthority": {
+    "readAdaEvidence": true,
+    "readPdaEvidence": true,
+    "appendAuditCasesWhenApprovedApiExists": true,
+    "changeOfficialStock": false,
+    "changePermissionsOrCredentials": false,
+    "triggerSyncOrChangeHourlyDelta": false,
+    "deployOrMigrate": false,
+    "sendExternalStaffMessages": false
+  }
+}
