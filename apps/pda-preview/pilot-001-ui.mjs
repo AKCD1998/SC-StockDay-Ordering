@@ -16,6 +16,7 @@ const draftKey=who=>'draft:'+who.staffId+':'+who.deviceId;
 const message = (text, tone='info') => { const status=$('#status');status.textContent=text;status.dataset.tone=tone;status.hidden=tone==='info'; };
 // View state only: no API, authentication, count payload or outbox changes.
 function showPane(name, scroll=true) {
+  if(name==='count'&&$('#countForm').hidden){$('#scanTools').open=true;step('Scan');}
   document.querySelectorAll('[data-panel]').forEach(panel=>panel.hidden=panel.dataset.panel!==name);
   document.querySelectorAll('[data-pane]').forEach(button=>{
     button.setAttribute('aria-pressed',String(button.dataset.pane===name));

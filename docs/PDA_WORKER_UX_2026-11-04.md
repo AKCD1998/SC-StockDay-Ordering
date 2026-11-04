@@ -74,3 +74,7 @@ The API client, payload, outbox, stored public identity and backend remain uncha
 ### Footer removal in the same update
 
 Removed the persistent operator-name / branch / disconnect footer. The avatar now opens the existing account actions in a small native dialog; sign-out retains its original draft preservation, explicit-logout flag and authentication behavior. Closing the dialog does not sign out. Enrollment remains on the existing screen. This supersedes the compact-footer placement described above.
+
+## Default phone workspace — 2026-11-04
+
+The default scan card now fills the available mobile viewport: a larger camera action occupies the spare middle space and manual/HID barcode entry stays at the bottom. Small screens and reduced keyboard-height layouts can scroll naturally. The page background covers the viewport, removing the previous lower background band. Expanded scanning controls use a view-only flex layout; selected-product/counting forms retain their compact layout. No explanatory copy, automatic camera start, API or counting behavior was added.

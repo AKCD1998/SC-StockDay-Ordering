@@ -13,3 +13,18 @@ summary:focus-visible,textarea:focus-visible{outline:3px solid var(--navy);outli
 @media(max-width:380px){body{padding-left:8px;padding-right:8px}.pilot-card{padding:16px}.pilot-nav button{font-size:14px}.pilot-submit-bar{gap:8px;padding:10px}.pilot-submit-bar>.button{padding:12px;font-size:15px}.pilot-submit-bar strong{font-size:22px}.pilot-steps{font-size:12px;gap:4px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 
 .is-counting #scanCard{padding-top:12px;padding-bottom:8px}.is-counting #scanCard>.pilot-help{display:none}.is-counting #scopeSelect{min-height:44px;font-size:14px}.is-counting .pilot-scope-label{font-size:13px;margin-bottom:4px}.is-counting .pilot-scan-tools>summary{font-size:14px}.pilot-card input,.pilot-card select,.pilot-card textarea{scroll-margin-bottom:130px}
+
+/* Fill the default phone workspace; counting forms retain their compact flow. */
+@media(max-width:680px){
+  body{min-height:100dvh;padding-bottom:max(12px,env(safe-area-inset-bottom))}
+  .pilot-wrap{min-height:calc(100dvh - max(12px,env(safe-area-inset-bottom)));display:flex;flex-direction:column}
+  .pilot-heading,.pilot-nav,.pilot-status,#operatorPane{flex-shrink:0}
+  .pilot-wrap:not(.is-counting) #countPane{display:flex;flex:1;flex-direction:column}
+  .pilot-wrap:not(.is-counting) #scanCard{display:flex;flex:1;flex-direction:column;margin-bottom:0}
+  .pilot-wrap:not(.is-counting) #scanCard>.pilot-scope-label,.pilot-wrap:not(.is-counting) #scopeSelect{flex-shrink:0}
+  .pilot-wrap:not(.is-counting) #scanTools[open],.pilot-wrap:not(.is-counting) #scanTools[open]::details-content{display:contents}
+  .pilot-wrap:not(.is-counting) .pilot-scan-content{display:flex;flex:1;flex-direction:column}
+  .pilot-wrap:not(.is-counting) .pilot-camera{flex:1;flex-direction:column;min-height:100px!important;gap:14px}
+  .pilot-wrap:not(.is-counting) .pilot-camera svg{width:56px;height:56px;stroke-width:1.4}
+  .pilot-manual-entry{flex-shrink:0}
+}
