@@ -10,9 +10,8 @@
 </head>
 <body>
   <main class="pilot-wrap">
-    <header class="pilot-heading"><div class="pilot-brand"><span class="pilot-brandmark" aria-hidden="true">SC</span><div><span class="eyebrow">STOCKDAY · PDA</span><h1>นับสต๊อก <span>สาขา 001</span></h1></div></div><span class="pilot-badge" id="connectionBadge">ยังไม่เชื่อมต่อ</span></header>
-    <div class="pilot-environment">รุ่นตรวจรับ · ผลนับยังไม่ปรับยอดคลัง<details><summary>รายละเอียดระบบ</summary><p id="scopeNotice">API ผลนับนี้ยังไม่เปิดบนระบบจริง เก็บหลักฐานแยกจากสต๊อกทางการ ไม่ใช้ Hourly 004</p></details></div>
-    <p class="pilot-status" id="status" role="status" aria-live="polite"></p>
+    <header class="pilot-heading"><div class="pilot-brand"><span class="pilot-brandmark" aria-hidden="true">SC</span><div><span class="eyebrow">STOCKDAY · PDA</span><h1>นับสต๊อก <span>สาขา 001</span></h1></div></div></header>
+    <p class="pilot-status" id="status" role="status" aria-live="polite" hidden></p>
     <nav class="pilot-nav" aria-label="เมนูหลัก">
       <button type="button" data-pane="count" aria-controls="countPane" aria-pressed="false" disabled><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 7V4h4m8 0h4v3M4 17v3h4m8 0h4v-3M7 8v8m3-8v8m3-8v8m4-8v8"/></svg></span> นับสินค้า</button>
       <button type="button" data-pane="history" aria-controls="historyPane" aria-pressed="false" disabled><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6m-6 4h6m-6 4h4"/></svg></span> รายการ <span id="queueBadge" class="pilot-queue" hidden></span></button>

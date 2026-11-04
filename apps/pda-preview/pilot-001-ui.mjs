@@ -12,7 +12,7 @@ let product = null, correction = null, capturedAt = null, reviewed = null, recor
 let scopeList=[],offlineIdentity=null,draftTimer=null;
 const identity=()=>api.identity||offlineIdentity;
 const draftKey=who=>'draft:'+who.staffId+':'+who.deviceId;
-const message = text => { $('#status').textContent = text; $('#status').dataset.tone='info'; };
+const message = (text, tone='info') => { const status=$('#status');status.textContent=text;status.dataset.tone=tone;status.hidden=tone==='info'; };
 // View state only: no API, authentication, count payload or outbox changes.
 function showPane(name, scroll=true) {
   document.querySelectorAll('[data-panel]').forEach(panel=>panel.hidden=panel.dataset.panel!==name);
@@ -27,7 +27,7 @@ function showPane(name, scroll=true) {
 function step(name){$('.pilot-wrap').classList.toggle('is-counting',name!=='Scan');for(const key of ['Scan','Count','Review']){const node=$('#step'+key);if(key===name)node.setAttribute('aria-current','step');else node.removeAttribute('aria-current');}}
 for(const button of document.querySelectorAll('[data-pane]'))button.onclick=()=>showPane(button.dataset.pane);
 $('#nextItemButton').onclick=()=>{showPane('count');$('#scanTools').open=true;step($('#countForm').hidden?'Scan':'Count');$('#barcode').focus();};
-function focusProblem(field,text){field.closest('.pilot-lot')?.setAttribute('open','');field.setAttribute('aria-invalid','true');field.focus();field.scrollIntoView({block:'center',behavior:'instant'});message(text);$('#status').dataset.tone='error';}
+function focusProblem(field,text){field.closest('.pilot-lot')?.setAttribute('open','');field.setAttribute('aria-invalid','true');field.focus();field.scrollIntoView({block:'center',behavior:'instant'});message(text,'error');}
 function revealMissingField(){
   $('#countForm').querySelectorAll('[aria-invalid]').forEach(field=>field.removeAttribute('aria-invalid'));
   if(!$('#unitSize').value){focusProblem($('#unitSize'),'เลือกหน่วยที่นับจริงก่อน');return true;}
@@ -43,9 +43,9 @@ function revealMissingField(){
 }
 const date = value => value ? new Date(value).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }) : 'ไม่ทราบ';
 const qty = value => value === null ? 'ไม่ทราบยอด' : String(value);
-function handle(error) { if(error.staleAuthentication)return;message(error.message); $('#status').dataset.tone='error'; if (error.status === 401) cacheDraft().catch(()=>{}).finally(disconnected); }
+function handle(error) { if(error.staleAuthentication)return;message(error.message,'error'); if (error.status === 401) cacheDraft().catch(()=>{}).finally(disconnected); }
 function disconnected() {
-  api.disconnect(); offlineIdentity=null; $('#connectionBadge').textContent = 'ยังไม่เชื่อมต่อ';
+  api.disconnect(); offlineIdentity=null;
   $('#enrollmentCard').hidden = false; $('#scanCard').hidden = true; $('#countForm').hidden = true; $('#syncButton').disabled = true;
   $('#history').innerHTML = ''; records = []; product = null; correction = null; $('#queueBadge').hidden=true;showPane('operator');
 }
@@ -68,8 +68,6 @@ $('#connectButton').onclick = async () => {
     await api.connect();
     offlineIdentity=api.identity;scopeList=await api.scopes();showScopes();
     await outbox.saveData('context',{identity:api.identity,scopeList,explicitLogout:false});
-    $('#connectionBadge').textContent = (fixture ? 'LOCAL FIXTURE · ' : '') + '001 · ' + api.identity.staffName;
-    $('#scopeNotice').textContent = fixture ? 'กำลังตรวจรับกับ PostgreSQL จำลองในเครื่อง ไม่ใช่ระบบจริง และไม่เปลี่ยนสต๊อกทางการ' : 'เชื่อม API ผลนับสาขา 001 แล้ว · ผลนับเก็บเป็นหลักฐาน ยังไม่แทนยอดสต๊อกทางการ';
     $('#enrollmentCard').hidden = true; $('#scanCard').hidden = false; $('#syncButton').disabled = false;
     showPane('count');$('#scanTools').open=true;step('Scan');message('เชื่อมต่อแล้ว · สแกนหรือกรอกบาร์โค้ดเพื่อเริ่มนับ'); await restoreDraft();await sync();
   } catch (error) { handle(error); } finally { $('#connectButton').disabled = false; }
@@ -201,7 +199,7 @@ async function sync() {
   } catch (error) { await renderHistory(); handle(error); } finally { busy = false; }
 }
 $('#syncButton').onclick = sync; window.addEventListener('online', sync);
-window.addEventListener('offline', () => message('ออฟไลน์ · บันทึกคำขอในเครื่องได้ แต่ยังไม่มีใบรับจนเชื่อมต่ออีกครั้ง'));
+window.addEventListener('offline', () => message('ออฟไลน์ · บันทึกคำขอในเครื่องได้ แต่ยังไม่มีใบรับจนเชื่อมต่ออีกครั้ง','warning'));
 setInterval(() => { if (navigator.onLine) sync(); }, 15000);
 message('ขอรหัสจากผู้ดูแล แล้วเลือกชื่อของคุณเพื่อเริ่มงาน');
 async function cacheDraft(){if(!product||$('#countForm').hidden||!identity())return;const lots=[...document.querySelectorAll('.pilot-lot')].map(node=>({code:node.querySelector('.lot-code').value,quantity:node.querySelector('.lot-quantity').value,mfg:node.querySelector('.lot-mfg').value,exp:node.querySelector('.lot-exp').value,lotUnknown:node.querySelector('.lot-unknown').checked,mfgUnknown:node.querySelector('.mfg-unknown').checked,expUnknown:node.querySelector('.exp-unknown').checked}));await outbox.saveData(draftKey(identity()),{product,correction,capturedAt,unitSize:$('#unitSize').value,lots,complete:$('#complete').checked,note:$('#countNote').value,reason:$('#correctionReason').value});}
@@ -211,7 +209,7 @@ window.addEventListener('pagehide',()=>{cacheDraft().catch(()=>{});});
 async function initialize(){const context=await outbox.readData('context');if(context?.identity&&!context.explicitLogout&&Date.parse(context.identity.expiresAt)>Date.now()){
   // navigator.onLine is advisory and can be true on an offline cold navigation.
   // A cached public identity restores local drafts only, never API authentication.
-  offlineIdentity=context.identity;scopeList=context.scopeList;showScopes();$('#connectionBadge').textContent='LOCAL DRAFT · ร่างในเครื่อง · '+offlineIdentity.staffName;$('#scanCard').hidden=false;showPane('count',false);step('Scan');$('#scopeNotice').textContent='ร่างในเครื่อง · ยังไม่ได้ยืนยันตัวตนกับเซิร์ฟเวอร์ เก็บร่าง/คิวเดิมได้ ต้องลงทะเบียนใหม่ก่อนส่งจริง';await restoreDraft();await renderHistory();}
+  offlineIdentity=context.identity;scopeList=context.scopeList;showScopes();$('#scanCard').hidden=false;showPane('count',false);step('Scan');await restoreDraft();await renderHistory();}
   if('serviceWorker'in navigator)navigator.serviceWorker.register('/pilot-001-worker.js',{scope:'/pilot-001.html'}).catch(()=>message('ยังเตรียมหน้าออฟไลน์ไม่ได้ คิวที่บันทึกแล้วคงอยู่'));
 }
 initialize().catch(handle);

@@ -50,3 +50,7 @@ Updated review assets were prepared locally with the existing build script. The 
 Cloud-local fixture results are separate from the old ScProductDev Windows R2/SQLite acceptance and its static port-8765 HTML. This UI candidate has not been run on ScProductDev, staging or a physical phone. Hosted v4 is unchanged. Production activation still requires the previously documented explicit deployment/migration/CORS and accepted auth/count/product-identity contracts. No production action, official inventory write, permission change, new service, cost or persistent access was performed.
 
 See [existing integration/run instructions](PDA_SHARED_INTEGRATION_2026-11-01.md). Evidence and screenshot walkthrough are delivered in `SC-PDA-WORKER-UX-R1`; earlier immutable archives remain unchanged.
+
+## Requested header cleanup — 2026-11-04
+
+Removed the connection/fixture badge and yellow environment/details notice from the PDA header. Routine informational/sync messages no longer render or reserve space; actionable errors and an actual offline transition can still provide feedback. Operator identification remains in the Operator view. No API/auth/storage/count logic changed. The local read-only review was refreshed; hosted v4 remains unchanged. This small change was checked with explicit synthetic UI read fixtures, not a new PostgreSQL/production acceptance run. Earlier real roundtrip evidence stays attached to the immutable R1 delivery.

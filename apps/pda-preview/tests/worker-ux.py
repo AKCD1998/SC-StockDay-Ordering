@@ -18,7 +18,7 @@ with sync_playwright() as p:
  page.on('pageerror',lambda error:errors.append(str(error)))
  page.on('request',lambda request:writes.append(request.method) if request.url.endswith('/api/mobile/counts') and request.method=='POST' else None)
  page.goto(origin+'/pilot-001.html',wait_until='networkidle')
- assert 'ขอรหัสจากผู้ดูแล' in page.locator('#status').inner_text()
+ assert 'ขอรหัสจากผู้ดูแล' in page.locator('#status').text_content()
  page.screenshot(path=str(out/'pda-login-mobile.png'),full_page=True)
  login=context.request.post(origin+'/admin/auth/login',data={'username':'fixture-branch001','password':'fixture-only-password'})
  assert login.status==200
@@ -64,7 +64,7 @@ with sync_playwright() as p:
   page.set_viewport_size({'width':width,'height':844});assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
   sizes[str(width)]={'quantityInput':q.bounding_box()['height'],'reviewButton':page.locator('#countForm button[type=submit]').bounding_box()['height']}
   assert min(sizes[str(width)].values())>=48
- page.locator('[data-pane=operator]').click();page.locator('#disconnectButton').click();page.wait_for_function("document.querySelector('#connectionBadge').textContent==='ยังไม่เชื่อมต่อ'");assert page.locator('[data-pane=count]').is_disabled()
+ page.locator('[data-pane=operator]').click();page.locator('#disconnectButton').click();page.wait_for_function("document.querySelector('[data-pane=count]').disabled");assert page.locator('[data-pane=count]').is_disabled()
  assert writes==[],'Targeted UI/camera check must not save a count'
  assert errors==[],errors
  report={'environment':'cloud-loopback-existing-postgresql-fixture','cameraSource':'Chromium fake camera, not physical Android','loginAndOperatorViews':True,'deliberateAimingNoCountWrite':True,'torchDefaultOffOrUnsupported':True,'cameraTouchControls48px':True,'exactBarcodeAndExplicitUnit':True,'invalidFieldVisibleAboveStickyBar':True,'escapeFromReviewPreservesDraft':True,'logoutDisablesCounting':True,'touchControlSizes':sizes,'noHorizontalOverflow':True,'historyRefreshPreservesExpandedReceipt':True,'countPostRequests':len(writes),'browserErrors':errors,'physicalPhoneVerified':False,'hostedPreviewChanged':False,'productionOrStagingVerified':False}

@@ -179,7 +179,7 @@ with sync_playwright() as p:
         mobile.locator('#countForm').wait_for(state='visible',timeout=5000)
     except Exception:
         state=mobile.evaluate("""async origin=>{const db=await new Promise(resolve=>{const r=indexedDB.open('sc-pda-count-pilot-001:'+origin);r.onsuccess=()=>resolve(r.result)});const context=await new Promise(resolve=>{const r=db.transaction('metadata','readonly').objectStore('metadata').get('context');r.onsuccess=()=>resolve(r.result)});return {hasContext:!!context,hasIdentity:!!context?.identity,expiresAt:context?.identity?.expiresAt,explicitLogout:context?.explicitLogout,online:navigator.onLine,now:new Date().toISOString()}}""",origin)
-        print(json.dumps({'offlineStatus':mobile.locator('#status').inner_text(),'badge':mobile.locator('#connectionBadge').inner_text(),'cacheState':state,'browserErrors':errors}),file=sys.stderr)
+        print(json.dumps({'offlineStatus':mobile.locator('#status').inner_text(),'cacheState':state,'browserErrors':errors}),file=sys.stderr)
         raise
     assert mobile.locator('.lot-quantity').first.input_value()=='7'
     assert mobile.locator('.lot-code').first.input_value()=='INTEGRATED-OFFLINE'
