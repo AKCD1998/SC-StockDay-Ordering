@@ -1,0 +1,161 @@
+{
+  "status": "READ_ONLY_PRODUCTION_STOCK_AUDIT",
+  "checkedAt": "2026-11-04T09:44:02.6029Z",
+  "workspace": "My Workspace",
+  "database": "sc_drug_db",
+  "site": "https://sc-stockday-ordering.onrender.com/#/",
+  "access": {
+    "tool": "Render query_render_postgres",
+    "transactionReadOnly": "on",
+    "productionWrites": false,
+    "loggedInWebsiteBrowserCheck": false
+  },
+  "queries": {
+    "Current": {
+      "sql": "SELECT v.branch_code, count(*)::bigint AS product_rows, count(v.quantity)::bigint AS nonnull_quantities, count(*) FILTER (WHERE v.quantity <> trunc(v.quantity))::bigint AS fractional_quantities, min(v.quantity) FILTER (WHERE v.quantity <> trunc(v.quantity)) AS smallest_fractional_value, max(v.quantity) FILTER (WHERE v.quantity <> trunc(v.quantity)) AS largest_fractional_value FROM ada.branch_stock_snapshots s CROSS JOIN LATERAL (VALUES ('000',s.qty_branch_000),('001',s.qty_branch_001),('002',s.qty_branch_002),('003',s.qty_branch_003),('004',s.qty_branch_004),('005',s.qty_branch_005)) AS v(branch_code,quantity) GROUP BY v.branch_code ORDER BY v.branch_code",
+      "result": [
+        {
+          "branch_code": "000",
+          "fractional_quantities": 0,
+          "largest_fractional_value": null,
+          "nonnull_quantities": 6861,
+          "product_rows": 6861,
+          "smallest_fractional_value": null
+        },
+        {
+          "branch_code": "001",
+          "fractional_quantities": 0,
+          "largest_fractional_value": null,
+          "nonnull_quantities": 6861,
+          "product_rows": 6861,
+          "smallest_fractional_value": null
+        },
+        {
+          "branch_code": "002",
+          "fractional_quantities": 0,
+          "largest_fractional_value": null,
+          "nonnull_quantities": 6861,
+          "product_rows": 6861,
+          "smallest_fractional_value": null
+        },
+        {
+          "branch_code": "003",
+          "fractional_quantities": 0,
+          "largest_fractional_value": null,
+          "nonnull_quantities": 6861,
+          "product_rows": 6861,
+          "smallest_fractional_value": null
+        },
+        {
+          "branch_code": "004",
+          "fractional_quantities": 0,
+          "largest_fractional_value": null,
+          "nonnull_quantities": 6861,
+          "product_rows": 6861,
+          "smallest_fractional_value": null
+        },
+        {
+          "branch_code": "005",
+          "fractional_quantities": 0,
+          "largest_fractional_value": null,
+          "nonnull_quantities": 6861,
+          "product_rows": 6861,
+          "smallest_fractional_value": null
+        }
+      ]
+    },
+    "History001": {
+      "sql": "SELECT branch_code, count(*)::bigint AS snapshot_rows, count(qty_on_hand)::bigint AS nonnull_quantities, count(*) FILTER (WHERE qty_on_hand <> trunc(qty_on_hand))::bigint AS fractional_quantities, min(snapshot_at) AS earliest_snapshot_at, max(snapshot_at) AS latest_snapshot_at FROM ada.stock_snapshots WHERE branch_code='001' GROUP BY branch_code",
+      "result": [
+        {
+          "branch_code": "001",
+          "earliest_snapshot_at": "2026-07-22T12:28:47.587Z",
+          "fractional_quantities": 0,
+          "latest_snapshot_at": "2026-11-04T01:21:33.95Z",
+          "nonnull_quantities": 739573,
+          "snapshot_rows": 739573
+        }
+      ]
+    },
+    "HistoryAll": {
+      "sql": "SELECT branch_code, count(*)::bigint AS snapshot_rows, count(qty_on_hand)::bigint AS nonnull_on_hand, count(*) FILTER (WHERE qty_on_hand <> trunc(qty_on_hand))::bigint AS fractional_on_hand, count(qty_base)::bigint AS nonnull_base, count(*) FILTER (WHERE qty_base <> trunc(qty_base))::bigint AS fractional_base, min(snapshot_at) AS earliest_snapshot_at, max(snapshot_at) AS latest_snapshot_at FROM ada.stock_snapshots GROUP BY branch_code ORDER BY branch_code",
+      "result": [
+        {
+          "branch_code": "000",
+          "earliest_snapshot_at": "2026-07-21T03:03:25.403Z",
+          "fractional_base": 0,
+          "fractional_on_hand": 0,
+          "latest_snapshot_at": "2026-11-04T01:21:14.755Z",
+          "nonnull_base": 0,
+          "nonnull_on_hand": 738510,
+          "snapshot_rows": 738510
+        },
+        {
+          "branch_code": "001",
+          "earliest_snapshot_at": "2026-07-22T12:28:47.587Z",
+          "fractional_base": 0,
+          "fractional_on_hand": 0,
+          "latest_snapshot_at": "2026-11-04T01:21:33.95Z",
+          "nonnull_base": 0,
+          "nonnull_on_hand": 739573,
+          "snapshot_rows": 739573
+        },
+        {
+          "branch_code": "003",
+          "earliest_snapshot_at": "2026-07-22T12:28:14.151Z",
+          "fractional_base": 0,
+          "fractional_on_hand": 0,
+          "latest_snapshot_at": "2026-11-04T01:21:18.442Z",
+          "nonnull_base": 0,
+          "nonnull_on_hand": 732742,
+          "snapshot_rows": 732742
+        },
+        {
+          "branch_code": "004",
+          "earliest_snapshot_at": "2026-07-22T12:26:16.532Z",
+          "fractional_base": 0,
+          "fractional_on_hand": 0,
+          "latest_snapshot_at": "2026-11-04T01:21:51.715Z",
+          "nonnull_base": 0,
+          "nonnull_on_hand": 759548,
+          "snapshot_rows": 759548
+        },
+        {
+          "branch_code": "005",
+          "earliest_snapshot_at": "2026-07-07T05:37:22.904Z",
+          "fractional_base": 0,
+          "fractional_on_hand": 0,
+          "latest_snapshot_at": "2026-11-04T01:20:57.7Z",
+          "nonnull_base": 0,
+          "nonnull_on_hand": 955422,
+          "snapshot_rows": 955422
+        },
+        {
+          "branch_code": "900",
+          "earliest_snapshot_at": "2026-05-21T02:17:00Z",
+          "fractional_base": 0,
+          "fractional_on_hand": 0,
+          "latest_snapshot_at": "2026-05-21T02:17:00Z",
+          "nonnull_base": 1,
+          "nonnull_on_hand": 1,
+          "snapshot_rows": 1
+        }
+      ]
+    },
+    "Totals": {
+      "sql": "SELECT count(*)::bigint AS product_rows, count(*) FILTER (WHERE qty_total_all_branches <> trunc(qty_total_all_branches))::bigint AS fractional_totals FROM ada.branch_stock_snapshots",
+      "result": [
+        {
+          "fractional_totals": 0,
+          "product_rows": 6861
+        }
+      ]
+    }
+  },
+  "limits": [
+    "Retained snapshot data only; does not prove never had fractions in older or deleted data.",
+    "Regular branch qty_base is null; canonical smallest-unit completeness is not established.",
+    "Raw snapshot audit does not verify every Hourly or Shopee projection, or a live Ada source database.",
+    "Schema supports decimals; no database type or server API restriction changed."
+  ]
+}

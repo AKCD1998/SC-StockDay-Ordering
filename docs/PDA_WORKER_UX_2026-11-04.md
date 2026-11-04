@@ -1,5 +1,7 @@
 # StockDay PDA: frontline counting interface
 
+Latest input-policy update: [whole-number count entry and read-only stock audit](PDA_WHOLE_NUMBER_POLICY_2026-11-04.md). This supersedes earlier fractional-entry examples only; stored values, API precision and retry payloads are preserved. Earlier verification below describes the corresponding historical artifacts.
+
 Date: 2026-11-04. Continues the existing branch-001 PDA, StockDay integration and navy/yellow/white theme. This is an original UI implementation in the existing pilot entry, not a new project or a replacement backend. Hosted v4 and production remain unchanged.
 
 ## GitHub research and reuse
