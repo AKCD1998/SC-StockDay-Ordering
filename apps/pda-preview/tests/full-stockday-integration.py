@@ -43,6 +43,7 @@ with sync_playwright() as p:
 
     def connect(code,tab=None,staff='1'):
         tab=tab or mobile
+        tab.locator('[data-pane=operator]').click()
         tab.locator('#enrollmentCode').fill(code)
         tab.locator('#rosterButton').click()
         tab.wait_for_function("!document.querySelector('#staffSelect').disabled")
@@ -56,6 +57,8 @@ with sync_playwright() as p:
         tab.wait_for_function("document.querySelector('#status').textContent.includes('ดึงประวัติแล้ว')")
 
     def lookup():
+        mobile.locator('[data-pane=count]').click()
+        mobile.locator('#scanTools').evaluate('(node)=>node.open=true')
         mobile.locator('#barcode').fill('0001234567890')
         with mobile.expect_response(lambda response:'/api/mobile/counts/products/by-barcode/' in response.url) as response:
             mobile.locator('#barcode').press('Enter')
@@ -82,12 +85,32 @@ with sync_playwright() as p:
 
     connect(enrollment_code())
     mobile.wait_for_function("navigator.serviceWorker.controller?.scriptURL.endsWith('pilot-001-worker.js')")
+    mobile.screenshot(path=str(out/'pda-scan-mobile.png'),full_page=True)
     product=lookup()
+    mobile.locator('#unitSize').select_option('')
+    mobile.locator('#countForm button[type=submit]').click()
+    assert mobile.locator('#unitSize').evaluate('(node)=>node===document.activeElement')
+    assert mobile.locator('#unitSize').get_attribute('aria-invalid')=='true'
+    assert not mobile.locator('#reviewDialog').evaluate('(node)=>node.open')
+    mobile.locator('#unitSize').select_option('S')
     row=mobile.locator('.pilot-lot').first
     row.locator('.lot-code').fill('INTEGRATED-LOT-ONE')
     row.locator('.lot-quantity').fill('3')
     row.locator('.lot-mfg').fill('2026-01-15')
     row.locator('.lot-exp').fill('2026-10-30')
+    # Collapsed invalid lot reopens and receives focus instead of silently failing.
+    row.locator('.lot-exp').fill('')
+    row.locator('summary').click()
+    mobile.locator('#countForm button[type=submit]').click()
+    assert row.evaluate('(node)=>node.open')
+    assert row.locator('.lot-exp').evaluate('(node)=>node===document.activeElement')
+    row.locator('.lot-exp').fill('2026-10-30')
+    assert mobile.locator('#totalUnit').inner_text()=='ชิ้น'
+    mobile.screenshot(path=str(out/'pda-count-mobile.png'),full_page=True)
+    mobile.locator('#countForm button[type=submit]').click()
+    mobile.screenshot(path=str(out/'pda-review-mobile.png'),full_page=False)
+    mobile.locator('#reviewCancel').click()
+    assert row.locator('.lot-quantity').input_value()=='3'
     first=save()
     assert first['event']['complete'] is False
     view=refresh_web()
@@ -119,7 +142,16 @@ with sync_playwright() as p:
     assert view['activeObservations'][0]['event']['quantity']=='6.000'
     assert len(view['activeObservations'][0]['event']['lots'])==2
     web.screenshot(path=str(out/'stockday-lot-history-desktop.png'),full_page=True)
+    assert mobile.locator('.pilot-lot[open]').count()==1
+    mobile.locator('[data-event="'+corrected['eventId']+'"] details summary').click()
+    assert corrected['receiptId'] in mobile.locator('[data-event="'+corrected['eventId']+'"]').inner_text()
     mobile.screenshot(path=str(out/'pda-receipt-mobile.png'),full_page=True)
+    mobile.locator('#nextItemButton').click()
+    assert mobile.locator('#barcode').evaluate('(node)=>node===document.activeElement')
+    for width in [360,390,768]:
+        mobile.set_viewport_size({'width':width,'height':844})
+        assert mobile.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    mobile.set_viewport_size({'width':390,'height':844})
 
     # A web cold reload restores the ordinary cookie session and reads the same
     # database evidence without any manual count import.
@@ -166,6 +198,7 @@ with sync_playwright() as p:
     mobile.goto(origin+'/pilot-001.html',wait_until='domcontentloaded')
     mobile.wait_for_function("document.querySelector('#history').textContent.includes('รอส่ง')")
     assert next(item for item in events() if item['id']==request['id'])['original']==immutable
+    mobile.locator('[data-pane=history]').click()
     mobile.screenshot(path=str(out/'pda-offline-reopen-mobile.png'),full_page=True)
     code=enrollment_code()
     mobile_context.set_offline(False)
@@ -236,7 +269,7 @@ with sync_playwright() as p:
     mobile.locator('#countForm').wait_for(state='visible')
     connect(enrollment_code(),staff='2')
     assert mobile.locator('#countForm').is_hidden(),'Alice draft was relabelled as Bob'
-    mobile.locator('#disconnectButton').click();mobile.locator('#enrollmentCard').wait_for(state='visible')
+    mobile.locator('[data-pane=operator]').click();mobile.locator('#disconnectButton').click();mobile.locator('#enrollmentCard').wait_for(state='visible')
     connect(enrollment_code(),staff='1')
     assert mobile.locator('.lot-code').first.input_value()=='ACTOR-BOUND-DRAFT'
     assert mobile.locator('.lot-quantity').first.input_value()=='11'
@@ -247,7 +280,7 @@ with sync_playwright() as p:
     report={'environment':'cloud-isolated-postgres16-full-stockday-react-and-pda','checkedAt':__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat(),
         'firstEventId':first['eventId'],'firstReceiptId':first['receiptId'],'correctionEventId':corrected['eventId'],'correctionReceiptId':corrected['receiptId'],'offlineEventId':offline['eventId'],'offlineReceiptId':offline['receiptId'],
         'enrollmentThroughExistingWebAndPdaUi':True,'sameDatabaseVisibleFromSeparateWebSession':True,'webReloadReadsDurableRecords':True,'originalAndCorrectionVisible':True,'sharedSourceDecisionMatches':True,'partialCountHeldAsReference':True,
-        'draftAndQueueOfflineColdReopen':True,'reauthenticationPreservesOriginalPayload':True,'expiredEnrollmentQueueRecovered':True,'expiredEnrollmentEventId':resumed_receipt['eventId'],'conflictVisibleAndOriginalQueueRetained':True,'conflictEventId':conflict['id'],'draftNotRelabelledAcrossActors':True,'apiResponsesCached':False,'browserErrors':errors,'productionOrStagingVerified':False,'physicalPhoneVerified':False,'officialStockWrites':False}
+        'draftAndQueueOfflineColdReopen':True,'reauthenticationPreservesOriginalPayload':True,'expiredEnrollmentQueueRecovered':True,'expiredEnrollmentEventId':resumed_receipt['eventId'],'conflictVisibleAndOriginalQueueRetained':True,'conflictEventId':conflict['id'],'draftNotRelabelledAcrossActors':True,'apiResponsesCached':False,'browserErrors':errors,'productionOrStagingVerified':False,'physicalPhoneVerified':False,'officialStockWrites':False,'guidedViewsVerified':True,'invalidCollapsedLotRevealed':True,'reviewCancelPreservesDraft':True,'nextScanFocused':True,'viewportWidthsChecked':[360,390,768]}
     (out/'full-browser-roundtrip.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
     print(json.dumps(report))
     mobile_context.close();web_context.close();browser.close()

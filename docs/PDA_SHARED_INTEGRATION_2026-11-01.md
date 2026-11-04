@@ -107,3 +107,7 @@ Production actions remain pending under the user's explicit scope:
 Before applying, refresh concurrent source/migration numbers and deployed revision. Inspect actual migration history/separator style under backend AGENTS.md; never blindly run the Windows migration runner. The Render workspace and current CORS snapshot were not re-established by this local phase. The last actual hosted-origin OPTIONS check returned 403; no bypass, public tunnel or production proxy was used.
 
 First live acceptance then requires an existing branch-001 authenticated web account and eligible mobile staff enrollment through the UI. If login/OTP is needed, the user completes that screen; no password or Bearer token is requested in chat. No new cost, remote service or persistent access is proposed. Official human-stock publication still requires accepted unit/identity/movement evidence and remains disabled independently of count-record receipt.
+
+## Interface continuation — 2026-11-04
+
+The same integrated pilot now has a guided mobile interface. [Worker UI research and verified scope](PDA_WORKER_UX_2026-11-04.md). Backend/API/outbox/scanner contracts remain unchanged; new UI evidence and review artifacts are separate from the original R1 bundle.

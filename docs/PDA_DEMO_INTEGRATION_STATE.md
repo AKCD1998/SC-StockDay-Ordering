@@ -29,6 +29,10 @@ Updated: 2026-11-01, Asia/Bangkok. ScProductDev R2 acceptance remains recorded f
 | Shared StockDay website / PDA reads | Implemented and cloud-integrated | Existing product-list entry, lot/receipt/correction/expiry views and source resolver use the same PostgreSQL evidence; [current delivery](PDA_SHARED_INTEGRATION_2026-11-01.md) |
 | Team stocktake sessions / floor rounds | Scope and independent-round primitives implemented; full session workflow pending | Immutable event/area/round scopes, separate heads and same-counter rejection now work. Formal task leases, blind entry, lead reconciliation/finalization and workbook export remain outside this milestone |
 
+## Worker interface update — 2026-11-04
+
+The existing branch-001 pilot has a guided Count / Records / Operator interface based on read-only research of official InvenTree/OCA GitHub projects. The original SC implementation preserves the API client, count payload, outbox, scanner and backend. [Research, scope and verification](PDA_WORKER_UX_2026-11-04.md). Actual cloud-local HTTP/PostgreSQL/browser roundtrips passed with the revised UI; targeted touch/focus/fake-camera checks passed. This is not an update to hosted v4, an APK, new ScProductDev acceptance, staging or a physical-phone trial. Existing integration and production gates remain in force.
+
 ## Actual verification
 
 Prior cloud-local measured results: 37 actual HTTP/SQLite assertions passed; 6 mobile-contract fixture tests passed. Integrated UI, real offline cold reopen, existing camera/torch-off controls, and static correction-flow regressions passed without browser errors. These checks were already scheduled for the implementation; the later status-only clarification did not restart work or trigger duplicate tests. ScProductDev's later bounded Windows acceptance is recorded separately below.

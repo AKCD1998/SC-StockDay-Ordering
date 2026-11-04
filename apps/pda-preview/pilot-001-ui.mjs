@@ -12,14 +12,42 @@ let product = null, correction = null, capturedAt = null, reviewed = null, recor
 let scopeList=[],offlineIdentity=null,draftTimer=null;
 const identity=()=>api.identity||offlineIdentity;
 const draftKey=who=>'draft:'+who.staffId+':'+who.deviceId;
-const message = text => { $('#status').textContent = text; };
+const message = text => { $('#status').textContent = text; $('#status').dataset.tone='info'; };
+// View state only: no API, authentication, count payload or outbox changes.
+function showPane(name, scroll=true) {
+  document.querySelectorAll('[data-panel]').forEach(panel=>panel.hidden=panel.dataset.panel!==name);
+  document.querySelectorAll('[data-pane]').forEach(button=>{
+    button.setAttribute('aria-pressed',String(button.dataset.pane===name));
+    if(button.dataset.pane!=='operator')button.disabled=!identity();
+  });
+  $('#operatorCard').hidden=!identity();
+  $('#operatorName').textContent=identity()?identity().staffName+' · สาขา 001':'';
+  if(scroll)window.scrollTo({top:0,behavior:'instant'});
+}
+function step(name){$('.pilot-wrap').classList.toggle('is-counting',name!=='Scan');for(const key of ['Scan','Count','Review']){const node=$('#step'+key);if(key===name)node.setAttribute('aria-current','step');else node.removeAttribute('aria-current');}}
+for(const button of document.querySelectorAll('[data-pane]'))button.onclick=()=>showPane(button.dataset.pane);
+$('#nextItemButton').onclick=()=>{showPane('count');$('#scanTools').open=true;step($('#countForm').hidden?'Scan':'Count');$('#barcode').focus();};
+function focusProblem(field,text){field.closest('.pilot-lot')?.setAttribute('open','');field.setAttribute('aria-invalid','true');field.focus();field.scrollIntoView({block:'center',behavior:'instant'});message(text);$('#status').dataset.tone='error';}
+function revealMissingField(){
+  $('#countForm').querySelectorAll('[aria-invalid]').forEach(field=>field.removeAttribute('aria-invalid'));
+  if(!$('#unitSize').value){focusProblem($('#unitSize'),'เลือกหน่วยที่นับจริงก่อน');return true;}
+  for(const node of document.querySelectorAll('.pilot-lot')){
+    for(const [field,unknown,label] of [['lot-code','lot-unknown','เลขล็อต'],['lot-quantity',null,'จำนวน'],['lot-mfg','mfg-unknown','วันผลิต'],['lot-exp','exp-unknown','วันหมดอายุ']]){
+      const input=node.querySelector('.'+field);
+      if((!unknown||!node.querySelector('.'+unknown).checked)&&!input.value.trim()){focusProblem(input,'กรอก'+label+(unknown?' หรือเลือกไม่ทราบ':''));return true;}
+      if(field==='lot-quantity'){try{milli(input.value);}catch(error){focusProblem(input,error.message);return true;}}
+    }
+  }
+  if(correction&&$('#correctionReason').value.trim().length<3){focusProblem($('#correctionReason'),'ระบุเหตุผลที่แก้ไข');return true;}
+  return false;
+}
 const date = value => value ? new Date(value).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }) : 'ไม่ทราบ';
 const qty = value => value === null ? 'ไม่ทราบยอด' : String(value);
-function handle(error) { if(error.staleAuthentication)return;message(error.message); if (error.status === 401) cacheDraft().catch(()=>{}).finally(disconnected); }
+function handle(error) { if(error.staleAuthentication)return;message(error.message); $('#status').dataset.tone='error'; if (error.status === 401) cacheDraft().catch(()=>{}).finally(disconnected); }
 function disconnected() {
   api.disconnect(); offlineIdentity=null; $('#connectionBadge').textContent = 'ยังไม่เชื่อมต่อ';
   $('#enrollmentCard').hidden = false; $('#scanCard').hidden = true; $('#countForm').hidden = true; $('#syncButton').disabled = true;
-  $('#history').innerHTML = ''; records = []; product = null; correction = null;
+  $('#history').innerHTML = ''; records = []; product = null; correction = null; $('#queueBadge').hidden=true;showPane('operator');
 }
 $('#rosterButton').onclick = async () => {
   $('#staffSelect').disabled=true;$('#staffSelect').value='';$('#connectButton').disabled=true;
@@ -43,10 +71,10 @@ $('#connectButton').onclick = async () => {
     $('#connectionBadge').textContent = (fixture ? 'LOCAL FIXTURE · ' : '') + '001 · ' + api.identity.staffName;
     $('#scopeNotice').textContent = fixture ? 'กำลังตรวจรับกับ PostgreSQL จำลองในเครื่อง ไม่ใช่ระบบจริง และไม่เปลี่ยนสต๊อกทางการ' : 'เชื่อม API ผลนับสาขา 001 แล้ว · ผลนับเก็บเป็นหลักฐาน ยังไม่แทนยอดสต๊อกทางการ';
     $('#enrollmentCard').hidden = true; $('#scanCard').hidden = false; $('#syncButton').disabled = false;
-    message('เชื่อมต่อแล้ว · สแกนหรือกรอกบาร์โค้ดเพื่อเริ่มนับ'); await restoreDraft();await sync();
+    showPane('count');$('#scanTools').open=true;step('Scan');message('เชื่อมต่อแล้ว · สแกนหรือกรอกบาร์โค้ดเพื่อเริ่มนับ'); await restoreDraft();await sync();
   } catch (error) { handle(error); } finally { $('#connectButton').disabled = false; }
 };
-$('#disconnectButton').onclick = async () => {await cacheDraft();await outbox.saveData('context',{explicitLogout:true});camera.close(); disconnected(); message('ล้าง token ในหน่วยความจำแล้ว · คิวเดิมคงอยู่ การถอนสิทธิ์เครื่องใช้ระบบผู้ดูแลเดิม'); };
+$('#disconnectButton').onclick = async () => {await cacheDraft();await outbox.saveData('context',{explicitLogout:true});camera.close(); disconnected(); message('ออกจากการเชื่อมต่อแล้ว · ร่างและคิวเดิมยังอยู่ ต้องเชื่อมใหม่ก่อนส่ง'); };
 function showScopes(selected=null){$('#scopeSelect').innerHTML=scopeList.map(item=>`<option value="${item.id}">${esc(item.label)} · รอบ ${item.round}</option>`).join('');if(selected)$('#scopeSelect').value=selected;}
 async function openProduct(barcode, original = null, known = null, restoring=false) {
   const scopeId=original?.event.scopeId||$('#scopeSelect').value;
@@ -55,8 +83,8 @@ async function openProduct(barcode, original = null, known = null, restoring=fal
   $('#scopeSelect').value=found.scope.id;$('#scopeSelect').disabled=true;
   $('#countForm').reset(); $('#countForm').hidden = false;
   $('#productName').textContent = found.name; $('#productIdentity').textContent = found.productCode + ' · ' + found.barcode;
-  $('#stockReference').textContent = 'ยอดอ้างอิงระบบ: ' + qty(found.stock.quantity) + ' · Full Sync\nเวลาสต๊อกและหน่วยอ้างอิง: ยังไม่ทราบ · ยังเทียบผลต่างหรือตัดสินว่ายอดใดถูกไม่ได้\nแหล่งที่เลือกจาก backend: '+(found.sourceResolution?.selected.source||'full-sync')+' · ผลนับยังเป็นหลักฐานอ้างอิง';
-  $('#unitSize').innerHTML = '<option value="">เลือกหน่วยที่นับจริง</option>' + found.units.filter(unit => unit.name).map(unit => `<option value="${unit.size}">${esc(unit.name)} (${unit.size}) · ตัวคูณอ้างอิง ${unit.factor ?? 'ไม่ทราบ'}</option>`).join('');
+  $('#stockReference').textContent = 'ยอดระบบ: ' + qty(found.stock.quantity) + ' · Full Sync\nหน่วยและเวลาสต๊อกยังไม่ทราบ จึงยังเทียบผลต่างไม่ได้';
+  $('#unitSize').innerHTML = '<option value="">เลือกหน่วยที่นับจริง</option>' + found.units.filter(unit => unit.name).map(unit => `<option value="${unit.size}">${esc(unit.name)} (${unit.size})</option>`).join('');
   $('#lots').innerHTML = ''; $('#reasonGroup').hidden = !original; $('#correctionNotice').hidden = !original;
   if (original) {
     $('#unitSize').value = original.event.unitSize; $('#unitSize').disabled = true;
@@ -65,7 +93,7 @@ async function openProduct(barcode, original = null, known = null, restoring=fal
     original.event.lots.forEach(addLot);
   } else { $('#unitSize').disabled = false; addLot(); }
   $('#complete').parentElement.lastChild.textContent=found.scope.coverage==='whole-branch'?'ตรวจครบทุกชั้นและทุกพื้นที่ของสินค้านี้แล้ว':'ตรวจครบสินค้านี้ในพื้นที่ที่เลือกแล้ว (ไม่ใช่ทั้งสาขา)';
-  total(); if(!restoring)await cacheDraft();$('#countForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  total();showPane('count',false);$('#scanTools').open=false;step('Count'); if(!restoring)await cacheDraft();$('#countForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 $('#lookupButton').onclick = () => openProduct($('#barcode').value).catch(handle);
 $('#barcode').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); $('#lookupButton').click(); } });
@@ -88,8 +116,9 @@ const camera = new PilotCamera({ catalog: [], onConfirm: barcode => openProduct(
 $('#cameraButton').onclick = () => camera.open();
 let lotNumber = 0;
 function addLot(value = null) {
-  const node = document.createElement('section'); node.className = 'pilot-lot'; const id = ++lotNumber;
-  node.innerHTML = `<div class="row between"><h3>ล็อต</h3><button type="button" class="link-btn remove-lot">ลบล็อต</button></div><label for="lot-${id}">เลขล็อต</label><input id="lot-${id}" class="lot-code" maxlength="100"><label class="check-label"><input type="checkbox" class="lot-unknown">ไม่ทราบเลขล็อต</label><label for="quantity-${id}">จำนวนในล็อตนี้</label><input id="quantity-${id}" class="lot-quantity" inputmode="decimal" placeholder="0.000" required><label for="mfg-${id}">วันผลิต</label><input id="mfg-${id}" type="date" class="lot-mfg"><label class="check-label"><input type="checkbox" class="mfg-unknown">ไม่ทราบวันผลิต</label><label for="expiry-${id}">วันหมดอายุ</label><input id="expiry-${id}" type="date" class="lot-exp"><label class="check-label"><input type="checkbox" class="exp-unknown">ไม่ทราบวันหมดอายุ</label>`;
+  document.querySelectorAll('.pilot-lot').forEach(lot=>lot.open=false);
+  const node = document.createElement('details'); node.className = 'pilot-lot'; node.open=true; const id = ++lotNumber;
+  node.innerHTML = `<summary><div><strong>ล็อตที่ ${document.querySelectorAll('.pilot-lot').length+1}</strong><span class="lot-summary">ยังไม่กรอก</span></div></summary><div class="pilot-lot-body"><label for="quantity-${id}">จำนวนในล็อตนี้</label><input id="quantity-${id}" class="lot-quantity" inputmode="decimal" placeholder="กรอกจำนวน" required><label for="lot-${id}">เลขล็อต</label><input id="lot-${id}" class="lot-code" maxlength="100" placeholder="อ่านจากฉลากสินค้า"><label class="check-label"><input type="checkbox" class="lot-unknown">ไม่ทราบเลขล็อต</label><div class="pilot-date-pair"><label for="mfg-${id}">วันผลิต</label><input id="mfg-${id}" type="date" class="lot-mfg"><label class="check-label"><input type="checkbox" class="mfg-unknown">ไม่ทราบวันผลิต</label><label for="expiry-${id}">วันหมดอายุ</label><input id="expiry-${id}" type="date" class="lot-exp"><label class="check-label"><input type="checkbox" class="exp-unknown">ไม่ทราบวันหมดอายุ</label></div><button type="button" class="remove-lot">ลบล็อตนี้</button></div>`;
   for (const [unknown, field] of [['lot-unknown', 'lot-code'], ['mfg-unknown', 'lot-mfg'], ['exp-unknown', 'lot-exp']]) node.querySelector('.' + unknown).onchange = event => { node.querySelector('.' + field).disabled = event.target.checked; };
   node.querySelector('.remove-lot').onclick = () => { node.remove(); total();cacheDraft().catch(handle); };
   node.querySelector('.lot-quantity').oninput = total;
@@ -98,14 +127,18 @@ function addLot(value = null) {
     node.querySelector('.lot-mfg').value = value.manufacturedOn || ''; node.querySelector('.lot-exp').value = value.expiresOn || '';
     for (const [key, flag, field] of [['code', 'lot-unknown', 'lot-code'], ['manufacturedOn', 'mfg-unknown', 'lot-mfg'], ['expiresOn', 'exp-unknown', 'lot-exp']]) { node.querySelector('.' + flag).checked = value[key] === null; node.querySelector('.' + field).disabled = value[key] === null; }
   }
-  $('#lots').append(node); total();
+  $('#lots').append(node);node.addEventListener('input',total);node.addEventListener('change',total); total();
 }
 function milli(text) {
   if (!/^(0|[1-9]\d{0,8})(\.\d{1,3})?$/.test(text)) throw new Error('กรอกจำนวนตั้งแต่ 0 และทศนิยมไม่เกิน 3 ตำแหน่ง');
   const [whole, fraction = ''] = text.split('.'); return Number(whole) * 1000 + Number(fraction.padEnd(3, '0'));
 }
 const decimal = value => `${Math.floor(value / 1000)}.${String(value % 1000).padStart(3, '0')}`;
-function total() { try { $('#total').textContent = decimal([...document.querySelectorAll('.lot-quantity')].reduce((sum, field) => sum + milli(field.value || '0'), 0)); } catch { $('#total').textContent = 'ตรวจจำนวน'; } }
+function total() {
+  $('#totalUnit').textContent=product?.units.find(unit=>unit.size===$('#unitSize').value)?.name||'เลือกหน่วย';
+  document.querySelectorAll('.pilot-lot').forEach((node,index)=>{node.querySelector('summary strong').textContent='ล็อตที่ '+(index+1);const code=node.querySelector('.lot-unknown').checked?'ไม่ทราบล็อต':node.querySelector('.lot-code').value||'ยังไม่กรอกล็อต';node.querySelector('.lot-summary').textContent=code+' · '+(node.querySelector('.lot-quantity').value||'ยังไม่กรอกจำนวน');});
+  try { $('#total').textContent = decimal([...document.querySelectorAll('.lot-quantity')].reduce((sum, field) => sum + milli(field.value || '0'), 0)); } catch { $('#total').textContent = 'ตรวจจำนวน'; } }
+$('#unitSize').addEventListener('change',total);
 $('#addLotButton').onclick = () => { if (document.querySelectorAll('.pilot-lot').length < 100) addLot();cacheDraft().catch(handle); };
 $('#zeroButton').onclick = () => { $('#lots').innerHTML = ''; total();cacheDraft().catch(handle);message('ระบุผลนับ 0 · ยืนยันพื้นที่ที่ตรวจแล้วก่อนบันทึก'); };
 function draft() {
@@ -129,25 +162,31 @@ function draft() {
 }
 $('#countForm').onsubmit = event => {
   event.preventDefault();
+  if(revealMissingField())return;
+  message('ตรวจจำนวน หน่วย ล็อต และพื้นที่ให้ครบก่อนส่ง');
   try { reviewed = draft(); const unit = product.units.find(unit => unit.size === reviewed.unitSize).name;
-    $('#reviewText').innerHTML = `<p>เว็บไซต์: <strong>${esc(qty(product.stock.quantity))}</strong> · Full Sync · หน่วยและเวลาสต๊อกยังไม่ทราบ</p><p>ผลนับ: <strong>${reviewed.quantity} ${esc(unit)}</strong> · ${reviewed.lots.length} ล็อต</p><p>${reviewed.complete ? 'ยืนยันตรวจครบทุกพื้นที่' : 'สำรวจบางล็อต ยังไม่ครบทั้งสินค้า'}</p><p class="pilot-quiet">เก็บเป็นหลักฐานพร้อมใบรับ ยังไม่แทนยอดสต๊อกทางการ${correction ? ' · รายการเดิมยังคงอยู่ในประวัติ' : ''}</p>`;
-    $('#reviewDialog').showModal();
+    $('#reviewText').innerHTML = `<p>เว็บไซต์: <strong>${esc(qty(product.stock.quantity))}</strong> · Full Sync · หน่วยและเวลาสต๊อกยังไม่ทราบ</p><p>ผลนับ: <strong class="pilot-review-number">${reviewed.quantity} ${esc(unit)}</strong> · ${reviewed.lots.length} ล็อต</p><p>${reviewed.complete ? (product.scope.coverage==='whole-branch'?'ยืนยันตรวจครบทุกพื้นที่ของสินค้า':'ยืนยันตรวจครบในพื้นที่ที่เลือก ยังไม่ใช่ทั้งสาขา') : 'สำรวจบางล็อต ยังไม่ครบทั้งสินค้า'}</p><p class="pilot-quiet">เก็บเป็นหลักฐานพร้อมใบรับ ยังไม่แทนยอดสต๊อกทางการ${correction ? ' · รายการเดิมยังคงอยู่ในประวัติ' : ''}</p>`;
+    step('Review');$('#reviewDialog').showModal();
   } catch (error) { handle(error); }
 };
-$('#reviewCancel').onclick = () => { reviewed = null; $('#reviewDialog').close(); };
+$('#reviewDialog').oncancel=()=>{reviewed=null;step('Count');};
+$('#reviewCancel').onclick = () => { reviewed = null; $('#reviewDialog').close();step('Count'); };
 $('#reviewSave').onclick = async () => {
   if (!reviewed || !identity()) return;
   $('#reviewSave').disabled = true;
   try { await outbox.enqueue(identity(), reviewed); await outbox.saveData(draftKey(identity()),null); reviewed = null; $('#reviewDialog').close(); $('#countForm').hidden = true;$('#scopeSelect').disabled=false;
-    message('เก็บคำขอเดิมในอุปกรณ์แล้ว · รอใบรับจากเซิร์ฟเวอร์'); await renderHistory();await sync();
+    showPane('history');step('Scan');message('เก็บคำขอเดิมในอุปกรณ์แล้ว · รอใบรับจากเซิร์ฟเวอร์'); await renderHistory();await sync();
   } catch (error) { handle(error); } finally { $('#reviewSave').disabled = false; }
 };
 async function renderHistory() {
   if (!identity()) return;
+  const expanded=new Set([...$('#history').querySelectorAll('[data-event] details[open]')].map(node=>node.closest('[data-event]').dataset.event));
   const local = await outbox.forIdentity(identity()), known = new Set(records.map(record => record.eventId));
+  const waiting=local.filter(item=>item.status==='pending').length;$('#queueBadge').hidden=!waiting;$('#queueBadge').textContent=String(waiting);
   const latest = new Map();
   for (const record of records) { const key = record.event.productCode + ':' + record.event.unitSize+':'+record.event.scopeId; if (!latest.has(key)) latest.set(key, record.eventId); }
-  $('#history').innerHTML = local.filter(item => !known.has(item.id)).map(item => { const request = JSON.parse(item.original); return `<article class="pilot-record"><strong>${esc(request.productCode)} · ${request.quantity}</strong><p>${item.status === 'conflict' ? 'ข้อมูลชนกัน · คงคำขอเดิมไว้ กรุณาตรวจนับใหม่' : item.status === 'rejected' ? 'เซิร์ฟเวอร์ปฏิเสธ · คงคำขอเดิมไว้' : item.status === 'accepted' ? 'เซิร์ฟเวอร์รับแล้ว · ใบรับคงอยู่ในเครื่อง' : 'รอส่ง · ยังไม่มีใบรับ'}</p><p>${esc(item.detail || '')}</p><p class="mono pilot-quiet">${item.id}</p></article>`; }).join('') + records.map(record => `<article class="pilot-record" data-event="${record.eventId}"><strong>${esc(record.event.productCode)} · ${record.event.quantity} ${esc(record.event.unit)}</strong><p>${esc(record.event.scope?.label||'ตรวจรายสินค้า')} · รอบ ${record.event.scope?.round||1}</p><p>${esc(record.event.staffName || record.event.staffId)} · นับ ${date(record.event.observedAt)}</p>${record.event.lots.map(lot => `<p>ล็อต ${esc(lot.code || 'ไม่ทราบ')} × ${lot.quantity}<br>ผลิต ${esc(lot.manufacturedOn || 'ไม่ทราบ')} · หมดอายุ ${esc(lot.expiresOn || 'ไม่ทราบ')}</p>`).join('')}<p class="pilot-quiet">${record.event.correctionOf ? 'แก้ไขจาก ' + esc(record.event.correctionOf) + ' · ' + esc(record.event.reason) : 'หลักฐานต้นฉบับ'}</p><p class="pilot-quiet">อ้างอิงตอนเปิด ${esc(qty(record.event.referenceAtCapture?.quantity??null))} · ตอนส่ง ${esc(qty(record.event.referenceAtSubmit?.quantity??null))} · Full Sync · เวลาสต๊อกไม่ทราบ</p><p class="pilot-quiet mono">Receipt ${record.receiptId}<br>เซิร์ฟเวอร์รับ ${date(record.receivedAt)}</p><p class="pilot-quiet">เก็บผลนับแล้ว · ไม่แทนยอดสต๊อกทางการ</p>${latest.get(record.event.productCode + ':' + record.event.unitSize+':'+record.event.scopeId) !== record.eventId ? '<p class="pilot-quiet">มีรายการใหม่กว่า · คงหลักฐานเดิม</p>' : record.event.staffId === identity().staffId || identity().role === 'manager' ? `<button class="button secondary correct-count" data-id="${record.eventId}">แก้ไขโดยเก็บประวัติเดิม</button>` : ''}</article>`).join('');
+  $('#history').innerHTML = local.filter(item => !known.has(item.id)).map(item => { const request = JSON.parse(item.original); return `<article class="pilot-record" data-state="${item.status}"><span class="pilot-record-state">${item.status==='pending'?'รอส่ง':item.status==='accepted'?'รับแล้ว':item.status==='conflict'?'ต้องตรวจใหม่':'ส่งไม่ผ่าน'}</span><br><strong>${esc(request.productCode)} · ${request.quantity}</strong><p>${item.status === 'conflict' ? 'ข้อมูลชนกัน · คงคำขอเดิมไว้ กรุณาตรวจนับใหม่' : item.status === 'rejected' ? 'เซิร์ฟเวอร์ปฏิเสธ · คงคำขอเดิมไว้' : item.status === 'accepted' ? 'เซิร์ฟเวอร์รับแล้ว · ใบรับคงอยู่ในเครื่อง' : 'รอส่ง · ยังไม่มีใบรับ'}</p><p>${esc(item.detail || '')}</p><details><summary>ดูหมายเลขคำขอ</summary><p class="mono pilot-quiet">${item.id}</p></details></article>`; }).join('') + records.map(record => `<article class="pilot-record" data-event="${record.eventId}" data-state="accepted"><span class="pilot-record-state">รับแล้ว · มีใบรับ</span><br><strong>${esc(record.event.productCode)} · ${record.event.quantity} ${esc(record.event.unit)}</strong><p>${esc(record.event.scope?.label||'ตรวจรายสินค้า')} · รอบ ${record.event.scope?.round||1}</p><p>${esc(record.event.staffName || record.event.staffId)} · นับ ${date(record.event.observedAt)}</p><details><summary>ดู ${record.event.lots.length} ล็อต / วันที่ / ใบรับ</summary>${record.event.lots.map(lot => `<p>ล็อต ${esc(lot.code || 'ไม่ทราบ')} × ${lot.quantity}<br>ผลิต ${esc(lot.manufacturedOn || 'ไม่ทราบ')} · หมดอายุ ${esc(lot.expiresOn || 'ไม่ทราบ')}</p>`).join('')}<p class="pilot-quiet">${record.event.correctionOf ? 'แก้ไขจาก ' + esc(record.event.correctionOf) + ' · ' + esc(record.event.reason) : 'หลักฐานต้นฉบับ'}</p><p class="pilot-quiet">อ้างอิงตอนเปิด ${esc(qty(record.event.referenceAtCapture?.quantity??null))} · ตอนส่ง ${esc(qty(record.event.referenceAtSubmit?.quantity??null))} · Full Sync · เวลาสต๊อกไม่ทราบ</p><p class="pilot-quiet mono">Receipt ${record.receiptId}<br>เซิร์ฟเวอร์รับ ${date(record.receivedAt)}</p><p class="pilot-quiet">เก็บผลนับแล้ว · ไม่แทนยอดสต๊อกทางการ</p></details>${latest.get(record.event.productCode + ':' + record.event.unitSize+':'+record.event.scopeId) !== record.eventId ? '<p class="pilot-quiet">มีรายการใหม่กว่า · คงหลักฐานเดิม</p>' : record.event.staffId === identity().staffId || identity().role === 'manager' ? `<button class="button secondary correct-count" data-id="${record.eventId}">แก้ไขโดยเก็บประวัติเดิม</button>` : ''}</article>`).join('')||'<p class="pilot-quiet">ยังไม่มีรายการ · เริ่มนับได้ที่เมนูนับสินค้า</p>';
+  for(const id of expanded){const detail=$('#history').querySelector('[data-event="'+CSS.escape(id)+'"] details');if(detail)detail.open=true;}
   document.querySelectorAll('.correct-count').forEach(button => { button.onclick = () => { const original = records.find(record => record.eventId === button.dataset.id); openProduct(original.event.barcode, original).catch(handle); }; });
 }
 async function sync() {
@@ -164,15 +203,15 @@ async function sync() {
 $('#syncButton').onclick = sync; window.addEventListener('online', sync);
 window.addEventListener('offline', () => message('ออฟไลน์ · บันทึกคำขอในเครื่องได้ แต่ยังไม่มีใบรับจนเชื่อมต่ออีกครั้ง'));
 setInterval(() => { if (navigator.onLine) sync(); }, 15000);
-message('API เป้าหมาย: ' + api.origin + ' · ต้องยืนยันสิทธิ์และสัญญา API ก่อนส่งผลนับ');
+message('ขอรหัสจากผู้ดูแล แล้วเลือกชื่อของคุณเพื่อเริ่มงาน');
 async function cacheDraft(){if(!product||$('#countForm').hidden||!identity())return;const lots=[...document.querySelectorAll('.pilot-lot')].map(node=>({code:node.querySelector('.lot-code').value,quantity:node.querySelector('.lot-quantity').value,mfg:node.querySelector('.lot-mfg').value,exp:node.querySelector('.lot-exp').value,lotUnknown:node.querySelector('.lot-unknown').checked,mfgUnknown:node.querySelector('.mfg-unknown').checked,expUnknown:node.querySelector('.exp-unknown').checked}));await outbox.saveData(draftKey(identity()),{product,correction,capturedAt,unitSize:$('#unitSize').value,lots,complete:$('#complete').checked,note:$('#countNote').value,reason:$('#correctionReason').value});}
 async function restoreDraft(){if(!identity())return;const saved=await outbox.readData(draftKey(identity()));if(!saved)return;await openProduct(saved.product.barcode,saved.correction,saved.product,true);capturedAt=saved.capturedAt;$('#unitSize').value=saved.unitSize;$('#complete').checked=saved.complete;$('#countNote').value=saved.note;$('#correctionReason').value=saved.reason;$('#lots').innerHTML='';for(const value of saved.lots){addLot({code:value.lotUnknown?null:value.code,quantity:value.quantity,manufacturedOn:value.mfgUnknown?null:value.mfg,expiresOn:value.expUnknown?null:value.exp});}total();await cacheDraft();message('กู้ร่างเดิมแล้ว · หน่วย/เวลา/ขอบเขตเดิมยังอยู่ ตรวจข้อมูลก่อนยืนยัน');}
-for(const eventName of ['input','change'])$('#countForm').addEventListener(eventName,()=>{clearTimeout(draftTimer);draftTimer=setTimeout(()=>cacheDraft().catch(handle),100);});
+for(const eventName of ['input','change'])$('#countForm').addEventListener(eventName,event=>{event.target.removeAttribute('aria-invalid');clearTimeout(draftTimer);draftTimer=setTimeout(()=>cacheDraft().catch(handle),100);});
 window.addEventListener('pagehide',()=>{cacheDraft().catch(()=>{});});
 async function initialize(){const context=await outbox.readData('context');if(context?.identity&&!context.explicitLogout&&Date.parse(context.identity.expiresAt)>Date.now()){
   // navigator.onLine is advisory and can be true on an offline cold navigation.
   // A cached public identity restores local drafts only, never API authentication.
-  offlineIdentity=context.identity;scopeList=context.scopeList;showScopes();$('#connectionBadge').textContent='LOCAL DRAFT · ร่างในเครื่อง · '+offlineIdentity.staffName;$('#scanCard').hidden=false;$('#scopeNotice').textContent='ร่างในเครื่อง · ยังไม่ได้ยืนยันตัวตนกับเซิร์ฟเวอร์ เก็บร่าง/คิวเดิมได้ ต้องลงทะเบียนใหม่ก่อนส่งจริง';await restoreDraft();await renderHistory();}
+  offlineIdentity=context.identity;scopeList=context.scopeList;showScopes();$('#connectionBadge').textContent='LOCAL DRAFT · ร่างในเครื่อง · '+offlineIdentity.staffName;$('#scanCard').hidden=false;showPane('count',false);step('Scan');$('#scopeNotice').textContent='ร่างในเครื่อง · ยังไม่ได้ยืนยันตัวตนกับเซิร์ฟเวอร์ เก็บร่าง/คิวเดิมได้ ต้องลงทะเบียนใหม่ก่อนส่งจริง';await restoreDraft();await renderHistory();}
   if('serviceWorker'in navigator)navigator.serviceWorker.register('/pilot-001-worker.js',{scope:'/pilot-001.html'}).catch(()=>message('ยังเตรียมหน้าออฟไลน์ไม่ได้ คิวที่บันทึกแล้วคงอยู่'));
 }
 initialize().catch(handle);
