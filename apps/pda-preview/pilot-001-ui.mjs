@@ -1,6 +1,7 @@
 import { MobileCountPilotClient } from './mobile-count-pilot.mjs';
 import { PilotOutbox } from './pilot-001-outbox.mjs';
 import { CameraScanner } from './camera-scanner.mjs';
+import { operatorDisplayCode, FIXTURE_OPERATOR_NUMBERS } from './operator-display.mjs';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const fixture = location.hostname === '127.0.0.1' && location.protocol === 'http:' && document.querySelector('meta[name="pda-pilot-fixture"]')?.content === 'enabled';
@@ -20,12 +21,20 @@ function showPane(name, scroll=true) {
     button.setAttribute('aria-pressed',String(button.dataset.pane===name));
     if(button.dataset.pane!=='operator')button.disabled=!identity();
   });
+  const code=operatorDisplayCode(identity(),fixture?FIXTURE_OPERATOR_NUMBERS:{});
+  $('#operatorCode').textContent=code||'—';
+  $('#operatorCode').setAttribute('aria-label',code?'ผู้ใช้งาน '+code.slice(0,2)+' · สาขา '+code.slice(2):'ยังไม่มีรหัสแสดงผลของผู้ใช้งาน');
+  $('#operatorAvatar').disabled=!identity();
+  if(!identity())$('#operatorCard').close();
   $('#operatorCard').hidden=!identity();
+  $('#accountCode').textContent=code||'บัญชี';
   $('#operatorName').textContent=identity()?identity().staffName+' · สาขา 001':'';
   if(scroll)window.scrollTo({top:0,behavior:'instant'});
 }
 function step(name){$('.pilot-wrap').classList.toggle('is-counting',name!=='Scan');for(const key of ['Scan','Count','Review']){const node=$('#step'+key);if(key===name)node.setAttribute('aria-current','step');else node.removeAttribute('aria-current');}}
 for(const button of document.querySelectorAll('[data-pane]'))button.onclick=()=>showPane(button.dataset.pane);
+$('#operatorAvatar').onclick=()=>{if(identity())$('#operatorCard').showModal();};
+$('#accountClose').onclick=()=>$('#operatorCard').close();
 $('#nextItemButton').onclick=()=>{showPane('count');$('#scanTools').open=true;step($('#countForm').hidden?'Scan':'Count');$('#barcode').focus();};
 function focusProblem(field,text){field.closest('.pilot-lot')?.setAttribute('open','');field.setAttribute('aria-invalid','true');field.focus();field.scrollIntoView({block:'center',behavior:'instant'});message(text,'error');}
 function revealMissingField(){
@@ -72,7 +81,7 @@ $('#connectButton').onclick = async () => {
     showPane('count');$('#scanTools').open=true;step('Scan');message('เชื่อมต่อแล้ว · สแกนหรือกรอกบาร์โค้ดเพื่อเริ่มนับ'); await restoreDraft();await sync();
   } catch (error) { handle(error); } finally { $('#connectButton').disabled = false; }
 };
-$('#disconnectButton').onclick = async () => {await cacheDraft();await outbox.saveData('context',{explicitLogout:true});camera.close(); disconnected(); message('ออกจากการเชื่อมต่อแล้ว · ร่างและคิวเดิมยังอยู่ ต้องเชื่อมใหม่ก่อนส่ง'); };
+$('#disconnectButton').onclick = async () => {await cacheDraft();await outbox.saveData('context',{explicitLogout:true});$('#operatorCard').close();camera.close(); disconnected(); message('ออกจากการเชื่อมต่อแล้ว · ร่างและคิวเดิมยังอยู่ ต้องเชื่อมใหม่ก่อนส่ง'); };
 function showScopes(selected=null){$('#scopeSelect').innerHTML=scopeList.map(item=>`<option value="${item.id}">${esc(item.label)} · รอบ ${item.round}</option>`).join('');if(selected)$('#scopeSelect').value=selected;}
 async function openProduct(barcode, original = null, known = null, restoring=false) {
   const scopeId=original?.event.scopeId||$('#scopeSelect').value;

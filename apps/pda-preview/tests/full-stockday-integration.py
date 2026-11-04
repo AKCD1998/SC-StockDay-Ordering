@@ -268,7 +268,7 @@ with sync_playwright() as p:
     mobile.locator('#countForm').wait_for(state='visible')
     connect(enrollment_code(),staff='2')
     assert mobile.locator('#countForm').is_hidden(),'Alice draft was relabelled as Bob'
-    mobile.locator('#disconnectButton').click();mobile.locator('#enrollmentCard').wait_for(state='visible')
+    mobile.locator('#operatorAvatar').click();mobile.locator('#disconnectButton').click();mobile.locator('#enrollmentCard').wait_for(state='visible')
     connect(enrollment_code(),staff='1')
     assert mobile.locator('.lot-code').first.input_value()=='ACTOR-BOUND-DRAFT'
     assert mobile.locator('.lot-quantity').first.input_value()=='11'

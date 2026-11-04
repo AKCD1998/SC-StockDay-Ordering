@@ -62,3 +62,15 @@ Removed the visible “นับสต๊อก สาขา 001” title and th
 ## Requested scan-copy cleanup — 2026-11-04
 
 Removed the round-explanation disclosure, the scan-section heading/intro and the Bluetooth/Enter help sentence from the scan card. Scope selection, independent-round rules, camera/manual/HID lookup and backend/auth/count code are unchanged. Only markup and this note changed; the local review was refreshed without publishing.
+
+## Requested operator code / avatar — 2026-11-04
+
+The header now uses an original avatar SVG and a five-digit display alias: two-digit branch user number followed by the three-digit branch code. Explicit preview assignments are `001:staff1 → 01001`, `001:staff2 → 02001`, `001:staff3 → 03001`. The label follows the selected enrolled/cached-draft actor and clears on logout; before login it is a neutral dash.
+
+These are presentation aliases, not new credentials or server staff IDs. The current real enrollment roster exposes globally allocated `staffId` values and sorts by display name; it does not expose a stable per-branch ordinal. Therefore the preview mapping is enabled only by the existing explicitly selected loopback fixture mode. Real deployment requires an approved stable branch/staff-to-number assignment; unknown/unassigned users show a dash rather than a fabricated ordinal. Names, roster order, role, truncated IDs and client-side encounter order are never used to invent a code.
+
+The API client, payload, outbox, stored public identity and backend remain unchanged. The alias formatter is a public app-shell module and is included in the existing worker cache/preparation fingerprint so the header also works after an actual offline cold reload. Formatter checks cover the three requested aliases, unknown/malformed identities, explicit assignment for a different global staff ID, and roster/name independence. Browser evidence for this phase uses explicit synthetic API reads and Chromium fake camera; it does not establish new production backend acceptance.
+
+### Footer removal in the same update
+
+Removed the persistent operator-name / branch / disconnect footer. The avatar now opens the existing account actions in a small native dialog; sign-out retains its original draft preservation, explicit-logout flag and authentication behavior. Closing the dialog does not sign out. Enrollment remains on the existing screen. This supersedes the compact-footer placement described above.
