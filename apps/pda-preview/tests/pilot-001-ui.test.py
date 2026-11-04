@@ -42,7 +42,7 @@ with sync_playwright() as p:
 
     def save_count():
         page.locator('#countForm button[type=submit]').click()
-        assert 'Full Sync' in page.locator('#reviewText').inner_text()
+        assert 'PDA-TEST-001' in page.locator('#reviewText').inner_text()
         with page.expect_response(lambda response: response.url.endswith('/api/mobile/counts') and response.request.method == 'POST') as received:
             page.locator('#reviewSave').click()
         response = received.value

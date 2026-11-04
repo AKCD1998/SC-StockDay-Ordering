@@ -86,3 +86,9 @@ Replaced the thin outlined person with an original filled profile: white face, l
 ## Category / round simplification — 2026-11-04
 
 The user chose category and independent round for this phase. Two selectors now replace the combined task/area/round control. [Binding semantics, actual HTTP/PostgreSQL evidence and live limitations](PDA_CATEGORY_ROUND_2026-11-04.md). Backend/API/outbox contracts and all earlier visual refinements are retained.
+
+## Staff-readable confirmation — 2026-11-04
+
+The user requested a concrete Thai confirmation mockup: “ยืนยันจำนวนสต๊อก?”, exact SKU code and Thai product name, unit/barcode, then lot quantities. Removed the kicker, category/round summary, website/Full Sync explanation, partial-survey sentence and technical storage/official-stock footnote from this dialog. Multiple lots have separate rows and a compact total; explicit unknown lots and zero counts remain represented. Audit/reference/coverage/date fields remain in the unchanged request and history; the selected category/round stays locked in the form.
+
+The mockup uses a synthetic IC code, Thai product name and the SKU's small unit “เม็ด”, selected explicitly as S. The renderer always uses the actual selected count unit. It does not relabel a box quantity as tablets or invent S/M/L conversion from unverified factors. Display-only trailing decimal zeroes are removed; payload decimal precision is unchanged. This is a view update, not a unit-conversion or backend policy change.

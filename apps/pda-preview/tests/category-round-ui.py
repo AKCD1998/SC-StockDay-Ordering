@@ -21,7 +21,7 @@ with sync_playwright() as p:
   page.locator('#categorySelect').select_option('pharma');page.locator('#roundSelect').select_option('2');selected_scope=page.locator('#scopeSelect').input_value()
   page.locator('#barcode').fill('0001234567890');page.locator('#barcode').press('Enter');page.locator('#countForm').wait_for(state='visible');assert page.locator('#categorySelect').is_disabled();assert page.locator('#roundSelect').is_disabled();assert page.locator('#roundSelect').input_value()=='2'
   page.locator('#unitSize').select_option('S');row=page.locator('.pilot-lot').first;row.locator('.lot-code').fill('CATEGORY-ROUND-2');row.locator('.lot-quantity').fill('6');row.locator('.mfg-unknown').check();row.locator('.exp-unknown').check()
-  page.locator('#countForm button[type=submit]').click();assert 'เภสัช · รอบ 2' in page.locator('#reviewText').inner_text()
+  page.locator('#countForm button[type=submit]').click();assert 'PDA-TEST-001' in page.locator('#reviewText').inner_text();assert '6' in page.locator('#reviewText .confirm-quantity').inner_text();assert page.locator('#roundSelect').input_value()=='2'
   with page.expect_response(lambda r:r.url.endswith('/api/mobile/counts') and r.request.method=='POST') as received:page.locator('#reviewSave').click()
   body=received.value.json();assert received.value.status==status,{'status':received.value.status,'code':body.get('code')}
   if status==201:
@@ -42,5 +42,5 @@ with sync_playwright() as p:
    page.wait_for_function("document.querySelector('#history').textContent.includes('ข้อมูลชนกัน')")
   context.close()
  assert not errors,errors
- report={'environment':'cloud-loopback-existing-http-postgresql-fixture','secondCounterRound2':receipts[0],'firstAndSecondRoundsHaveSeparateHeads':True,'roundValuesComparedNotAdded':True,'sameCounterAcrossRoundsRejected409':True,'selectorsLockedDuringCount':True,'reviewShowsCategoryAndRound':True,'officialReferenceRemains6':True,'browserErrors':errors,'productionOrStagingVerified':False,'physicalPhoneVerified':False}
+ report={'environment':'cloud-loopback-existing-http-postgresql-fixture','secondCounterRound2':receipts[0],'firstAndSecondRoundsHaveSeparateHeads':True,'roundValuesComparedNotAdded':True,'sameCounterAcrossRoundsRejected409':True,'selectorsLockedDuringCount':True,'selectedCategoryAndRoundRetained':True,'reviewShowsSkuAndQuantity':True,'officialReferenceRemains6':True,'browserErrors':errors,'productionOrStagingVerified':False,'physicalPhoneVerified':False}
  (out/'category-round-roundtrip.json').write_text(json.dumps(report,indent=2,ensure_ascii=False));print(json.dumps(report,ensure_ascii=False));browser.close()
