@@ -1,5 +1,7 @@
 # PDA audit core: isolated implementation delivery
 
+Later login update: [operator codes and compact entry](PDA_OPERATOR_CODES_AND_LOGIN_2026-11-04.md). The prior audit-core artifact is unchanged; its earlier transport hashes refer to that pinned version. Count/audit runtime semantics remain intact.
+
 Date: 4 November 2026, Bangkok. Continues the same SC StockDay/PDA and existing backend worktree. User requested implementation with a hard stop by 19:45. This delivery is a cloud-local synthetic integration; no production deployment, Ada stock write or scheduled task activation occurred.
 
 Backend review commit: `e8cbcfa940bb6b11fb91c7b534b62bd99c93d702` on the existing isolated `codex/pda-001-count-pilot` branch. No push/merge occurred. Frontend source and artifact identity are pinned in the final bundle manifest.

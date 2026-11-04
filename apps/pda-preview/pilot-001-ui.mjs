@@ -8,7 +8,9 @@ import { initAuditInbox } from './pilot-audit-inbox.mjs';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const fixture = location.hostname === '127.0.0.1' && location.protocol === 'http:' && document.querySelector('meta[name="pda-pilot-fixture"]')?.content === 'enabled';
-const api = new MobileCountPilotClient(fixture ? { allowLocalFixture: true, fixtureOrigin: location.origin } : {apiOrigin:document.querySelector('meta[name="sc-pda-api-origin"]')?.content||'https://paasrtsm-project.onrender.com'});
+const reusableCodeFixture=fixture&&document.querySelector('meta[name="pda-reusable-code-fixture"]')?.content==='enabled';
+const api = new MobileCountPilotClient(fixture ? { allowLocalFixture: true, fixtureOrigin: location.origin,allowReusableCodeFixture:reusableCodeFixture } : {apiOrigin:document.querySelector('meta[name="sc-pda-api-origin"]')?.content||'https://paasrtsm-project.onrender.com'});
+if(reusableCodeFixture){$('#enrollmentCode').inputMode='numeric';$('#enrollmentCode').maxLength=4;$('#enrollmentCode').minLength=4;$('#enrollmentCode').placeholder='รหัส 4 หลัก';}
 const outbox = new PilotOutbox(api.origin);
 const auditInbox=initAuditInbox({api,onError:error=>handle(error)});
 const categorySessions=fixture?FIXTURE_CATEGORY_SESSIONS:APPROVED_CATEGORY_SESSIONS;
@@ -31,6 +33,7 @@ function showPane(name, scroll=true) {
   $('#operatorCode').textContent=code||'—';
   $('#operatorCode').setAttribute('aria-label',code?'ผู้ใช้งาน '+code.slice(0,2)+' · สาขา '+code.slice(2):'ยังไม่มีรหัสแสดงผลของผู้ใช้งาน');
   $('#operatorAvatar').disabled=!identity();
+  $('#codeRotationNotice').hidden=!identity()?.rotationDueAt||Date.parse(identity().rotationDueAt)>Date.now();
   if(!identity())$('#operatorCard').close();
   $('#operatorCard').hidden=!identity();
   $('#accountCode').textContent=code||'บัญชี';
@@ -69,7 +72,7 @@ $('#rosterButton').onclick = async () => {
   $('#staffSelect').disabled=true;$('#staffSelect').value='';$('#connectButton').disabled=true;
   try { const roster = await api.roster($('#enrollmentCode').value);
     $('#staffSelect').innerHTML = '<option value="">เลือกผู้ปฏิบัติงาน</option>' + roster.staff.map(staff => `<option value="${esc(staff.staffId)}">${esc(staff.displayName)}</option>`).join('');
-    $('#staffSelect').disabled = false; $('#connectButton').disabled = true; message('ตรวจพบรายชื่อสาขา 001 · เลือกชื่อแล้วเชื่อมเครื่อง');
+    $('#staffSelect').disabled = false;$('#staffSelect').value=roster.staff.length===1?roster.staff[0].staffId:''; $('#connectButton').disabled = !$('#staffSelect').value; message('ตรวจพบรายชื่อสาขา 001 · เลือกชื่อแล้วเชื่อมเครื่อง');
   } catch (error) { handle(error); }
 };
 $('#staffSelect').onchange=()=>{$('#connectButton').disabled=!$('#staffSelect').value;};

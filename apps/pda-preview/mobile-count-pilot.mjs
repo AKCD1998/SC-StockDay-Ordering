@@ -9,8 +9,10 @@ export class PilotApiError extends Error {
 export class MobileCountPilotClient {
   #identity = null;
   #connected = false;
-  constructor({ fetchImpl = globalThis.fetch, fixtureOrigin = null, allowLocalFixture = false, apiOrigin=LIVE_ORIGIN } = {}) {
+  constructor({ fetchImpl = globalThis.fetch, fixtureOrigin = null, allowLocalFixture = false, allowReusableCodeFixture=false, apiOrigin=LIVE_ORIGIN } = {}) {
     if (fixtureOrigin && (!allowLocalFixture || !/^http:\/\/127\.0\.0\.1:\d+$/.test(fixtureOrigin))) throw new Error('Only an explicitly selected loopback fixture origin is permitted');
+    if(allowReusableCodeFixture&&(!fixtureOrigin||!allowLocalFixture))throw new Error('Reusable operator codes are currently available only in the explicit isolated fixture');
+    Object.defineProperty(this,'reusableCodeFixture',{value:allowReusableCodeFixture});
     const configured=new URL(apiOrigin);
     if(configured.protocol!=='https:'||configured.username||configured.password||configured.pathname!=='/'||configured.search||configured.hash)throw new Error('Reviewed HTTPS API origin required');
     Object.defineProperty(this, 'origin', { value: fixtureOrigin || configured.origin, enumerable: true });
@@ -40,7 +42,9 @@ export class MobileCountPilotClient {
   }
   async roster(code) {
     if (typeof code !== 'string' || !code.trim() || code.length > 200) throw new Error('An existing enrollment code is required');
-    const data = await this.request('/api/mobile/enroll/roster?code=' + encodeURIComponent(code.trim()), { authenticated: false });
+    if(this.reusableCodeFixture&&!/^\d{4}$/.test(code.trim()))throw new Error('กรอกรหัสตัวเลข 4 หลัก');
+    const data = this.reusableCodeFixture?await this.request('/api/mobile/operator-access/roster',{method:'POST',body:{code:code.trim()},authenticated:false}):await this.request('/api/mobile/enroll/roster?code=' + encodeURIComponent(code.trim()), { authenticated: false });
+    if(this.reusableCodeFixture&&data.contract!=='sc-pda-reusable-code-fixture-v1')throw new Error('Reusable-code contract mismatch');
     if (data.branchCode !== '001' || !Array.isArray(data.staff)) throw new Error('This pilot accepts branch 001 enrollment only');
     return data;
   }
@@ -48,8 +52,9 @@ export class MobileCountPilotClient {
     this.disconnect();
     const roster = await this.roster(code);
     if (!roster.staff.some(staff => staff.staffId === staffId) || typeof deviceId !== 'string' || !deviceId.trim()) throw new Error('Select eligible staff and a device identity');
-    const data = await this.request('/api/mobile/enroll/redeem', { method: 'POST', authenticated: false,
+    const data = await this.request(this.reusableCodeFixture?'/api/mobile/operator-access/login':'/api/mobile/enroll/redeem', { method: 'POST', authenticated: false,
       body: { code: code.trim(), staffId, deviceId, ...(deviceLabel ? { deviceLabel } : {}) } });
+    if(this.reusableCodeFixture&&(data.contract!=='sc-pda-reusable-code-fixture-v1'||data.fixtureOnly!==true))throw new Error('Reusable-code session is not an isolated fixture response');
     if (data.branchCode !== '001' || data.staffId !== staffId || data.deviceId !== deviceId || !['sales', 'manager'].includes(data.role) || typeof data.token !== 'string' || !data.token || !Number.isFinite(Date.parse(data.expiresAt)) || Date.parse(data.expiresAt) <= Date.now()) throw new Error('Enrollment response identity mismatch');
     this.#identity = data;
     return this.identity;

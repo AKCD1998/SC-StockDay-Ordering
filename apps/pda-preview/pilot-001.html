@@ -40,15 +40,14 @@
     <section id="historyPane" data-panel="history" hidden><section class="panel pilot-card"><div class="pilot-section-title"><h2>รายการนับ</h2><button class="button secondary" id="syncButton" disabled>ส่งคิว / อัปเดต</button></div><p class="pilot-quiet">“รับแล้ว” ต้องมีใบรับจากเซิร์ฟเวอร์ · “รอส่ง” ยังอยู่ในเครื่อง</p><button class="button pilot-wide" id="nextItemButton">นับสินค้าถัดไป →</button><details class="pilot-help" id="auditInbox"><summary>คำถามจากผู้ตรวจ</summary><button type="button" class="button secondary" id="auditLoad">โหลดคำถามจากผู้ตรวจ</button><div id="auditCases"></div></details><div id="history" class="pilot-history"></div></section></section>
     <section id="operatorPane">
       <section class="panel pilot-card" id="enrollmentCard">
-        <span class="pilot-kicker">ก่อนเริ่มงาน</span><h2>เลือกชื่อ แล้วเชื่อมเครื่อง</h2><p class="pilot-quiet">ขอรหัสลงทะเบียนจากผู้ดูแลสาขาใน StockDay รหัสใช้ได้ครั้งเดียวและมีอายุสั้น</p>
-        <label for="enrollmentCode">1. รหัสลงทะเบียนเครื่อง</label><input id="enrollmentCode" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="กรอกรหัสจากผู้ดูแล">
-        <button class="button secondary" id="rosterButton">ดึงรายชื่อพนักงาน</button>
+        <h2>เลือกชื่อ แล้วเริ่มงาน</h2>
+        <label for="enrollmentCode">1. รหัสเข้าใช้งาน</label><div class="pilot-code-row"><input id="enrollmentCode" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="กรอกรหัส"><button type="button" class="button secondary" id="rosterButton" aria-label="ดึงรายชื่อพนักงาน" title="ดึงรายชื่อพนักงาน"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button></div>
         <label for="staffSelect">2. ชื่อผู้ปฏิบัติงาน</label><select id="staffSelect" disabled><option value="">ดึงรายชื่อก่อน</option></select>
         <button class="button pilot-wide" id="connectButton" disabled>เชื่อมเครื่อง · เริ่มงาน</button>
       </section>
     </section>
   </main>
-  <dialog id="operatorCard" class="pilot-review" aria-labelledby="accountCode"><h2 id="accountCode">บัญชี</h2><p id="operatorName"></p><div class="pilot-actions"><button type="button" class="button secondary" id="accountClose">ปิด</button><button type="button" class="button secondary" id="disconnectButton">ออกจากการเชื่อมต่อ</button></div></dialog>
+  <dialog id="operatorCard" class="pilot-review" aria-labelledby="accountCode"><h2 id="accountCode">บัญชี</h2><p id="operatorName"></p><p id="codeRotationNotice" class="pilot-warning" hidden>ถึงรอบเปลี่ยนรหัส 6 เดือนแล้ว กรุณาให้ผู้ดูแลเปลี่ยนรหัสเข้าใช้งาน</p><div class="pilot-actions"><button type="button" class="button secondary" id="accountClose">ปิด</button><button type="button" class="button secondary" id="disconnectButton">ออกจากการเชื่อมต่อ</button></div></dialog>
   <dialog id="reviewDialog" class="pilot-review" aria-labelledby="reviewTitle"><h2 id="reviewTitle">ยืนยันจำนวนสต๊อก?</h2><div id="reviewText"></div><div class="pilot-actions"><button class="button secondary" id="reviewCancel">กลับไปแก้</button><button class="button" id="reviewSave">ยืนยันและส่ง</button></div></dialog>
   <script type="module" src="./pilot-001-ui.mjs"></script>
 </body>
