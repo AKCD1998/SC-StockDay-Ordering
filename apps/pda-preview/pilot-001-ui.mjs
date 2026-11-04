@@ -2,11 +2,13 @@ import { MobileCountPilotClient } from './mobile-count-pilot.mjs';
 import { PilotOutbox } from './pilot-001-outbox.mjs';
 import { CameraScanner } from './camera-scanner.mjs';
 import { operatorDisplayCode, FIXTURE_OPERATOR_NUMBERS } from './operator-display.mjs';
+import { COUNT_CATEGORIES, FIXTURE_CATEGORY_SESSIONS, APPROVED_CATEGORY_SESSIONS, scopeForChoice, choiceForScope } from './count-choice.mjs';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const fixture = location.hostname === '127.0.0.1' && location.protocol === 'http:' && document.querySelector('meta[name="pda-pilot-fixture"]')?.content === 'enabled';
 const api = new MobileCountPilotClient(fixture ? { allowLocalFixture: true, fixtureOrigin: location.origin } : {apiOrigin:document.querySelector('meta[name="sc-pda-api-origin"]')?.content||'https://paasrtsm-project.onrender.com'});
 const outbox = new PilotOutbox(api.origin);
+const categorySessions=fixture?FIXTURE_CATEGORY_SESSIONS:APPROVED_CATEGORY_SESSIONS;
 const deviceKey = 'sc-pda-001-device-v1';
 const deviceId = localStorage.getItem(deviceKey) || crypto.randomUUID(); localStorage.setItem(deviceKey, deviceId);
 let product = null, correction = null, capturedAt = null, reviewed = null, records = [], busy = false;
@@ -72,7 +74,7 @@ $('#connectButton').onclick = async () => {
   $('#connectButton').disabled = true;
   try {
     // Preserve the former actor's draft before authenticating another operator.
-    await cacheDraft();$('#countForm').hidden=true;product=null;correction=null;reviewed=null;$('#scopeSelect').disabled=false;
+    await cacheDraft();$('#countForm').hidden=true;product=null;correction=null;reviewed=null;lockCountChoice(false);
     await api.enroll({ code: $('#enrollmentCode').value, staffId: $('#staffSelect').value, deviceId, deviceLabel: 'SC PDA branch001 pilot' });
     $('#enrollmentCode').value = '';
     await api.connect();
@@ -83,12 +85,38 @@ $('#connectButton').onclick = async () => {
   } catch (error) { handle(error); } finally { $('#connectButton').disabled = false; }
 };
 $('#disconnectButton').onclick = async () => {await cacheDraft();await outbox.saveData('context',{explicitLogout:true});$('#operatorCard').close();camera.close(); disconnected(); message('ออกจากการเชื่อมต่อแล้ว · ร่างและคิวเดิมยังอยู่ ต้องเชื่อมใหม่ก่อนส่ง'); };
-function showScopes(selected=null){$('#scopeSelect').innerHTML=scopeList.map(item=>`<option value="${item.id}">${esc(item.label)} · รอบ ${item.round}</option>`).join('');if(selected)$('#scopeSelect').value=selected;}
+function showScopes(selected=null){
+  $('#scopeSelect').innerHTML=scopeList.map(item=>`<option value="${item.id}">${esc(item.label)} · รอบ ${item.round}</option>`).join('');
+  const previous=$('#categorySelect').value;
+  $('#categorySelect').innerHTML=COUNT_CATEGORIES.map(item=>`<option value="${item.key}">${item.label}</option>`).join('');
+  $('#categorySelect').value=COUNT_CATEGORIES.some(item=>item.key===previous)?previous:'pharma';
+  if(selected){
+    const choice=choiceForScope(scopeList,selected,categorySessions);
+    if(choice){$('#categorySelect').value=choice.category;renderRoundChoices(choice.round);$('#scopeSelect').value=selected;}
+    else {$('#categorySelect').insertAdjacentHTML('beforeend','<option value="legacy">หมวดเดิมยังไม่ระบุ</option>');$('#categorySelect').value='legacy';const old=scopeList.find(item=>item.id===selected);$('#roundSelect').innerHTML=`<option value="${old?.round||''}">${old?'รอบ '+old.round:'รอบเดิม'}</option>`;$('#scopeSelect').value=selected;}
+  }else{renderRoundChoices(1);applyCountChoice();}
+}
+function renderRoundChoices(round=Number($('#roundSelect').value)||1){
+  $('#roundSelect').innerHTML=[1,2,3].map(value=>`<option value="${value}" ${scopeForChoice(scopeList,$('#categorySelect').value,value,categorySessions)?'':'disabled'}>รอบ ${value}</option>`).join('');
+  $('#roundSelect').value=String(round);
+}
+function applyCountChoice(){
+  const scope=scopeForChoice(scopeList,$('#categorySelect').value,Number($('#roundSelect').value),categorySessions);
+  $('#scopeSelect').value=scope?.id||'';
+  const unavailable=!scope;
+  $('#lookupButton').disabled=unavailable;$('#cameraButton').disabled=unavailable;
+  if(unavailable)message('ยังไม่มีงานนับที่ตรวจสอบแล้วสำหรับหมวดและรอบนี้','error');
+  else message('เลือกหมวดและรอบแล้ว · สแกนสินค้าเพื่อเริ่มนับ');
+}
+function lockCountChoice(locked){$('#scopeSelect').disabled=locked;$('#categorySelect').disabled=locked;$('#roundSelect').disabled=locked;}
+function requireCountScope(){const id=$('#scopeSelect').value;if(!id)throw new Error('เลือกหมวดและรอบที่มีงานนับจากเซิร์ฟเวอร์ก่อน');return id;}
+$('#categorySelect').onchange=()=>{renderRoundChoices();applyCountChoice();};
+$('#roundSelect').onchange=applyCountChoice;
 async function openProduct(barcode, original = null, known = null, restoring=false) {
-  const scopeId=original?.event.scopeId||$('#scopeSelect').value;
+  const scopeId=original?.event.scopeId||requireCountScope();
   const found = known || await api.lookup(barcode,scopeId);
   product = found; correction = original; capturedAt = new Date().toISOString();
-  $('#scopeSelect').value=found.scope.id;$('#scopeSelect').disabled=true;
+  if(!scopeList.some(item=>item.id===found.scope.id))scopeList.push(found.scope);showScopes(found.scope.id);lockCountChoice(true);
   $('#countForm').reset(); $('#countForm').hidden = false;
   $('#productName').textContent = found.name; $('#productIdentity').textContent = found.productCode + ' · ' + found.barcode;
   $('#stockReference').textContent = 'ยอดระบบ: ' + qty(found.stock.quantity) + ' · Full Sync\nหน่วยและเวลาสต๊อกยังไม่ทราบ จึงยังเทียบผลต่างไม่ได้';
@@ -109,7 +137,7 @@ class PilotCamera extends CameraScanner {
   async showResult(result) {
     const token = this.token;
     try {
-      const found = await api.lookup(result.value,$('#scopeSelect').value);
+      const found = await api.lookup(result.value,requireCountScope());
       if (token !== this.token || !this.dialog.open) return;
       this.resolved = found;
       super.showResult({ ...result, kind: 'known', product: { code: found.productCode, barcode: found.barcode, name: found.name } });
@@ -173,7 +201,7 @@ $('#countForm').onsubmit = event => {
   if(revealMissingField())return;
   message('ตรวจจำนวน หน่วย ล็อต และพื้นที่ให้ครบก่อนส่ง');
   try { reviewed = draft(); const unit = product.units.find(unit => unit.size === reviewed.unitSize).name;
-    $('#reviewText').innerHTML = `<p>เว็บไซต์: <strong>${esc(qty(product.stock.quantity))}</strong> · Full Sync · หน่วยและเวลาสต๊อกยังไม่ทราบ</p><p>ผลนับ: <strong class="pilot-review-number">${reviewed.quantity} ${esc(unit)}</strong> · ${reviewed.lots.length} ล็อต</p><p>${reviewed.complete ? (product.scope.coverage==='whole-branch'?'ยืนยันตรวจครบทุกพื้นที่ของสินค้า':'ยืนยันตรวจครบในพื้นที่ที่เลือก ยังไม่ใช่ทั้งสาขา') : 'สำรวจบางล็อต ยังไม่ครบทั้งสินค้า'}</p><p class="pilot-quiet">เก็บเป็นหลักฐานพร้อมใบรับ ยังไม่แทนยอดสต๊อกทางการ${correction ? ' · รายการเดิมยังคงอยู่ในประวัติ' : ''}</p>`;
+    $('#reviewText').innerHTML = `<p class="pilot-quiet">${esc(COUNT_CATEGORIES.find(item=>item.key===choiceForScope(scopeList,product.scope.id,categorySessions)?.category)?.label||'หมวดเดิมยังไม่ระบุ')} · รอบ ${product.scope.round}</p><p>เว็บไซต์: <strong>${esc(qty(product.stock.quantity))}</strong> · Full Sync · หน่วยและเวลาสต๊อกยังไม่ทราบ</p><p>ผลนับ: <strong class="pilot-review-number">${reviewed.quantity} ${esc(unit)}</strong> · ${reviewed.lots.length} ล็อต</p><p>${reviewed.complete ? (product.scope.coverage==='whole-branch'?'ยืนยันตรวจครบทุกพื้นที่ของสินค้า':'ยืนยันตรวจครบในพื้นที่ที่เลือก ยังไม่ใช่ทั้งสาขา') : 'สำรวจบางล็อต ยังไม่ครบทั้งสินค้า'}</p><p class="pilot-quiet">เก็บเป็นหลักฐานพร้อมใบรับ ยังไม่แทนยอดสต๊อกทางการ${correction ? ' · รายการเดิมยังคงอยู่ในประวัติ' : ''}</p>`;
     step('Review');$('#reviewDialog').showModal();
   } catch (error) { handle(error); }
 };
@@ -182,7 +210,7 @@ $('#reviewCancel').onclick = () => { reviewed = null; $('#reviewDialog').close()
 $('#reviewSave').onclick = async () => {
   if (!reviewed || !identity()) return;
   $('#reviewSave').disabled = true;
-  try { await outbox.enqueue(identity(), reviewed); await outbox.saveData(draftKey(identity()),null); reviewed = null; $('#reviewDialog').close(); $('#countForm').hidden = true;$('#scopeSelect').disabled=false;
+  try { await outbox.enqueue(identity(), reviewed); await outbox.saveData(draftKey(identity()),null); reviewed = null; $('#reviewDialog').close(); $('#countForm').hidden = true;lockCountChoice(false);if($('#categorySelect').value==='legacy')showScopes();
     showPane('history');step('Scan');message('เก็บคำขอเดิมในอุปกรณ์แล้ว · รอใบรับจากเซิร์ฟเวอร์'); await renderHistory();await sync();
   } catch (error) { handle(error); } finally { $('#reviewSave').disabled = false; }
 };

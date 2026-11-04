@@ -28,3 +28,5 @@ summary:focus-visible,textarea:focus-visible{outline:3px solid var(--navy);outli
   .pilot-wrap:not(.is-counting) .pilot-camera svg{width:56px;height:56px;stroke-width:1.4}
   .pilot-manual-entry{flex-shrink:0}
 }
+
+.pilot-count-choices{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:12px;flex-shrink:0}.pilot-count-choices>div{min-width:0}.pilot-count-choices label{margin-top:0}.is-counting .pilot-count-choices label{font-size:13px}.is-counting .pilot-count-choices select{min-height:44px;font-size:14px}

@@ -23,8 +23,20 @@ with sync_playwright() as p:
     web.goto(origin+'/stockday/#/branch-stock',wait_until='networkidle')
     web.locator('input[autocomplete=username]').fill('fixture-branch001')
     web.locator('input[autocomplete=current-password]').fill('fixture-only-password')
-    web.get_by_role('button',name='เข้าสู่ระบบ',exact=True).click()
+    with web.expect_response(lambda r:r.url.endswith('/admin/auth/login')) as login_response:
+        web.get_by_role('button',name='เข้าสู่ระบบ',exact=True).click()
     web.get_by_role('heading',name='สต็อกแยกตามสาขา',exact=True).wait_for()
+    # Register category counting jobs via existing authenticated scope API.
+    # All cover the whole branch: categories are not physical location keys.
+    csrf=login_response.value.json()['csrf_token']
+    existing=web.request.get(origin+'/api/stock-counts/scopes').json()['scopes']
+    for category,label in [('pharma','เภสัช'),('common','สามัญ'),('normal','ปกติ')]:
+        for round_no in [1,2,3]:
+            session='fixture-001-'+category
+            if any(s['sessionKey']==session and s['locationKey']=='whole-branch' and s['round']==round_no for s in existing):continue
+            created=web.request.post(origin+'/api/stock-counts/scopes',data={'sessionKey':session,'locationKey':'whole-branch','label':label,'round':round_no,'coverage':'whole-branch'},headers={'X-CSRF-Token':csrf})
+            assert created.status==201,'Isolated scope registration failed'
+
     web.get_by_role('button',name='ล็อตและประวัตินับ PDA-TEST-001').click()
     web.get_by_role('dialog').get_by_role('heading',name='ใบรับและลำดับการแก้ไข').wait_for()
 
@@ -112,6 +124,9 @@ with sync_playwright() as p:
     assert row.locator('.lot-quantity').input_value()=='3'
     first=save()
     assert first['event']['complete'] is False
+    assert first['event']['scope']['label']=='เภสัช'
+    assert first['event']['scope']['round']==1
+    assert first['event']['scope']['locationKey']=='whole-branch'
     view=refresh_web()
     web.locator('[data-count-event="'+first['eventId']+'"]').wait_for()
     assert 'Fixture Alice' in web.locator('[data-count-event="'+first['eventId']+'"]').inner_text()
@@ -279,7 +294,7 @@ with sync_playwright() as p:
     report={'environment':'cloud-isolated-postgres16-full-stockday-react-and-pda','checkedAt':__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat(),
         'firstEventId':first['eventId'],'firstReceiptId':first['receiptId'],'correctionEventId':corrected['eventId'],'correctionReceiptId':corrected['receiptId'],'offlineEventId':offline['eventId'],'offlineReceiptId':offline['receiptId'],
         'enrollmentThroughExistingWebAndPdaUi':True,'sameDatabaseVisibleFromSeparateWebSession':True,'webReloadReadsDurableRecords':True,'originalAndCorrectionVisible':True,'sharedSourceDecisionMatches':True,'partialCountHeldAsReference':True,
-        'draftAndQueueOfflineColdReopen':True,'reauthenticationPreservesOriginalPayload':True,'expiredEnrollmentQueueRecovered':True,'expiredEnrollmentEventId':resumed_receipt['eventId'],'conflictVisibleAndOriginalQueueRetained':True,'conflictEventId':conflict['id'],'draftNotRelabelledAcrossActors':True,'apiResponsesCached':False,'browserErrors':errors,'productionOrStagingVerified':False,'physicalPhoneVerified':False,'officialStockWrites':False,'guidedViewsVerified':True,'invalidCollapsedLotRevealed':True,'reviewCancelPreservesDraft':True,'nextScanFocused':True,'viewportWidthsChecked':[360,390,768]}
+        'draftAndQueueOfflineColdReopen':True,'reauthenticationPreservesOriginalPayload':True,'expiredEnrollmentQueueRecovered':True,'expiredEnrollmentEventId':resumed_receipt['eventId'],'conflictVisibleAndOriginalQueueRetained':True,'conflictEventId':conflict['id'],'draftNotRelabelledAcrossActors':True,'apiResponsesCached':False,'browserErrors':errors,'productionOrStagingVerified':False,'physicalPhoneVerified':False,'officialStockWrites':False,'categoryAndRoundStoredUnderRegisteredScope':True,'guidedViewsVerified':True,'invalidCollapsedLotRevealed':True,'reviewCancelPreservesDraft':True,'nextScanFocused':True,'viewportWidthsChecked':[360,390,768]}
     (out/'full-browser-roundtrip.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
     print(json.dumps(report))
     mobile_context.close();web_context.close();browser.close()

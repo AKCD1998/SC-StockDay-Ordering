@@ -96,3 +96,7 @@ The later pasted request explicitly authorized completing the code and integrate
 Measured results: 12 HTTP/PostgreSQL tests, 18 existing-mobile/policy tests, 46 React tests, one async auth-race test, actual full-app browser roundtrips, and production-target builds passed. The isolated browser harness uses synthetic baseline product/navigation data plus actual existing auth/enrollment and candidate count/read implementations. No live authentication/write, new ScProductDev acceptance, staging or physical-phone acceptance is implied. Original R2/earlier archives and accepted scanner/theme core remain unchanged. Count receipts are live in the test database only; human operational selection remains held because real unit/movement proofs are absent.
 
 Deployment assets, a merge-only exact-origin CORS plan and rollback are prepared. Production actions and first enrolled branch-001 live acceptance remain pending. No new project, Site, remote service, permissions or credentials were created; no production or official stock changes were made.
+
+## Category / round update — 2026-11-04
+
+[Current category/round interface and verified scope](PDA_CATEGORY_ROUND_2026-11-04.md). Existing server scope IDs carry the chosen counting group and independent round. Actual cloud-local HTTP/PostgreSQL checks passed; no production scope creation, deployment, live catalog classification or new host/phone acceptance is claimed.

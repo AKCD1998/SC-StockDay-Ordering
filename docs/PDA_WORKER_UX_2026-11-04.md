@@ -82,3 +82,7 @@ The default scan card now fills the available mobile viewport: a larger camera a
 ## Avatar finish / future settings cue — 2026-11-04
 
 Replaced the thin outlined person with an original filled profile: white face, light-blue shoulders/collar, navy gradient disc and a small yellow gear badge. The existing 48 px account button, operator code and account dialog remain unchanged. The gear is a visual cue for future account/settings development; no new settings screen, permissions or backend capability is claimed. Only SVG markup/styles and this note changed.
+
+## Category / round simplification — 2026-11-04
+
+The user chose category and independent round for this phase. Two selectors now replace the combined task/area/round control. [Binding semantics, actual HTTP/PostgreSQL evidence and live limitations](PDA_CATEGORY_ROUND_2026-11-04.md). Backend/API/outbox contracts and all earlier visual refinements are retained.

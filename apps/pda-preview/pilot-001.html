@@ -19,7 +19,7 @@
     <section id="countPane" data-panel="count" hidden>
       <ol class="pilot-steps" aria-label="ขั้นตอนนับสินค้า"><li id="stepScan" aria-current="step"><b>1</b> สแกน</li><li id="stepCount"><b>2</b> กรอกผลนับ</li><li id="stepReview"><b>3</b> ตรวจและส่ง</li></ol>
       <section class="panel pilot-card" id="scanCard" hidden>
-        <label class="pilot-scope-label" for="scopeSelect">งาน / พื้นที่ / รอบนับ</label><select id="scopeSelect"></select>
+        <div class="pilot-count-choices"><div><label for="categorySelect">หมวด</label><select id="categorySelect"></select></div><div><label for="roundSelect">รอบนับ</label><select id="roundSelect"></select></div></div><select id="scopeSelect" hidden aria-hidden="true" tabindex="-1"></select>
         <details id="scanTools" class="pilot-scan-tools" open><summary>สแกนสินค้า / เปลี่ยนสินค้า</summary><div class="pilot-scan-content">
           <button class="button pilot-wide pilot-camera" id="cameraButton"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 7V4h4m8 0h4v3M4 17v3h4m8 0h4v-3M7 8v8m3-8v8m3-8v8m4-8v8"/></svg></span> ใช้กล้องสแกน</button>
           <div class="pilot-manual-entry"><div class="pilot-divider">หรือใช้เครื่องสแกน / พิมพ์เลข</div><label for="barcode">บาร์โค้ดสินค้า</label><div class="pilot-barcode-row"><input id="barcode" inputmode="numeric" autocomplete="off" placeholder="เช่น 0001234567890"><button class="button secondary" id="lookupButton">ค้นหา</button></div></div>
