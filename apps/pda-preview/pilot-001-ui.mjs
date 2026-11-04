@@ -4,11 +4,13 @@ import { CameraScanner } from './camera-scanner.mjs';
 import { operatorDisplayCode, FIXTURE_OPERATOR_NUMBERS } from './operator-display.mjs';
 import { COUNT_CATEGORIES, FIXTURE_CATEGORY_SESSIONS, APPROVED_CATEGORY_SESSIONS, scopeForChoice, choiceForScope } from './count-choice.mjs';
 import { parseCountMilli, formatQuantity, COUNT_INPUT_MODE, COUNT_INPUT_PATTERN } from './quantity-policy.mjs';
+import { initAuditInbox } from './pilot-audit-inbox.mjs';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const fixture = location.hostname === '127.0.0.1' && location.protocol === 'http:' && document.querySelector('meta[name="pda-pilot-fixture"]')?.content === 'enabled';
 const api = new MobileCountPilotClient(fixture ? { allowLocalFixture: true, fixtureOrigin: location.origin } : {apiOrigin:document.querySelector('meta[name="sc-pda-api-origin"]')?.content||'https://paasrtsm-project.onrender.com'});
 const outbox = new PilotOutbox(api.origin);
+const auditInbox=initAuditInbox({api,onError:error=>handle(error)});
 const categorySessions=fixture?FIXTURE_CATEGORY_SESSIONS:APPROVED_CATEGORY_SESSIONS;
 const deviceKey = 'sc-pda-001-device-v1';
 const deviceId = localStorage.getItem(deviceKey) || crypto.randomUUID(); localStorage.setItem(deviceKey, deviceId);
@@ -58,6 +60,7 @@ const date = value => value ? new Date(value).toLocaleString('th-TH', { timeZone
 const qty = value => value === null ? 'ไม่ทราบยอด' : String(value);
 function handle(error) { if(error.staleAuthentication)return;message(error.message,'error'); if (error.status === 401) cacheDraft().catch(()=>{}).finally(disconnected); }
 function disconnected() {
+  auditInbox.reset();
   api.disconnect(); offlineIdentity=null;
   $('#enrollmentCard').hidden = false; $('#scanCard').hidden = true; $('#countForm').hidden = true; $('#syncButton').disabled = true;
   $('#history').innerHTML = ''; records = []; product = null; correction = null; $('#queueBadge').hidden=true;showPane('operator');

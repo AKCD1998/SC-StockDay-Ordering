@@ -1,5 +1,7 @@
 # PDA integration living state
 
+Latest isolated implementation, 4 November 2026: [audit cases, branch replies and Ada adjustment preparation](PDA_AUDIT_CORE_DELIVERY_2026-11-04.md). Actual HTTP/PostgreSQL/browser and a manual Codex fixture iteration passed. Current review migrations are 080/081/082 after resolving the upstream 077 numbering conflict. Audit input reads raw transfer evidence; complete movement/canonical-unit/confirmed-lot and Ada execution contracts remain pending. No production activation or hourly task was performed. Older checkpoints below retain their historical scope.
+
 Updated: 2026-11-01, Asia/Bangkok. ScProductDev R2 acceptance remains recorded for 2026-10-31; a later branch-001 PostgreSQL pilot candidate is prepared but not activated. Owner: existing PDA conversation. Existing Transfer Delta owner was consulted once through the coordinating conversation; response received and incorporated. No replacement owner, CPU-v5/Delta work, or production changes.
 
 | Area | State | Evidence / practical limit |

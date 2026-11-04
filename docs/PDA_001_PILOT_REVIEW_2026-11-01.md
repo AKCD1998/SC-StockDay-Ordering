@@ -1,5 +1,7 @@
 # Branch 001 count integration — production activation review
 
+4 November continuation: [current audit implementation and admission](PDA_AUDIT_CORE_DELIVERY_2026-11-04.md). Current isolated migration filenames are 080/081/082; the older 077/078 candidate references below describe their historical numbering. No production migration was applied.
+
 Current continuation: [shared StockDay website/PDA integration](PDA_SHARED_INTEGRATION_2026-11-01.md) supersedes this earlier candidate's code/status for activation review. Original R1 ZIP/evidence remain immutable. The current candidate adds migration 078 and contract v2; no production approval is inferred.
 
 Date: 2026-11-01, Asia/Bangkok. Same PDA project and owner. User requested connection to the real backend using branch **001**. This phase prepares that integration; it has not activated or written to production.
@@ -67,7 +69,7 @@ Render's connector reported no selected workspace. Listing found **My Workspace*
 Approval must name the existing backend and preview targets, not authorize a new public service:
 
 1. Confirm Render **My Workspace** and the existing `paasrtsm-project` backend target. Recheck the deployed revision and concurrent-owner changes before applying the candidate.
-2. Approve the additive count-ledger migration (candidate `077_add_pda_001_count_ledger.sql`, number must be rechecked before merge), backend deployment, and enabling the branch-001-only flag. Inspect actual production migration history/separator style first per backend AGENTS.md; do not run the general Windows migration runner.
+2. Approve the additive count-ledger migration (candidate `080_add_pda_001_count_ledger.sql`, number must be rechecked before merge), backend deployment, and enabling the branch-001-only flag. Inspect actual production migration history/separator style first per backend AGENTS.md; do not run the general Windows migration runner.
 3. Approve allowing only `https://sc-stockday-pda-lab.scgroup1989-it.chatgpt.site` as needed by existing CORS configuration, preserving all other rules, and updating that same existing PDA preview. No wildcard CORS, new service/cost or permission-role change is proposed.
 4. Use the existing authenticated branch-001 enrollment flow for the first real staff/device acceptance. No real code/token should be pasted into a public report. Verify a real barcode, chosen unit, count receipt and second client before admitting a live pilot.
 

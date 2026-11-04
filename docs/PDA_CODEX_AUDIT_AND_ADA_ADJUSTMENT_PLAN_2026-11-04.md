@@ -1,5 +1,7 @@
 # Codex audit execution and official Ada adjustment preparation
 
+Implementation continuation: [isolated audit-core delivery](PDA_AUDIT_CORE_DELIVERY_2026-11-04.md) supersedes the proposal-only status for case/input/reply/run-receipt APIs, UI and immutable blocked previews. Scheduler activation and the official Ada executor remain unimplemented/unapproved. The original proposal below is retained for context.
+
 Status: reviewable integration contract, 4 November 2026. This extends the same PDA/StockDay project. It does not activate a scheduler, implement a new API, contact another owner, deploy, migrate, provision credentials or perform an Ada write.
 
 ## Accepted direction

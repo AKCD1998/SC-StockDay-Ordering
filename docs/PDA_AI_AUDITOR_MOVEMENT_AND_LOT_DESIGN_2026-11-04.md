@@ -1,5 +1,7 @@
 # AI auditor: Ada movement evidence and staff-observed lots
 
+Implementation update: [audit-core delivery](PDA_AUDIT_CORE_DELIVERY_2026-11-04.md) now provides isolated cases, staff replies, raw-transfer input and blocked adjustment previews. Candidate lot links remain unconfirmed; live Ada access, scheduled execution and an official adjustment writer are still pending. Earlier proposal-only descriptions below remain historical.
+
 Status: architecture proposal added on 4 November 2026. Continues the existing StockDay/PDA project. No runtime change, database connection, permission grant, LLM service activation, migration, deployment or official inventory write is performed by this document.
 
 Execution clarification from the user: the first auditor uses an hourly Codex scheduled task under the existing subscription, with no external LLM API dependency. Preparing official Ada stock-count adjustment is a core deliverable. See [the execution and adjustment contract](PDA_CODEX_AUDIT_AND_ADA_ADJUSTMENT_PLAN_2026-11-04.md), [reviewable schedule configuration](../deployment/pda-codex-hourly-audit.review.json) and [task prompt](../deployment/pda-codex-hourly-audit.prompt.txt). These files do not create or enable a task.

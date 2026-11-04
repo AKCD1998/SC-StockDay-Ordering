@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import './stock-counts.css';
+import StockAuditPanel from './StockAuditPanel.jsx';
 
 const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 const show = value => value === null || value === undefined ? 'ไม่ทราบ' : String(value);
@@ -50,6 +51,7 @@ export default function StockCountWorkspace({ productCode = null, csrfToken, onC
     {view&&<>
       <h3>{view.product.name} · <span>{view.product.code}</span></h3>
       <div className="sc-count-reference"><strong>ยอดอ้างอิงระบบ: {show(view.systemReference.quantity)}</strong><p>Full Sync · หน่วยอ้างอิงและเวลาสต๊อก: ไม่ทราบ</p><p>แหล่งที่เลือก: {view.sourceResolution.selected.source} · {show(view.sourceResolution.selected.quantity)} · ยังไม่ยืนยันเป็นยอดปัจจุบัน</p><ul>{view.sourceResolution.human.reasons.map(reason=><li key={reason}>{reasons[reason]||reason}</li>)}</ul></div>
+      <StockAuditPanel productCode={activeProduct} csrfToken={csrfToken} canReview={Boolean(cap?.canManageScopes)}/>
       <h3>ผลนับล่าสุดแต่ละขอบเขตและหน่วย</h3><p>รอบนับอิสระใช้เปรียบเทียบ ไม่รวมจำนวนเข้าด้วยกัน</p>
       {view.activeObservations.length===0&&<p>ยังไม่มีผลนับ</p>}
       {view.activeObservations.map(record=><article className="sc-count-card" key={record.eventId}><strong>{record.event.quantity} {record.event.unit}</strong><p>{record.scope.label} · รอบ {record.scope.round} · {record.event.complete?'ตรวจครบขอบเขตนี้':'ตรวจบางส่วน'}</p><p>{record.event.staffName||record.event.staffId} · นับล่าสุดเมื่อ {time(record.event.observedAt)}</p><p>เซิร์ฟเวอร์รับแล้ว · ยังไม่ถูกเลือกแทนยอดระบบ</p><LotRows lots={record.event.lots}/></article>)}
