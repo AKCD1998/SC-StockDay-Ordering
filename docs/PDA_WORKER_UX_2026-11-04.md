@@ -54,3 +54,7 @@ See [existing integration/run instructions](PDA_SHARED_INTEGRATION_2026-11-01.md
 ## Requested header cleanup — 2026-11-04
 
 Removed the connection/fixture badge and yellow environment/details notice from the PDA header. Routine informational/sync messages no longer render or reserve space; actionable errors and an actual offline transition can still provide feedback. Operator identification remains in the Operator view. No API/auth/storage/count logic changed. The local read-only review was refreshed; hosted v4 remains unchanged. This small change was checked with explicit synthetic UI read fixtures, not a new PostgreSQL/production acceptance run. Earlier real roundtrip evidence stays attached to the immutable R1 delivery.
+
+## Requested title/navigation cleanup — 2026-11-04
+
+Removed the visible “นับสต๊อก สาขา 001” title and the “ผู้ใช้งาน” navigation button. The existing SC/StockDay branding remains and the two remaining navigation actions fill the row. Enrollment remains available before work and for cached-draft reauthentication; the existing operator name/logout controls are a compact footer. Authentication, branch scope, API, outbox and counting semantics are unchanged. The local review is updated; hosted v4 is unchanged.
