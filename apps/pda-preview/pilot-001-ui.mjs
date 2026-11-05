@@ -5,17 +5,22 @@ import { operatorDisplayCode, FIXTURE_OPERATOR_NUMBERS } from './operator-displa
 import { COUNT_CATEGORIES, FIXTURE_CATEGORY_SESSIONS, APPROVED_CATEGORY_SESSIONS, scopeForChoice, choiceForScope } from './count-choice.mjs';
 import { parseCountMilli, formatQuantity, COUNT_INPUT_MODE, COUNT_INPUT_PATTERN } from './quantity-policy.mjs';
 import { initAuditInbox } from './pilot-audit-inbox.mjs';
+import { BrowserPreviewClient, PREVIEW_CATALOG, pdaRuntime } from './browser-preview-client.mjs';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const fixture = location.hostname === '127.0.0.1' && location.protocol === 'http:' && document.querySelector('meta[name="pda-pilot-fixture"]')?.content === 'enabled';
 const reusableCodeFixture=fixture&&document.querySelector('meta[name="pda-reusable-code-fixture"]')?.content==='enabled';
-const api = new MobileCountPilotClient(fixture ? { allowLocalFixture: true, fixtureOrigin: location.origin,allowReusableCodeFixture:reusableCodeFixture } : {apiOrigin:document.querySelector('meta[name="sc-pda-api-origin"]')?.content||'https://paasrtsm-project.onrender.com'});
-if(reusableCodeFixture){$('#enrollmentCode').inputMode='numeric';$('#enrollmentCode').maxLength=4;$('#enrollmentCode').minLength=4;$('#enrollmentCode').placeholder='รหัส 4 หลัก';}
-const outbox = new PilotOutbox(api.origin);
+const configuredApiOrigin=document.querySelector('meta[name="sc-pda-api-origin"]')?.content||null;
+const preview=pdaRuntime({localFixture:fixture,apiOrigin:configuredApiOrigin})==='browser-preview';
+const api = preview?new BrowserPreviewClient():new MobileCountPilotClient(fixture ? { allowLocalFixture: true, fixtureOrigin: location.origin,allowReusableCodeFixture:reusableCodeFixture } : {apiOrigin:configuredApiOrigin});
+if(reusableCodeFixture||preview){$('#enrollmentCode').inputMode='numeric';$('#enrollmentCode').maxLength=4;$('#enrollmentCode').minLength=4;$('#enrollmentCode').placeholder='รหัส 4 หลัก';}
+const outbox = preview?api.outbox:new PilotOutbox(api.origin);
 const auditInbox=initAuditInbox({api,onError:error=>handle(error)});
-const categorySessions=fixture?FIXTURE_CATEGORY_SESSIONS:APPROVED_CATEGORY_SESSIONS;
-const deviceKey = 'sc-pda-001-device-v1';
-const deviceId = localStorage.getItem(deviceKey) || crypto.randomUUID(); localStorage.setItem(deviceKey, deviceId);
+const categorySessions=fixture||preview?FIXTURE_CATEGORY_SESSIONS:APPROVED_CATEGORY_SESSIONS;
+const deviceKey = preview?'sc-pda-preview-device-v1':'sc-pda-001-device-v1';
+let deviceId;
+if(preview){try{deviceId=localStorage.getItem(deviceKey);}catch{/* Opaque preview frames use a temporary local profile. */}deviceId||=crypto.randomUUID();try{localStorage.setItem(deviceKey,deviceId);}catch{/* The visible preview badge reports temporary storage. */}}
+else{deviceId=localStorage.getItem(deviceKey)||crypto.randomUUID();localStorage.setItem(deviceKey,deviceId);}
 let product = null, correction = null, capturedAt = null, reviewed = null, records = [], busy = false;
 let scopeList=[],offlineIdentity=null,draftTimer=null;
 const identity=()=>api.identity||offlineIdentity;
@@ -29,7 +34,8 @@ function showPane(name, scroll=true) {
     button.setAttribute('aria-pressed',String(button.dataset.pane===name));
     if(button.dataset.pane!=='operator')button.disabled=!identity();
   });
-  const code=operatorDisplayCode(identity(),fixture?FIXTURE_OPERATOR_NUMBERS:{});
+  const code=operatorDisplayCode(identity(),fixture||preview?FIXTURE_OPERATOR_NUMBERS:{});
+  document.body.classList.toggle('pilot-authed',Boolean(identity()));$('#loginBrand').hidden=Boolean(identity());$('#operatorCode').hidden=!identity();
   $('#operatorCode').textContent=code||'—';
   $('#operatorCode').setAttribute('aria-label',code?'ผู้ใช้งาน '+code.slice(0,2)+' · สาขา '+code.slice(2):'ยังไม่มีรหัสแสดงผลของผู้ใช้งาน');
   $('#operatorAvatar').disabled=!identity();
@@ -61,7 +67,7 @@ function revealMissingField(){
 }
 const date = value => value ? new Date(value).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }) : 'ไม่ทราบ';
 const qty = value => value === null ? 'ไม่ทราบยอด' : String(value);
-function handle(error) { if(error.staleAuthentication)return;message(error.message,'error'); if (error.status === 401) cacheDraft().catch(()=>{}).finally(disconnected); }
+function handle(error) { if(error.staleAuthentication)return;message(error instanceof TypeError&&/fetch|network|load failed/i.test(error.message)?'เชื่อมต่อระบบไม่ได้ กรุณาลองใหม่หรือติดต่อผู้ดูแล':error.message,'error'); if (error.status === 401) cacheDraft().catch(()=>{}).finally(disconnected); }
 function disconnected() {
   auditInbox.reset();
   api.disconnect(); offlineIdentity=null;
@@ -126,7 +132,7 @@ async function openProduct(barcode, original = null, known = null, restoring=fal
   if(!scopeList.some(item=>item.id===found.scope.id))scopeList.push(found.scope);showScopes(found.scope.id);lockCountChoice(true);
   $('#countForm').reset(); $('#countForm').hidden = false;
   $('#productName').textContent = found.name; $('#productIdentity').textContent = found.productCode + ' · ' + found.barcode;
-  $('#stockReference').textContent = 'ยอดระบบ: ' + qty(found.stock.quantity) + ' · Full Sync\nหน่วยและเวลาสต๊อกยังไม่ทราบ จึงยังเทียบผลต่างไม่ได้';
+  $('#stockReference').textContent = preview?'ยอดอ้างอิงตัวอย่าง: '+qty(found.stock.quantity)+' · ข้อมูลสมมติสำหรับลองนับ':'ยอดระบบ: ' + qty(found.stock.quantity) + ' · Full Sync\nหน่วยและเวลาสต๊อกยังไม่ทราบ จึงยังเทียบผลต่างไม่ได้';
   $('#unitSize').innerHTML = '<option value="">เลือกหน่วยที่นับจริง</option>' + found.units.filter(unit => unit.name).map(unit => `<option value="${unit.size}">${esc(unit.name)} (${unit.size})</option>`).join('');
   $('#lots').innerHTML = ''; $('#reasonGroup').hidden = !original; $('#correctionNotice').hidden = !original;
   if (original) {
@@ -139,6 +145,8 @@ async function openProduct(barcode, original = null, known = null, restoring=fal
   total();showPane('count',false);$('#scanTools').open=false;step('Count'); if(!restoring)await cacheDraft();$('#countForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 $('#lookupButton').onclick = () => openProduct($('#barcode').value).catch(handle);
+$('#previewSample').hidden=!preview;
+$('#previewSample').onclick=()=>{const sample=PREVIEW_CATALOG.find(p=>p.category===$('#categorySelect').value)||PREVIEW_CATALOG[0];$('#barcode').value=sample.barcode;$('#lookupButton').click();};
 $('#barcode').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); $('#lookupButton').click(); } });
 class PilotCamera extends CameraScanner {
   async showResult(result) {
@@ -153,7 +161,7 @@ class PilotCamera extends CameraScanner {
       super.showResult(result); this.message(error.message);
     }
   }
-  render() { super.render(); this.q('#cameraSample').closest('.camera-demo').hidden = true; }
+  render() { super.render(); this.q('#cameraSample').closest('.camera-demo').hidden = !preview; }
 }
 const camera = new PilotCamera({ catalog: [], onConfirm: barcode => openProduct(barcode, null, camera.resolved).catch(handle) });
 $('#cameraButton').onclick = () => camera.open();
@@ -204,8 +212,7 @@ function draft() {
     baseRevision: product.revisions[unitSize] || 0, correctionOf: correction?.eventId || null, reason: correction ? reason : null, note: $('#countNote').value,
     referenceAtCapture: { source: 'full-sync', quantity: product.stock.quantity, observedAt: null, fetchedAt: product.stock.fetchedAt } };
 }
-$('#countForm').onsubmit = event => {
-  event.preventDefault();
+function reviewCount() {
   if(revealMissingField())return;
   message('ตรวจจำนวน หน่วย ล็อต และพื้นที่ให้ครบก่อนส่ง');
   try { reviewed = draft(); const unit = product.units.find(unit => unit.size === reviewed.unitSize).name;
@@ -213,7 +220,11 @@ $('#countForm').onsubmit = event => {
     $('#reviewText').innerHTML = `<p class="confirm-product"><strong>${esc(product.productCode)}</strong> : ${esc(product.name)}</p><p class="confirm-meta"><span>หน่วย: <strong>${esc(unit)}</strong></span><span>บาร์โค้ด: <span class="mono">${esc(product.barcode)}</span></span></p><div class="confirm-lots">${reviewed.lots.length?reviewed.lots.map(lot=>`<div class="confirm-lot"><span class="confirm-lot-code">ล็อต ${esc(lot.code??'ไม่ทราบ')} :</span><strong class="confirm-quantity">${esc(shownQuantity(lot.quantity))} <small>${esc(unit)}</small></strong></div>`).join(''):`<div class="confirm-lot"><span>จำนวนที่ส่ง :</span><strong class="confirm-quantity">0 <small>${esc(unit)}</small></strong></div>`}</div>${reviewed.lots.length>1?`<p class="confirm-total">รวม <strong>${esc(shownQuantity(reviewed.quantity))} ${esc(unit)}</strong></p>`:''}`;
     step('Review');$('#reviewDialog').showModal();
   } catch (error) { handle(error); }
-};
+}
+$('#countForm').onsubmit = event => {event.preventDefault();reviewCount();};
+// Embedded previews may forbid native form submissions. This button performs
+// local validation/review only; it never submits a form or sends a network call.
+if(preview){const action=$('#countReviewButton');action.type='button';action.onclick=reviewCount;}
 $('#reviewDialog').oncancel=()=>{reviewed=null;step('Count');};
 $('#reviewCancel').onclick = () => { reviewed = null; $('#reviewDialog').close();step('Count'); };
 $('#reviewSave').onclick = async () => {
@@ -230,7 +241,7 @@ async function renderHistory() {
   const waiting=local.filter(item=>item.status==='pending').length;$('#queueBadge').hidden=!waiting;$('#queueBadge').textContent=String(waiting);
   const latest = new Map();
   for (const record of records) { const key = record.event.productCode + ':' + record.event.unitSize+':'+record.event.scopeId; if (!latest.has(key)) latest.set(key, record.eventId); }
-  $('#history').innerHTML = local.filter(item => !known.has(item.id)).map(item => { const request = JSON.parse(item.original); return `<article class="pilot-record" data-state="${item.status}"><span class="pilot-record-state">${item.status==='pending'?'รอส่ง':item.status==='accepted'?'รับแล้ว':item.status==='conflict'?'ต้องตรวจใหม่':'ส่งไม่ผ่าน'}</span><br><strong>${esc(request.productCode)} · ${esc(formatQuantity(request.quantity))}</strong><p>${item.status === 'conflict' ? 'ข้อมูลชนกัน · คงคำขอเดิมไว้ กรุณาตรวจนับใหม่' : item.status === 'rejected' ? 'เซิร์ฟเวอร์ปฏิเสธ · คงคำขอเดิมไว้' : item.status === 'accepted' ? 'เซิร์ฟเวอร์รับแล้ว · ใบรับคงอยู่ในเครื่อง' : 'รอส่ง · ยังไม่มีใบรับ'}</p><p>${esc(item.detail || '')}</p><details><summary>ดูหมายเลขคำขอ</summary><p class="mono pilot-quiet">${item.id}</p></details></article>`; }).join('') + records.map(record => `<article class="pilot-record" data-event="${record.eventId}" data-state="accepted"><span class="pilot-record-state">รับแล้ว · มีใบรับ</span><br><strong>${esc(record.event.productCode)} · ${esc(formatQuantity(record.event.quantity))} ${esc(record.event.unit)}</strong><p>${esc(record.event.scope?.label||'ตรวจรายสินค้า')} · รอบ ${record.event.scope?.round||1}</p><p>${esc(record.event.staffName || record.event.staffId)} · นับ ${date(record.event.observedAt)}</p><details><summary>ดู ${record.event.lots.length} ล็อต / วันที่ / ใบรับ</summary>${record.event.lots.map(lot => `<p>ล็อต ${esc(lot.code || 'ไม่ทราบ')} × ${esc(formatQuantity(lot.quantity))}<br>ผลิต ${esc(lot.manufacturedOn || 'ไม่ทราบ')} · หมดอายุ ${esc(lot.expiresOn || 'ไม่ทราบ')}</p>`).join('')}<p class="pilot-quiet">${record.event.correctionOf ? 'แก้ไขจาก ' + esc(record.event.correctionOf) + ' · ' + esc(record.event.reason) : 'หลักฐานต้นฉบับ'}</p><p class="pilot-quiet">อ้างอิงตอนเปิด ${esc(qty(record.event.referenceAtCapture?.quantity??null))} · ตอนส่ง ${esc(qty(record.event.referenceAtSubmit?.quantity??null))} · Full Sync · เวลาสต๊อกไม่ทราบ</p><p class="pilot-quiet mono">Receipt ${record.receiptId}<br>เซิร์ฟเวอร์รับ ${date(record.receivedAt)}</p><p class="pilot-quiet">เก็บผลนับแล้ว · ไม่แทนยอดสต๊อกทางการ</p></details>${latest.get(record.event.productCode + ':' + record.event.unitSize+':'+record.event.scopeId) !== record.eventId ? '<p class="pilot-quiet">มีรายการใหม่กว่า · คงหลักฐานเดิม</p>' : record.event.staffId === identity().staffId || identity().role === 'manager' ? `<button class="button secondary correct-count" data-id="${record.eventId}">แก้ไขโดยเก็บประวัติเดิม</button>` : ''}</article>`).join('')||'<p class="pilot-quiet">ยังไม่มีรายการ · เริ่มนับได้ที่เมนูนับสินค้า</p>';
+  $('#history').innerHTML = local.filter(item => !known.has(item.id)).map(item => { const request = JSON.parse(item.original); return `<article class="pilot-record" data-state="${item.status}"><span class="pilot-record-state">${item.status==='pending'?'รอส่ง':item.status==='accepted'?(preview?'บันทึกในเดโม':'รับแล้ว'):item.status==='conflict'?'ต้องตรวจใหม่':'ส่งไม่ผ่าน'}</span><br><strong>${esc(request.productCode)} · ${esc(formatQuantity(request.quantity))}</strong><p>${item.status === 'conflict' ? 'ข้อมูลชนกัน · คงคำขอเดิมไว้ กรุณาตรวจนับใหม่' : item.status === 'rejected' ? (preview?'ข้อมูลทดลองไม่ผ่านการตรวจ · คงคำขอเดิมไว้':'เซิร์ฟเวอร์ปฏิเสธ · คงคำขอเดิมไว้') : item.status === 'accepted' ? (preview?'บันทึกผลทดลองในอุปกรณ์นี้แล้ว':'เซิร์ฟเวอร์รับแล้ว · ใบรับคงอยู่ในเครื่อง') : (preview?'รอบันทึกในเดโม':'รอส่ง · ยังไม่มีใบรับ')}</p><p>${esc(item.detail || '')}</p><details><summary>ดูหมายเลขคำขอ</summary><p class="mono pilot-quiet">${item.id}</p></details></article>`; }).join('') + records.map(record => `<article class="pilot-record" data-event="${record.eventId}" data-state="accepted"><span class="pilot-record-state">${preview?'บันทึกในเดโม':'รับแล้ว · มีใบรับ'}</span><br><strong>${esc(record.event.productCode)} · ${esc(formatQuantity(record.event.quantity))} ${esc(record.event.unit)}</strong><p>${esc(record.event.scope?.label||'ตรวจรายสินค้า')} · รอบ ${record.event.scope?.round||1}</p><p>${esc(record.event.staffName || record.event.staffId)} · นับ ${date(record.event.observedAt)}</p><details><summary>ดู ${record.event.lots.length} ล็อต / วันที่ / ${preview?'อ้างอิงเดโม':'ใบรับ'}</summary>${record.event.lots.map(lot => `<p>ล็อต ${esc(lot.code || 'ไม่ทราบ')} × ${esc(formatQuantity(lot.quantity))}<br>ผลิต ${esc(lot.manufacturedOn || 'ไม่ทราบ')} · หมดอายุ ${esc(lot.expiresOn || 'ไม่ทราบ')}</p>`).join('')}<p class="pilot-quiet">${record.event.correctionOf ? 'แก้ไขจาก ' + esc(record.event.correctionOf) + ' · ' + esc(record.event.reason) : 'หลักฐานต้นฉบับ'}</p><p class="pilot-quiet">อ้างอิงตอนเปิด ${esc(qty(record.event.referenceAtCapture?.quantity??null))} · ตอนส่ง ${esc(qty(record.event.referenceAtSubmit?.quantity??null))} · ${preview?'ข้อมูลสมมติ':'Full Sync · เวลาสต๊อกไม่ทราบ'}</p><p class="pilot-quiet mono">${preview?'อ้างอิงเดโม':'Receipt'} ${record.receiptId}<br>${preview?'บันทึกในเครื่อง':'เซิร์ฟเวอร์รับ'} ${date(record.receivedAt)}</p><p class="pilot-quiet">${preview?'เก็บผลทดลองในอุปกรณ์นี้':'เก็บผลนับแล้ว · ไม่แทนยอดสต๊อกทางการ'}</p></details>${latest.get(record.event.productCode + ':' + record.event.unitSize+':'+record.event.scopeId) !== record.eventId ? '<p class="pilot-quiet">มีรายการใหม่กว่า · คงหลักฐานเดิม</p>' : record.event.staffId === identity().staffId || identity().role === 'manager' ? `<button class="button secondary correct-count" data-id="${record.eventId}">แก้ไขโดยเก็บประวัติเดิม</button>` : ''}</article>`).join('')||'<p class="pilot-quiet">ยังไม่มีรายการ · เริ่มนับได้ที่เมนูนับสินค้า</p>';
   for(const id of expanded){const detail=$('#history').querySelector('[data-event="'+CSS.escape(id)+'"] details');if(detail)detail.open=true;}
   document.querySelectorAll('.correct-count').forEach(button => { button.onclick = () => { const original = records.find(record => record.eventId === button.dataset.id); openProduct(original.event.barcode, original).catch(handle); }; });
 }
@@ -246,7 +257,7 @@ async function sync() {
   } catch (error) { await renderHistory(); handle(error); } finally { busy = false; }
 }
 $('#syncButton').onclick = sync; window.addEventListener('online', sync);
-window.addEventListener('offline', () => message('ออฟไลน์ · บันทึกคำขอในเครื่องได้ แต่ยังไม่มีใบรับจนเชื่อมต่ออีกครั้ง','warning'));
+window.addEventListener('offline', () => message(preview?'โหมดทดลองยังใช้งานในอุปกรณ์นี้ได้':'ออฟไลน์ · บันทึกคำขอในเครื่องได้ แต่ยังไม่มีใบรับจนเชื่อมต่ออีกครั้ง','warning'));
 setInterval(() => { if (navigator.onLine) sync(); }, 15000);
 message('ขอรหัสจากผู้ดูแล แล้วเลือกชื่อของคุณเพื่อเริ่มงาน');
 async function cacheDraft(){if(!product||$('#countForm').hidden||!identity())return;const lots=[...document.querySelectorAll('.pilot-lot')].map(node=>({code:node.querySelector('.lot-code').value,quantity:node.querySelector('.lot-quantity').value,mfg:node.querySelector('.lot-mfg').value,exp:node.querySelector('.lot-exp').value,lotUnknown:node.querySelector('.lot-unknown').checked,mfgUnknown:node.querySelector('.mfg-unknown').checked,expUnknown:node.querySelector('.exp-unknown').checked}));await outbox.saveData(draftKey(identity()),{product,correction,capturedAt,unitSize:$('#unitSize').value,lots,complete:$('#complete').checked,note:$('#countNote').value,reason:$('#correctionReason').value});}
@@ -256,7 +267,9 @@ window.addEventListener('pagehide',()=>{cacheDraft().catch(()=>{});});
 async function initialize(){const context=await outbox.readData('context');if(context?.identity&&!context.explicitLogout&&Date.parse(context.identity.expiresAt)>Date.now()){
   // navigator.onLine is advisory and can be true on an offline cold navigation.
   // A cached public identity restores local drafts only, never API authentication.
-  offlineIdentity=context.identity;scopeList=context.scopeList;showScopes();$('#scanCard').hidden=false;showPane('count',false);step('Scan');await restoreDraft();await renderHistory();}
-  if('serviceWorker'in navigator)navigator.serviceWorker.register('/pilot-001-worker.js',{scope:'/pilot-001.html'}).catch(()=>message('ยังเตรียมหน้าออฟไลน์ไม่ได้ คิวที่บันทึกแล้วคงอยู่'));
+  if(preview){api.restorePreviewIdentity(context.identity);$('#enrollmentCard').hidden=Boolean(api.identity);$('#syncButton').disabled=!api.identity;}
+  offlineIdentity=context.identity;scopeList=context.scopeList;showScopes();$('#scanCard').hidden=false;showPane('count',false);step('Scan');await restoreDraft();if(preview)records=await api.history();await renderHistory();}else showPane('operator',false);
+  if(preview){$('#previewModeBadge').hidden=false;$('#previewModeBadge').textContent=api.persistent?'ทดลอง':'ทดลองชั่วคราว';$('#previewModeBadge').title=api.persistent?'ข้อมูลทดลองเก็บในเบราว์เซอร์นี้ ไม่ส่งเข้าระบบจริง':'ข้อมูลทดลองอยู่เฉพาะหน้านี้และไม่คงอยู่เมื่อปิด';$('#historyHint').textContent=api.persistent?'ผลทดลองเก็บในเบราว์เซอร์นี้ ไม่ส่งยอดเข้าระบบจริง':'ผลทดลองอยู่เฉพาะหน้านี้และไม่คงอยู่เมื่อปิด';$('#reviewSave').textContent='ยืนยันผลทดลอง';}
+  if(!preview&&'serviceWorker'in navigator)navigator.serviceWorker.register('/pilot-001-worker.js',{scope:'/pilot-001.html'}).catch(()=>message('ยังเตรียมหน้าออฟไลน์ไม่ได้ คิวที่บันทึกแล้วคงอยู่'));
 }
 initialize().catch(handle);

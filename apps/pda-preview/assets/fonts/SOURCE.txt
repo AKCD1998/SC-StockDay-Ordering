@@ -1,0 +1,3 @@
+IBM Plex Sans Thai, SIL Open Font License 1.1.
+Google Fonts source: https://raw.githubusercontent.com/google/fonts/main/ofl/ibmplexsansthai/OFL.txt
+Font assets retrieved from fonts.gstatic.com using the existing Google Fonts family reference.

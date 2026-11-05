@@ -3,14 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#19324a">
-  <title>SC StockDay · PDA สาขา 001</title>
+  <meta name="theme-color" content="#0b1fb8">
+  <title>SC Group 1989 · PDA สาขา 001</title>
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./pilot-001-worker-ui.css">
+  <link rel="stylesheet" href="./pilot-001-sc-brand.css">
 </head>
 <body>
   <main class="pilot-wrap">
-    <header class="pilot-heading"><div class="pilot-brand"><button type="button" id="operatorAvatar" class="pilot-avatar" aria-label="บัญชีผู้ใช้งาน" aria-haspopup="dialog" aria-controls="operatorCard" disabled><svg class="avatar-person" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7.8" r="4.2" fill="#fff"/><path d="M4.2 20.6v-1.5c0-4.3 3.2-6.8 7.8-6.8s7.8 2.5 7.8 6.8v1.5c0 .8-.6 1.4-1.4 1.4H5.6c-.8 0-1.4-.6-1.4-1.4Z" fill="#e0eaf4"/><path d="m8.5 12.9 3.5 4.2 3.5-4.2a11.4 11.4 0 0 0-7 0Z" fill="#fff"/></svg><span class="avatar-gear" aria-hidden="true"><svg viewBox="0 0 24 24"><g fill="currentColor"><rect x="10" y="1" width="4" height="22" rx="1"/><rect x="10" y="1" width="4" height="22" rx="1" transform="rotate(45 12 12)"/><rect x="10" y="1" width="4" height="22" rx="1" transform="rotate(90 12 12)"/><rect x="10" y="1" width="4" height="22" rx="1" transform="rotate(135 12 12)"/><circle cx="12" cy="12" r="7.8"/></g><circle cx="12" cy="12" r="3.2" fill="var(--avatar-gear-bg)"/></svg></span></button><span id="operatorCode" class="pilot-operator-code" aria-label="ยังไม่ได้เลือกผู้ใช้งาน">—</span></div></header>
+    <header class="pilot-heading"><div class="pilot-brand"><button type="button" id="operatorAvatar" class="pilot-avatar" aria-label="บัญชีผู้ใช้งาน" aria-haspopup="dialog" aria-controls="operatorCard" disabled><svg class="avatar-person" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7.8" r="4.2" fill="#fff"/><path d="M4.2 20.6v-1.5c0-4.3 3.2-6.8 7.8-6.8s7.8 2.5 7.8 6.8v1.5c0 .8-.6 1.4-1.4 1.4H5.6c-.8 0-1.4-.6-1.4-1.4Z" fill="#e0eaf4"/><path d="m8.5 12.9 3.5 4.2 3.5-4.2a11.4 11.4 0 0 0-7 0Z" fill="#fff"/></svg><span class="avatar-gear" aria-hidden="true"><svg viewBox="0 0 24 24"><g fill="currentColor"><rect x="10" y="1" width="4" height="22" rx="1"/><rect x="10" y="1" width="4" height="22" rx="1" transform="rotate(45 12 12)"/><rect x="10" y="1" width="4" height="22" rx="1" transform="rotate(90 12 12)"/><rect x="10" y="1" width="4" height="22" rx="1" transform="rotate(135 12 12)"/><circle cx="12" cy="12" r="7.8"/></g><circle cx="12" cy="12" r="3.2" fill="var(--avatar-gear-bg)"/></svg></span></button><span id="operatorCode" class="pilot-operator-code" hidden aria-label="ยังไม่ได้เลือกผู้ใช้งาน">—</span><span class="pilot-login-brand" id="loginBrand"><strong>SC Group 1989</strong><small>ศิริชัยเภสัช</small></span></div><span class="pilot-preview-badge" id="previewModeBadge" hidden title="ข้อมูลทดลองในอุปกรณ์นี้ ไม่ส่งเข้าระบบจริง">ทดลอง</span></header>
     <p class="pilot-status" id="status" role="status" aria-live="polite" hidden></p>
     <nav class="pilot-nav" aria-label="เมนูหลัก">
       <button type="button" data-pane="count" aria-controls="countPane" aria-pressed="false" disabled><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 7V4h4m8 0h4v3M4 17v3h4m8 0h4v-3M7 8v8m3-8v8m3-8v8m4-8v8"/></svg></span> นับสินค้า</button>
@@ -22,7 +23,7 @@
         <div class="pilot-count-choices"><div><label for="categorySelect">หมวด</label><select id="categorySelect"></select></div><div><label for="roundSelect">รอบนับ</label><select id="roundSelect"></select></div></div><select id="scopeSelect" hidden aria-hidden="true" tabindex="-1"></select>
         <details id="scanTools" class="pilot-scan-tools" open><summary>สแกนสินค้า / เปลี่ยนสินค้า</summary><div class="pilot-scan-content">
           <button class="button pilot-wide pilot-camera" id="cameraButton"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 7V4h4m8 0h4v3M4 17v3h4m8 0h4v-3M7 8v8m3-8v8m3-8v8m4-8v8"/></svg></span> ใช้กล้องสแกน</button>
-          <div class="pilot-manual-entry"><div class="pilot-divider">หรือใช้เครื่องสแกน / พิมพ์เลข</div><label for="barcode">บาร์โค้ดสินค้า</label><div class="pilot-barcode-row"><input id="barcode" inputmode="numeric" autocomplete="off" placeholder="เช่น 0001234567890"><button class="button secondary" id="lookupButton">ค้นหา</button></div></div>
+          <div class="pilot-manual-entry"><div class="pilot-divider">หรือใช้เครื่องสแกน / พิมพ์เลข</div><label for="barcode">บาร์โค้ดสินค้า</label><div class="pilot-barcode-row"><input id="barcode" inputmode="numeric" autocomplete="off" placeholder="เช่น 0001234567890"><button class="button secondary" id="lookupButton">ค้นหา</button></div><button type="button" class="pilot-preview-sample" id="previewSample" hidden>ลองนับสินค้าตัวอย่าง</button></div>
         </div></details>
       </section>
       <form class="panel pilot-card" id="countForm" hidden novalidate>
@@ -34,10 +35,10 @@
         <label class="check-label pilot-complete"><input type="checkbox" id="complete">ตรวจครบทุกชั้นและทุกพื้นที่ของสินค้านี้แล้ว</label>
         <label for="countNote">หมายเหตุ <span class="pilot-quiet">(ถ้ามี)</span></label><textarea id="countNote" rows="2" maxlength="2000"></textarea>
         <div id="reasonGroup" hidden><label for="correctionReason">เหตุผลที่แก้ไข <span class="pilot-required">จำเป็น</span></label><textarea id="correctionReason" rows="2" maxlength="1000"></textarea></div>
-        <div class="pilot-submit-bar"><div><span class="pilot-quiet">ยอดนับรอบนี้</span><strong><span id="total">0</span> <small id="totalUnit">เลือกหน่วย</small></strong></div><button class="button" type="submit">ตรวจและส่ง →</button></div>
+        <div class="pilot-submit-bar"><div><span class="pilot-quiet">ยอดนับรอบนี้</span><strong><span id="total">0</span> <small id="totalUnit">เลือกหน่วย</small></strong></div><button class="button" id="countReviewButton" type="submit">ตรวจและส่ง →</button></div>
       </form>
     </section>
-    <section id="historyPane" data-panel="history" hidden><section class="panel pilot-card"><div class="pilot-section-title"><h2>รายการนับ</h2><button class="button secondary" id="syncButton" disabled>ส่งคิว / อัปเดต</button></div><p class="pilot-quiet">“รับแล้ว” ต้องมีใบรับจากเซิร์ฟเวอร์ · “รอส่ง” ยังอยู่ในเครื่อง</p><button class="button pilot-wide" id="nextItemButton">นับสินค้าถัดไป →</button><details class="pilot-help" id="auditInbox"><summary>คำถามจากผู้ตรวจ</summary><button type="button" class="button secondary" id="auditLoad">โหลดคำถามจากผู้ตรวจ</button><div id="auditCases"></div></details><div id="history" class="pilot-history"></div></section></section>
+    <section id="historyPane" data-panel="history" hidden><section class="panel pilot-card"><div class="pilot-section-title"><h2>รายการนับ</h2><button class="button secondary" id="syncButton" disabled>ส่งคิว / อัปเดต</button></div><p class="pilot-quiet" id="historyHint">“รับแล้ว” ต้องมีใบรับจากเซิร์ฟเวอร์ · “รอส่ง” ยังอยู่ในเครื่อง</p><button class="button pilot-wide" id="nextItemButton">นับสินค้าถัดไป →</button><details class="pilot-help" id="auditInbox"><summary>คำถามจากผู้ตรวจ</summary><button type="button" class="button secondary" id="auditLoad">โหลดคำถามจากผู้ตรวจ</button><div id="auditCases"></div></details><div id="history" class="pilot-history"></div></section></section>
     <section id="operatorPane">
       <section class="panel pilot-card" id="enrollmentCard">
         <h2>เลือกชื่อ แล้วเริ่มงาน</h2>
