@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="th.co.scgroup1989.scpda.preview" android:versionCode="1" android:versionName="0.1.0-test.1">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="th.co.scgroup1989.scpda.preview" android:versionCode="2" android:versionName="0.2.0-test.2">
  <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35"/>
  <uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.CAMERA"/><uses-permission android:name="android.permission.VIBRATE"/>
  <uses-feature android:name="android.hardware.camera" android:required="false"/>

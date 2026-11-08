@@ -1,26 +1,22 @@
 # SCPDA Android internal test build
 
-This is the Android build target of the existing SC StockDay PDA project. It reuses the PDA camera/decoder, fonts, SC colors and count demo. It does not replace or publish the existing Site.
+This is the Android target of the existing SC StockDay PDA project. It retains the navy/yellow/white identity, manual camera capture, decoder and separate count demo. It does not publish the existing Site.
 
-The initial app reads real Ada-synced product/price/stock records through the existing StockDay **web-session** API. Sign in using an existing **branch-001 StockDay account**. The browser demo's `1111/2222/3333` profiles are not production logins. There is no database password, server JWT key, service token or default live credential inside the APK.
+## Reader access R2
 
-The original `/api/mobile` catalogue was found to contain only one product and no branch-001 effective prices on 5 November. The website catalogue is populated. SCPDA therefore explicitly selects the existing authenticated web read contract from the start; a network/auth failure does not switch it to a demo or another source.
+Version `0.2.0-test.2` uses dedicated SCPDA readers `01001`, `02001`, `03001`, each with a reusable four-digit PIN. These are separate from existing StockDay web/mobile accounts. First activate this installation by selecting the privately supplied device-setup JSON, then choose an operator and enter its PIN. The PIN rotation reminder is six months; it does not change PINs automatically.
 
-## What the APK does
+The Android Keystore holds a non-exportable P-256 key. The public device certificate is saved locally; PINs and reader Bearer tokens are not saved. A one-use server challenge and device signature precede every PIN check. Native HTTPS uses the fixed existing StockDay backend and its normal certificate validation. The embedded page never receives a PIN hash, private key or Bearer token. No secret is packaged in the APK.
 
-- Exact barcode or IC lookup; leading zeros remain strings. Partial matches are not selected. Shared barcodes require the user to choose an IC/name.
-- Per-unit retail prices from `/admin/products` and branch-001 stock from `/api/branch-stock` without an Hourly/Shopee projection parameter.
-- Existing StockDay username/password login, server-confirmed branch role/context, and CSRF-protected logout. Session cookies stay in native memory for the current app process; reopening after process death requires login.
-- Manual camera capture, torch off by default, and a native Volume+ event handler to aim/capture. Bluetooth scanners paired as keyboards can enter the barcode and Enter.
-- Opens the existing StockDay website externally. The packaged count demo opens in a separate Activity with no native API/session bridge.
+The additive `/api/scpda` backend contract is default-off until explicitly configured. It reuses the populated public SKU/price queries and branch-001 Full Sync snapshot. It preserves null, zero and negative quantities, exact leading-zero barcode strings and unknown stock observation time/pack identity. Costs, other branches and existing admin privileges are excluded. Network failure does not switch to demo data.
 
-This build does not submit live counts, create enrollment/staff accounts, change permissions, execute Ada stock adjustments, run sync jobs or infer stock-unit/pack conversion. Its only POST operations are existing login/logout.
+The APK looks up products, per-unit retail prices and stock. It does **not upload counts/lots or adjust Ada stock**. The existing local count demo remains a separate Activity without the native API/session bridge. Counts and official adjustments require their separate accepted contracts and schema authorization.
 
-The stock API's legacy mapper can turn a missing value into zero. SCPDA shows that uncertainty rather than treating such a zero as a confirmed empty shelf. It does not use price/table/fetch timestamps as the time stock was physically observed.
+The previous R1 web-password design and evidence remain available at commit `5aed5e6` and in the November 5 delivery report; those are historical, not instructions for R2.
 
 ## Build
 
-Requirements: Node dependencies already installed for the existing repo (esbuild), Java 21 with `jdk.compiler` and keytool, Python with Pillow, Android platform/build-tools 35.0.0. Standard Android SDK layout and the scoped review-toolchain layout are supported.
+Requirements: existing repo dependencies (esbuild), Java 21 with compiler/keytool, Python/Pillow, Android SDK platform 35 and build tools. Standard SDK and scoped review-toolchain layouts are supported.
 
 ```sh
 python scripts/build-scpda-android.py \
@@ -29,16 +25,12 @@ python scripts/build-scpda-android.py \
   --signing-dir /absolute/private/scpda-signing
 ```
 
-Use a separate output directory. Rebuilding an existing marked SCPDA build is supported; unmarked build directories are refused. The signing directory is private, is not committed/packaged, and must be retained for updates to the installed internal test app. A new internal test certificate is created on the first build. Production distribution/signing is a separate decision.
+Retain the private signing directory for installable updates. The same app ID and internal signing certificate are used as R1. Signing files are excluded from source and delivery archives. Result: `SCPDA-0.2.0-test.2.apk`, `APK-IDENTITY.json` and generated build files; Android 8+, target 35. Public-store signing/distribution and iPhone acceptance are separate decisions.
 
-Result: `SCPDA-0.1.0-test.1.apk`, `APK-IDENTITY.json` and generated build files. Label **SCPDA**, package `th.co.scgroup1989.scpda.preview`, Android 8+, target SDK 35; no native ABI-specific libraries.
+## Verification boundaries
 
-## Verification and limits
+The exact APK HTML is tested through the shipping Java session/proof interface and actual candidate HTTP handlers against disposable PostgreSQL fixtures using `tests/ui-registered-access.py`. This covers PIN entry, device admission, wrong-PIN feedback, exact barcode/IC lookup, ambiguity, prices, null/negative stock, logout, offline errors, escaped product names and scanner aim/capture behavior. Host software signing emulates the DeviceProof interface; this is **not Android Keystore, WebView or physical-phone acceptance**. The old script name forwards to this current harness.
 
-The APK was compiled, aligned, and verified with v2/v3 signatures. Seven read-contract checks passed. The exact packaged HTML was exercised through a host-JVM instance of the shipping `StockDaySession` and the actual existing backend authentication/product/stock handlers against disposable PostgreSQL fixtures. The handler files match live backend revision `3ab71e7131739887cda6c216e30a031daf198565`. This is not execution of Android WebView or a live authenticated phone session.
+Backend tests cover activation replay/expiry, proof replay, all three identities, rate holds, credential rotation, device revocation, durable logout, existing-session isolation, default-off health and denied writes. Fixture credentials/keys are excluded from all delivered app archives. Live authentication, if completed, is recorded separately in the dated delivery report.
 
-The fixture integration covers branch rejection, exact identity, ambiguity, per-unit prices, missing/zero/negative values, offline failures, logout, forbidden count writes and unchanged fixture stock. APK extraction verifies the demo has no bridge and host-only QA classes are absent from dex. Camera/Volume+ browser-event checks do not establish physical Android acceptance.
-
-Physical acceptance: install on the intended Android, sign in with the existing branch account, allow camera when requested, scan known products, compare IC/price/branch stock with StockDay, and test Volume+ and the paired Bluetooth scanner. Only the device owner can perform these actions on that phone. No live credentials need to be sent into chat.
-
-See [delivery report](../../docs/SCPDA_ANDROID_READ_DELIVERY_2026-11-05.md) for live data findings and evidence boundaries. iPhone remains a later platform target; this shared HTML/read module does not constitute an iOS build.
+Only the phone owner can install the APK, import the private setup file, grant camera permission and test actual Volume+, torch and Bluetooth hardware on that Android. No credentials need to be pasted into chat. Clearing app data or reinstalling after removal deletes the installation key and requires a new invitation.

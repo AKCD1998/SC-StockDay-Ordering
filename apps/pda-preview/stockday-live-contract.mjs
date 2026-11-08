@@ -3,6 +3,7 @@
 const fail=(message,code='READ_CONTRACT')=>{throw Object.assign(new Error(message),{code});};
 const exact=value=>{if(typeof value!=='string'||!value.trim()||value.length>160)fail('กรอกบาร์โค้ดหรือรหัส IC ให้ครบ');return value.trim();};
 const numeric=value=>value===null||value===undefined||value===''?null:Number.isFinite(Number(value))?Number(value):null;
+export function requireScpda001(data){const u=data?.user;if(data?.contract!=='scpda-read-001-v1'||data.branchCode!=='001'||u?.role!=='reader'||u.branchCode!=='001'||!['01001','02001','03001'].includes(u.operatorCode)||u.id!==u.operatorCode||!Number.isFinite(Date.parse(u.rotationDueAt)))fail('ข้อมูลบัญชี SCPDA ไม่ตรงกัน','SCPDA_IDENTITY');return {branchCode:'001',userId:u.id,operatorCode:u.operatorCode,role:'reader',rotationDueAt:u.rotationDueAt,rotationDue:u.rotationDue===true};}
 export function requireBranch001(data){const u=data?.user;if(data?.ok!==true||u?.role!=='branch'||(u.effective_branch_code||u.branch_code)!=='001')fail('ใช้บัญชี StockDay ของสาขา 001 สำหรับรุ่นทดสอบนี้','BRANCH_REQUIRED');return {branchCode:'001',userId:String(u.id),role:u.role};}
 export function selectExactCandidates(query,details,stockRows){
  query=exact(query);const byCode=new Map();
@@ -21,7 +22,7 @@ export function normalizeStockDayProduct(candidate,query,stockRows,{fetchedAt=ne
  const detail=candidate.detail,prices=(detail?.unit_prices||[]).map(p=>({unit:typeof p.unit==='string'&&p.unit?p.unit:null,amount:numeric(p.retail_price),currency:p.currency||'THB',sourceUpdatedAt:p.source_updated_at||null,updatedAt:p.updated_at||null}));
  if(!prices.length&&detail?.retail_price)prices.push({unit:null,amount:numeric(detail.retail_price.price),currency:detail.retail_price.currency||'THB',sourceUpdatedAt:null,updatedAt:detail.retail_price.updated_at||null});
  return {productCode:candidate.code,skuId:candidate.skuId,name:detail?.display_name||row?.productNameThai||candidate.name,barcode:query,websiteBarcode:row?.barcode||null,prices,
-  stock:{quantity:row?value:null,source:'stockday-full-sync-web-view',observedAt:null,unitBasis:'unknown',displayUnit:row?.unit||null,websiteTableSyncedAt:row?.syncedAt||null,zeroMayRepresentMissing:row?.qtyBranch001===0,recordPresent:Boolean(row)},
+  stock:{quantity:row?value:null,source:'stockday-full-sync-web-view',observedAt:null,unitBasis:'unknown',displayUnit:row?.unit||null,websiteTableSyncedAt:row?.syncedAt||null,zeroMayRepresentMissing:row?.qtyBranch001===0&&row?.stockNullsPreserved!==true,recordPresent:Boolean(row)},
   fetchedAt,branchCode:'001',identity:{scannedPack:'unknown',conversionRuleVersion:null},officialStockWrites:false,countSubmissionAvailable:false};
 }
 export class StockDayLookup {
