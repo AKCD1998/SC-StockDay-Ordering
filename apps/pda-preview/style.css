@@ -62,3 +62,9 @@ a { color: var(--navy); }
 .bottomnav .scan-nav { background: var(--yellow); color: var(--ink); }
 .bottomnav button.active { color: var(--navy); }
 .bottomnav .scan-nav.active { background: var(--yellow); color: var(--ink); }
+
+/* Deliberate scan action; disabled remains visibly unavailable. */
+.camera-dialog .camera-trigger{background:#c62828;color:#fff}
+.camera-dialog .camera-trigger:hover:not(:disabled){background:#a91f25;color:#fff}
+.camera-dialog button.camera-trigger:disabled,.camera-dialog button.camera-trigger:disabled:hover{background:#f9dde0;color:#8f1d2c;opacity:1}
+.camera-message[hidden]{display:none}
