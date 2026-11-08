@@ -18,7 +18,7 @@ public final class MainActivity extends AssetActivity {
  private void reply(String id,JSONObject data){runOnUiThread(()->{if(web!=null&&!isFinishing())web.evaluateJavascript("window.__scpdaReceive("+JSONObject.quote(id)+","+data.toString()+");",null);});}
  private final class Bridge {
   @JavascriptInterface public void invoke(final String id,final String operation,final String raw){
-   if(id==null||!id.matches("[0-9]{1,12}")||operation==null||raw==null||raw.length()>4096)return;
+   if(id==null||!id.matches("[0-9]{1,12}")||operation==null||raw==null||raw.length()>(("countSubmit".equals(operation)||"countCheck".equals(operation))?65536:4096))return;
    if(operation.equals("activateDevice")){runOnUiThread(()->{if(activationRequestId!=null){replyError(id,409,"กำลังเลือกไฟล์เชื่อมเครื่อง");return;}activationRequestId=id;try{Intent picker=new Intent(Intent.ACTION_OPEN_DOCUMENT);picker.addCategory(Intent.CATEGORY_OPENABLE);picker.setType("application/json");picker.putExtra(Intent.EXTRA_LOCAL_ONLY,true);startActivityForResult(picker,52);}catch(Exception e){activationRequestId=null;replyError(id,400,"เปิดตัวเลือกไฟล์ไม่ได้");}});return;}
    executor.submit(()->{JSONObject result=new JSONObject();try{JSONObject args=new JSONObject(raw),data;
     if(operation.equals("openWebsite")){runOnUiThread(()->startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://sc-stockday-ordering.onrender.com/#/"))));data=new JSONObject().put("ok",true);}

@@ -9,13 +9,18 @@ public final class StockDaySession {
  public interface DeviceProof {String publicKey()throws Exception;String deviceId();String certificate();void saveCertificate(String c);String sign(String text)throws Exception;}
  public static final class Reply {public final int status;public final JSONObject data;public Reply(int s,JSONObject d){status=s;data=d;}}
  public static final class ApiError extends Exception {public final int status;public final String code;public ApiError(int s,String m){this(s,"REQUEST_REJECTED",m);}public ApiError(int s,String c,String m){super(m);status=s;code=c;}}
- private final Wire wire;private final DeviceProof device;private final CookieManager emptyJar=new CookieManager(null,CookiePolicy.ACCEPT_NONE);private String token;
+ private final Wire wire;private final DeviceProof device;private final CookieManager emptyJar=new CookieManager(null,CookiePolicy.ACCEPT_NONE);private String token,countToken;
  public StockDaySession(DeviceProof d){this(new HttpsWire(),d);}StockDaySession(Wire w,DeviceProof d){wire=w;device=d;}
  public synchronized JSONObject execute(String operation,JSONObject args)throws Exception{
   if(operation.equals("status"))return status();
   if(operation.equals("login"))return login(args);
-  if(operation.equals("logout")){try{if(token!=null)call("POST","/api/scpda/auth/logout",new JSONObject(),true);}finally{token=null;}return new JSONObject().put("ok",true);}
+  if(operation.equals("logout")){try{if(token!=null)call("POST","/api/scpda/auth/logout",new JSONObject(),true);}finally{token=null;countToken=null;}return new JSONObject().put("ok",true);}
   if(token==null)throw new ApiError(401,"LOGIN_REQUIRED","เข้าสู่ระบบ SCPDA ก่อน");
+  if(operation.equals("countCapabilities"))return countCall("GET","/api/scpda/counts/capabilities",null,countToken);
+  if(operation.equals("countCheck"))return countCall("POST","/api/scpda/counts/check",args,countToken);
+  if(operation.equals("countSubmit"))return countCall("POST","/api/scpda/counts",args,countToken);
+  if(operation.equals("countHistory"))return countCall("GET","/api/scpda/counts/history",null,countToken);
+  if(operation.equals("countReceipt")){String id=text(args,"id",36);if(!id.matches("[a-fA-F0-9-]{36}"))throw new ApiError(400,"รหัสผลนับไม่ถูกต้อง");return countCall("GET","/api/scpda/counts/events/"+id,null,countToken);}
   if(operation.equals("products"))return call("GET","/api/scpda/products?keyword="+encoded(text(args,"keyword",160))+"&limit=200&offset=0",null,true);
   if(operation.equals("product")){String id=text(args,"skuId",15);if(!id.matches("[1-9][0-9]*"))throw new ApiError(400,"SKU ไม่ถูกต้อง");return call("GET","/api/scpda/products/"+id,null,true);}
   if(operation.equals("stock"))return call("GET","/api/scpda/stock?search="+encoded(text(args,"search",160))+"&limit=200&offset=0",null,true);
@@ -28,11 +33,25 @@ public final class StockDaySession {
   String cert=r.optString("deviceCertificate","");if(cert.isEmpty())throw new ApiError(502,"ระบบไม่ส่งใบยืนยันเครื่อง");device.saveCertificate(cert);JSONObject state=status();if(!state.optBoolean("paired"))throw new ApiError(502,"ใบยืนยันเครื่องไม่ตรงกัน");return state;
  }
  private JSONObject login(JSONObject args)throws Exception{
-  token=null;if(!status().optBoolean("paired"))throw new ApiError(409,"DEVICE_ACTIVATION_REQUIRED","เลือกไฟล์เชื่อมเครื่องก่อนเริ่มใช้งาน");String user=text(args,"username",5),pin=text(args,"password",4);if(!user.matches("0[123]001")||!pin.matches("[0-9]{4}"))throw new ApiError(400,"เลือกผู้ใช้งานและกรอก PIN 4 หลัก");
+  token=null;countToken=null;if(!status().optBoolean("paired"))throw new ApiError(409,"DEVICE_ACTIVATION_REQUIRED","เลือกไฟล์เชื่อมเครื่องก่อนเริ่มใช้งาน");String user=text(args,"username",5),pin=text(args,"password",4);if(!user.matches("0[123]001")||!pin.matches("[0-9]{4}"))throw new ApiError(400,"เลือกผู้ใช้งานและกรอก PIN 4 หลัก");
   try{String cert=device.certificate();JSONObject c=call("POST","/api/scpda/auth/challenge",new JSONObject().put("deviceCertificate",cert),false);String message="SCPDA-LOGIN-V1\n"+c.getString("challengeId")+"\n"+c.getString("nonce")+"\n"+user+"\n"+c.getString("deviceRef");
    JSONObject r=call("POST","/api/scpda/auth/login",new JSONObject().put("operatorCode",user).put("pin",pin).put("deviceCertificate",cert).put("challengeId",c.getString("challengeId")).put("signature",device.sign(message)),false);token=r.optString("token","");JSONObject u=r.optJSONObject("user");if(token.isEmpty()||u==null||!u.optString("operatorCode").equals(user)||!u.optString("branchCode").equals("001")||!u.optString("role").equals("reader"))throw new ApiError(502,"ข้อมูลบัญชี SCPDA ไม่ตรงกัน");
-   JSONObject me=call("GET","/api/scpda/session",null,true);if(me.optBoolean("officialStockWrites",true)||me.optBoolean("countSubmissionAvailable",true)||!me.getJSONObject("user").optString("operatorCode").equals(user))throw new ApiError(502,"ขอบเขตเซสชันไม่ตรงกัน");return me;
-  }catch(Exception e){token=null;throw e;}
+   JSONObject me=call("GET","/api/scpda/session",null,true);if(me.optBoolean("officialStockWrites",true)||me.optBoolean("countSubmissionAvailable",true)||!me.getJSONObject("user").optString("operatorCode").equals(user))throw new ApiError(502,"ขอบเขตเซสชันไม่ตรงกัน");try{negotiateCountAccess(user);}catch(Exception unavailable){countToken=null;}me.put("countUploadAvailable",countToken!=null);return me;
+  }catch(Exception e){token=null;countToken=null;throw e;}
+ }
+ private void negotiateCountAccess(String user)throws Exception{
+  JSONObject admission=countCall("GET","/api/scpda/counts/admission",null,token);if(!admission.optBoolean("canRequestCountAccess"))return;
+  JSONObject c=countCall("POST","/api/scpda/counts/access/challenge",new JSONObject().put("deviceCertificate",device.certificate()),token);
+  if(!c.optString("operatorCode").equals(user))throw new ApiError(502,"บัญชีสิทธิ์นับไม่ตรงกัน");
+  String message="SCPDA-COUNT-ACCESS-V1\n"+c.getString("challengeId")+"\n"+c.getString("nonce")+"\n"+user+"\n"+c.getString("deviceRef")+"\n"+c.getString("parentSessionId");
+  JSONObject r=countCall("POST","/api/scpda/counts/access/authorize",new JSONObject().put("deviceCertificate",device.certificate()).put("challengeId",c.getString("challengeId")).put("signature",device.sign(message)),token);
+  if(!r.optString("operatorCode").equals(user)||r.optString("countToken").isEmpty())throw new ApiError(502,"สิทธิ์นับไม่ครบ");countToken=r.getString("countToken");
+  if(!countCall("GET","/api/scpda/counts/capabilities",null,countToken).optBoolean("canSubmit"))countToken=null;
+ }
+ private JSONObject countCall(String method,String path,JSONObject body,String bearer)throws Exception{
+  if(bearer==null)throw new ApiError(401,"COUNT_ACCESS_REQUIRED","ยังไม่เชื่อมระบบรับผลนับ");Map<String,String> h=new HashMap<>();h.put("Authorization","Bearer "+bearer);Reply r=wire.send(method,path,body,h,emptyJar);
+  if(r.status<200||r.status>=300){if(r.status==401&&bearer.equals(countToken))countToken=null;throw new ApiError(r.status,r.data.optString("code","COUNT_REJECTED"),r.data.optString("error","ระบบรับผลนับยังไม่พร้อม"));}
+  if(!r.data.optString("contract").equals("scpda-counts-001-v1")||!r.data.optString("branchCode").equals("001"))throw new ApiError(502,"COUNT_CONTRACT","ข้อมูลผลนับตอบกลับไม่ตรงกัน");return r.data;
  }
  private JSONObject call(String method,String path,JSONObject body,boolean authenticated)throws Exception{
   Map<String,String> headers=new HashMap<>();if(authenticated){if(token==null)throw new ApiError(401,"LOGIN_REQUIRED","เข้าสู่ระบบ SCPDA ก่อน");headers.put("Authorization","Bearer "+token);}Reply r=wire.send(method,path,body,headers,emptyJar);if(r.status<200||r.status>=300){if(r.status==401&&authenticated)token=null;throw new ApiError(r.status,r.data.optString("code","REQUEST_REJECTED"),r.data.optString("error","ระบบตอบกลับ HTTP "+r.status));}if(!r.data.optString("contract").equals(CONTRACT)||!r.data.optString("branchCode").equals("001"))throw new ApiError(502,"SCPDA_CONTRACT","ระบบ SCPDA ตอบกลับไม่ตรงกัน");return r.data;
@@ -42,7 +61,7 @@ public final class StockDaySession {
  private static final class HttpsWire implements Wire {
   public Reply send(String method,String path,JSONObject body,Map<String,String> headers,CookieManager jar) throws Exception {
    URL url=new URL(ORIGIN+path);if(!url.getProtocol().equals("https")||!url.getHost().equals("paasrtsm-project.onrender.com")||!path.startsWith("/"))throw new ApiError(400,"API origin rejected");
-   HttpURLConnection c=(HttpURLConnection)url.openConnection();c.setInstanceFollowRedirects(false);c.setConnectTimeout(15000);c.setReadTimeout(25000);c.setRequestMethod(method);c.setRequestProperty("Accept","application/json");c.setRequestProperty("Cache-Control","no-store");c.setRequestProperty("User-Agent","SCPDA-Android/0.2.0");
+   HttpURLConnection c=(HttpURLConnection)url.openConnection();c.setInstanceFollowRedirects(false);c.setConnectTimeout(15000);c.setReadTimeout(25000);c.setRequestMethod(method);c.setRequestProperty("Accept","application/json");c.setRequestProperty("Cache-Control","no-store");c.setRequestProperty("User-Agent","SCPDA-Android/0.4.0");
    for(Map.Entry<String,List<String>> h:jar.get(url.toURI(),Collections.<String,List<String>>emptyMap()).entrySet())c.setRequestProperty(h.getKey(),join(h.getValue()));for(Map.Entry<String,String> h:headers.entrySet())c.setRequestProperty(h.getKey(),h.getValue());
    try{if(body!=null){c.setDoOutput(true);c.setRequestProperty("Content-Type","application/json; charset=utf-8");byte[] b=body.toString().getBytes(StandardCharsets.UTF_8);c.setFixedLengthStreamingMode(b.length);try(OutputStream o=c.getOutputStream()){o.write(b);}}
     int code=c.getResponseCode();jar.put(url.toURI(),c.getHeaderFields());if(code>=300&&code<400)throw new ApiError(code,"ระบบเปลี่ยนเส้นทาง กรุณาตรวจการเชื่อมต่อ");InputStream stream=code>=400?c.getErrorStream():c.getInputStream();ByteArrayOutputStream bytes=new ByteArrayOutputStream();if(stream!=null)try(InputStream in=stream){byte[] buf=new byte[8192];int n;while((n=in.read(buf))!=-1){if(bytes.size()+n>4*1024*1024)throw new ApiError(502,"ข้อมูลตอบกลับมากเกินไป");bytes.write(buf,0,n);}}
