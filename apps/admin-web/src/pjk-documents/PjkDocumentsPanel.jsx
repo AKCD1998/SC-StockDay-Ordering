@@ -19,13 +19,13 @@ export default function PjkDocumentsPanel() {
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [filters, offset]);
-  async function open(doc) {
+  async function open(doc, monthly = false) {
     setOpening(doc.id); setError("");
     try {
-      const response = await apiFetch(`${API}/${doc.id}/pdf`);
+      const response = await apiFetch(monthly ? `${API}/monthly/${doc.month}/pdf` : `${API}/${doc.id}/pdf`);
       if (!response.ok) throw Error("เปิด PDF ไม่สำเร็จ");
       const url = URL.createObjectURL(await response.blob());
-      const a = document.createElement("a"); a.href = url; a.download = `PJK-${doc.month || "legacy"}-${doc.branch}-${doc.id.slice(0, 12)}.pdf`;
+      const a = document.createElement("a"); a.href = url; a.download = monthly ? `PJK-${doc.month}-All-Branches-Signed.pdf` : `PJK-${doc.month || "legacy"}-${doc.branch}-${doc.id.slice(0, 12)}.pdf`;
       a.click(); setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (e) { setError(e.message); } finally { setOpening(null); }
   }
@@ -33,6 +33,16 @@ export default function PjkDocumentsPanel() {
     <header><p className="pjk-eyebrow">เภสัชกร / เอกสารปฏิบัติการ</p><h2>ภจก.1</h2>
       <p>แบบแจ้งเภสัชกรเข้าปฏิบัติหน้าที่แทน แยกตามเดือนและสาขา</p>
       {data ? <p className="pjk-muted">รวม {data.archiveTotal} ฉบับ · รวบรวม ณ {data.asOf} · แนบภาพลายเซ็นผู้รับอนุญาตตามคำสั่งแล้ว</p> : null}</header>
+    {data?.monthlyBundles?.length ? <section className="pjk-monthly" aria-label="ดาวน์โหลด PDF รวมรายเดือน">
+      <h3>ดาวน์โหลด PDF รวมรายเดือน</h3>
+      <p>รวมทุกสาขา พร้อมลายเซ็นทุกหน้า · ไม่ขึ้นกับตัวกรองด้านล่าง</p>
+      <div>{data.monthlyBundles.map(bundle => {
+        const doc = { ...bundle, id: `monthly-${bundle.month}` };
+        return <button type="button" className="ghost-button" key={doc.id} disabled={opening === doc.id} onClick={() => open(doc, true)}>
+          {opening === doc.id ? "กำลังดาวน์โหลด…" : `ดาวน์โหลด ${monthLabel(bundle.month)} (${bundle.pageCount} หน้า)`}
+        </button>;
+      })}</div>
+    </section> : null}
     <form className="pjk-filters" onSubmit={e => { e.preventDefault(); setOffset(0); setFilters({ ...form }); }}>
       <label>เดือนเวร<select value={form.month} onChange={e => setForm({ ...form, month: e.target.value })}>
         <option value="">ทุกเดือน</option>{(data?.months || []).map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
