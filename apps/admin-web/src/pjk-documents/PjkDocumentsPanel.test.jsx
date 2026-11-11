@@ -19,3 +19,15 @@ it('shows an API failure without displaying stale document rows',async()=>{
   expect(await screen.findByRole('alert')).toHaveTextContent('หมดเวลาการใช้งาน');
   expect(screen.queryByText('ธันวาคม 69')).not.toBeInTheDocument();
 });
+
+it('downloads a monthly bundle independently of row filters', async()=>{
+  apiFetch.mockResolvedValue({ok:true,json:async()=>({...data,monthlyBundles:[{month:'2026-11',pageCount:22}]})});
+  render(<PjkDocumentsPanel />);
+  const button=await screen.findByRole('button',{name:'ดาวน์โหลด 11/2569 (22 หน้า)'});
+  URL.createObjectURL=vi.fn(()=> 'blob:test'); URL.revokeObjectURL=vi.fn();
+  const click=vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{});
+  apiFetch.mockResolvedValueOnce({ok:true,blob:async()=>new Blob(['%PDF'])});
+  fireEvent.click(button);
+  await waitFor(()=>expect(apiFetch).toHaveBeenLastCalledWith('/api/admin/pjk-documents/monthly/2026-11/pdf'));
+  await waitFor(()=>expect(click).toHaveBeenCalled()); click.mockRestore();
+});
