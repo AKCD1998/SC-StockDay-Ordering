@@ -32,7 +32,7 @@ export default function PjkDocumentsPanel() {
   return <section className="pjk-panel" aria-label="คลังเอกสาร ภจก.1">
     <header><p className="pjk-eyebrow">เภสัชกร / เอกสารปฏิบัติการ</p><h2>ภจก.1</h2>
       <p>แบบแจ้งเภสัชกรเข้าปฏิบัติหน้าที่แทน แยกตามเดือนและสาขา</p>
-      {data ? <p className="pjk-muted">รวม {data.archiveTotal} ฉบับ · รวบรวม ณ {data.asOf} · แนบภาพลายเซ็นผู้รับอนุญาตตามคำสั่งแล้ว</p> : null}</header>
+      {data ? <p className="pjk-muted">รวม {data.archiveTotal} ฉบับ · รวบรวม ณ {data.asOf} · {data.storageMode === "database-rows" ? "เก็บข้อมูลถาวร · สร้าง PDF พร้อมลายเซ็นเมื่อดาวน์โหลด" : "แนบภาพลายเซ็นผู้รับอนุญาตตามคำสั่งแล้ว"}</p> : null}</header>
     {data?.monthlyBundles?.length ? <section className="pjk-monthly" aria-label="ดาวน์โหลด PDF รวมรายเดือน">
       <h3>ดาวน์โหลด PDF รวมรายเดือน</h3>
       <p>รวมทุกสาขา พร้อมลายเซ็นทุกหน้า · ไม่ขึ้นกับตัวกรองด้านล่าง</p>
@@ -60,7 +60,7 @@ export default function PjkDocumentsPanel() {
       <div className="pjk-table"><table><thead><tr><th>เดือน / สาขา</th><th>เภสัชกรและวันปฏิบัติงาน</th><th>ที่มา</th><th>เอกสาร</th></tr></thead>
         <tbody>{data.documents.map(d => <tr key={d.id}><td><strong>{monthLabel(d.month)}</strong><br />สาขา {d.branch}</td>
           <td>{d.slots.length ? d.slots.map((s, i) => <p key={i}><strong>{s.pharmacistName}</strong> · {s.pharmacistLicense}<br />{s.dateStart} – {s.dateEnd} · {s.timeStart}–{s.timeEnd}</p>) : "ไม่พบช่วงเวรในข้อมูลเดิม"}</td>
-          <td>{d.sourceSheet || "ข้อมูลที่บันทึกใน DigitalPJK เดิม"}<br /><small>{d.provenance === "legacy-regenerated" ? "สร้าง PDF ใหม่จากข้อมูลเดิม" : "ไฟล์ PDF ที่สร้างจากตารางเวร"}</small>{d.note ? <p>{d.note}</p> : null}</td>
+          <td>{d.sourceSheet || "ข้อมูลที่บันทึกใน DigitalPJK เดิม"}<br /><small>{d.pdfGeneratedOnDemand ? "ข้อมูลถาวร · สร้าง PDF เมื่อต้องการ" : d.provenance === "legacy-regenerated" ? "สร้าง PDF ใหม่จากข้อมูลเดิม" : "ไฟล์ PDF ที่สร้างจากตารางเวร"}</small>{d.note ? <p>{d.note}</p> : null}</td>
           <td><button type="button" className="ghost-button" disabled={opening === d.id} onClick={() => open(d)}>{opening === d.id ? "กำลังดาวน์โหลด…" : "ดาวน์โหลด PDF"}</button></td></tr>)}</tbody></table></div>
       {!data.documents.length ? <p>ไม่มีเอกสารตรงกับเงื่อนไข</p> : null}
       <div className="pjk-pager"><button type="button" disabled={!offset || loading} onClick={() => setOffset(v => Math.max(0, v - 50))}>ก่อนหน้า</button>
