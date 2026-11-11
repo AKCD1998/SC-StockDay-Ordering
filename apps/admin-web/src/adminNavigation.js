@@ -122,7 +122,7 @@ export function getNavigationGroups(isAdminUser, hideDashboard = false) {
       label: "เภสัชกร",
       shortLabel: "RX",
       adminOnly: true,
-      items: [{ label: "ภจก.1", view: "pjk-documents", description: "คลังเอกสารปฏิบัติหน้าที่แทน แยกเดือนและสาขา" }],
+      items: [{ label: "จภก. 1", view: "pjk-documents", description: "คลังเอกสารปฏิบัติหน้าที่แทน แยกเดือนและสาขา" }],
     },
   ].filter((group) => (!group.adminOnly || isAdminUser) && (!hideDashboard || group.id !== "dashboard"));
 }

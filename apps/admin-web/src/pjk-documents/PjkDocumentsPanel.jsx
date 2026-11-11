@@ -29,8 +29,8 @@ export default function PjkDocumentsPanel() {
       a.click(); setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (e) { setError(e.message); } finally { setOpening(null); }
   }
-  return <section className="pjk-panel" aria-label="คลังเอกสาร ภจก.1">
-    <header><p className="pjk-eyebrow">เภสัชกร / เอกสารปฏิบัติการ</p><h2>ภจก.1</h2>
+  return <section className="pjk-panel" aria-label="คลังเอกสาร จภก. 1">
+    <header><p className="pjk-eyebrow">เภสัชกร / เอกสารปฏิบัติการ</p><h2>จภก. 1</h2>
       <p>แบบแจ้งเภสัชกรเข้าปฏิบัติหน้าที่แทน แยกตามเดือนและสาขา</p>
       {data ? <p className="pjk-muted">รวม {data.archiveTotal} ฉบับ · รวบรวม ณ {data.asOf} · {data.storageMode === "database-rows" ? "เก็บข้อมูลถาวร · สร้าง PDF พร้อมลายเซ็นเมื่อดาวน์โหลด" : "แนบภาพลายเซ็นผู้รับอนุญาตตามคำสั่งแล้ว"}</p> : null}</header>
     {data?.monthlyBundles?.length ? <section className="pjk-monthly" aria-label="ดาวน์โหลด PDF รวมรายเดือน">
