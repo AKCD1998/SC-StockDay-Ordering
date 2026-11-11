@@ -17,7 +17,7 @@ export default function AdminNavigation({
       {navigationGroups.map((group) => {
         const activeItem = group.items.find((item) => item.view === view);
         const isOpen = openNavGroup === group.id;
-        const hasDropdown = group.items.length > 1 || group.items.some((item) => item.disabled);
+        const hasDropdown = group.hasDropdown || group.items.length > 1 || group.items.some((item) => item.disabled);
         const groupBadgeCount = group.items.some((item) => item.view === "stock-requests")
           ? stockRequestBadgeCount
           : group.items.some((item) => item.view === "sync-log")
