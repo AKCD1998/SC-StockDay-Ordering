@@ -1,5 +1,17 @@
 # Cloud source access admission — preparation, not executed
 
+## 11 November follow-on preparation
+
+CPU-v5 is now installed and its natural17:00 slot was accepted from independent
+source/central evidence. Device access remains unverified; that acceptance does
+not authorize this admission. The one-time native-connection plan, standalone
+read-only reader, explicit grant impact and rollback are in
+`hourly004-direct-read-setup-review.md`. Do not install recovery or ship a new
+Hourly runtime to perform that read. The new reader's access-only contract is
+not this PR's full controller-policy contract; expected guard fields must never
+be used to fabricate that contract. This is preparation only, with no device
+grant, source-file transfer or source schedule activation.
+
 This checks read access to the already-existing SERVER004 Hourly evidence and
 Tasks. It does not authorize device access, install a reader, change a flag or
 activate the prepared recovery. Main-laptop SMB success is not cloud proof.

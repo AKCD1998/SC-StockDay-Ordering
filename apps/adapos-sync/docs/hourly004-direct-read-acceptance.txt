@@ -1,0 +1,53 @@
+REVIEW / ACCEPTANCE / ROLLBACK — preparation only
+
+เกณฑ์ตรวจรับก่อนเปลี่ยนตารางเดิม
+
+A. สิทธิ์และเส้นทางจริง
+[ ] ผู้ใช้อนุมัติ native computer grant ที่กว้างกว่างานอ่านนี้แล้ว
+[ ] ยืนยัน ChatGPT desktop บน SERVER004 ด้วยบัญชี/workspace เดิม รุ่นที่รองรับ
+[ ] native inventory ฝั่ง Ozymandias พบ SERVER004 + task authorized จริง
+[ ] เลือก contextอ่านเฉพาะงานนี้ และไม่ได้ใช้/interruptงานแก้Hourly/Delta/CRM
+[ ] ยืนยัน audit ว่าคำสั่ง execute ที่ SERVER004จริง ไม่มี hop SCPRODUCTDEV
+[ ] หากมีการวางไฟล์ ให้เป็น readerที่อนุมัติเพียงไฟล์เดียวใน native workspace
+[ ] hard deadline/cancellation30วินาทีทำงานจริงใน platformที่เลือก ไม่ใช่เดา
+
+B. ผลคำสั่งอ่านหนึ่งครั้ง
+[ ] actualExecutionHostVerified true / existingIdentityVerified true / zone true
+[ ] fileRead passed / taskReadsExpected11 / taskReadsPassed11
+[ ] Taskแต่ละตัวมีเวลาจริง/state/definitionVerified ไม่มีargs/XML/SDDLออกมา
+[ ] อ่านได้กับข้อมูลตีความผ่านเป็นคนละสถานะ corrupted readable JSONไม่ใช่denied
+[ ] receipt/sequence/วัน/slot/Task-startสัมพันธ์กัน ไม่เอารอบเก่ามารับรองรอบใหม่
+[ ] queue knownจริงก่อนใช้pending0; unknownต้องnull มีlockPresenceแยกจากlivePID
+[ ] pointercpu-v5กับfullreleaseintegrityเป็นคนละข้อ ตัว readerไม่อ้างตรวจทั้งrelease
+[ ] ไม่มีSQL/POSอ่านเพิ่ม/CPUprobe/TaskRun/capture/upload/config/permissionwrite
+[ ] ไม่มีrawlog/token/env/receiptkey/เอกสาร/ยอดรายสินค้าในreport
+
+C. รวมเข้าตารางเดิมหลังA+Bผ่าน
+[ ] owner Ozymandias / cloudautomationเดิม ไม่เปิดlocal hourly-004และไม่สร้างซ้ำ
+[ ] source/central/journalแยกสถานะ ชุดอ่านล้มไม่กั้นcentral query
+[ ] อ่านหลังรอบ20นาที และใช้exactslotBKKกับquerysnapshotจริง
+[ ] ประกาศsource/centralagreeเฉพาะหลักฐานที่ตรวจ ไม่ฝืนPR87fullcontractด้วยexpectedค่า
+[ ] บันทึกreceiptลงnativejournalเดิมพร้อมrevisionprecondition/readback/dedup
+[ ] ต่อไปมีscheduled invocationจริงอีกครั้งที่reusegrant/contextเดิมโดยไม่พึ่งlaptop
+
+คำสั่งหลังการอนุมัติและreaderอยู่ในnativeworkspaceจริงแล้ว
+(ให้Ozymandiasใช้pathที่ได้รับจากworkspaceจริง ไม่เดาpathและไม่ต้องให้ผู้ใช้คัดลอก)
+
+& 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File '<approved native workspace>\Read-Hourly004DirectSource.ps1' -Mode Status
+
+ห้ามรันคำสั่งตัวอย่างที่ยังมีplaceholder ห้ามใช้pathDownloadsของSCPRODUCTDEVแทน
+ไม่ให้ทดสอบด้วยการrunHourly/reboot/ปิดPOS/networkจริง การoffline/timeoutและsource
+เสียในชุดนี้ทดสอบด้วยfixtureเท่านั้นจนกว่าจะมีเหตุธรรมชาติที่สังเกตได้
+
+การย้อนกลับ
+1. ถอดsource-callเฉพาะขั้นนี้ออกจากpromptเดิม คงcentralquery/journal/schedule
+2. ตรวจว่ามีnativeงานอื่นใช้grantSERVER004หรือไม่ ไม่interruptงานอื่น
+3. ถ้าgrantนี้เพิ่งสร้างและผู้ใช้ต้องการยกเลิก ให้ผู้ใช้RevokeเฉพาะSERVER004ในDot
+   ถ้าเป็นgrantเดิม/sharedgrant ให้คงไว้และถอดเพียงsource-call
+4. ไม่ลบreader/audit/คิว ไม่เปลี่ยนTask/ACL/credentials ไม่rollbackCPU-v5
+
+สถานะชุดนี้
+- มีcode/แผน/negative testsพร้อมตรวจ
+- ยังไม่grant/เชื่อม/ถ่ายไฟล์/สร้างnativecontext/เปลี่ยนcloudpromptหรือschedule
+- ยังไม่ทดสอบจากOzymandiasถึงSERVER004จริง ผลนั้นยังUNVERIFIED
+- คงguard12 recoveryOFFและFullSync/Deltaเดิม ไม่มีmerge/deploy/install

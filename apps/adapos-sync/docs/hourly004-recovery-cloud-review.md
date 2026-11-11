@@ -1,5 +1,20 @@
 # Hourly004 recovery and cloud-source inspection — review only
 
+## Current preparation update — 11 November 2026
+
+CPU-v5 installation and the natural17:00 slot have now been accepted from real
+source/central evidence; old missing slots remain unresolved. Native cloud
+authorization for SERVER004 is still unverified. The additive standalone direct
+reader and one-time connection review are documented in
+`hourly004-direct-read-setup-review.md`. They require no new business runtime,
+Scheduled Task, service, backend or recovery activation. The native computer
+grant is broader than the read-only workflow and requires human review.
+
+The historical29October starting point and validations below are preserved as
+history. Neither the old preparation nor this follow-on grants access or
+authorizes shipping. The new reader deliberately reports access and cached
+source facts separately, without faking this PR's full policy contract.
+
 This candidate builds on PR #81's CPU-v5. It does not install a release, enable
 recovery, update the cloud schedule, grant device access or change production.
 The approved CPU-v5 ZIP and its source worktree are unchanged. Do not build this
