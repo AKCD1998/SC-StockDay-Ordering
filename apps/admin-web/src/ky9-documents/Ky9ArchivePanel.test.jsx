@@ -41,3 +41,9 @@ it("ignores an old detail response after a new search", async () => {
  resolve(json({ ...row, data: { label: "OLD DETAIL" } }));
  await waitFor(() => expect(screen.queryByRole("region", { name: "หลักฐานของรายการ" })).not.toBeInTheDocument());
 });
+it("keeps month-only expiry precision even when its saved date has an inferred day", async () => {
+ apiFetch.mockResolvedValue(json({ total: 1, rows: [{ ...row, expiry: "2030-06-30", expiry_precision: "month" }] }));
+ render(<Ky9ArchivePanel />);
+ expect(await screen.findByText("หมดอายุ 06/2573")).toBeVisible();
+ expect(screen.queryByText(/30\/06\/2573/)).not.toBeInTheDocument();
+});
