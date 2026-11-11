@@ -19,6 +19,17 @@
 .member-code { font-family: Consolas, monospace; font-size: .7rem; white-space: nowrap; }
 .member-status { display: inline-block; padding: 4px 10px; border-radius: 30px; white-space: nowrap; background: var(--member-soft); }
 .member-status.active { background: #e5f5eb; color: #195a36; }
+.member-sync-dialog { width: min(900px, 100%); }
+.member-sync-small { display: block; margin: 4px 0 8px; color: var(--member-muted); line-height: 1.6; font-size: .7rem; }
+.member-sync-summary { border: 1px solid var(--member-line); border-radius: 10px; padding: 14px; background: var(--member-soft); font-weight: 600; }
+.member-sync-summary.succeeded, .member-sync-small.succeeded { color: #195a36; }
+.member-sync-summary.review, .member-sync-small.review { color: #9c3626; }
+.member-sync-stages { display: grid; grid-template-columns: repeat(auto-fit,minmax(135px,1fr)); gap: 10px; margin: 16px 0 24px; }
+.member-sync-stages > div { display: grid; align-content: start; gap: 8px; padding: 14px; border: 1px solid var(--member-line); border-radius: 10px; background: var(--member-soft); }
+.member-sync-stages span, .member-sync-stages small { color: var(--member-muted); font-size: .7rem; line-height: 1.6; overflow-wrap: anywhere; }
+.member-sync-timeline { list-style: none; padding: 0; }
+.member-sync-timeline li { display: grid; gap: 6px; padding: 14px 0 14px 16px; border-left: 3px solid var(--member-line); border-bottom: 1px solid var(--member-line); }
+.member-sync-timeline time, .member-sync-timeline span { color: var(--member-muted); font-size: .7rem; }
 .member-history-button { padding: 8px 12px; border: 1px solid var(--member-line); border-radius: 8px; color: var(--member-blue); background: var(--member-soft); white-space: nowrap; font-weight: 600; }
 .members-pagination { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-top: 18px; color: var(--member-muted); }
 .members-pagination div { display: flex; gap: 8px; }
