@@ -7,9 +7,10 @@ function query(filters, offset = 0) {
   const p = new URLSearchParams(Object.entries(filters).filter(([, v]) => v));
   p.set("offset", String(offset)); p.set("limit", "50"); return p.toString();
 }
-function date(value) {
+function date(value, precision) {
   if (!value) return "—";
-  if (/^\d{4}-\d{2}$/.test(value)) return `${value.slice(5)}/${Number(value.slice(0, 4)) + 543}`;
+  if (precision === "year" && /^\d{4}/.test(value)) return String(Number(value.slice(0, 4)) + 543);
+  if ((precision === "month" || /^\d{4}-\d{2}$/.test(value)) && /^\d{4}-\d{2}/.test(value)) return `${value.slice(5, 7)}/${Number(value.slice(0, 4)) + 543}`;
   const parsed = new Date(value + "T00:00:00+07:00");
   return Number.isNaN(parsed.getTime()) ? String(value) : new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "2-digit", month: "2-digit", year: "numeric" }).format(parsed);
 }
@@ -21,7 +22,7 @@ export default function Ky9ArchivePanel() {
   const [form, setForm] = useState(blank), [applied, setApplied] = useState(blank), [offset, setOffset] = useState(0);
   const [batches, setBatches] = useState([]), [result, setResult] = useState(null), [loading, setLoading] = useState(true);
   const [error, setError] = useState(""), [detail, setDetail] = useState(null), [exporting, setExporting] = useState(false);
-  const detailSeq = useRef(0), alive = useRef(true);
+  const detailSeq = useRef(0), searchSeq = useRef(0), alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; detailSeq.current += 1; }; }, []);
   useEffect(() => {
     const c = new AbortController();
@@ -29,9 +30,11 @@ export default function Ky9ArchivePanel() {
     return () => c.abort();
   }, []);
   useEffect(() => {
-    const c = new AbortController(); setLoading(true); setResult(null); setDetail(null); setError(""); detailSeq.current += 1;
-    read("/rows?" + query(applied, offset), c.signal).then(setResult).catch(e => { if (!c.signal.aborted) setError(e.message); })
-      .finally(() => { if (!c.signal.aborted) setLoading(false); });
+    const c = new AbortController(), seq = ++searchSeq.current;
+    setLoading(true); setResult(null); setDetail(null); setError(""); detailSeq.current += 1;
+    read("/rows?" + query(applied, offset), c.signal).then(value => { if (!c.signal.aborted && seq === searchSeq.current) setResult(value); })
+      .catch(e => { if (!c.signal.aborted && seq === searchSeq.current) setError(e.message); })
+      .finally(() => { if (!c.signal.aborted && seq === searchSeq.current) setLoading(false); });
     return () => c.abort();
   }, [applied, offset]);
   const dirty = JSON.stringify(form) !== JSON.stringify(applied);
@@ -80,7 +83,7 @@ export default function Ky9ArchivePanel() {
         <thead><tr>{["วันที่รับ / สาขา", "สินค้า", "ล็อต / หมดอายุ", "จำนวนตามร่าง", "ใบรับ / ใบโอน / ใบกำกับ", "ที่มา"].map(t => <th key={t}>{t}</th>)}</tr></thead>
         <tbody>{rows.map(r => <tr key={`${r.batch_id}:${r.row_key}`}>
           <td>{date(r.received_date)}<br />สาขา {r.branch_code}</td><td><strong>{r.product_name}</strong><br /><small>{r.product_code}</small></td>
-          <td>{r.lot || "ไม่ระบุล็อต"}<br /><small>{r.expiry ? `หมดอายุ ${date(r.expiry)}` : ""}</small>
+          <td>{r.lot || "ไม่ระบุล็อต"}<br /><small>{r.expiry ? `หมดอายุ ${date(r.expiry, r.expiry_precision)}` : ""}</small>
             {r.movement_type === "transfer_receipt" && r.physical_lot_confirmed !== true ? <p className="ky9-muted">ล็อตเสนอให้ตรวจ</p> : null}</td>
           <td>{r.quantity_display || `${r.quantity ?? ""} ${r.unit || ""}`}{r.free_goods ? <small> · ของแถม</small> : null}</td>
           <td>{r.document_no}<br /><small>{r.invoice_no}</small><br /><small>{r.supplier}</small></td>
