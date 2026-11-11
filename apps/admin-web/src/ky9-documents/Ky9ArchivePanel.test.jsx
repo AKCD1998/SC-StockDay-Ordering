@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup, act } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import Ky9ArchivePanel from "./Ky9ArchivePanel.jsx";
 import { apiFetch } from "../lib/apiClient.js";
@@ -46,4 +46,20 @@ it("keeps month-only expiry precision even when its saved date has an inferred d
  render(<Ky9ArchivePanel />);
  expect(await screen.findByText("หมดอายุ 06/2573")).toBeVisible();
  expect(screen.queryByText(/30\/06\/2573/)).not.toBeInTheDocument();
+});
+it("does not replace a newer search with a late old response even if abort is ignored", async () => {
+ let resolveOld;
+ apiFetch.mockImplementation(path => {
+  if (path.includes("/batches")) return Promise.resolve(json({ batches: [] }));
+  if (path.includes("q=OLD")) return new Promise(r => { resolveOld = r; });
+  return Promise.resolve(json({ total: 1, rows: [{ ...row, product_name: path.includes("q=NEW") ? "NEW RESULT" : row.product_name }] }));
+ });
+ render(<Ky9ArchivePanel />); await screen.findByText("24 ขวด");
+ const field = screen.getByLabelText("สินค้า / SKU / ล็อต / ใบรับ / ใบโอน"), form = screen.getByRole("form", { name: "ค้นคลังร่าง" });
+ fireEvent.change(field, { target: { value: "OLD" } }); fireEvent.submit(form);
+ await waitFor(() => expect(resolveOld).toBeTypeOf("function"));
+ fireEvent.change(field, { target: { value: "NEW" } }); fireEvent.submit(form);
+ await screen.findByText("NEW RESULT");
+ await act(async () => { resolveOld(json({ total: 1, rows: [{ ...row, product_name: "OLD RESULT" }] })); });
+ expect(screen.getByText("NEW RESULT")).toBeVisible(); expect(screen.queryByText("OLD RESULT")).not.toBeInTheDocument();
 });

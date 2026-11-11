@@ -22,7 +22,7 @@ export default function Ky9ArchivePanel() {
   const [form, setForm] = useState(blank), [applied, setApplied] = useState(blank), [offset, setOffset] = useState(0);
   const [batches, setBatches] = useState([]), [result, setResult] = useState(null), [loading, setLoading] = useState(true);
   const [error, setError] = useState(""), [detail, setDetail] = useState(null), [exporting, setExporting] = useState(false);
-  const detailSeq = useRef(0), alive = useRef(true);
+  const detailSeq = useRef(0), searchSeq = useRef(0), alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; detailSeq.current += 1; }; }, []);
   useEffect(() => {
     const c = new AbortController();
@@ -30,9 +30,11 @@ export default function Ky9ArchivePanel() {
     return () => c.abort();
   }, []);
   useEffect(() => {
-    const c = new AbortController(); setLoading(true); setResult(null); setDetail(null); setError(""); detailSeq.current += 1;
-    read("/rows?" + query(applied, offset), c.signal).then(setResult).catch(e => { if (!c.signal.aborted) setError(e.message); })
-      .finally(() => { if (!c.signal.aborted) setLoading(false); });
+    const c = new AbortController(), seq = ++searchSeq.current;
+    setLoading(true); setResult(null); setDetail(null); setError(""); detailSeq.current += 1;
+    read("/rows?" + query(applied, offset), c.signal).then(value => { if (!c.signal.aborted && seq === searchSeq.current) setResult(value); })
+      .catch(e => { if (!c.signal.aborted && seq === searchSeq.current) setError(e.message); })
+      .finally(() => { if (!c.signal.aborted && seq === searchSeq.current) setLoading(false); });
     return () => c.abort();
   }, [applied, offset]);
   const dirty = JSON.stringify(form) !== JSON.stringify(applied);
