@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../lib/apiClient.js";
 import "./ky9-documents.css";
+import Ky9ArchivePanel from "./Ky9ArchivePanel.jsx";
 
 export const BRANCHES = ["000", "001", "003", "004", "005"];
 const COVERAGE = { in_progress: "กำลังรวบรวม / ตรวจ", collected: "ครบตามหลักฐานที่รวบรวมได้", reconciled: "ตรวจเทียบครบทั้งงวดแล้ว" };
@@ -256,6 +257,7 @@ function AdminDocuments({ csrfToken }) {
       </div>
     </header>
     <p className="ky9-scope-note">งวดตามวันที่รับสินค้า · วันที่บันทึกงานเก็บแยกในประวัติ · การเก็บสแกนครบไม่เท่ากับตรวจใบรับครบทั้งเดือน</p>
+    {!bundle && error ? null : <Ky9ArchivePanel />}
     <div className="ky9-actions">
       <button type="button" className="ghost-button" disabled={saving || loading} onClick={() => setReload(x => x + 1)}>โหลดข้อมูลล่าสุด</button>
       <span className="ky9-muted">การโหลดใหม่จะปิดแบบฟอร์มเคสที่ยังไม่บันทึก</span>
