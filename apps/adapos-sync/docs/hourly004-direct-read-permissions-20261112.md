@@ -94,7 +94,13 @@ Corrupt, conflicting, stale or task-mismatched evidence stays unknown.
 
 ## Approved apply / acceptance / rollback sequence
 
-No apply command is enabled by this proposal. After approval of the scope:
+The one-time owner controller is now prepared in
+`scripts/Set-Hourly004ReaderPermissions.ps1`; see
+`hourly004-reader-permission-owner-setup.md`. Default action is Plan.
+Only the human owner runs Apply/Rollback with explicit `-ApproveReadScope`
+in an already-elevated SERVER004 Administrator PowerShell. Main has not executed
+it on production. This does not change the native reader's sandbox or policy.
+After approval of the scope:
 
 1. Reconfirm native caller SID/context, exact reviewed bytes, filesystem policy,
    current object identities/DACLs, existing incident owner and quiet task/queue
