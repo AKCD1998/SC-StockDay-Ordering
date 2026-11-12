@@ -65,9 +65,17 @@ function H004Receipt([byte[]]$Bytes){
   if($a.phase -ceq 'finished' -and ($null -eq (H004Time (H004Prop $a 'finishedAt')) -or $null -eq (H004Integer (H004Prop $a 'finalViewSequence')))){H004Stop 'RECEIPT_UNVERIFIED'}
   return @{state=$s;body=$body}
 }
+function H004IdentityKind([string]$Name){
+  # Recognize the two already-observed callers. This grants neither Windows
+  # access nor native authorization and never changes/impersonates a token.
+  if($Name -ieq 'SERVER004\Administrator'){return 'existing-owner'}
+  if($Name -ieq 'SERVER004\CodexSandboxOffline'){return 'existing-native-sandbox'}
+  return 'unrecognized'
+}
 function H004GetContext {
   $principal=New-Object Security.Principal.WindowsPrincipal -ArgumentList ([Security.Principal.WindowsIdentity]::GetCurrent())
-  [pscustomobject]@{hostName=[Environment]::MachineName;existingIdentityMatched=[Security.Principal.WindowsIdentity]::GetCurrent().Name -ieq 'SERVER004\Administrator';timeZone=[TimeZoneInfo]::Local.Id;edition=$PSVersionTable.PSEdition;major=$PSVersionTable.PSVersion.Major;isAdministrator=$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)}
+  $kind=H004IdentityKind ([Security.Principal.WindowsIdentity]::GetCurrent().Name)
+  [pscustomobject]@{hostName=[Environment]::MachineName;existingIdentityMatched=($kind -cne 'unrecognized');identityKind=$kind;timeZone=[TimeZoneInfo]::Local.Id;edition=$PSVersionTable.PSEdition;major=$PSVersionTable.PSVersion.Major;isAdministrator=$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)}
 }
 function H004TaskProjection($Task,[int]$Hour){
   [xml]$xml=$Task.Xml;$ns=New-Object Xml.XmlNamespaceManager($xml.NameTable);$ns.AddNamespace('t','http://schemas.microsoft.com/windows/2004/02/mit/task')
@@ -148,6 +156,7 @@ function Invoke-Hourly004DirectRead {
     $ctx=& $Context
     if($ctx.hostName -ine 'SERVER004'){H004Stop 'WRONG_EXECUTION_HOST'};$report.actualExecutionHostVerified=$true
     if((H004Prop $ctx 'existingIdentityMatched') -cne $true){H004Stop 'WRONG_EXISTING_IDENTITY'};$report.existingIdentityVerified=$true
+    $kind=H004Prop $ctx 'identityKind';$report['executionIdentityKind']=$(if($kind -cin @('existing-owner','existing-native-sandbox')){$kind}else{'fixture-or-unreported'})
     if($ctx.timeZone -cne 'SE Asia Standard Time'){H004Stop 'WRONG_TIMEZONE'};$report.timeZoneVerified=$true
     if($ctx.edition -cne 'Desktop' -or $ctx.major -ne 5){H004Stop 'NATIVE_PS51_REQUIRED'};$report.administratorToken=$ctx.isAdministrator
     $stage='task-read';$taskRows=@(& $Tasks|ForEach-Object {H004SafeTask $_})

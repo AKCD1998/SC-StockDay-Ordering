@@ -1,5 +1,7 @@
 # Cloud source access admission — preparation, not executed
 
+Current direct-read steps: hourly004-direct-read-r2.md and hourly004-direct-read-r2-handoff.txt (H004-DIRECT-READ-20261112-R2). R2 supersedes the R1 direct-read onboarding steps below; existing full-policy controller and recovery contracts are unchanged.
+
 ## 11 November follow-on preparation
 
 CPU-v5 is now installed and its natural17:00 slot was accepted from independent

@@ -1,5 +1,7 @@
 # Hourly004 recovery and cloud-source inspection — review only
 
+Current direct-read steps: hourly004-direct-read-r2.md and hourly004-direct-read-r2-handoff.txt (H004-DIRECT-READ-20261112-R2). R2 supersedes the R1 direct-read onboarding steps below; existing full-policy controller and recovery contracts are unchanged.
+
 ## Current preparation update — 11 November 2026
 
 CPU-v5 installation and the natural17:00 slot have now been accepted from real

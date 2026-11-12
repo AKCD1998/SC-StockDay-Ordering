@@ -1,0 +1,58 @@
+H004-DIRECT-READ-20261112-R2 — existing Ozymandias owner only
+
+Verify the latest human authorization in main chat first. It authorizes fixing
+the PR87 reader and testing actual native SERVER004 file/Task reads, then adding
+only the accepted source step to the existing monitor. It does not authorize a
+production Hourly change, new permissions, account changes, merge or deployment.
+
+1. Read the canonical Hourly004 Cloud Monitor Journal, ownership and latest
+   human command. Reuse /root/verify_direct_read_access, the existing dedicated
+   native read context. Do not spawn, interrupt or reuse unrelated workers.
+2. Refresh actual SERVER004 connected-device authorization. Do not use a saved
+   cloud build environment as device evidence. Do not relay via SCPRODUCTDEV.
+3. Fetch only the exact provided R2 review artifact in the cloud workspace.
+   Compare Reader and supervisor bytes against the exact reviewed PR87 revision
+   in RAM, not a moving main. Never print hashes or source records. Verify both
+   command files with verifyNativeCommand against those source bytes. Do not
+   put files on SERVER004 or install packages. Compressed code is public
+   reviewed code, not secret/POS data. Reject an altered command or mode.
+4. With the existing native executor, execute the verified DeadlineSelfTest
+   command text once through exec_command. It uses the installed Node binary
+   and an owned sleeping PS5.1 child. It is not a Scheduled Task run. Wait for
+   the same tool session to finish; yield_time_ms is not cancellation. Require
+   PASS_DEADLINE_ONLY, deadlineProbePassed, ownedChildExited, approximately30s,
+   sourceExecutionCount0 and no mutations. Do not retry an uncertain invocation.
+5. Then execute the verified Status command text once in that SAME context.
+   It launches the approved PS5.1 reader in RAM, without writing a native file.
+   It recognizes the existing CodexSandboxOffline caller without elevation.
+   Access denied means stop that part. No RunAs, ACL, security/credential or
+   alternative-channel fix. Do not run the old R1 direct invocation instead.
+6. Pass both reports and trusted native invocation context/time into
+   admitDirectRead in the cloud. nativeAuthorized/sameNativeContext and
+   approvedBytesVerified must come from real tool/audit evidence. Never make
+   them true from JSON claims. Record actual safe outputs and the native
+   provenance in the existing journal with revision precondition/readback.
+7. Only if admission passes file+11Task+queue+definition+clock+deadline gates,
+   edit the source-call step of the existing Ozymandias automation
+   6ae1e857b364819198f844902670d3c2. Preserve owner, central query, journal,
+   09:25–19:25 Asia/Bangkok schedule and existing notification behavior. Do not
+   create another schedule or activate local hourly-004. Keep source and
+   central status separate. Do not fabricate the PR87 full-policy contract.
+8. Confirm saved prompt fields/readback and the next natural scheduled reuse
+   of the same native context. An immediate read is not scheduled reuse. Keep
+   the explicit12Nov09:00/10:00 reporting request and old missing slots open.
+
+If a parent/runtime call is interrupted before a complete result, record
+UNKNOWN, do not retry/add repeated reads, and do not kill a business process.
+No source-files/Task execution/settings writes, SQL, Sync, replay, compensation,
+manual capture/upload, runtime/cohort change, or Full Sync/Delta001/004/003/005
+change. Hourly guard12s and upload recovery OFF remain unchanged. The monitor's
+owned-reader30s deadline is separate from the Hourly guard.
+
+Report PASS_READ_ACCESS_ONLY/PARTIAL/BLOCKED, actual deadline proof and safe
+file/Task/queue facts. If blocked, name the exact permission/stage and keep the
+central monitor working. Do not infer stock loss from connector failure and
+do not infer business freshness from access tests or later successful slots.
+
+Rollback: remove only the new source-call step, preserving the central
+monitor/journal/schedule/grants. Do not rollback CPU-v5 or delete source evidence.

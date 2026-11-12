@@ -1,5 +1,7 @@
 # SERVER004 direct read: review package, not activation
 
+Current direct-read steps: hourly004-direct-read-r2.md and hourly004-direct-read-r2-handoff.txt (H004-DIRECT-READ-20261112-R2). R2 supersedes the R1 direct-read onboarding steps below; existing full-policy controller and recovery contracts are unchanged.
+
 Prepared 11 November 2026. Continue the existing PR #87 and Ozymandias monitor.
 No change to PR #81, its installed CPU-v5, backend, schema or Windows Tasks.
 
