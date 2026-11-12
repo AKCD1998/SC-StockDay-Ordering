@@ -19,15 +19,30 @@ function Get-H004PermissionSpec {
 function Normalize-H004PermissionDacl([string]$Sddl){
   try{$d=[Security.AccessControl.RawSecurityDescriptor]::new($Sddl);if($null -eq $d.DiscretionaryAcl -or $d.DiscretionaryAcl.Count -eq 0){Stop-H004Permission 'UNSAFE_DACL'};return $d.GetSddlForm([Security.AccessControl.AccessControlSections]::Access)}catch{Stop-H004Permission 'UNSAFE_DACL'}
 }
-function Test-H004PermissionDaclEqual([string]$Actual,[string]$Expected){
+function Test-H004PermissionAclBytes($Actual,$Expected){
+  $ab=New-Object byte[] $Actual.BinaryLength;$eb=New-Object byte[] $Expected.BinaryLength
+  $Actual.GetBinaryForm($ab,0);$Expected.GetBinaryForm($eb,0)
+  return [Linq.Enumerable]::SequenceEqual([byte[]]$ab,[byte[]]$eb)
+}
+function Test-H004PermissionDaclEqual([string]$Actual,[string]$Expected,[ValidateSet('file','directory','task')][string]$Kind='file'){
   # SetSecurityInfo can add SE_DACL_AUTO_INHERITED (0x400) on readback.
   # Compare only: do not rewrite stored before/after images or canonicalize ACEs.
   $a=[Security.AccessControl.RawSecurityDescriptor]::new((Normalize-H004PermissionDacl $Actual))
   $e=[Security.AccessControl.RawSecurityDescriptor]::new((Normalize-H004PermissionDacl $Expected))
   if((([int]$a.ControlFlags -bxor [int]$e.ControlFlags) -band (-bnot 1024)) -ne 0){return $false}
-  $ab=New-Object byte[] $a.DiscretionaryAcl.BinaryLength;$eb=New-Object byte[] $e.DiscretionaryAcl.BinaryLength
-  $a.DiscretionaryAcl.GetBinaryForm($ab,0);$e.DiscretionaryAcl.GetBinaryForm($eb,0)
-  return [Linq.Enumerable]::SequenceEqual([byte[]]$ab,[byte[]]$eb)
+  if(Test-H004PermissionAclBytes $a.DiscretionaryAcl $e.DiscretionaryAcl){return $true}
+  if($Kind -cne 'task'){return $false}
+  # Task Service can hoist pre-existing explicit allows ahead of inherited
+  # allows. Only this stable partition is accepted, and only for a DACL made
+  # entirely of ordinary unconditional allow ACEs. Never sort within a group.
+  foreach($descriptor in @($a,$e)){foreach($ace in $descriptor.DiscretionaryAcl){
+    if($ace -isnot [Security.AccessControl.CommonAce] -or $ace.IsCallback -or $ace.AceQualifier -ne [Security.AccessControl.AceQualifier]::AccessAllowed){return $false}
+  }}
+  $partition=[Security.AccessControl.RawAcl]::new($e.DiscretionaryAcl.Revision,$e.DiscretionaryAcl.Count)
+  foreach($inherited in @($false,$true)){foreach($ace in $e.DiscretionaryAcl){
+    if((([int]$ace.AceFlags -band 16) -ne 0) -eq $inherited){$partition.InsertAce($partition.Count,$ace)}
+  }}
+  return (Test-H004PermissionAclBytes $a.DiscretionaryAcl $partition)
 }
 function Add-H004PermissionRules([string]$Sddl,[string]$Sid,$Rules){
   $d=[Security.AccessControl.RawSecurityDescriptor]::new((Normalize-H004PermissionDacl $Sddl));$sidObject=[Security.Principal.SecurityIdentifier]::new($Sid)
@@ -60,7 +75,7 @@ function Invoke-H004CheckedPermissionWrite($Spec,[string]$Wanted,[string]$Expect
   # writing; do not overwrite an edit observed while checking business work.
   $current=& $Read $Spec
   if($current.identity -cne $ExpectedIdentity){Stop-H004Permission 'OBJECT_IDENTITY_CHANGED'}
-  if(-not (Test-H004PermissionDaclEqual $current.sddl $ExpectedDacl)){Stop-H004Permission 'FOREIGN_PERMISSION_CHANGE'}
+  if(-not (Test-H004PermissionDaclEqual $current.sddl $ExpectedDacl $Spec.kind)){Stop-H004Permission 'FOREIGN_PERMISSION_CHANGE'}
   & $Write $Spec $Wanted
 }
 function Invoke-H004PermissionEngine {
@@ -91,7 +106,7 @@ function Invoke-H004PermissionEngine {
       $phase='object-verification';$objectNumber=$i+1
       $current=& $Provider.Get $Spec[$i];$r=$records[$i];$d=Normalize-H004PermissionDacl $current.sddl
       if($current.identity -cne $r.identity){Stop-H004Permission 'OBJECT_IDENTITY_CHANGED'}
-      $isAfter=Test-H004PermissionDaclEqual $d $r.after;$isBefore=Test-H004PermissionDaclEqual $d $r.before
+      $isAfter=Test-H004PermissionDaclEqual $d $r.after $r.kind;$isBefore=Test-H004PermissionDaclEqual $d $r.before $r.kind
       if($isAfter){$afterCount++};if($isBefore){$beforeCount++};if(-not $isAfter -and -not $isBefore){Stop-H004Permission 'FOREIGN_PERMISSION_CHANGE'}
     }
     if($Mode -ceq 'Plan'){$report.status='READ_PERMISSION_PLAN_READY';return [pscustomobject]$report}
@@ -108,14 +123,14 @@ function Invoke-H004PermissionEngine {
       $s=$Spec[$i];$r=$records[$i];$current=& $Provider.Get $s;$d=Normalize-H004PermissionDacl $current.sddl
       if($current.identity -cne $r.identity){Stop-H004Permission 'OBJECT_IDENTITY_CHANGED'}
       $wanted=if($Mode -cin @('Apply','Resume')){$r.after}else{$r.before}
-      if(Test-H004PermissionDaclEqual $d $wanted){continue}
+      if(Test-H004PermissionDaclEqual $d $wanted $s.kind){continue}
       $expected=if($Mode -cin @('Apply','Resume')){$r.before}else{$r.after}
-      if(-not (Test-H004PermissionDaclEqual $d $expected)){Stop-H004Permission 'FOREIGN_PERMISSION_CHANGE'}
+      if(-not (Test-H004PermissionDaclEqual $d $expected $s.kind)){Stop-H004Permission 'FOREIGN_PERMISSION_CHANGE'}
       $report.objectsAttempted++
       $phase='permission-write'
       & $Provider.Set $s $wanted $r.identity $expected
       $check=& $Provider.Get $s
-      if($check.identity -cne $r.identity -or -not (Test-H004PermissionDaclEqual $check.sddl $wanted)){Stop-H004Permission 'PERMISSION_READBACK_DIFFER'}
+      if($check.identity -cne $r.identity -or -not (Test-H004PermissionDaclEqual $check.sddl $wanted $s.kind)){Stop-H004Permission 'PERMISSION_READBACK_DIFFER'}
       $report.objectsChanged++
     }
     $phase='preservation';$objectNumber=$null; & $Provider.Preserve
@@ -168,6 +183,23 @@ function Assert-H004PrivatePermissionBackup([string]$Path){
   Assert-H004PermissionPath $Path
   $acl=[IO.Directory]::GetAccessControl($Path)
   foreach($r in $acl.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])){if($r.AccessControlType -eq 'Allow' -and $r.IdentityReference.Value -cnotin @('S-1-5-18','S-1-5-32-544')){Stop-H004Permission 'BACKUP_WRITE_UNVERIFIED'}}
+}
+function Write-H004PermissionResult([string]$Directory,[ValidateSet('Apply','Resume','Rollback')][string]$Mode,$Result){
+  # Keep every attempt: an old failed Resume must not masquerade as a later run.
+  # Allocation is bounded and create-only; never rewrite results or before.json.
+  $chosen=$null;$name=$null
+  for($number=1;$number -le 32;$number++){
+    $name=if($number -eq 1){$Mode.ToLowerInvariant()+'-result.json'}else{('{0}-result-{1:000}.json' -f $Mode.ToLowerInvariant(),$number)}
+    $candidate=Join-Path $Directory $name
+    if(-not [IO.File]::Exists($candidate) -and -not [IO.Directory]::Exists($candidate)){$chosen=$candidate;break}
+  }
+  if($null -eq $chosen){Stop-H004Permission 'RESULT_HISTORY_FULL'}
+  $Result|Add-Member -NotePropertyName setupReportFile -NotePropertyValue $name -Force
+  $text=$Result|ConvertTo-Json -Depth 5 -Compress;$bytes=[Text.Encoding]::UTF8.GetBytes($text)
+  if($bytes.Length -gt 16384){Stop-H004Permission 'RESULT_UNVERIFIED'}
+  $stream=[IO.FileStream]::new($chosen,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read,4096,[IO.FileOptions]::WriteThrough)
+  try{$stream.Write($bytes,0,$bytes.Length);$stream.Flush($true)}finally{$stream.Dispose()}
+  if([IO.File]::ReadAllText($chosen) -cne $text){Stop-H004Permission 'RESULT_UNVERIFIED'}
 }
 function Invoke-H004NativePermissionSetup([string]$Mode,[bool]$Approved){
   $service=$null;$handles=@{};$taskHandles=@{};$definitions=@{};$memo=@{};$nativeSpec=Get-H004PermissionSpec
@@ -231,12 +263,8 @@ function Invoke-H004NativePermissionSetup([string]$Mode,[bool]$Approved){
     if($Mode -cin @('Apply','Resume','Rollback') -and [IO.Directory]::Exists($backupDir)){
       try{
       Assert-H004PrivatePermissionBackup $backupDir
-      $resultFile=Join-Path $backupDir ($Mode.ToLowerInvariant()+'-result.json')
-      if(-not [IO.File]::Exists($resultFile)){
-        $bytes=[Text.Encoding]::UTF8.GetBytes(($result|ConvertTo-Json -Depth 5 -Compress));$stream=[IO.FileStream]::new($resultFile,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read,4096,[IO.FileOptions]::WriteThrough)
-        try{$stream.Write($bytes,0,$bytes.Length);$stream.Flush($true)}finally{$stream.Dispose()}
-      }
-      }catch{$result|Add-Member -NotePropertyName setupReportPersistence -NotePropertyValue 'UNAVAILABLE_KEEP_WINDOW_OPEN' -Force}
+      Write-H004PermissionResult $backupDir $Mode $result
+      }catch{$result.PSObject.Properties.Remove('setupReportFile');$result|Add-Member -NotePropertyName setupReportPersistence -NotePropertyValue 'UNAVAILABLE_KEEP_WINDOW_OPEN' -Force}
     }
     return $result
   }finally{foreach($h in @($handles.Values)+@($taskHandles.Values)){$h.Dispose()};if($null -ne $service){[void][Runtime.InteropServices.Marshal]::ReleaseComObject($service)}}

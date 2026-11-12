@@ -108,6 +108,16 @@ binary/order and all other represented control bits. Explicit Resume requires
 the original valid snapshot and skips matching after-images; it never creates a
 new baseline or discards foreign changes. See the owner setup document for this
 incident and the reviewed continuation; native access remains unproven.
+Owner Resume at17:03:25 verified seven more filesystem changes, then stopped on
+the first Task: Task Service moved an existing explicit allow before inherited
+allows. Read-only proof found identical ACE bytes with expected index order
+0,4,1,2,3 and only AI added. All8 filesystem objects now match after; other10
+Tasks remain before. The next correction accepts precisely that stable partition
+only for Task DACLs consisting entirely of ordinary noncallback allows, retaining
+ACE bytes/order inside each group. Other ACE kinds, arbitrary order/mask/flag
+changes and all filesystem permutations remain strict or fail closed. Stored
+snapshots stay unchanged. Create-only numbered result history distinguishes each
+owner attempt from the retained earlier failure. No blind retry or new rights.
 After approval of the scope:
 
 1. Reconfirm native caller SID/context, exact reviewed bytes, filesystem policy,

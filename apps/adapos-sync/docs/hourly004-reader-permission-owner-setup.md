@@ -82,11 +82,31 @@ Resume ต้องพบ before.json เดิมที่ตรวจครบ
 สำเร็จแล้ว และเพิ่มเฉพาะจุดที่เหลือ ไม่สร้าง/ทับ/ลบ snapshot เดิม
 หาก snapshot หาย/ผิดหรือพบ foreign change ให้หยุด ไม่ retry/rollback เอง
 
-ผล Resume อยู่ `resume-result.json` แยกจาก apply-result เดิม โดยเก็บแบบ
-create-once ไม่ทับหลักฐานความล้มเหลว หากต้องทำต่อหลัง Resume ที่ล้มอีก
-ให้ทบทวนสถานะจริงกับผลในหน้าต่างก่อน เพราะไฟล์ผลเก่าจะไม่ถูกเขียนทับ
+ผล Resume ครั้งแรกอยู่ `resume-result.json` แยกจาก apply-result เดิม
+ครั้งต่อไปเก็บ `resume-result-002.json`, `-003.json` ตามลำดับ สูงสุด 32 ไฟล์
+ต่อโหมด โดย create-only/flush/readback ไม่ทับผลเดิมหรือ before.json
+`setupReportFile` ใน JSON บอกผลของการรันครั้งนั้น หากบันทึกไม่ได้จะไม่มี
+field นี้และมี `setupReportPersistence=UNAVAILABLE_KEEP_WINDOW_OPEN`
+ให้เก็บหน้าต่างไว้และตรวจผลจริง ไม่ retry ACL เพราะไฟล์ผลเก่าดูเหมือนล้ม
 สถานะสำเร็จคือ `READ_PERMISSIONS_RESUMED_NATIVE_ACCEPTANCE_PENDING`
 ซึ่งยังไม่ใช่หลักฐานว่า Ozymandias อ่านจริงได้
+
+ผู้ดูแล Resume เวลา 17:03:25 +07 เขียนและตรวจผ่านอีก 7 จุด แล้วหยุดวัตถุ 9
+(Task แรก) การอ่านจริง 17:05/17:07 ยืนยันว่า filesystem ทั้ง 8 ตรง after-image
+พร้อม identity เดิม Task แรกมี ACE ชุดเดิมครบ แต่ Task Service ย้าย explicit
+allow เดิมจากท้ายขึ้นก่อน inherited allows: ลำดับ index ของ expected คือ
+`0,4,1,2,3` และเพิ่ม AI เท่านั้น อีก 10 Task ยังตรง before-image
+
+comparison รอบแก้ที่สองยอมรับรูปแบบนี้เฉพาะ kind=task จาก fixed spec:
+ต้องเป็น non-callback CommonAce AccessAllowed ทั้ง DACL และ actual ต้องตรง
+stable partition ของ expected ที่วาง explicit ก่อน inherited โดย byte ของ
+ทุก ACE และลำดับภายในแต่ละกลุ่มไม่เปลี่ยน คงตรวจ ACL revision/count และ
+control flags อื่น ไม่ sort ทั่วไป ไม่เพิ่ม/ลด mask หรือยอมรับ deny/object/
+callback permutation; descriptor ที่รองรับไม่ได้หยุดแบบ fail-closed
+filesystem ทุกชนิดยังเทียบลำดับอย่างเคร่งครัด และ snapshot/validation เดิม
+ไม่เปลี่ยน Rollback เขียน before-image เดิมและตรวจ canonical readback ได้
+Resume ใหม่ต้องข้าม filesystem 8 และ Task แรกที่สำเร็จ ไม่เขียนซ้ำเพื่อ
+ปรับรูปแบบสิทธิ์จริง ทดสอบก่อนส่งให้ owner รันต่อ ไม่มี main remote writes
 
 ## หลังผู้ใช้รัน
 
@@ -112,6 +132,14 @@ AI ด้วย legacy SetFileSecurity แล้วเรียก SetSecurityIn
 ปฏิเสธ protection/AutoInheritRequired/ACE order/mask/deny/extra/identity
 ที่ต่าง ไม่ใช้ผลจำลองแทนการตรวจ Task/receipt บน SERVER004 จริง
 
+เพิ่ม Task Service contract จำลองตามลำดับที่อ่านจริง: partial 8 filesystem+
+1 Task สำเร็จ, Resume เขียนเฉพาะ 10 ที่เหลือ, Apply/Status/Rollback/ทำซ้ำ,
+canonical before-image, late foreign edit, สลับลำดับในกลุ่ม/deny/object/
+callback/เพิ่ม ACE/mask/flags ที่ต้องปฏิเสธ และ result history ไม่ทับผลเก่า
+ไม่ได้สร้าง Task ชั่วคราวหรือเขียน Task จริงในการทดสอบนี้ ผลจริงของอีก
+10 Task และ native access ต้องรอ owner Resume/readback ไม่อ้างว่าจำลองผ่าน
+แล้ว production จะผ่านแน่นอน
+
 ผลจำลองไม่ยืนยันว่า Task service, filesystem หรือ native policy บน SERVER004
 จะผ่านแน่นอน ยังต้องตรวจหลังการรันจริง การทดสอบแก้นี้ไม่ได้เขียน production
 เพิ่มจาก owner Apply ที่หยุดข้างต้น คง guard12/recoveryOFF ตามนโยบาย ไม่ใช้ค่า expected เป็นหลักฐาน
@@ -120,4 +148,5 @@ AI ด้วย legacy SetFileSecurity แล้วเรียก SetSecurityIn
 API ที่ใช้: [Task read/execute แยกกัน](https://learn.microsoft.com/en-us/windows/win32/taskschd/security-contexts-for-running-tasks),
 [SetSecurityDescriptor flags](https://learn.microsoft.com/en-us/windows/win32/taskschd/registeredtask-setsecuritydescriptor),
 [SetSecurityInfo บน handle](https://learn.microsoft.com/en-us/windows/win32/api/aclapi/nf-aclapi-setsecurityinfo),
-[ความหมาย control flags](https://learn.microsoft.com/en-us/windows/win32/secauthz/security-descriptor-control)
+[ความหมาย control flags](https://learn.microsoft.com/en-us/windows/win32/secauthz/security-descriptor-control),
+[ลำดับ ACE](https://learn.microsoft.com/en-us/windows/win32/secauthz/order-of-aces-in-a-dacl)
