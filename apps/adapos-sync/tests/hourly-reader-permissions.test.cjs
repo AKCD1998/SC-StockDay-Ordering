@@ -15,3 +15,9 @@ test('native PS5.1 Apply Status Rollback and crash/error cases operate on fixtur
   const wrong=spawnSync(exe,['-NoProfile','-NonInteractive','-ExecutionPolicy','RemoteSigned','-File',setup,'-Action','Apply','-ApproveReadScope'],{encoding:'utf8',windowsHide:true,timeout:5000});const p=JSON.parse(wrong.stdout.trim());assert.equal(p.status,'STOPPED_BEFORE_PERMISSION_CHANGE');assert.equal(p.errorCode,'WRONG_EXECUTION_HOST');
  }
 });
+test('pasted memory execution retains helper visibility without dynamic modules',{skip:process.platform!=='win32'},()=>{
+ const native=source.slice(source.indexOf('function Invoke-H004NativePermissionSetup'),source.indexOf("if($MyInvocation.InvocationName"));assert.ok(!native.includes('GetNewClosure'));
+ const probe=`$ErrorActionPreference='Stop';$source=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${Buffer.from(source).toString('base64')}'));$value=&{.([scriptblock]::Create($source));function Test-H004Scope{$nativeSpec=Get-H004PermissionSpec;$text='D:P(A;;FA;;;SY)(A;;FA;;;BA)';$read={Normalize-H004PermissionDacl $text};$quiet={if($nativeSpec.Count -ne 19){Stop-H004Permission 'PLAN_OR_IDENTITY_UNVERIFIED'}};&$quiet;$v=&$read;return ($v.Length -gt 0)};Test-H004Scope};[pscustomobject]@{passed=$value;permissionWrites=0}|ConvertTo-Json -Compress`;
+ const r=spawnSync(path.join(process.env.SystemRoot,'System32/WindowsPowerShell/v1.0/powershell.exe'),['-NoProfile','-NonInteractive','-ExecutionPolicy','RemoteSigned','-Command','&([scriptblock]::Create([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:H004_MEMORY_FIXTURE))))'],{env:{...process.env,H004_MEMORY_FIXTURE:Buffer.from(probe).toString('base64')},encoding:'utf8',windowsHide:true,timeout:5000});
+ assert.equal(r.status,0,'Memory-only helper fixture failed');const v=JSON.parse(r.stdout.trim());assert.equal(v.passed,true);assert.equal(v.permissionWrites,0);
+});

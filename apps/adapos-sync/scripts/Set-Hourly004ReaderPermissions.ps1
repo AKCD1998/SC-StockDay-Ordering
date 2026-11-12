@@ -160,7 +160,7 @@ function Assert-H004PrivatePermissionBackup([string]$Path){
   foreach($r in $acl.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])){if($r.AccessControlType -eq 'Allow' -and $r.IdentityReference.Value -cnotin @('S-1-5-18','S-1-5-32-544')){Stop-H004Permission 'BACKUP_WRITE_UNVERIFIED'}}
 }
 function Invoke-H004NativePermissionSetup([string]$Mode,[bool]$Approved){
-  $service=$null;$handles=@{};$taskHandles=@{};$definitions=@{};$memo=@{};$spec=Get-H004PermissionSpec
+  $service=$null;$handles=@{};$taskHandles=@{};$definitions=@{};$memo=@{};$nativeSpec=Get-H004PermissionSpec
   $secure='C:\ProgramData\SC-StockDay-Ordering\hourly-stock-evidence-004\complete-on-20261022'
   $backupDir=Join-Path $secure 'reader-permission-setup-20261112';$backup=Join-Path $backupDir 'before.json'
   try{
@@ -174,7 +174,7 @@ function Invoke-H004NativePermissionSetup([string]$Mode,[bool]$Approved){
     if($sid -cnotmatch '^S-1-5-21-(\d+-){3}\d+$' -or (([Security.Principal.SecurityIdentifier]::new($sid)).Translate([Security.Principal.NTAccount]).Value) -ine 'SERVER004\CodexSandboxOffline' -or ([Security.Principal.SecurityIdentifier]::new($sid)).AccountDomainSid.Value -cne $identity.User.AccountDomainSid.Value){Stop-H004Permission 'PLAN_OR_IDENTITY_UNVERIFIED'}
     Initialize-H004PermissionHandles
     $service=New-Object -ComObject Schedule.Service;$service.Connect();$folder=$service.GetFolder('\')
-    foreach($s in $spec){
+    foreach($s in $nativeSpec){
       if($s.kind -ceq 'task'){
         $t=$folder.GetTask($s.path);$definitions[$s.key]=[string]$t.Xml
         $f=Join-Path 'C:\Windows\System32\Tasks' $s.path;Assert-H004PermissionPath $f
@@ -182,15 +182,15 @@ function Invoke-H004NativePermissionSetup([string]$Mode,[bool]$Approved){
       }else{Assert-H004PermissionPath $s.path;$opened=[Hourly004PermissionHandleV1]::new($s.path,($Mode -cin @('Apply','Rollback')));try{Assert-H004PermissionObjectKind $opened $s.kind;$handles[$s.key]=$opened}catch{$opened.Dispose();throw}}
     }
     $checkQuiet={
-      foreach($s in $spec|Where-Object {$_.kind -ceq 'task'}){$t=$folder.GetTask($s.path);if($t.State -eq 4 -or ($t.NextRunTime-(Get-Date)).TotalMinutes -le 5){Stop-H004Permission 'HOURLY_OR_FULLSYNC_BUSY'}}
+      foreach($s in $nativeSpec|Where-Object {$_.kind -ceq 'task'}){$t=$folder.GetTask($s.path);if($t.State -eq 4 -or ($t.NextRunTime-(Get-Date)).TotalMinutes -le 5){Stop-H004Permission 'HOURLY_OR_FULLSYNC_BUSY'}}
       foreach($period in @('Morning','Evening')){$t=$folder.GetTask('AdaPOS Sync (Branch 004) - '+$period);if($t.State -eq 4 -or ($t.NextRunTime-(Get-Date)).TotalMinutes -le 15){Stop-H004Permission 'HOURLY_OR_FULLSYNC_BUSY'}}
       $count=0;foreach($p in [IO.Directory]::EnumerateFileSystemEntries((Join-Path (Split-Path $secure -Parent) 'hourly-evidence-outbox\004'))){$count++;if($count -gt 0){Stop-H004Permission 'QUEUE_NOT_EMPTY_OR_UNVERIFIED'}}
-    }.GetNewClosure()
+    }
     $readObject={param($s)
       if($s.kind -ceq 'task'){$t=$folder.GetTask($s.path);if([string]$t.Xml -cne $definitions[$s.key]){Stop-H004Permission 'PRESERVATION_UNVERIFIED'};$f=Join-Path 'C:\Windows\System32\Tasks' $s.path;$check=[Hourly004PermissionHandleV1]::new($f,$false);try{if($check.Identity -cne $taskHandles[$s.key].Identity){Stop-H004Permission 'OBJECT_IDENTITY_CHANGED'}}finally{$check.Dispose()};return @{identity=$taskHandles[$s.key].Identity;sddl=[string]$t.GetSecurityDescriptor(4)}}
       $check=[Hourly004PermissionHandleV1]::new($s.path,$false);try{if($check.Identity -cne $handles[$s.key].Identity){Stop-H004Permission 'OBJECT_IDENTITY_CHANGED'}}finally{$check.Dispose()};return @{identity=$handles[$s.key].Identity;sddl=$handles[$s.key].Read()}
-    }.GetNewClosure()
-    $writeObject={param($s,$dacl);if($s.kind -ceq 'task'){$folder.GetTask($s.path).SetSecurityDescriptor($dacl,16)}else{$handles[$s.key].Write($dacl)}}.GetNewClosure()
+    }
+    $writeObject={param($s,$dacl);if($s.kind -ceq 'task'){$folder.GetTask($s.path).SetSecurityDescriptor($dacl,16)}else{$handles[$s.key].Write($dacl)}}
     $provider=@{
       Preflight={
         if($Mode -cin @('Apply','Rollback')){
@@ -199,10 +199,10 @@ function Invoke-H004NativePermissionSetup([string]$Mode,[bool]$Approved){
           $st=Get-Item -LiteralPath $config -Force;if($st.Length -gt 1048576){Stop-H004Permission 'PRESERVATION_UNVERIFIED'};$memo.config=[IO.File]::ReadAllBytes($config)
           foreach($period in @('Morning','Evening')){$t=$folder.GetTask('AdaPOS Sync (Branch 004) - '+$period);$memo[$period]=@{xml=[string]$t.Xml;dacl=[string]$t.GetSecurityDescriptor(4)}}
         }
-      }.GetNewClosure()
+      }
       Get=$readObject
-      Set={param($s,$dacl,$expectedIdentity,$expectedDacl);Invoke-H004CheckedPermissionWrite $s $dacl $expectedIdentity $expectedDacl $checkQuiet $readObject $writeObject}.GetNewClosure()
-      Load={if([IO.Directory]::Exists($backupDir)){Assert-H004PrivatePermissionBackup $backupDir;if(-not [IO.File]::Exists($backup)){Stop-H004Permission 'BACKUP_UNVERIFIED'};$st=Get-Item -LiteralPath $backup -Force;if($st.Length -gt 131072 -or $st.Attributes -band [IO.FileAttributes]::ReparsePoint){Stop-H004Permission 'BACKUP_UNVERIFIED'};return ([IO.File]::ReadAllText($backup)|ConvertFrom-Json)};return $null}.GetNewClosure()
+      Set={param($s,$dacl,$expectedIdentity,$expectedDacl);Invoke-H004CheckedPermissionWrite $s $dacl $expectedIdentity $expectedDacl $checkQuiet $readObject $writeObject}
+      Load={if([IO.Directory]::Exists($backupDir)){Assert-H004PrivatePermissionBackup $backupDir;if(-not [IO.File]::Exists($backup)){Stop-H004Permission 'BACKUP_UNVERIFIED'};$st=Get-Item -LiteralPath $backup -Force;if($st.Length -gt 131072 -or $st.Attributes -band [IO.FileAttributes]::ReparsePoint){Stop-H004Permission 'BACKUP_UNVERIFIED'};return ([IO.File]::ReadAllText($backup)|ConvertFrom-Json)};return $null}
       Save={param($value)
         if([IO.Directory]::Exists($backupDir)){Stop-H004Permission 'EXISTING_SETUP_REVIEW_REQUIRED'}
         [void][IO.Directory]::CreateDirectory($backupDir);Assert-H004PrivatePermissionBackup $backupDir
@@ -210,14 +210,14 @@ function Invoke-H004NativePermissionSetup([string]$Mode,[bool]$Approved){
         $stream=[IO.FileStream]::new($backup,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read,4096,[IO.FileOptions]::WriteThrough)
         try{$stream.Write($bytes,0,$bytes.Length);$stream.Flush($true)}finally{$stream.Dispose()}
         if([IO.File]::ReadAllText($backup) -cne [Text.Encoding]::UTF8.GetString($bytes)){Stop-H004Permission 'BACKUP_WRITE_UNVERIFIED'}
-      }.GetNewClosure()
+      }
       Preserve={
-        foreach($s in $spec|Where-Object {$_.kind -ceq 'task'}){if([string]$folder.GetTask($s.path).Xml -cne $definitions[$s.key]){Stop-H004Permission 'PRESERVATION_UNVERIFIED'}}
+        foreach($s in $nativeSpec|Where-Object {$_.kind -ceq 'task'}){if([string]$folder.GetTask($s.path).Xml -cne $definitions[$s.key]){Stop-H004Permission 'PRESERVATION_UNVERIFIED'}}
         foreach($period in @('Morning','Evening')){$t=$folder.GetTask('AdaPOS Sync (Branch 004) - '+$period);if([string]$t.Xml -cne $memo[$period].xml -or [string]$t.GetSecurityDescriptor(4) -cne $memo[$period].dacl){Stop-H004Permission 'PRESERVATION_UNVERIFIED'}}
         $b=[IO.File]::ReadAllBytes('C:\Users\Administrator\Desktop\RxAuu\apps\adapos-sync\.env');if(-not [Linq.Enumerable]::SequenceEqual([byte[]]$memo.config,[byte[]]$b)){Stop-H004Permission 'PRESERVATION_UNVERIFIED'}
-      }.GetNewClosure()
+      }
     }
-    $result=Invoke-H004PermissionEngine -Mode $Mode -Approved $Approved -Sid $sid -Spec $spec -Provider $provider
+    $result=Invoke-H004PermissionEngine -Mode $Mode -Approved $Approved -Sid $sid -Spec $nativeSpec -Provider $provider
     if($Mode -cin @('Apply','Rollback') -and [IO.Directory]::Exists($backupDir)){
       try{
       Assert-H004PrivatePermissionBackup $backupDir
