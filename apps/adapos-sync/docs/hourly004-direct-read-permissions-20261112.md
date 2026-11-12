@@ -39,12 +39,14 @@ back for approval.
 1. Non-inheriting file read (0x120089) on **two existing durable receipts and
    the existing public launcher pointer only**. No read on the full evidence
    tree, backups, configuration, product manifests or queued payloads.
-2. Traverse/read-attributes only (0xA0), non-inheriting, on four exact ancestor
+2. Traverse/read-attributes/synchronize only (0x1000A0), non-inheriting, on four exact ancestor
    directories. This grants no directory listing or file-content access there.
-3. List/traverse/read-attributes (0xA1), this-directory-only, on the existing
+3. List/traverse/read-attributes/synchronize (0x1000A1), this-directory-only, on the existing
    branch004 outbox. Inherit **read-attributes only** (0x80) to its children,
-   including future children, so the reader can count/type/size entries without
+   including future children, with synchronize (0x100080), so the reader can count/type/size entries without
    reading queued business payloads. Do not inherit file ReadData.
+   The synchronize bit matches Windows allow-rule construction; it grants no
+   content read/write, delete or ownership change.
 4. Read-only Task access (0x120089) on the **eleven exact Hourly004 tasks**.
    Preserve every existing ACE, action, principal, trigger and setting. No
    execute/start/stop/change/delete/write-DACL right for the reader. No Full

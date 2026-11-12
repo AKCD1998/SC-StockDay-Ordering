@@ -12,7 +12,7 @@
     "C:\\ProgramData\\SC-StockDay-Ordering\\hourly-stock-evidence-004\\complete-on-20261022\\hourly-complete-launcher.mjs"
   ],
   "fileInheritance": "None",
-  "ancestorMetadataMask": 160,
+  "ancestorMetadataMask": 1048736,
   "ancestorInheritance": "None",
   "metadataDirectories": [
     "C:\\ProgramData\\SC-StockDay-Ordering",
@@ -22,9 +22,9 @@
   ],
   "queue": {
     "path": "C:\\ProgramData\\SC-StockDay-Ordering\\hourly-stock-evidence-004\\hourly-evidence-outbox\\004",
-    "directoryMask": 161,
+    "directoryMask": 1048737,
     "directoryInheritance": "None",
-    "childMetadataMask": 128,
+    "childMetadataMask": 1048704,
     "childInheritance": "ContainerInherit,ObjectInherit,InheritOnly",
     "payloadReadGranted": false
   },
