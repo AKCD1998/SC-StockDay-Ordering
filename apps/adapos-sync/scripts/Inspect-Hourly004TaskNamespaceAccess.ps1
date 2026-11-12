@@ -1,5 +1,20 @@
+param([switch]$EvaluateRootReadCandidate)
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
+function New-H004RootReadCandidate([byte[]]$Descriptor,[Security.Principal.SecurityIdentifier]$Caller){
+ # Hypothetical self-only ListDirectory/ReadAttributes ACE, RAM only. No ACL API.
+ $copy=[Security.AccessControl.RawSecurityDescriptor]::new($Descriptor,0)
+ if($null -eq $copy.DiscretionaryAcl){throw 'CANDIDATE_NULL_DACL'}
+ $at=$copy.DiscretionaryAcl.Count
+ for($n=0;$n -lt $copy.DiscretionaryAcl.Count;$n++){
+  if(([int]$copy.DiscretionaryAcl[$n].AceFlags -band 16) -ne 0){$at=$n;break}
+ }
+ $ace=[Security.AccessControl.CommonAce]::new([Security.AccessControl.AceFlags]::None,[Security.AccessControl.AceQualifier]::AccessAllowed,129,$Caller,$false,$null)
+ $copy.DiscretionaryAcl.InsertAce($at,$ace)
+ [byte[]]$result=New-Object byte[] $copy.BinaryLength;$copy.GetBinaryForm($result,0)
+ return ,$result
+}
 $r=[ordered]@{schema='h004-root-kernel-accesscheck-v2';checkedAt=[DateTimeOffset]::UtcNow.ToString('o');status='UNKNOWN';identityVerified=$false;hostVerified=([Environment]::MachineName -ieq 'SERVER004');adminToken=$null;threadImpersonationDetected=$null;tokenBasis='process-primary';isTokenRestricted=$null;checks=@();impersonationPerformed=$false;permissionChanges=0;sourceReads=0;rootSecurityMetadataReads=0;namesEnumerated=0;sourceFileWrites=0;nativeReadAdmissionEstablished=$false}
+$r.candidate=[ordered]@{requested=[bool]$EvaluateRootReadCandidate;evaluated=$false;rights='directoryList,readAttributes';mask=129;selfOnly=$true;trustee='current-user-only';checks=@();applied=$false;comAdmissionEstablished=$false}
 $orig=[IntPtr]::Zero;$dup=[IntPtr]::Zero;$sdptr=[IntPtr]::Zero;$map=[IntPtr]::Zero;$priv=[IntPtr]::Zero;$stage='context'
 try{
 $id=[Security.Principal.WindowsIdentity]::GetCurrent();$r.identityVerified=($id.Name -ieq 'SERVER004\CodexSandboxOffline');$r.adminToken=([Security.Principal.WindowsPrincipal]::new($id)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -45,6 +60,20 @@ foreach($q in @(@{label='READ_CONTROL';mask=[uint32]131072},@{label='directoryLi
  $err=$null;if(-not $ok){$err=[Runtime.InteropServices.Marshal]::GetLastWin32Error()}
  $r.checks+=,[ordered]@{right=$q.label;apiSucceeded=$ok;allowed=$(if($ok){$allowed}else{$null});nativeError=$err}
  if(-not $ok){throw 'API_FAILED'}
+}
+if($EvaluateRootReadCandidate){
+ $stage='candidate-descriptor-in-memory'
+ [byte[]]$candidate=New-H004RootReadCandidate $sd $id.User
+ [Runtime.InteropServices.Marshal]::FreeHGlobal($sdptr);$sdptr=[IntPtr]::Zero
+ $sdptr=[Runtime.InteropServices.Marshal]::AllocHGlobal($candidate.Length);[Runtime.InteropServices.Marshal]::Copy($candidate,0,$sdptr,$candidate.Length)
+ foreach($q in @(@{label='READ_CONTROL';mask=[uint32]131072},@{label='directoryList';mask=[uint32]1},@{label='readAttributes';mask=[uint32]128},@{label='genericRead';mask=[uint32]2147483648})){
+  [uint32]$desired=$q.mask;$native::MapGenericMask([ref]$desired,$map);[uint32]$len=1024;[uint32]$granted=0;[bool]$allowed=$false
+  $ok=$native::AccessCheck($sdptr,$dup,$desired,$map,$priv,[ref]$len,[ref]$granted,[ref]$allowed)
+  $err=$null;if(-not $ok){$err=[Runtime.InteropServices.Marshal]::GetLastWin32Error()}
+  $r.candidate.checks+=,[ordered]@{right=$q.label;apiSucceeded=$ok;allowed=$(if($ok){$allowed}else{$null});nativeError=$err}
+  if(-not $ok){throw 'API_FAILED'}
+ }
+ $r.candidate.evaluated=$true
 }
 $r.status='KERNEL_ACCESSCHECK_COMPLETED';$r.limitation='Kernel AccessCheck on root security descriptor and an identification-only duplicate of the process primary token; pre-existing thread impersonation is rejected. Not proof of COM namespace visibility or actual directory open.'
 }catch{$r.status='BLOCKED';$r.failedStage=$stage;$r.exceptionType=$_.Exception.GetType().FullName;$r.hresult=[int64]$_.Exception.HResult}

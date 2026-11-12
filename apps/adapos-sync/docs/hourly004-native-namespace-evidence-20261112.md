@@ -39,10 +39,67 @@ Service admission. The existing owned-child30s supervisor is still required.
 
 Validation on ScProductDev used only current-process token queries and synthetic
 security descriptors in RAM: five corrected signatures, legacy zero-parameter
-regression, eight allow/deny decisions, and the real wrong-host gate. It did not
+regression, twelve allow/deny decisions, and the real wrong-host gate. It did not
 invoke the SERVER004 audit with a forged context or read a system directory.
 These fixtures do not establish actual SERVER004 kernel decisions or admission.
 An independent review and exact-revision CI precede any new native diagnostic.
+
+Actual corrected probe completed at18:43:12 Bangkok through the same existing
+Ozymandias native context, non-admin and unchanged profile; its owned child
+closed. The process primary token was restricted. Kernel AccessCheck succeeded:
+READ_CONTROL allowed; directory-list, read-attributes and generic-read denied.
+This now verifies an effective filesystem read limitation under that token.
+It does not identify the complete Task Service denial path or prove that a
+user-only root ACE would repair access. No permission retry was requested.
+Source admission remains PARTIAL: receipts2, current queue0,
+actual Task reads0/11, ACK/current evidence qualification unknown.
+
+The actual browser conversation with Ozymandias is now an acknowledged handoff
+and native execution receipt, superseding the earlier journal-only pending
+handoff. Main's SMB/COM observations are still a separate provenance and are
+never represented as cloud/native access. No further owner download/run is
+requested; no administrator route is available under current authority.
+
+## Permission boundary for the next review (not an Apply authorization)
+
+The approved19-object manifest must not silently grow a20th object. A possible
+extension would concern directory-list and read-attributes of the Task Scheduler
+root itself, without inheritance or Task Run/write/delete rights. Before proposing an
+executable change, establish which exact native Windows/restricted-token grant
+and platform policy are necessary, and an explicitly authorized administrator
+execution route. A root filesystem GR ACE alone is only an unproven candidate.
+Do not acquire another identity/profile/channel to bypass the observed denial.
+
+The optional `-EvaluateRootReadCandidate` evaluates one descriptor copy in RAM
+only: add an allow129 (directory-list/read-attributes) for the current user to
+the root object itself. It neither changes an ACL nor grants a restricting SID.
+Original ACE bytes/order, owner/group and descriptor control flags are retained;
+the inserted ACE has no inheritance flags. Synthetic native5.1 fixtures check
+the exact helper, preserving foreign/inherited ACEs and rejecting a null DACL.
+The actual restricted-token candidate result is still required and is not
+established by local unrestricted-token fixtures. Even an allowed candidate
+remains a kernel result and does not establish Task Service admission.
+This candidate is not Generic Read: it adds neither ReadEA nor traverse.
+Consequently a genericRead=false result cannot establish that a user-only GR
+candidate would fail. A denied candidate129 does not uniquely identify which
+restricted SID or additional check caused denial. This optional candidate has
+not yet run on SERVER004 and is not permission-change approval.
+
+Root namespace read can expose names/metadata of unrelated root Tasks, and an
+ACE for the shared sandbox account is not an Ozymandias-only grant. Existing
+rights must be assessed together with any added read access. Do not grant broad
+Users/Everyone/restricted-code access or inheritance as a diagnostic shortcut.
+The human's standing instruction requires a separate concrete review before
+new security scope; the current request to coordinate does not remove it.
+
+If a validated permission extension is later approved, preserve private exact
+before-images and object identities, retain every pre-existing ACE/owner and
+foreign change, verify all Task definitions/FullSync/Delta unchanged, and read
+back under the actual same restricted native caller before source admission.
+Rollback removes only the newly approved ACEs with matching identity/after-image;
+foreign changes stop rollback for review rather than replacing current ACLs.
+The source schedule step must still wait for actual11Task/receipt/ACK/queue
+admission, followed by saved-prompt/timing verification and scheduled reuse.
 
 No stock Task, Sync, replay, capture/upload, database, ACL, account, credential,
 guard12s, recoveryOFF, PR81 runtime or FullSync/Delta change is included.
