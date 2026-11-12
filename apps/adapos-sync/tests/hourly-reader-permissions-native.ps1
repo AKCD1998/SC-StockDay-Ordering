@@ -2,16 +2,16 @@ param([Parameter(Mandatory=$true)][string]$Setup)
 $ErrorActionPreference='Stop'
 . $Setup
 $passed=@();$failed=@()
-function Check([bool]$Value){if(-not $Value){throw 'FIXTURE_ASSERTION'}}
-function Case([string]$Name,[scriptblock]$Body){try{&$Body;$script:passed+=,$Name}catch{$script:failed+=@{case=$Name;line=$_.InvocationInfo.ScriptLineNumber;type=$_.Exception.GetType().Name}}}
+function Check([bool]$Value){$script:checkIndex++;if(-not $Value){throw 'FIXTURE_ASSERTION'}}
+function Case([string]$Name,[scriptblock]$Body){$script:checkIndex=0;try{&$Body;$script:passed+=,$Name}catch{$script:failed+=@{case=$Name;check=$script:checkIndex;line=$_.InvocationInfo.ScriptLineNumber;type=$_.Exception.GetType().Name}}}
 $sid='S-1-5-21-111-222-333-1001';$base='D:P(A;;FA;;;SY)(A;;FA;;;BA)'
 function Fixture([string]$Fault='none'){
  $spec=Get-H004PermissionSpec
  $state=@{fault=$Fault;saved=$null;gets=0;sets=0;saves=0;preflights=0;preserves=0;entries=@{}}
  foreach($s in $spec){$state.entries[$s.key]=@{identity=('fixture-'+$s.key);sddl=$base}}
  $read={param($s);$state.gets++;return @{identity=$state.entries[$s.key].identity;sddl=$state.entries[$s.key].sddl}}.GetNewClosure()
- $write={param($s,$d);$state.sets++;if($state.fault -eq 'set-failure' -and $state.sets -eq 3){throw [UnauthorizedAccessException]::new('MUST_NEVER_ESCAPE')};$state.entries[$s.key].sddl=$d;if($state.fault -eq 'set-then-throw'){throw [IO.IOException]::new('MUST_NEVER_ESCAPE')}}.GetNewClosure()
- $quiet={if($state.fault -eq 'foreign-during-quiet'){$state.entries['object-00'].sddl='D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FR;;;BU)'};if($state.fault -eq 'identity-during-quiet'){$state.entries['object-00'].identity='foreign-identity'}}.GetNewClosure()
+ $write={param($s,$d);$state.sets++;if($state.fault -eq 'set-failure' -and $state.sets -eq 3){throw [UnauthorizedAccessException]::new('MUST_NEVER_ESCAPE')};$state.entries[$s.key].sddl=$d;if($state.fault -eq 'ai-on-write'){$state.entries[$s.key].sddl=WithControlFlag $d 1024};if($state.fault -eq 'extra-on-write'){$state.entries[$s.key].sddl=$d+'(A;;FR;;;BU)'};if($state.fault -eq 'set-then-throw'){throw [IO.IOException]::new('MUST_NEVER_ESCAPE')}}.GetNewClosure()
+ $quiet={if($state.fault -eq 'foreign-during-quiet'){$state.entries['object-00'].sddl='D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FR;;;BU)'};if($state.fault -eq 'foreign-during-resume-quiet'){$state.entries['object-01'].sddl='D:(A;;FA;;;SY)(A;;FA;;;BA)(A;;FR;;;BU)'};if($state.fault -eq 'identity-during-quiet'){$state.entries['object-00'].identity='foreign-identity'}}.GetNewClosure()
  $provider=@{
   Preflight={$state.preflights++;if($state.fault -eq 'busy'){Stop-H004Permission 'HOURLY_OR_FULLSYNC_BUSY'}}.GetNewClosure()
   Load={return $state.saved}.GetNewClosure()
@@ -34,6 +34,8 @@ Case 'executable-scope-exactly-matches-reviewed-permission-manifest' {
 Case 'plan-does-not-save-or-write' {$f=Fixture;$r=Run $f 'Plan';Check ($r.status -eq 'READ_PERMISSION_PLAN_READY');Check ($f.state.sets -eq 0 -and $f.state.saves -eq 0)}
 Case 'apply-needs-explicit-scope-approval-before-provider' {$f=Fixture;$r=Run $f 'Apply' $false;Check ($r.errorCode -eq 'EXPLICIT_READ_SCOPE_APPROVAL_REQUIRED');Check ($f.state.preflights -eq 0 -and $f.state.sets -eq 0)}
 Case 'rollback-needs-explicit-scope-approval' {$f=Fixture;$r=Run $f 'Rollback' $false;Check ($r.errorCode -eq 'EXPLICIT_READ_SCOPE_APPROVAL_REQUIRED');Check ($f.state.sets -eq 0)}
+Case 'resume-needs-explicit-scope-approval-before-provider' {$f=Fixture;$r=Run $f 'Resume' $false;Check ($r.errorCode -eq 'EXPLICIT_READ_SCOPE_APPROVAL_REQUIRED');Check ($f.state.preflights -eq 0 -and $f.state.sets -eq 0)}
+Case 'resume-requires-existing-snapshot-without-creating-one' {$f=Fixture;$r=Run $f 'Resume';Check ($r.errorCode -eq 'NO_SETUP_BACKUP');Check ($f.state.sets -eq 0 -and $f.state.saves -eq 0)}
 Case 'busy-work-is-not-stopped-or-retried' {$f=Fixture 'busy';$r=Run $f;Check ($r.errorCode -eq 'HOURLY_OR_FULLSYNC_BUSY');Check ($f.state.preflights -eq 1 -and $f.state.sets -eq 0 -and $f.state.saves -eq 0)}
 Case 'durable-before-image-precedes-all-permission-writes' {$f=Fixture 'save-failure';$r=Run $f;Check ($r.errorCode -eq 'BACKUP_WRITE_UNVERIFIED');Check ($f.state.sets -eq 0)}
 Case 'apply-verifies-each-object-and-preservation' {$f=Fixture;$r=Run $f;Check ($r.status -eq 'READ_PERMISSIONS_APPLIED_NATIVE_ACCEPTANCE_PENDING');Check ($r.objectsChanged -eq 19 -and $r.objectsAttempted -eq 19);Check ($f.state.saves -eq 1 -and $f.state.preserves -eq 1);Check $r.fullSyncDefinitionsUnchanged;Check $r.deltaConfigurationBytesUnchanged;Check ($r.nativeReadAcceptance -eq 'NOT_PERFORMED')}
@@ -60,6 +62,40 @@ Case 'file-directory-and-task-types-are-checked-before-granting-rights' {
   foreach($kind in @('file','task')){$blocked=$false;try{Assert-H004PermissionObjectKind @{IsDirectory=$true} $kind}catch{$blocked=$_.Exception.Message -eq 'OBJECT_KIND_UNVERIFIED'};Check $blocked}
   $blocked=$false;try{Assert-H004PermissionObjectKind @{IsDirectory=$false} 'directory'}catch{$blocked=$_.Exception.Message -eq 'OBJECT_KIND_UNVERIFIED'};Check $blocked
 }
+function WithControlFlag([string]$Text,[int]$Flag){$d=[Security.AccessControl.RawSecurityDescriptor]::new($Text);$d.SetFlags([Security.AccessControl.ControlFlags]([int]$d.ControlFlags -bor $Flag));return $d.GetSddlForm([Security.AccessControl.AccessControlSections]::Access)}
+function PartialWithAi {
+  $f=Fixture 'set-then-throw';foreach($v in $f.state.entries.Values){$v.sddl='D:(A;;FA;;;SY)(A;;FA;;;BA)'}
+  $r=Run $f;Check ($r.objectsAttempted -eq 1 -and $r.objectsChanged -eq 0)
+  $f.state.entries['object-00'].sddl=WithControlFlag $f.state.entries['object-00'].sddl 1024;$f.state.fault='none';return $f
+}
+Case 'comparison-tolerates-only-ai-while-snapshot-canonicalization-stays-unchanged' {
+  $v='D:(A;;FA;;;SY)(A;;FA;;;BA)';$ai=WithControlFlag $v 1024
+  Check (Test-H004PermissionDaclEqual $ai $v);Check (Test-H004PermissionDaclEqual $v $ai)
+  Check ((Normalize-H004PermissionDacl $v) -cne (Normalize-H004PermissionDacl $ai))
+}
+Case 'comparison-preserves-all-other-sddl-control-flags' {
+  $v='D:(A;;FA;;;SY)(A;;FA;;;BA)'
+  foreach($flag in @(256,4096)){Check (-not (Test-H004PermissionDaclEqual (WithControlFlag (WithControlFlag $v 1024) $flag) $v))}
+}
+Case 'comparison-rejects-ace-mask-order-inherited-flag-deny-and-extra-entries' {
+  $v='D:(A;;FA;;;SY)(A;;FA;;;BA)'
+  foreach($other in @('D:AI(A;;FR;;;SY)(A;;FA;;;BA)','D:AI(A;;FA;;;BA)(A;;FA;;;SY)','D:AI(A;ID;FA;;;SY)(A;;FA;;;BA)','D:AI(D;;FA;;;SY)(A;;FA;;;BA)','D:AI(A;;FA;;;SY)(A;;FA;;;BA)(A;;FR;;;BU)')){Check (-not (Test-H004PermissionDaclEqual $other $v))}
+}
+Case 'ai-only-kernel-readback-passes-all-apply-status-and-rollback-stages' {$f=Fixture 'ai-on-write';foreach($v in $f.state.entries.Values){$v.sddl='D:(A;;FA;;;SY)(A;;FA;;;BA)'};$r=Run $f;Check ($r.status -eq 'READ_PERMISSIONS_APPLIED_NATIVE_ACCEPTANCE_PENDING' -and $r.objectsChanged -eq 19);$r=Run $f 'Status';Check ($r.status -eq 'READ_PERMISSIONS_PRESENT_NATIVE_ACCEPTANCE_PENDING');$r=Run $f 'Rollback';Check ($r.status -eq 'READER_PERMISSION_ROLLBACK_COMPLETED' -and $r.objectsChanged -eq 19)}
+Case 'extra-ace-on-write-still-fails-readback-without-auto-rollback' {$f=Fixture 'extra-on-write';$r=Run $f;Check ($r.errorCode -eq 'PERMISSION_READBACK_DIFFER' -and $r.objectsAttempted -eq 1 -and $r.objectsChanged -eq 0 -and $f.state.sets -eq 1)}
+Case 'observed-one-after-eighteen-before-status-is-partial-not-foreign' {$f=PartialWithAi;$before=$f.state.sets;$r=Run $f 'Status';Check ($r.status -eq 'PARTIAL_SETUP_REVIEW_REQUIRED');Check ($f.state.sets -eq $before)}
+Case 'old-apply-cannot-blindly-continue-ai-partial-state' {$f=PartialWithAi;$before=$f.state.sets;$r=Run $f;Check ($r.errorCode -eq 'EXISTING_SETUP_REVIEW_REQUIRED');Check ($f.state.sets -eq $before)}
+Case 'explicit-resume-skips-completed-object-and-preserves-original-snapshot' {
+  $f=PartialWithAi;$saved=$f.state.saved|ConvertTo-Json -Depth 12 -Compress;$before=$f.state.sets;$r=Run $f 'Resume'
+  Check ($r.status -eq 'READ_PERMISSIONS_RESUMED_NATIVE_ACCEPTANCE_PENDING');Check ($r.objectsChanged -eq 18 -and $r.objectsAttempted -eq 18 -and $f.state.sets -eq ($before+18))
+  Check ($f.state.saves -eq 1 -and $f.state.preserves -eq 1);Check (($f.state.saved|ConvertTo-Json -Depth 12 -Compress) -ceq $saved)
+  $before=$f.state.sets;$r=Run $f 'Resume';Check ($r.objectsAttempted -eq 0 -and $r.objectsChanged -eq 0 -and $f.state.sets -eq $before)
+}
+Case 'resume-rejects-foreign-on-last-object-before-first-write' {$f=PartialWithAi;$f.state.entries['object-18'].sddl='D:(A;;FA;;;SY)(A;;FA;;;BA)(A;;FR;;;BU)';$before=$f.state.sets;$r=Run $f 'Resume';Check ($r.errorCode -eq 'FOREIGN_PERMISSION_CHANGE' -and $f.state.sets -eq $before)}
+Case 'resume-rejects-identity-change-before-first-write' {$f=PartialWithAi;$f.state.entries['object-18'].identity='replacement';$before=$f.state.sets;$r=Run $f 'Resume';Check ($r.errorCode -eq 'OBJECT_IDENTITY_CHANGED' -and $f.state.sets -eq $before)}
+Case 'resume-rejects-tampered-snapshot-without-replacing-it' {$f=PartialWithAi;$f.state.saved.objects[0].after='D:(A;;FA;;;WD)';$before=$f.state.sets;$r=Run $f 'Resume';Check ($r.errorCode -eq 'BACKUP_UNVERIFIED' -and $f.state.sets -eq $before -and $f.state.saves -eq 1)}
+Case 'resume-rejects-edits-during-quiet-before-remaining-write' {$f=PartialWithAi;$f.state.fault='foreign-during-resume-quiet';$before=$f.state.sets;$r=Run $f 'Resume';Check ($r.errorCode -eq 'FOREIGN_PERMISSION_CHANGE' -and $f.state.sets -eq $before)}
+Case 'rollback-accepts-ai-only-readback-and-preserves-original-rights' {$f=PartialWithAi;$before=$f.state.sets;$r=Run $f 'Rollback';Check ($r.status -eq 'READER_PERMISSION_ROLLBACK_COMPLETED' -and $r.objectsChanged -eq 1 -and $f.state.sets -eq ($before+1));Check (Test-H004PermissionDaclEqual $f.state.entries['object-00'].sddl $f.state.saved.objects[0].before)}
 Case 'native-handle-dacl-and-child-metadata-inheritance-use-only-temporary-fixtures' {
   Initialize-H004PermissionHandles
   $root=Join-Path ([IO.Path]::GetTempPath()) ('h004-permission-'+[guid]::NewGuid().ToString('N'));$h=$null;$child=$null
@@ -72,6 +108,41 @@ Case 'native-handle-dacl-and-child-metadata-inheritance-use-only-temporary-fixtu
     $h.Write($before);Check ((Normalize-H004PermissionDacl $h.Read()) -ceq (Normalize-H004PermissionDacl $before))
   }finally{
     if($null -ne $child){$child.Dispose()};if($null -ne $h){$h.Dispose()}
+    $resolved=[IO.Path]::GetFullPath($root);$bound=[IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')+'\'
+    if($resolved.StartsWith($bound,[StringComparison]::OrdinalIgnoreCase) -and (Split-Path $resolved -Leaf) -like 'h004-permission-*'){Remove-Item -LiteralPath $resolved -Recurse -Force}
+  }
+}
+Case 'native-inherited-file-without-ai-reproduces-windows-ai-readback' {
+  Initialize-H004PermissionHandles
+  Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Security.AccessControl;
+public static class Hourly004LegacyAclFixtureV1 {
+  [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+  static extern bool SetFileSecurity(string path, uint info, byte[] descriptor);
+  public static void Seed(string path, string text) {
+    var d=new RawSecurityDescriptor(text);var bytes=new byte[d.BinaryLength];d.GetBinaryForm(bytes,0);
+    if(!SetFileSecurity(path,4,bytes))throw new Win32Exception(Marshal.GetLastWin32Error());
+  }
+}
+'@
+  $root=Join-Path ([IO.Path]::GetTempPath()) ('h004-permission-'+[guid]::NewGuid().ToString('N'));$h=$null
+  try{
+    [void][IO.Directory]::CreateDirectory($root);$file=Join-Path $root 'synthetic-receipt.json';[IO.File]::WriteAllText($file,'SYNTHETIC')
+    $h=[Hourly004PermissionHandleV1]::new($file,$true);$original=$h.Read();$seed=[Security.AccessControl.RawSecurityDescriptor]::new($original)
+    $seed.SetFlags([Security.AccessControl.ControlFlags]([int]$seed.ControlFlags -band (-bnot 1024)))
+    [Hourly004LegacyAclFixtureV1]::Seed($file,$seed.GetSddlForm([Security.AccessControl.AccessControlSections]::Access))
+    $before=$h.Read();$identity=$h.Identity
+    Check (([int]([Security.AccessControl.RawSecurityDescriptor]::new($before)).ControlFlags -band 1024) -eq 0)
+    $wanted=Add-H004PermissionRules $before $sid @(@{mask=1179785;flags=0});$h.Write($wanted);$actual=$h.Read()
+    Check ((Normalize-H004PermissionDacl $actual) -cne (Normalize-H004PermissionDacl $wanted))
+    Check (([int]([Security.AccessControl.RawSecurityDescriptor]::new($actual)).ControlFlags -bxor [int]([Security.AccessControl.RawSecurityDescriptor]::new($wanted)).ControlFlags) -eq 1024)
+    Check (Test-H004PermissionDaclEqual $actual $wanted);Check ($h.Identity -ceq $identity)
+    $h.Write($before);Check (Test-H004PermissionDaclEqual $h.Read() $before)
+  }finally{
+    if($null -ne $h){$h.Dispose()}
     $resolved=[IO.Path]::GetFullPath($root);$bound=[IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')+'\'
     if($resolved.StartsWith($bound,[StringComparison]::OrdinalIgnoreCase) -and (Split-Path $resolved -Leaf) -like 'h004-permission-*'){Remove-Item -LiteralPath $resolved -Recurse -Force}
   }

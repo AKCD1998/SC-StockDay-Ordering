@@ -97,9 +97,17 @@ Corrupt, conflicting, stale or task-mismatched evidence stays unknown.
 The one-time owner controller is now prepared in
 `scripts/Set-Hourly004ReaderPermissions.ps1`; see
 `hourly004-reader-permission-owner-setup.md`. Default action is Plan.
-Only the human owner runs Apply/Rollback with explicit `-ApproveReadScope`
-in an already-elevated SERVER004 Administrator PowerShell. Main has not executed
-it on production. This does not change the native reader's sandbox or policy.
+Only the human owner runs Apply/Resume/Rollback with explicit `-ApproveReadScope`
+in an already-elevated SERVER004 Administrator PowerShell. Main does not execute
+permission writes remotely. This does not change the native reader's sandbox or policy.
+The owner Apply at 12Nov16:30:55 stopped after the first approved receipt ACE was
+written: Windows added only the DACL AutoInherited control bit, triggering the old
+strict string readback check. The other18 DACLs remain at their saved before-image.
+The corrected comparison masks only that bit and still compares complete ACL
+binary/order and all other represented control bits. Explicit Resume requires
+the original valid snapshot and skips matching after-images; it never creates a
+new baseline or discards foreign changes. See the owner setup document for this
+incident and the reviewed continuation; native access remains unproven.
 After approval of the scope:
 
 1. Reconfirm native caller SID/context, exact reviewed bytes, filesystem policy,

@@ -1,4 +1,4 @@
-param([ValidateSet('Plan','Apply','Status','Rollback')][string]$Action='Plan',[switch]$ApproveReadScope)
+param([ValidateSet('Plan','Apply','Resume','Status','Rollback')][string]$Action='Plan',[switch]$ApproveReadScope)
 Set-StrictMode -Version 2
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 
@@ -18,6 +18,16 @@ function Get-H004PermissionSpec {
 }
 function Normalize-H004PermissionDacl([string]$Sddl){
   try{$d=[Security.AccessControl.RawSecurityDescriptor]::new($Sddl);if($null -eq $d.DiscretionaryAcl -or $d.DiscretionaryAcl.Count -eq 0){Stop-H004Permission 'UNSAFE_DACL'};return $d.GetSddlForm([Security.AccessControl.AccessControlSections]::Access)}catch{Stop-H004Permission 'UNSAFE_DACL'}
+}
+function Test-H004PermissionDaclEqual([string]$Actual,[string]$Expected){
+  # SetSecurityInfo can add SE_DACL_AUTO_INHERITED (0x400) on readback.
+  # Compare only: do not rewrite stored before/after images or canonicalize ACEs.
+  $a=[Security.AccessControl.RawSecurityDescriptor]::new((Normalize-H004PermissionDacl $Actual))
+  $e=[Security.AccessControl.RawSecurityDescriptor]::new((Normalize-H004PermissionDacl $Expected))
+  if((([int]$a.ControlFlags -bxor [int]$e.ControlFlags) -band (-bnot 1024)) -ne 0){return $false}
+  $ab=New-Object byte[] $a.DiscretionaryAcl.BinaryLength;$eb=New-Object byte[] $e.DiscretionaryAcl.BinaryLength
+  $a.DiscretionaryAcl.GetBinaryForm($ab,0);$e.DiscretionaryAcl.GetBinaryForm($eb,0)
+  return [Linq.Enumerable]::SequenceEqual([byte[]]$ab,[byte[]]$eb)
 }
 function Add-H004PermissionRules([string]$Sddl,[string]$Sid,$Rules){
   $d=[Security.AccessControl.RawSecurityDescriptor]::new((Normalize-H004PermissionDacl $Sddl));$sidObject=[Security.Principal.SecurityIdentifier]::new($Sid)
@@ -50,7 +60,7 @@ function Invoke-H004CheckedPermissionWrite($Spec,[string]$Wanted,[string]$Expect
   # writing; do not overwrite an edit observed while checking business work.
   $current=& $Read $Spec
   if($current.identity -cne $ExpectedIdentity){Stop-H004Permission 'OBJECT_IDENTITY_CHANGED'}
-  if((Normalize-H004PermissionDacl $current.sddl) -cne $ExpectedDacl){Stop-H004Permission 'FOREIGN_PERMISSION_CHANGE'}
+  if(-not (Test-H004PermissionDaclEqual $current.sddl $ExpectedDacl)){Stop-H004Permission 'FOREIGN_PERMISSION_CHANGE'}
   & $Write $Spec $Wanted
 }
 function Invoke-H004PermissionEngine {
@@ -58,7 +68,7 @@ function Invoke-H004PermissionEngine {
   $report=[ordered]@{schemaVersion='hourly004-reader-permission-result-v1';inspectionTime=[DateTimeOffset]::Now.ToString('o');action=$Mode;status='STOPPED_REVIEW_REQUIRED';errorCode=$null;failedStage=$null;failedObjectNumber=$null;nativeErrorCode=$null;objectsExpected=19;objectsAttempted=0;objectsChanged=0;backupAvailable=$false;sourceSqlQueries=0;taskRuns=0;syncRequested=$false;manualCaptureOrUploadRequested=$false;runtimeCodeChanged=$false;configurationChanged=$false;fullSyncDefinitionsUnchanged=$null;deltaConfigurationBytesUnchanged=$null;expectedGuardBudgetMs=12000;expectedUploadRecoveryEnabled=$false;nativeReadAcceptance='NOT_PERFORMED';cloudScheduleChanged=$false}
   $phase='approval';$objectNumber=$null
   try{
-    if($Mode -cin @('Apply','Rollback') -and -not $Approved){Stop-H004Permission 'EXPLICIT_READ_SCOPE_APPROVAL_REQUIRED'}
+    if($Mode -cin @('Apply','Resume','Rollback') -and -not $Approved){Stop-H004Permission 'EXPLICIT_READ_SCOPE_APPROVAL_REQUIRED'}
     if($Spec.Count -ne 19 -or $Sid -cnotmatch '^S-1-5-21-(\d+-){3}\d+$'){Stop-H004Permission 'PLAN_OR_IDENTITY_UNVERIFIED'}
     $phase='preflight'; & $Provider.Preflight
     $phase='backup-read'
@@ -72,7 +82,7 @@ function Invoke-H004PermissionEngine {
         if($r.key -cne $s.key -or $r.kind -cne $s.kind -or $r.path -cne $s.path -or $r.after -cne (Add-H004PermissionRules $r.before $Sid $s.rules)){Stop-H004Permission 'BACKUP_UNVERIFIED'}
       }
     }else{
-      if($Mode -ceq 'Rollback'){Stop-H004Permission 'NO_SETUP_BACKUP'}
+      if($Mode -cin @('Resume','Rollback')){Stop-H004Permission 'NO_SETUP_BACKUP'}
       $records=@()
       foreach($s in $Spec){$phase='object-snapshot';$objectNumber=$records.Count+1;$current=& $Provider.Get $s;$before=Normalize-H004PermissionDacl $current.sddl;$records+=@{key=$s.key;kind=$s.kind;path=$s.path;identity=$current.identity;before=$before;after=(Add-H004PermissionRules $before $Sid $s.rules)}}
     }
@@ -81,7 +91,7 @@ function Invoke-H004PermissionEngine {
       $phase='object-verification';$objectNumber=$i+1
       $current=& $Provider.Get $Spec[$i];$r=$records[$i];$d=Normalize-H004PermissionDacl $current.sddl
       if($current.identity -cne $r.identity){Stop-H004Permission 'OBJECT_IDENTITY_CHANGED'}
-      $isAfter=$d -ceq $r.after;$isBefore=$d -ceq $r.before
+      $isAfter=Test-H004PermissionDaclEqual $d $r.after;$isBefore=Test-H004PermissionDaclEqual $d $r.before
       if($isAfter){$afterCount++};if($isBefore){$beforeCount++};if(-not $isAfter -and -not $isBefore){Stop-H004Permission 'FOREIGN_PERMISSION_CHANGE'}
     }
     if($Mode -ceq 'Plan'){$report.status='READ_PERMISSION_PLAN_READY';return [pscustomobject]$report}
@@ -97,20 +107,20 @@ function Invoke-H004PermissionEngine {
       $phase='object-verification';$objectNumber=$i+1
       $s=$Spec[$i];$r=$records[$i];$current=& $Provider.Get $s;$d=Normalize-H004PermissionDacl $current.sddl
       if($current.identity -cne $r.identity){Stop-H004Permission 'OBJECT_IDENTITY_CHANGED'}
-      $wanted=if($Mode -ceq 'Apply'){$r.after}else{$r.before}
-      if($d -ceq $wanted){continue}
-      $expected=if($Mode -ceq 'Apply'){$r.before}else{$r.after}
-      if($d -cne $expected){Stop-H004Permission 'FOREIGN_PERMISSION_CHANGE'}
+      $wanted=if($Mode -cin @('Apply','Resume')){$r.after}else{$r.before}
+      if(Test-H004PermissionDaclEqual $d $wanted){continue}
+      $expected=if($Mode -cin @('Apply','Resume')){$r.before}else{$r.after}
+      if(-not (Test-H004PermissionDaclEqual $d $expected)){Stop-H004Permission 'FOREIGN_PERMISSION_CHANGE'}
       $report.objectsAttempted++
       $phase='permission-write'
       & $Provider.Set $s $wanted $r.identity $expected
       $check=& $Provider.Get $s
-      if($check.identity -cne $r.identity -or (Normalize-H004PermissionDacl $check.sddl) -cne $wanted){Stop-H004Permission 'PERMISSION_READBACK_DIFFER'}
+      if($check.identity -cne $r.identity -or -not (Test-H004PermissionDaclEqual $check.sddl $wanted)){Stop-H004Permission 'PERMISSION_READBACK_DIFFER'}
       $report.objectsChanged++
     }
     $phase='preservation';$objectNumber=$null; & $Provider.Preserve
     $report.fullSyncDefinitionsUnchanged=$true;$report.deltaConfigurationBytesUnchanged=$true
-    $report.status=$(if($Mode -ceq 'Apply'){'READ_PERMISSIONS_APPLIED_NATIVE_ACCEPTANCE_PENDING'}else{'READER_PERMISSION_ROLLBACK_COMPLETED'})
+    $report.status=$(if($Mode -ceq 'Apply'){'READ_PERMISSIONS_APPLIED_NATIVE_ACCEPTANCE_PENDING'}elseif($Mode -ceq 'Resume'){'READ_PERMISSIONS_RESUMED_NATIVE_ACCEPTANCE_PENDING'}else{'READER_PERMISSION_ROLLBACK_COMPLETED'})
   }catch{
     $report.failedStage=$phase;$report.failedObjectNumber=$objectNumber
     $known=@('EXPLICIT_READ_SCOPE_APPROVAL_REQUIRED','PLAN_OR_IDENTITY_UNVERIFIED','BACKUP_UNVERIFIED','NO_SETUP_BACKUP','OBJECT_IDENTITY_CHANGED','FOREIGN_PERMISSION_CHANGE','EXISTING_SETUP_REVIEW_REQUIRED','PERMISSION_READBACK_DIFFER','UNSAFE_DACL','EXISTING_READER_DENY_REVIEW_REQUIRED','EXISTING_READER_RIGHTS_REVIEW_REQUIRED','HOURLY_OR_FULLSYNC_BUSY','QUEUE_NOT_EMPTY_OR_UNVERIFIED','PRESERVATION_UNVERIFIED','BACKUP_WRITE_UNVERIFIED','READ_SCOPE_ACCESS_DENIED')
@@ -169,7 +179,7 @@ function Invoke-H004NativePermissionSetup([string]$Mode,[bool]$Approved){
     if($PSVersionTable.PSEdition -cne 'Desktop' -or $PSVersionTable.PSVersion.Major -ne 5){Stop-H004Permission 'NATIVE_PS51_REQUIRED'}
     $identity=[Security.Principal.WindowsIdentity]::GetCurrent();$principal=[Security.Principal.WindowsPrincipal]::new($identity)
     if($identity.Name -ine 'SERVER004\Administrator' -or -not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){Stop-H004Permission 'LOCAL_ADMINISTRATOR_REQUIRED'}
-    if($Mode -cin @('Apply','Rollback') -and -not $Approved){Stop-H004Permission 'EXPLICIT_READ_SCOPE_APPROVAL_REQUIRED'}
+    if($Mode -cin @('Apply','Resume','Rollback') -and -not $Approved){Stop-H004Permission 'EXPLICIT_READ_SCOPE_APPROVAL_REQUIRED'}
     $sid=([Security.Principal.NTAccount]::new('SERVER004','CodexSandboxOffline')).Translate([Security.Principal.SecurityIdentifier]).Value
     if($sid -cnotmatch '^S-1-5-21-(\d+-){3}\d+$' -or (([Security.Principal.SecurityIdentifier]::new($sid)).Translate([Security.Principal.NTAccount]).Value) -ine 'SERVER004\CodexSandboxOffline' -or ([Security.Principal.SecurityIdentifier]::new($sid)).AccountDomainSid.Value -cne $identity.User.AccountDomainSid.Value){Stop-H004Permission 'PLAN_OR_IDENTITY_UNVERIFIED'}
     Initialize-H004PermissionHandles
@@ -179,7 +189,7 @@ function Invoke-H004NativePermissionSetup([string]$Mode,[bool]$Approved){
         $t=$folder.GetTask($s.path);$definitions[$s.key]=[string]$t.Xml
         $f=Join-Path 'C:\Windows\System32\Tasks' $s.path;Assert-H004PermissionPath $f
         $opened=[Hourly004PermissionHandleV1]::new($f,$false);try{Assert-H004PermissionObjectKind $opened 'task';$taskHandles[$s.key]=$opened}catch{$opened.Dispose();throw}
-      }else{Assert-H004PermissionPath $s.path;$opened=[Hourly004PermissionHandleV1]::new($s.path,($Mode -cin @('Apply','Rollback')));try{Assert-H004PermissionObjectKind $opened $s.kind;$handles[$s.key]=$opened}catch{$opened.Dispose();throw}}
+      }else{Assert-H004PermissionPath $s.path;$opened=[Hourly004PermissionHandleV1]::new($s.path,($Mode -cin @('Apply','Resume','Rollback')));try{Assert-H004PermissionObjectKind $opened $s.kind;$handles[$s.key]=$opened}catch{$opened.Dispose();throw}}
     }
     $checkQuiet={
       foreach($s in $nativeSpec|Where-Object {$_.kind -ceq 'task'}){$t=$folder.GetTask($s.path);if($t.State -eq 4 -or ($t.NextRunTime-(Get-Date)).TotalMinutes -le 5){Stop-H004Permission 'HOURLY_OR_FULLSYNC_BUSY'}}
@@ -193,7 +203,7 @@ function Invoke-H004NativePermissionSetup([string]$Mode,[bool]$Approved){
     $writeObject={param($s,$dacl);if($s.kind -ceq 'task'){$folder.GetTask($s.path).SetSecurityDescriptor($dacl,16)}else{$handles[$s.key].Write($dacl)}}
     $provider=@{
       Preflight={
-        if($Mode -cin @('Apply','Rollback')){
+        if($Mode -cin @('Apply','Resume','Rollback')){
           &$checkQuiet
           $config='C:\Users\Administrator\Desktop\RxAuu\apps\adapos-sync\.env';Assert-H004PermissionPath $config
           $st=Get-Item -LiteralPath $config -Force;if($st.Length -gt 1048576){Stop-H004Permission 'PRESERVATION_UNVERIFIED'};$memo.config=[IO.File]::ReadAllBytes($config)
@@ -218,7 +228,7 @@ function Invoke-H004NativePermissionSetup([string]$Mode,[bool]$Approved){
       }
     }
     $result=Invoke-H004PermissionEngine -Mode $Mode -Approved $Approved -Sid $sid -Spec $nativeSpec -Provider $provider
-    if($Mode -cin @('Apply','Rollback') -and [IO.Directory]::Exists($backupDir)){
+    if($Mode -cin @('Apply','Resume','Rollback') -and [IO.Directory]::Exists($backupDir)){
       try{
       Assert-H004PrivatePermissionBackup $backupDir
       $resultFile=Join-Path $backupDir ($Mode.ToLowerInvariant()+'-result.json')
