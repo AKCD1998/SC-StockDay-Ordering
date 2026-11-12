@@ -156,6 +156,9 @@ function H004SafeTask($Task){
 function H004SafeGuard($Guard){
   $reasons=@('HOST_UNVERIFIED','IDENTITY_UNVERIFIED','FULL_SYNC_BUSY','PROCESS_UNREADABLE','CPU_UNREADABLE','CPU_LIMIT','PROVIDER_TIMEOUT','ACCESS_DENIED','TASKS_UNAVAILABLE','PROCESSES_UNAVAILABLE','CPU_UNAVAILABLE','PLATFORM_UNAVAILABLE','BUDGET_EXHAUSTED','START_FAILED','DEADLINE','OUTPUT_LIMIT','INVALID_OUTPUT','CHILD_EXIT','READY_UNVERIFIED','CHILD_STILL_RUNNING','GUARD_LEASE_UNVERIFIED')
   $reason=H004Prop $Guard 'reason';$result=[ordered]@{reason=$(if($reason -cin $reasons){$reason}else{$null});providerExceptions=@()}
+  $stage=H004Prop $Guard 'stage';if($stage -cin @('starting','host','tasks','processes','cpu','complete')){$result.stage=$stage}
+  $elapsed=H004Integer (H004Prop $Guard 'elapsedMs');if($null -ne $elapsed -and $elapsed -le 1200000){$result.elapsedMs=$elapsed}
+  $budget=H004Integer (H004Prop $Guard 'budgetMs');if($null -ne $budget -and $budget -le 12000){$result.budgetMs=$budget}
   $provider=H004Prop $Guard 'providerFailure';$exceptions=@(H004Prop $provider 'exceptions')
   $types=@('System.TimeoutException','System.UnauthorizedAccessException','System.IO.IOException','System.ComponentModel.Win32Exception','System.Management.ManagementException','Microsoft.Management.Infrastructure.CimException','OtherException')
   $safe=foreach($e in @($exceptions|Select-Object -First 4)){$type=H004Prop $e 'type';$hr=H004Prop $e 'hresult';if($type -cin $types -and $hr -is [ValueType] -and $hr -ge -2147483648 -and $hr -le 2147483647){[pscustomobject]@{type=$type;hresult=$hr;nativeErrorCode=(H004Integer (H004Prop $e 'nativeErrorCode'));cimStatusCode=(H004Integer (H004Prop $e 'cimStatusCode'))}}}
