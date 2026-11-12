@@ -1,5 +1,9 @@
 # Hourly004 direct source read R2 — 12 November 2026
 
+Current boundary: the actual native follow-up was denied at the status file.
+See `hourly004-direct-read-permissions-20261112.md` for the proposed R3 durable
+receipt scope and exact permission review. No grant/source admission is implied.
+
 Actual deadline proof passed on SERVER004 after30049ms. The initial exact Task
 lookup returned NOT_FOUND before any file read. Current follow-up behavior and
 limits are in `hourly004-direct-read-r2-followup.md`; no source admission yet.

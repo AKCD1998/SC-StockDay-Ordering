@@ -1,4 +1,4 @@
-param([ValidateSet('Preflight','Status')][string]$Mode='Status')
+param([ValidateSet('Preflight','Status')][string]$Mode='Status',[ValidateSet('DisplayAndReceipt','DurableReceipt')][string]$EvidenceMode='DurableReceipt')
 Set-StrictMode -Version 2
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
@@ -200,11 +200,34 @@ function H004EvidenceProjection($View,$Receipt,$Task,[DateTimeOffset]$Now){
   $out.guard=H004SafeGuard (H004Prop (H004Prop $View 'failure') 'guard')
   return [pscustomobject]$out
 }
+function H004DurableEvidenceProjection($Receipt,$Task,[DateTimeOffset]$Now){
+  $out=[ordered]@{availability='unknown';reason='EVIDENCE_UNVERIFIED';status='unknown';observationBasis='durable-receipt';slot=$null;taskStartedAt=$null;attemptStartedAt=$null;collectionStartedAt=$null;finishedAt=$null;observedProducts=$null;readBatchCount=$null;backendAcceptedRecords=$null;acknowledgements=$null;outboxPending=$null;durableAckVerified=$false;recoveryEnabled=$null;maxSampledHostCpuPercent=$null;checkpointFailures=$null;failureCode=$null;guard=$null;liveProgressObserved=$false;httpAttemptCountKnown=$false}
+  if($null -eq $Receipt -or $null -eq $Task){return [pscustomobject]$out}
+  $a=$Receipt.state.attempt;$taskAt=H004Time $Task.startedAt;$start=H004Time $a.startedAt;$finish=H004Time (H004Prop $a 'finishedAt')
+  if($a.phase -cne 'finished' -or $Task.running -ne $false){$out.reason='CURRENT_ATTEMPT_NOT_FINISHED';return [pscustomobject]$out}
+  if($null -eq $taskAt -or $null -eq $start -or $null -eq $finish -or [math]::Abs(($taskAt-$start).TotalMilliseconds) -gt 2000 -or ($Now-$taskAt).TotalMilliseconds -gt 3602000 -or ($taskAt-$Now).TotalMilliseconds -gt 2000 -or $finish -lt $start -or ($finish-$taskAt).TotalMilliseconds -gt 1200000 -or ($finish-$Now).TotalMilliseconds -gt 2000 -or $taskAt.ToOffset([TimeSpan]::FromHours(7)).ToString('yyyy-MM-dd HH:00') -cne $finish.ToOffset([TimeSpan]::FromHours(7)).ToString('yyyy-MM-dd HH:00') -or $taskAt.ToOffset([TimeSpan]::FromHours(7)).ToString('HH:00') -cne $a.slot){$out.reason='ATTEMPT_TIME_UNVERIFIED';return [pscustomobject]$out}
+  $ack=H004Prop $Receipt.state 'lastAck';$success=H004Prop $Receipt.state 'lastSuccess'
+  $captured=H004Time (H004Prop $ack 'capturedAt');$recorded=H004Time (H004Prop $ack 'recordedAt')
+  $matches=($null -ne $ack -and (H004Prop $ack 'attemptSequence') -eq $a.sequence -and (H004Prop $ack 'slot') -ceq $a.slot)
+  if($matches){
+    if($Task.lastResult -ne 0 -or (H004Prop $ack 'accepted') -ne 6835 -or (H004Prop $ack 'key') -cnotmatch '^[a-f0-9]{64}$' -or $null -eq $captured -or $null -eq $recorded -or $captured -lt $start -or $recorded -lt $captured -or ($recorded-$finish).TotalMilliseconds -gt 2000 -or (H004Prop $success 'status') -cne 'captured-and-acknowledged' -or (H004Prop $success 'slot') -cne $a.slot -or (H004Prop $success 'finishedAt') -cne (H004Prop $a 'finishedAt') -or (H004Prop $success 'expectedProducts') -ne 6835 -or (H004Prop $success 'observedProducts') -ne 6835 -or (H004Prop $success 'readBatchCount') -ne 35 -or (H004Prop $success 'backendAcceptedRecords') -ne 6835 -or (H004Prop $success 'outboxPending') -ne 0){$out.reason='ACK_UNVERIFIED';return [pscustomobject]$out}
+    $out.status='captured-and-acknowledged';$out.observedProducts=6835;$out.readBatchCount=35;$out.backendAcceptedRecords=6835;$out.outboxPending=0;$out.durableAckVerified=$true
+  }else{
+    $failures=@(H004Prop $Receipt.state 'recentFailures'|Where-Object {(H004Prop $_ 'sequence') -eq $a.sequence -and (H004Prop $_ 'slot') -ceq $a.slot -and (H004Prop $_ 'startedAt') -ceq $a.startedAt -and (H004Prop $_ 'finishedAt') -ceq $a.finishedAt})
+    if($failures.Count -ne 1){$out.reason='CURRENT_RECEIPT_OUTCOME_UNVERIFIED';return [pscustomobject]$out}
+    $f=$failures[0];$status=H004Prop $f 'status'
+    if($status -cnotin @('launch-stopped','stopped-no-partial-capture','pending-or-incomplete')){return [pscustomobject]$out}
+    $out.status=$status
+    foreach($key in @('observedProducts','backendAcceptedRecords','outboxPending')){$n=H004Integer (H004Prop $f $key);if($null -ne $n -and $n -le 10000){$out[$key]=$n}}
+    $code=H004Prop $f 'code';$codes=@('HOURLY_SOURCE_GUARD_UNAVAILABLE','HOURLY_SOURCE_TIMEOUT','HOURLY_SOURCE_ACCESS_DENIED','HOURLY_SOURCE_READ_FAILED','HOURLY_EVIDENCE_ACK_INVALID','HOURLY_EVIDENCE_HTTP_ERROR','HOURLY_EVIDENCE_TIMEOUT','HOURLY_RECEIPT_PERSISTENCE_FAILED','HOURLY_RECEIPT_STATE_UNVERIFIED','HOURLY_OPERATION_FAILED_DETAILS_WITHHELD','EACCES','EPERM','EIO');$out.failureCode=$(if($code -cin $codes){$code}else{'HOURLY_OPERATION_FAILED_DETAILS_WITHHELD'});$out.guard=H004SafeGuard (H004Prop $f 'guard')
+  }
+  $out.availability='published';$out.reason=$null;$out.slot=$a.slot;$out.taskStartedAt=$taskAt.ToUniversalTime().ToString('o');$out.attemptStartedAt=$start.ToUniversalTime().ToString('o');$out.finishedAt=$finish.ToUniversalTime().ToString('o');return [pscustomobject]$out
+}
 function Invoke-Hourly004DirectRead {
-  param([scriptblock]$Context={H004GetContext},[scriptblock]$Read={param($Name) H004ReadKnown $Name},[scriptblock]$Tasks={H004GetTasks},[scriptblock]$Queue={H004GetQueue},[scriptblock]$Now={[DateTimeOffset]::UtcNow})
+  param([scriptblock]$Context={H004GetContext},[scriptblock]$Read={param($Name) H004ReadKnown $Name},[scriptblock]$Tasks={H004GetTasks},[scriptblock]$Queue={H004GetQueue},[scriptblock]$Now={[DateTimeOffset]::UtcNow},[ValidateSet('DisplayAndReceipt','DurableReceipt')][string]$EvidenceProfile='DisplayAndReceipt')
   $watch=[Diagnostics.Stopwatch]::StartNew();$stage='context';$at=& $Now
   $report=[ordered]@{schemaVersion='hourly004-direct-source-v1';checkedAt=$at.ToUniversalTime().ToString('o');branch='004';mode=$Mode;accessStatus='PARTIAL';failedStage=$null;safeError=$null;actualExecutionHostVerified=$false;existingIdentityVerified=$false;timeZoneVerified=$false;administratorToken=$null;platformAuthorization='NOT_EVALUATED_LOCALLY';requiresTrustedNativeAuthorization=$true;requiresNativeInvocationDeadlineMs=30000;fileRead='not-attempted';taskReadsExpected=11;taskReadsPassed=0;tasks=@();latestTask=$null;activePointerVersion='unknown';releaseIntegrity='NOT_FULLY_REVALIDATED';receiptState='unknown';evidence=$null;failureHistory=$null;queue=@{known=$false;pending=$null};expectedGuardBudgetMs=12000;expectedRecoveryEnabled=$false;guardChanged=$false;recoveryChanged=$false;sqlQueries=0;taskRuns=0;configurationChanges=0;permissionChanges=0;sourceFileWrites=0;newScheduledTasks=0;currentStockCertified=$false}
-  $report['readerRevision']='r2-visible-task-file-parts-1'
+  $report['readerRevision']='r3-durable-receipt-permission-review-1';$report['evidenceProfile']=$EvidenceProfile;$report['receiptFilesRead']=0
   try{
     $ctx=& $Context
     if($ctx.hostName -ine 'SERVER004'){H004Stop 'WRONG_EXECUTION_HOST'};$report.actualExecutionHostVerified=$true
@@ -222,23 +245,31 @@ function Invoke-Hourly004DirectRead {
     $report['taskVisibility']=$script:H004TaskVisibility
     $latest=@($taskRows|Where-Object {$null -ne (H004Time $_.startedAt)}|Sort-Object {[DateTimeOffset]::Parse($_.startedAt)} -Descending|Select-Object -First 1);if($latest.Count){$report.latestTask=$latest[0]}
     if($watch.ElapsedMilliseconds -gt 20000){H004Stop 'READ_DEADLINE'}
-    $stage='status-file';try{$bytes=[byte[]](& $Read 'status');$report.fileRead='passed'}catch{$report.fileRead='unavailable';$report['fileReadFailure']=H004NativeFailure $_;throw};$view=$null;$viewInvalid=$false
-    try{$view=H004Json $bytes}catch{if((H004SafeError $_) -cne 'INVALID_JSON'){throw};$viewInvalid=$true}
+    $view=$null;$viewInvalid=$false
+    if($EvidenceProfile -ceq 'DisplayAndReceipt'){
+      $stage='status-file';try{$bytes=[byte[]](& $Read 'status');$report.fileRead='passed'}catch{$report.fileRead='unavailable';$report['fileReadFailure']=H004NativeFailure $_;throw}
+      try{$view=H004Json $bytes}catch{if((H004SafeError $_) -cne 'INVALID_JSON'){throw};$viewInvalid=$true}
+    }
     $stage='pointer-read';$pointer=[Text.Encoding]::UTF8.GetString([byte[]](& $Read 'pointer'));$normalize={param($s) $s.Replace("`r`n","`n").TrimEnd([char[]]"`r`n")};if((&$normalize $pointer) -ceq (&$normalize $script:H004Pointer)){$report.activePointerVersion='cpu-v5'}
     $stage='receipt-read';$valid=@();$receiptIssues=@()
-    foreach($name in @('receipt0','receipt1')){try{$valid+=,(H004Receipt ([byte[]](& $Read $name)))}catch{$code=H004SafeError $_;if($code -cne 'NOT_FOUND'){$receiptIssues+=,$code}}}
+    foreach($name in @('receipt0','receipt1')){try{$b=[byte[]](& $Read $name);$report.receiptFilesRead++;$valid+=,(H004Receipt $b)}catch{$code=H004SafeError $_;if($code -ceq 'ACCESS_DENIED'){$report.fileRead='unavailable';throw};if($code -cne 'NOT_FOUND' -or $EvidenceProfile -ceq 'DurableReceipt'){$receiptIssues+=,$code}}}
     $selected=$null
     if($receiptIssues.Count -eq 0 -and $valid.Count){$ordered=@($valid|Sort-Object {$_.state.generation} -Descending);if($ordered.Count -gt 1 -and $ordered[0].state.generation -eq $ordered[1].state.generation -and $ordered[0].body -cne $ordered[1].body){$report.receiptState='conflict'}else{$selected=$ordered[0];$report.receiptState='verified'}}else{$report.receiptState='unverified'}
-    $stage='evidence-validation';$seen=&$Now;$report.evidence=H004EvidenceProjection $view $selected $report.latestTask $seen;$report.failureHistory=H004History $selected $seen
+    $stage='evidence-validation';$seen=&$Now
+    if($EvidenceProfile -ceq 'DurableReceipt'){
+      $report.fileRead=$(if($report.receiptFilesRead -eq 2){'passed'}else{'unavailable'})
+      $report.evidence=H004DurableEvidenceProjection $selected $report.latestTask $seen
+    }else{$report.evidence=H004EvidenceProjection $view $selected $report.latestTask $seen}
+    $report.failureHistory=H004History $selected $seen
     if($watch.ElapsedMilliseconds -gt 20000){H004Stop 'READ_DEADLINE'}
     $stage='queue-read';try{$report.queue=&$Queue}catch{$report.queue=@{known=$false;pending=$null;safeError=(H004SafeError $_)}}
-    if($null -ne $taskProblem){$report.accessStatus='PARTIAL';$report.failedStage='task-read';$report.safeError=$taskProblem}elseif($viewInvalid){$report.accessStatus='PARTIAL';$report.failedStage='status-json';$report.safeError='INVALID_JSON'}else{$report.accessStatus='PASS_READ_ACCESS_ONLY'}
+    if($null -ne $taskProblem){$report.accessStatus='PARTIAL';$report.failedStage='task-read';$report.safeError=$taskProblem}elseif($viewInvalid){$report.accessStatus='PARTIAL';$report.failedStage='status-json';$report.safeError='INVALID_JSON'}elseif($EvidenceProfile -ceq 'DurableReceipt' -and ($report.fileRead -cne 'passed' -or $report.receiptState -cne 'verified')){$report.accessStatus='PARTIAL';$report.failedStage='receipt-read';$report.safeError='RECEIPT_UNVERIFIED'}else{$report.accessStatus='PASS_READ_ACCESS_ONLY'}
   }catch{$report.failedStage=$stage;$report.safeError=H004SafeError $_;$report.accessStatus=$(if($report.safeError -cin @('WRONG_EXECUTION_HOST','WRONG_EXISTING_IDENTITY','WRONG_TIMEZONE','NATIVE_PS51_REQUIRED','ACCESS_DENIED','PATH_UNVERIFIED')){'BLOCKED'}else{'PARTIAL'})}
   $report.elapsedMs=$watch.ElapsedMilliseconds
   [pscustomobject]$report
 }
 if($MyInvocation.InvocationName -ne '.'){
-  $result=Invoke-Hourly004DirectRead
+  $result=Invoke-Hourly004DirectRead -EvidenceProfile $EvidenceMode
   $result|ConvertTo-Json -Depth 10
   if($result.accessStatus -cne 'PASS_READ_ACCESS_ONLY'){exit 1}
 }

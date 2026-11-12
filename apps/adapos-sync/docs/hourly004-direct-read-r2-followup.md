@@ -1,5 +1,9 @@
 # R2 actual NOT_FOUND follow-up — same PR87, token and channel
 
+Historical follow-up: it was actually run and returned status-file ACCESS_DENIED.
+Current R3 permission proposal is `hourly004-direct-read-permissions-20261112.md`;
+do not retry this unchanged command or treat the old preparation as accepted.
+
 The authorized SERVER004 test proved the R2 parent deadline: its own sleeping
 PS5.1 child was terminated/reaped after30049ms, using installed Node24.16.0.
 The Status command finished after1495ms. The reader recognized the existing
