@@ -107,6 +107,12 @@ test("native Windows PowerShell 5.1 provider fixtures preserve guard boundaries"
   const harness=fileURLToPath(new URL("./hourly-guard-native-fixture.ps1",import.meta.url));
   const result=spawnSync(executable,["-NoProfile","-NonInteractive","-ExecutionPolicy","RemoteSigned","-File",harness],{encoding:"utf8",timeout:20000,windowsHide:true});
   assert.equal(result.status,0,result.stdout||'Native fixture unavailable; details withheld.');const summary=JSON.parse(result.stdout.replace(/^\uFEFF/,""));assert.equal(summary.simulation,true);assert.equal(summary.failed,0);assert.ok(summary.passed>=14);assert.equal(summary.productionQueries,0);
+  assert.equal(summary.budgetFailures.length,3);
+  for(const [i,phase]of ['entry','initialization','interval'].entries()){
+    const serialized=summary.budgetFailures[i],safe=safeProviderFailure(serialized.providerFailure);
+    assert.ok(safe);assert.equal(safe.validation,'CPU_BUDGET_EXHAUSTED');assert.equal(safe.cpuPhase,phase);assert.equal(safe.cpuRemainingMs,phase==='interval'?100:655);
+    assert.ok(safe.exceptions.length);assert.ok(!JSON.stringify(serialized).includes('System.Collections.Hashtable'));
+  }
 });
 test("startup and provider time are measured separately without retaining raw child fields",async()=>{
   const events=[],f=fixture({onDiagnostic:event=>events.push(event)}),p=f.guard();

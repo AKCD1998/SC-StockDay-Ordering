@@ -24,6 +24,12 @@ test('sampling metadata is safe historical evidence at the guard, not a reusable
  assert.equal(safeCpuObservation({...observation,ageMsAtGuard:1001}),null);assert.equal(safeCpuObservation({...observation,provider:'cim'}),null);
  assert.equal(validCpuMeasurement(observation,2100,5),false);
 });
+
+test('budget-phase diagnostics keep only bounded CPU setup details',()=>{
+ const base={exceptions:[{type:'System.InvalidOperationException',hresult:-2146233079}],validation:'CPU_BUDGET_EXHAUSTED',cpuPhase:'initialization',cpuRemainingMs:655,cpuInitializationMs:11345,commandLine:'PRIVATE'};
+ const safe=safeProviderFailure(base);assert.equal(safe.cpuPhase,'initialization');assert.equal(safe.cpuRemainingMs,655);assert.equal(safe.cpuInitializationMs,11345);assert.ok(!JSON.stringify(safe).includes('PRIVATE'));
+ const invalid=safeProviderFailure({...base,cpuPhase:'PRIVATE',cpuRemainingMs:-1,cpuInitializationMs:12001});assert.equal(invalid.cpuPhase,undefined);assert.equal(invalid.cpuRemainingMs,undefined);assert.equal(invalid.cpuInitializationMs,undefined);
+});
 test('native PS5.1 CPU math, timeout, invalid, stale, warm-up and budget fault fixtures use no real CPU reads',{skip:process.platform!=='win32'},t=>{
  const exe=path.join(process.env.SystemRoot,'System32/WindowsPowerShell/v1.0/powershell.exe');
  const r=spawnSync(exe,['-NoProfile','-NonInteractive','-ExecutionPolicy','RemoteSigned','-File',path.join(here,'hourly-host-cpu-native-fixture.ps1')],{encoding:'utf8',windowsHide:true,timeout:20000});assert.equal(r.status,0,r.stdout||'Safe native fixture unavailable.');

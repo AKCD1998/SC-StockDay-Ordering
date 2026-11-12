@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {createHourlyStatusStore,readHourlyDurableState,inspectHourlyStatus,STATUS_BOUNDS} from '../src/hourlyStatusStore.js';
-import {FAILURE_HISTORY_BOUNDS,boundedFailureHistory,safeHistoricalFailure} from '../src/hourlyFailureHistory.js';
+import {FAILURE_HISTORY_BOUNDS,boundedFailureHistory,safeHistoricalFailure,failureForAttempt} from '../src/hourlyFailureHistory.js';
 const at=(hour,minute=0)=>new Date(Date.UTC(2026,9,28,hour-7,minute)).toISOString();
 const slot=hour=>String(hour).padStart(2,'0')+':00';
 const success={status:'captured-and-acknowledged',slot:'08:00',expectedProducts:6835,observedProducts:6835,readBatchCount:35,backendAcceptedRecords:6835,outboxPending:0,finishedAt:at(8,2)};
@@ -16,6 +16,18 @@ async function succeeded(file,hour,viewIo){const store=createHourlyStatusStore(f
 test('failed guard survives a later successful run and restart without confusing history with current status',async t=>{
  const file=fixture(t);await failed(file,9);const result=await succeeded(file,11);assert.equal(result.status,'captured-and-acknowledged');assert.equal(result.recentFailures[0].slot,'09:00');
  const status=inspectHourlyStatus(file,{now:at(11,3),latestTaskStartedAt:at(11),taskRunning:false});assert.equal(status.latestAttempt.status,'captured-and-acknowledged');assert.equal(status.guardReason,null);assert.equal(status.failureHistory.records[0].guard.reason,'CPU_UNAVAILABLE');assert.equal(status.failureHistory.availability,'verified');assert.equal(status.failureHistory.coversAllAttempts,false);assert.equal(status.lastSuccess.slot,'11:00');
+});
+
+test('12 November partial read failure is attributed to CPU, not its enclosing capture lock',()=>{
+ const attempt={sequence:1,slot:'09:00',startedAt:'2026-11-12T02:00:01.718Z'};
+ const record=failureForAttempt({status:'stopped-no-partial-capture',finishedAt:'2026-11-12T02:02:51.992Z',observedProducts:4600,backendAcceptedRecords:null,outboxPending:0,failure:{code:'HOURLY_SOURCE_GUARD_UNAVAILABLE',guard:{stage:'cpu',reason:'BUDGET_EXHAUSTED',elapsedMs:11345,budgetMs:12000}},diagnostics:{events:[{stage:'cpu-provider',kind:'failure'},{stage:'sql-close',kind:'success'},{stage:'capture-lock',kind:'failure'}]}},attempt);
+ assert.equal(record.stage,'cpu-provider');assert.equal(record.guard.budgetMs,12000);assert.equal(record.guard.elapsedMs,11345);assert.equal(record.observedProducts,4600);assert.equal(record.outboxPending,0);assert.equal(record.backendAcceptedRecords,undefined);
+});
+
+test('CPU budget phase survives durable storage and a later successful natural-shaped attempt',async t=>{
+ const file=fixture(t),providerFailure={exceptions:[{type:'System.InvalidOperationException',hresult:-2146233079}],validation:'CPU_BUDGET_EXHAUSTED',cpuPhase:'initialization',cpuRemainingMs:655,cpuInitializationMs:11345};
+ await failed(file,9,{reason:'BUDGET_EXHAUSTED',elapsedMs:11345,providerFailure});await succeeded(file,10);
+ const record=readHourlyDurableState(file).state.recentFailures[0];assert.equal(record.stage,'cpu-provider');assert.equal(record.guard.providerFailure.cpuPhase,'initialization');assert.equal(record.guard.providerFailure.cpuRemainingMs,655);assert.equal(readHourlyDurableState(file).state.lastSuccess.slot,'10:00');
 });
 test('two earlier failures remain readable when the latest attempt is running or its display is unreadable',async t=>{
  const file=fixture(t);await failed(file,9);await failed(file,10);const result=await succeeded(file,11,{...fs.promises,rename:async()=>{throw Object.assign(new Error('PRIVATE'),{code:'EACCES'});}});assert.equal(result.status,'status-unavailable');

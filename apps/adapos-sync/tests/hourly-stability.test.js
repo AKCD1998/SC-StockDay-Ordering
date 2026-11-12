@@ -21,7 +21,7 @@ function fixture(t,{missing=0,fault}={}) {
   const codes=Array.from({length:6835},(_,i)=>'SYNTHETIC-'+i),manifest=path.join(dir,'manifest.json');
   fs.writeFileSync(manifest,JSON.stringify({schemaVersion:'hourly-approved-cohort-v1',scope:'explicit',productCodes:codes}));
   const config={branchCode:'004',sqlServerUser:'readonly_pilot',apiBaseUrl:'https://example.test',hourlyStockEvidence:{enabled:true,completeCohortEnabled:true,cohortFile:manifest,cacheDir:dir,uploadToken:'synthetic-token'.repeat(4),contentCaptureBranches:new Set()}};
-  let elapsed=0,queries=0,reads=0,uploads=0,connects=0,closes=0;
+  let elapsed=0,queries=0,reads=0,uploads=0,connects=0,closes=0,guardCalls=0;
   const now=()=>Date.parse('2026-10-24T04:00:00.000Z')+elapsed;
   const pool={close:async()=>{closes++;},request(){const bound=[];return {input(_k,_t,value){bound.push(value);},cancel(){},async query(text){
     queries++;elapsed++;
@@ -33,7 +33,7 @@ function fixture(t,{missing=0,fault}={}) {
   const dependencies=observe=>({config,runner:options=>runHourlyStockIntraday({...options,sqlServerConfig:{},runHourlyStockShadow:()=>({}),
     ...(fault==='outbox-full'?{enqueueHourlyEvidence:options=>enqueueHourlyEvidence({...options,io:{...fs,writeFileSync:()=>{throw Object.assign(new Error('DO-NOT-OUTPUT'),{code:'ENOSPC',path:'DO-NOT-OUTPUT'});}}})}:{})}),
     connectSql:async()=>{connects++;if(fault==='connect')throw Object.assign(new Error('DO-NOT-OUTPUT'),{code:'ELOGIN'});return pool;},
-    guard:async()=>{if(fault==='guard')throw Object.assign(new Error('DO-NOT-OUTPUT'),{code:'HOST_CPU_AT_OR_ABOVE_70_PERCENT'});return {systemCpuPercent:5};},
+    guard:async()=>{guardCalls++;if(fault==='cpu-budget-after-4600'&&guardCalls===46)throw Object.assign(new Error('DO-NOT-OUTPUT'),{code:'HOURLY_SOURCE_GUARD_UNAVAILABLE',guardSummary:{stage:'cpu',reason:'BUDGET_EXHAUSTED',elapsedMs:11345,budgetMs:12000}});if(fault==='guard')throw Object.assign(new Error('DO-NOT-OUTPUT'),{code:'HOST_CPU_AT_OR_ABOVE_70_PERCENT'});return {systemCpuPercent:5};},
     collector:(p,c,options)=>readHourlyCompleteCohort(p,c,{...options,now,monotonic:()=>elapsed,readBatch:async(_p,selected)=>{
       reads++;elapsed++;
       if(fault==='partial'&&reads===2)throw Object.assign(new Error('DO-NOT-OUTPUT'),{code:'HOURLY_SOURCE_TIMEOUT'});
@@ -50,6 +50,14 @@ test('protected runtime and real collector/runner produce one complete acknowled
   assert.deepEqual(f.counts(),{queries:38,reads:35,uploads:1,connects:1,closes:1});
   const stages=new Set(result.diagnostics.events.map(e=>e.stage));for(const name of ['capture-lock','sql-connect','readonly-boundary','sql-batch','payload','outbox-enqueue','upload','acknowledgement'])assert.ok(stages.has(name),name);
   assert.ok(!JSON.stringify(result).includes('SYNTHETIC-'));assert.equal(result.recovery.newUploadRecoveryEnabled,false);
+});
+
+test('CPU budget failure after 4600 products closes SQL and never enqueues or acknowledges a partial cohort',async t=>{
+  const f=fixture(t,{fault:'cpu-budget-after-4600'}),file=path.join(f.dir,'latest-slot-result.json');
+  const result=await runObservedHourly004({slot:'09:00',load:async observe=>f.dependencies(observe),writeStatus:createStatusWriter(file),now:f.now,readPending:()=>pendingCount(f.dir)});
+  assert.equal(result.status,'stopped-no-partial-capture');assert.equal(result.observedProducts,4600);assert.equal(result.backendAcceptedRecords,null);assert.equal(result.acknowledgements,0);assert.equal(result.outboxPending,0);
+  assert.equal(f.counts().reads,23);assert.equal(f.counts().uploads,0);assert.equal(f.counts().closes,1);
+  const state=readHourlyDurableState(file).state;assert.equal(state.lastAck,null);assert.equal(state.recentFailures[0].stage,'cpu-provider');assert.equal(state.recentFailures[0].guard.budgetMs,12000);assert.equal(result.recovery.newUploadRecoveryEnabled,false);
 });
 for(const fault of ['guard','readonly','partial','connect','upload'])test(`protected runtime fault ${fault}: no partial publication and previous success survives`,async t=>{
   const f=fixture(t,{fault}),file=path.join(f.dir,'latest-slot-result.json');

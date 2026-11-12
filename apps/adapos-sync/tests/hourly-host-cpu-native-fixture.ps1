@@ -4,7 +4,12 @@ $cases=@('cpu-0','cpu-5','cpu-69.999','cpu-70','cpu-71','cpu-100','budget-zero',
 $passed=0;$report=[ordered]@{simulation=$true;nativePowerShell=$PSVersionTable.PSVersion.ToString();productionCpuReads=0;productionQueries=0;taskRuns=0;cases=@();passed=0;failed=0}
 try{
  Initialize-HourlyHostCpuNative
- if([Runtime.InteropServices.Marshal]::SizeOf([Activator]::CreateInstance(('HourlyHostCpuNative+FT' -as [type]))) -ne 8){throw 'FIXTURE_NATIVE_FILETIME_LAYOUT'}
+ if([Runtime.InteropServices.Marshal]::SizeOf([Activator]::CreateInstance(('HourlyHostCpuFileTime' -as [type]))) -ne 8){throw 'FIXTURE_NATIVE_FILETIME_LAYOUT'}
+ foreach($method in ('HourlyHostCpuNative' -as [type]).GetMethods([Reflection.BindingFlags]'Public,Static,DeclaredOnly')){
+  $import=@($method.GetCustomAttributes([Runtime.InteropServices.DllImportAttribute],$false))
+  if($import.Count -ne 1 -or -not $import[0].SetLastError -or $import[0].Value -cne 'kernel32.dll'){throw 'FIXTURE_NATIVE_BINDING_CONTRACT'}
+ }
+ Initialize-HourlyHostCpuNative
  $report.nativeBindingCompiledWithoutCpuRead=$true
  foreach($case in $cases){
   $script:CpuFixtureNow=100000.0;$script:CpuFixtureReads=0;$script:CpuFixtureWaits=0;$script:CpuFixtureInitializes=0

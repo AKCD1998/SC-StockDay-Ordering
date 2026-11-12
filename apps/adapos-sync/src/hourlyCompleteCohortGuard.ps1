@@ -25,7 +25,9 @@ function Invoke-HourlyCompleteGuard([int]$ObserverProcessId,[double]$DeadlineMs)
   function Write-GuardEvent([string]$Kind,[hashtable]$Fields) {
     $record=[ordered]@{schemaVersion='hourly-source-guard-v2';kind=$Kind;stage=$stage;elapsedMs=[long]$watch.ElapsedMilliseconds}
     foreach($key in $Fields.Keys){$record[$key]=$Fields[$key]}
-    [pscustomobject]$record | ConvertTo-Json -Compress
+    # Nested exception codes otherwise stringify at the default depth and are
+    # correctly rejected by the parent sanitizer, losing the actual reason.
+    [pscustomobject]$record | ConvertTo-Json -Depth 8 -Compress
   }
   try {
     Assert-GuardDeadline

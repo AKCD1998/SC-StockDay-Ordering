@@ -6,8 +6,9 @@ if($errors.Count){throw 'fixture parse failed'}
 foreach($function in $ast.EndBlock.Statements | Where-Object {$_ -is [Management.Automation.Language.FunctionDefinitionAst]}) {
   . ([scriptblock]::Create($function.Extent.Text))
 }
-$cases=@('ready','wrong-host','wrong-zone','wrong-identity','missing-task','disabled-task','running-task','within-15','boundary-15','busy-process','unreadable-process','own-process','missing-cpu','cpu-70','cpu-69','cpu-nan','access-denied','provider-timeout','cpu-71','cpu-many','cpu-null','cpu-stale','cpu-warmup','cpu-invalid-range','expired-before-provider','ready-late','clock-advanced','cpu-native-denied')
+$cases=@('ready','wrong-host','wrong-zone','wrong-identity','missing-task','disabled-task','running-task','within-15','boundary-15','busy-process','unreadable-process','own-process','missing-cpu','cpu-70','cpu-69','cpu-nan','access-denied','provider-timeout','cpu-71','cpu-many','cpu-null','cpu-stale','cpu-warmup','cpu-invalid-range','expired-before-provider','ready-late','clock-advanced','cpu-native-denied','cpu-budget-entry','cpu-budget-initialization','cpu-budget-interval')
 $passed=0
+$budgetFailures=@()
 foreach($case in $cases) {
   $script:FixtureNow=100000.0;$script:FixtureCpuReads=0
   function Get-HourlyMonotonicMs {return $script:FixtureNow}
@@ -17,6 +18,7 @@ foreach($case in $cases) {
     @([pscustomobject]@{enabled=($case -ne 'disabled-task');running=($case -eq 'running-task');nextRunMinutes=$(if($case -eq 'within-15'){14}elseif($case -eq 'boundary-15'){15}else{500})},[pscustomobject]@{enabled=$true;running=$false;nextRunMinutes=1000})
   }
   function Get-HourlyGuardProcesses {
+    if($case -eq 'cpu-budget-entry'){$script:FixtureNow+=11345}
     if($case -eq 'access-denied'){throw [UnauthorizedAccessException]::new('DO-NOT-OUTPUT')}
     if($case -eq 'busy-process'){[pscustomobject]@{ProcessId=456;CommandLine='node X:\fixture\adapos-sync\src\index.js'}}
     elseif($case -eq 'unreadable-process'){[pscustomobject]@{ProcessId=456;CommandLine=$null}}
@@ -24,6 +26,11 @@ foreach($case in $cases) {
   }
   function Get-HourlyGuardCpu([double]$DeadlineMs) {
     $script:FixtureCpuReads++
+    if($case -like 'cpu-budget-*'){
+      return Get-HourlyHostCpu -DeadlineMs $DeadlineMs -Now {$script:FixtureNow} -Initialize {if($case -eq 'cpu-budget-initialization'){$script:FixtureNow+=11345}} -Wait {param($ms);$script:FixtureNow+=$(if($case -eq 'cpu-budget-interval'){11900}else{$ms})} -ReadPoint {
+        [pscustomobject]@{Idle=[decimal]300000000;Kernel=[decimal]1000000000;User=[decimal]500000000;Groups=1;Processors=4;AtMs=[double]$script:FixtureNow}
+      }
+    }
     if($case -eq 'provider-timeout'){throw [TimeoutException]::new('DO-NOT-OUTPUT')}
     if($case -eq 'cpu-native-denied'){throw [ComponentModel.Win32Exception]::new(5)}
     if($case -eq 'missing-cpu'){return @()}
@@ -49,8 +56,15 @@ foreach($case in $cases) {
   if($case -eq 'access-denied' -and $events[-1].reason -ne 'ACCESS_DENIED'){throw 'fixture access classification'}
   if($case -eq 'provider-timeout' -and $events[-1].reason -ne 'PROVIDER_TIMEOUT'){throw 'fixture timeout classification'}
   if($case -eq 'cpu-native-denied' -and $events[-1].reason -ne 'ACCESS_DENIED'){throw 'fixture native access classification'}
+  if($case -eq 'cpu-native-denied' -and @($events[-1].providerFailure.exceptions|Where-Object {$_.type -eq 'System.ComponentModel.Win32Exception' -and $_.nativeErrorCode -eq 5}).Count -ne 1){throw 'fixture nested native code lost during guard serialization'}
+  if($case -like 'cpu-budget-*'){
+    $expectedPhase=if($case -eq 'cpu-budget-entry'){'entry'}elseif($case -eq 'cpu-budget-initialization'){'initialization'}else{'interval'}
+    if($events[-1].reason -ne 'BUDGET_EXHAUSTED' -or $events[-1].providerFailure.validation -ne 'CPU_BUDGET_EXHAUSTED' -or $events[-1].providerFailure.cpuPhase -ne $expectedPhase){throw 'fixture CPU budget phase lost'}
+    if($events[-1].providerFailure.cpuRemainingMs -ne $(if($expectedPhase -eq 'interval'){100}else{655})){throw 'fixture CPU budget remaining lost'}
+    $budgetFailures+=,$events[-1]
+  }
   if($script:FixtureCpuReads -gt 1){throw 'fixture provider retried'}
   if($case -eq 'expired-before-provider' -and $script:FixtureCpuReads -ne 0){throw 'fixture provider called after deadline'}
   $passed++
 }
-[pscustomobject]@{simulation=$true;nativePowerShellVersion=$PSVersionTable.PSVersion.ToString();passed=$passed;failed=0;productionQueries=0;taskRuns=0;changes=0}|ConvertTo-Json -Compress
+[pscustomobject]@{simulation=$true;nativePowerShellVersion=$PSVersionTable.PSVersion.ToString();passed=$passed;failed=0;productionQueries=0;taskRuns=0;changes=0;budgetFailures=$budgetFailures}|ConvertTo-Json -Depth 10 -Compress

@@ -10,16 +10,31 @@ function Stop-HourlyCpu([string]$Code) {
 }
 function Initialize-HourlyHostCpuNative {
   if('HourlyHostCpuNative' -as [type]){return}
-  Add-Type -TypeDefinition @'
-using System;using System.ComponentModel;using System.Runtime.InteropServices;
-public static class HourlyHostCpuNative {
-  [StructLayout(LayoutKind.Sequential)] public struct FT {public uint Low,High;public ulong Value {get{return ((ulong)High<<32)|Low;}}}
-  [DllImport("kernel32.dll",SetLastError=true)] static extern bool GetSystemTimes(out FT idle,out FT kernel,out FT user);
-  [DllImport("kernel32.dll",SetLastError=true)] public static extern ushort GetActiveProcessorGroupCount();
-  [DllImport("kernel32.dll",SetLastError=true)] public static extern uint GetActiveProcessorCount(ushort group);
-  public static ulong[] Read(){FT i,k,u;if(!GetSystemTimes(out i,out k,out u))throw new Win32Exception(Marshal.GetLastWin32Error());return new[]{i.Value,k.Value,u.Value};}
-}
-'@
+  # Emit only the three fixed P/Invoke declarations in memory. Starting the C#
+  # compiler for each fresh guard child spent the same twelve-second budget as
+  # Task/process checks and sampling. This changes binding setup, not the CPU
+  # provider, interval, freshness checks, topology checks, or deadline.
+  $name=[Reflection.AssemblyName]::new('HourlyHostCpuBindings')
+  $assembly=[AppDomain]::CurrentDomain.DefineDynamicAssembly($name,[Reflection.Emit.AssemblyBuilderAccess]::Run)
+  $module=$assembly.DefineDynamicModule('HourlyHostCpuBindings')
+  $fileTime=$module.DefineType('HourlyHostCpuFileTime',([Reflection.TypeAttributes]::Public -bor [Reflection.TypeAttributes]::SequentialLayout -bor [Reflection.TypeAttributes]::Sealed),[ValueType])
+  [void]$fileTime.DefineField('Low',[uint32],[Reflection.FieldAttributes]::Public)
+  [void]$fileTime.DefineField('High',[uint32],[Reflection.FieldAttributes]::Public)
+  $ft=$fileTime.CreateType()
+  $native=$module.DefineType('HourlyHostCpuNative',([Reflection.TypeAttributes]::Public -bor [Reflection.TypeAttributes]::Abstract -bor [Reflection.TypeAttributes]::Sealed))
+  $definitions=@(
+    @{name='GetSystemTimes';result=[bool];parameters=[type[]]@($ft.MakeByRefType(),$ft.MakeByRefType(),$ft.MakeByRefType())},
+    @{name='GetActiveProcessorGroupCount';result=[uint16];parameters=[type[]]@()},
+    @{name='GetActiveProcessorCount';result=[uint32];parameters=[type[]]@([uint16])}
+  )
+  foreach($definition in $definitions){
+    $method=$native.DefineMethod($definition.name,([Reflection.MethodAttributes]::Public -bor [Reflection.MethodAttributes]::Static -bor [Reflection.MethodAttributes]::PinvokeImpl),[Reflection.CallingConventions]::Standard,$definition.result,$definition.parameters)
+    $method.SetImplementationFlags([Reflection.MethodImplAttributes]::PreserveSig)
+    $constructor=[Runtime.InteropServices.DllImportAttribute].GetConstructor([type[]]@([string]))
+    $attribute=[Reflection.Emit.CustomAttributeBuilder]::new($constructor,[object[]]@('kernel32.dll'),[Reflection.FieldInfo[]]@([Runtime.InteropServices.DllImportAttribute].GetField('SetLastError')),[object[]]@($true))
+    $method.SetCustomAttribute($attribute)
+  }
+  [void]$native.CreateType()
 }
 function Get-HourlyCpuPoint {
   $groups=[HourlyHostCpuNative]::GetActiveProcessorGroupCount()
@@ -29,8 +44,10 @@ function Get-HourlyCpuPoint {
   # GetSystemTimes covers only one processor group on larger machines. Never
   # label that partial group as host CPU or choose a different lower provider.
   if($groups -ne 1 -or $processors -gt 64){Stop-HourlyCpu 'CPU_SCOPE_UNSUPPORTED'}
-  $times=[HourlyHostCpuNative]::Read()
-  return [pscustomobject]@{Idle=[decimal]$times[0];Kernel=[decimal]$times[1];User=[decimal]$times[2];Groups=[int]$groups;Processors=[int]$processors;AtMs=(Get-HourlyMonotonicMs)}
+  $ft='HourlyHostCpuFileTime' -as [type]
+  $idle=[Activator]::CreateInstance($ft);$kernel=[Activator]::CreateInstance($ft);$user=[Activator]::CreateInstance($ft)
+  if(-not [HourlyHostCpuNative]::GetSystemTimes([ref]$idle,[ref]$kernel,[ref]$user)){throw [ComponentModel.Win32Exception]::new([Runtime.InteropServices.Marshal]::GetLastWin32Error())}
+  return [pscustomobject]@{Idle=([decimal]$idle.High*4294967296+[decimal]$idle.Low);Kernel=([decimal]$kernel.High*4294967296+[decimal]$kernel.Low);User=([decimal]$user.High*4294967296+[decimal]$user.Low);Groups=[int]$groups;Processors=[int]$processors;AtMs=(Get-HourlyMonotonicMs)}
 }
 function Test-HourlyCpuPoint($Point) {
   if($null -eq $Point -or $Point -is [array]){return $false}
@@ -43,22 +60,28 @@ function Test-HourlyCpuPoint($Point) {
 }
 function Get-HourlyHostCpu([double]$DeadlineMs,[scriptblock]$Now={Get-HourlyMonotonicMs},[scriptblock]$ReadPoint={Get-HourlyCpuPoint},[scriptblock]$Wait={param($Milliseconds);Start-Sleep -Milliseconds $Milliseconds},[scriptblock]$Initialize={Initialize-HourlyHostCpuNative}) {
   $started=& $Now
+  $phase='entry';$initializationMs=$null
+  try {
   if([double]::IsNaN($DeadlineMs) -or [double]::IsInfinity($DeadlineMs) -or $DeadlineMs-$started -lt 1250 -or $DeadlineMs-$started -gt 12000){Stop-HourlyCpu 'CPU_BUDGET_EXHAUSTED'}
+  $phase='initialization';$initializationStarted=& $Now
   & $Initialize
+  $initializationMs=(& $Now)-$initializationStarted
   if($DeadlineMs-(& $Now) -lt 1250){Stop-HourlyCpu 'CPU_BUDGET_EXHAUSTED'}
+  $phase='first-point'
   $first=& $ReadPoint
   if(-not(Test-HourlyCpuPoint $first)){Stop-HourlyCpu 'CPU_SAMPLE_INVALID'}
   $at=& $Now
   if($first.AtMs -gt $at -or $at-$first.AtMs -gt 1000){Stop-HourlyCpu 'CPU_SAMPLE_STALE'}
   if($DeadlineMs-$at -lt 1250){Stop-HourlyCpu 'CPU_BUDGET_EXHAUSTED'}
-  & $Wait 1000
+  $phase='interval'; & $Wait 1000
   if($DeadlineMs-(& $Now) -lt 250){Stop-HourlyCpu 'CPU_BUDGET_EXHAUSTED'}
+  $phase='second-point'
   $last=& $ReadPoint
   if(-not(Test-HourlyCpuPoint $last)){Stop-HourlyCpu 'CPU_SAMPLE_INVALID'}
   $finished=& $Now
   if($finished -ge $DeadlineMs){Stop-HourlyCpu 'CPU_BUDGET_EXHAUSTED'}
   if($last.AtMs -gt $finished -or $finished-$last.AtMs -gt 1000){Stop-HourlyCpu 'CPU_SAMPLE_STALE'}
-  $window=$last.AtMs-$first.AtMs
+  $phase='validation';$window=$last.AtMs-$first.AtMs
   if($window -lt 1000 -or $window -gt 1500){Stop-HourlyCpu 'CPU_WINDOW_INVALID'}
   if($last.Groups -ne $first.Groups -or $last.Processors -ne $first.Processors){Stop-HourlyCpu 'CPU_SCOPE_UNSUPPORTED'}
   $idle=[decimal]$last.Idle-[decimal]$first.Idle;$kernel=[decimal]$last.Kernel-[decimal]$first.Kernel;$user=[decimal]$last.User-[decimal]$first.User;$total=$kernel+$user
@@ -68,6 +91,13 @@ function Get-HourlyHostCpu([double]$DeadlineMs,[scriptblock]$Now={Get-HourlyMono
   $percent=[double](100*($total-$idle)/$total)
   if([double]::IsNaN($percent) -or [double]::IsInfinity($percent) -or $percent -lt 0 -or $percent -gt 100){Stop-HourlyCpu 'CPU_SAMPLE_INVALID'}
   return [pscustomobject]@{PercentProcessorTime=$percent;provider='windows-system-times-v1';hostWide=$true;rawSamples=2;windowMs=$window;startedMs=$first.AtMs;endedMs=$last.AtMs;ageMs=$finished-$last.AtMs;groups=$first.Groups;processors=$first.Processors}
+  } catch {
+    $_.Exception.Data['HourlyCpuPhase']=$phase
+    $left=$DeadlineMs-(& $Now)
+    if(-not [double]::IsNaN($left) -and -not [double]::IsInfinity($left)){$_.Exception.Data['HourlyCpuRemainingMs']=[math]::Max(0,[math]::Min(12000,[math]::Floor($left)))}
+    if($null -ne $initializationMs -and $initializationMs -ge 0 -and $initializationMs -le 12000){$_.Exception.Data['HourlyCpuInitializationMs']=[math]::Ceiling($initializationMs)}
+    throw
+  }
 }
 function Test-HourlyCpuMeasurement($Value,[double]$NowMs) {
   if($null -eq $Value -or $Value -is [array] -or $Value.provider -cne 'windows-system-times-v1' -or $Value.hostWide -ne $true -or $Value.rawSamples -ne 2 -or $Value.groups -ne 1 -or $Value.processors -lt 1 -or $Value.processors -gt 64){return $false}
@@ -76,14 +106,17 @@ function Test-HourlyCpuMeasurement($Value,[double]$NowMs) {
 }
 function Get-HourlySafeProviderError($Record) {
   $types=@('System.Exception','System.InvalidOperationException','System.TimeoutException','System.UnauthorizedAccessException','System.IO.IOException','System.ComponentModel.Win32Exception','System.Management.ManagementException','System.Management.Automation.RuntimeException','System.Management.Automation.ActionPreferenceStopException','System.Management.Automation.CmdletInvocationException','System.Management.Automation.PipelineStoppedException','Microsoft.Management.Infrastructure.CimException')
-  $chain=@();$exception=$Record.Exception;$validation=$null
+  $chain=@();$exception=$Record.Exception;$validation=$null;$cpuFields=@{}
   for($depth=0;$null -ne $exception -and $depth -lt 4;$depth++){
     $entry=@{type=$(if($exception.GetType().FullName -in $types){$exception.GetType().FullName}else{'OtherException'});hresult=[long]$exception.HResult}
     foreach($pair in @(@('NativeErrorCode','nativeErrorCode'),@('StatusCode','cimStatusCode'))){if($null -ne $exception.PSObject.Properties[$pair[0]]){try{$entry[$pair[1]]=[long]$exception.($pair[0])}catch{}}}
     if($exception.Data['HourlyCpuValidation'] -in @('CPU_CLOCK_UNVERIFIED','CPU_BUDGET_EXHAUSTED','CPU_SCOPE_UNSUPPORTED','CPU_SAMPLE_INVALID','CPU_SAMPLE_STALE','CPU_WINDOW_INVALID')){$validation=[string]$exception.Data['HourlyCpuValidation']}
+    if($exception.Data['HourlyCpuPhase'] -cin @('entry','initialization','first-point','interval','second-point','validation')){$cpuFields.cpuPhase=[string]$exception.Data['HourlyCpuPhase']}
+    foreach($pair in @(@('HourlyCpuRemainingMs','cpuRemainingMs'),@('HourlyCpuInitializationMs','cpuInitializationMs'))){$v=$exception.Data[$pair[0]];if($v -is [ValueType] -and $v -isnot [bool] -and $v -ge 0 -and $v -le 12000){$cpuFields[$pair[1]]=[long]$v}}
     $chain+=,$entry;$exception=$exception.InnerException
   }
   $allowedIds=@('Microsoft.Management.Infrastructure.CimCmdlets.GetCimInstanceCommand','CimJob_BrokenCimSession','CimJob_UnhandledException','GetCimInstanceCommand','CimJob_InvalidOperation')
   $ids=@();foreach($part in ([string]$Record.FullyQualifiedErrorId -split ',')){if($part -in $allowedIds -or $part -cmatch '^HRESULT 0x[0-9A-Fa-f]{8}$'){$ids+=,$part}}
-  return @{exceptions=$chain;category=[string]$Record.CategoryInfo.Category;qualifiedErrorIdParts=$ids;additionalInnerException=$null -ne $exception;validation=$validation;detailsWithheld=$true}
+  $result=@{exceptions=$chain;category=[string]$Record.CategoryInfo.Category;qualifiedErrorIdParts=$ids;additionalInnerException=$null -ne $exception;validation=$validation;detailsWithheld=$true}
+  foreach($key in $cpuFields.Keys){$result[$key]=$cpuFields[$key]};return $result
 }

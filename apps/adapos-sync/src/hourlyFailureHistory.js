@@ -23,5 +23,8 @@ export function failureForAttempt(summary,attempt){
  if(!statuses.has(summary?.status))return null;
  const failure=summary.failure??summary.deliveryFailure??summary.uploadFailure;
  const event=summary.diagnostics?.events?.findLast?.(x=>x.kind==='failure');
- return safeHistoricalFailure({sequence:attempt.sequence,slot:attempt.slot,startedAt:attempt.startedAt,finishedAt:summary.finishedAt,status:summary.status,code:failure?.code,guard:failure?.guard,stage:event?.stage,observedProducts:summary.observedProducts,backendAcceptedRecords:summary.backendAcceptedRecords,outboxPending:summary.outboxPending});
+ // capture-lock wraps the entire collection callback. An inner guard failure
+ // must not be attributed to lock acquisition just because it unwinds last.
+ const guardStage={starting:'powershell-startup',host:'host-identity',tasks:'task-scheduler',processes:'processes',cpu:'cpu-provider',complete:'cpu-provider'}[failure?.guard?.stage];
+ return safeHistoricalFailure({sequence:attempt.sequence,slot:attempt.slot,startedAt:attempt.startedAt,finishedAt:summary.finishedAt,status:summary.status,code:failure?.code,guard:failure?.guard,stage:guardStage??event?.stage,observedProducts:summary.observedProducts,backendAcceptedRecords:summary.backendAcceptedRecords,outboxPending:summary.outboxPending});
 }
