@@ -1,0 +1,89 @@
+REVIEW COPY — NOT AN ACCESS GRANT OR AN INSTRUCTION TO ACT NOW
+
+Current direct-read steps: hourly004-direct-read-r2.md and hourly004-direct-read-r2-handoff.txt (H004-DIRECT-READ-20261112-R2). R2 supersedes the R1 direct-read onboarding steps below; existing full-policy controller and recovery contracts are unchanged.
+Only use after the human approves this exact direct-read onboarding package.
+
+ผู้รับ: Ozymandias เจ้าของตาราง Hourly004 เดิม
+เป้าหมาย: อ่านไฟล์หลักฐานและ Task บน SERVER004 ตรง ไม่ผ่าน SCPRODUCTDEV
+
+เริ่มจากคำสั่งผู้ใช้ล่าสุดและบันทึกกลาง Hourly004 Cloud Monitor Journal เดิม
+ตรวจเจ้าของงาน/PR81/PR87 และ native context ที่มีอยู่ ห้ามเปิดผู้ตรวจซ้ำ
+ใช้คลาวด์ automation เดิม Hourly004 cloud delivery เท่านั้น
+ID 6ae1e857b364819198f844902670d3c2
+ไม่เปิด local hourly-004 ที่ PAUSED และไม่สร้างตารางอื่น
+
+ข้ออนุมัติที่ต้องได้ก่อนลงมือ
+- ผู้ใช้ต้องอนุมัติการให้ Ozymandias เข้าถึงเครื่อง SERVER004 ผ่าน native computer
+  ซึ่งเป็นสิทธิ์ทำงานเครื่องกว้างกว่าการอ่าน ไม่ใช่สิทธิ์ readonly ระดับ Windows
+- ถ้าจำเป็น ต้องครอบคลุมการสร้าง native context อ่านอย่างเดียวเพียงหนึ่งตัว
+  และวาง reader ที่ตรวจแล้วหนึ่งไฟล์ใน workspace ของ context นั้นครั้งเดียว
+- การติดตั้ง/อัปเดตแอป การเปลี่ยน workspace policy, ACL, credentials หรือ identity
+  ไม่รวมอยู่ด้วย ต้องหยุดและเสนอแยกก่อน ห้ามแก้เพื่อให้ทดสอบผ่าน
+
+ลำดับครั้งเดียว
+1) ให้ผู้ใช้ทำบน SERVER004 ใน ChatGPT desktop บัญชี/workspace เดิม:
+   เปิด Ozymandias -> Details -> Computers -> เครื่อง SERVER004 -> Allow access
+   ยืนยันชื่อเครื่องจริงก่อนกด ไม่ใช่เครื่องหลักของผู้ใช้
+   ต้องเป็นแอปที่รองรับ local computer access (เอกสารระบุ26.929ขึ้นไป)
+   อย่าอ่าน token/session store เพื่อหาว่าเป็นบัญชีใด ใช้หน้าบัญชีที่ผู้ใช้ตรวจเอง
+2) refresh native device inventory ฝั่งคลาวด์ ใช้ ID ที่คืนมาจริง
+   ต้องพบ SERVER004 และสิทธิ์ task-execution authorized จริงก่อนสั่งอ่าน
+   Connected อย่างเดียวไม่ผ่าน ถ้าไม่มี/ปฏิเสธ/UNKNOWN หยุดส่วนต้นทาง
+   ไม่เปลี่ยนบัญชี/ACL/ช่องทาง/VPN/host ไม่ relay ผ่านเครื่องผู้ใช้
+3) หา context ที่เป็นงาน readonly SERVER004 เดิมที่ตรงงานนี้ก่อน หากไม่มีและ
+   ผู้ใช้อนุมัติการสร้างแล้ว ให้สร้างหนึ่ง context และบันทึก ID แล้วใช้ซ้ำ
+   ไม่ใช้แชทแก้ CPU-v5/PR81 หรือ worker ของ Delta/CRM/งานอื่น
+4) reader ที่ตรวจ: apps/adapos-sync/scripts/Read-Hourly004DirectSource.ps1
+   จาก artifact/revision ที่ผู้ใช้อนุมัติเท่านั้น เปรียบเทียบ bytes ใน RAM
+   วางครั้งเดียวใน workspace native ของงานนี้ ไม่ลง business runtime
+   ไม่มี .env/credential/ข้อมูลสินค้าในชุด ไม่เปลี่ยน code เองเมื่อมี error
+5) ใช้ native Windows PowerShell5.1 บน SERVER004, NoProfile,
+   NonInteractive, RemoteSigned, -File reader -Mode Status
+   ให้ native invocation มี hard deadline30วินาทีที่พิสูจน์การยุติงานของตัวเองได้
+   reader มีเพียง cooperative check20วินาที ไม่ใช่ hard timeout ของ COM
+   ถ้า executor ไม่มี hard deadline/cancellation ให้ PARTIAL และยังไม่ใส่ source
+   read ที่รันซ้ำในตาราง ห้ามฆ่า POS/Hourly/Full Sync/Delta process
+6) ตัว reader ตรวจ actual SERVER004 / timezone / existing Administrator identity
+   จากของจริง อ่านเฉพาะหลักฐาน/receipt/pointerเดิม, Task Hourly11ตัวผ่าน localCOM,
+   และจำนวนคิวไม่เกิน512 entries ไม่มีSQL/CPU probe/TaskRun/แก้ไฟล์ต้นทาง
+   ถ้าสิทธิ์อ่านไม่ผ่าน อย่า RunAs, grantACL, download helper หรือสลับidentityเอง
+7) ยืนยันจาก execution audit ฝั่งคลาวด์ว่าเป็น native SERVER004 จริง ไม่ใช่
+   main-laptop SMB และไม่ใช่อ่าน JSON ที่เครื่องอื่นคัดมา ยืนยัน fileRead passed
+   และ taskReadsPassed11 พร้อมเวลาใหม่เทียบ platform execution time
+   Local output platformAuthorization=NOT_EVALUATED_LOCALLY ไม่ใช่การ grant
+8) บันทึก safe receipt ลง journal เดิมแบบ revision guard/readback
+   แล้วจึงเพิ่ม source step เข้าตารางเดิมคง owner/เวลา/central query เดิม
+   ผู้ใช้ไม่ต้องเปิด SCPRODUCTDEV ไว้สำหรับเส้นทางนี้
+
+ขอบเขตในทุก scheduled check
+- คง guard12วินาที recoveryOFF,6835,batch200,perbatch60s,collection15min/Task20min
+- ไม่ Run Task/Sync/ชดเชย/replay/rebaseline/manual capture/upload
+- ไม่เปลี่ยน Full Sync/Delta001/004/003/005, cohort, credentials, ACL หรือระบบอื่น
+- ห้ามแสดง rawenv/logs/Taskargs/XML/SDDL/receiptkeys/รายการสินค้าหรือยอดรายตัว
+- central/source/journal เป็นคนละสถานะ ถ้า connectorล้มไม่แปลว่า captureหาย
+- อ่าน source หลังรอบอย่างน้อย20นาทีใน loop09:25–19:25ตามเดิม ไม่ backfill
+- ทำ exact-slot/วันที่และ central per-capture6835/6835/6835 แยก duplicate
+- ไม่เอา expectedGuardBudgetMs ไปอ้างว่าเป็น policyที่วัดใหม่ และไม่สร้าง
+  installationTransaction:idle เพื่อทำให้ PR87 reconcilerผ่าน
+- ใช้ PR87 full reconcilerเฉพาะเมื่อมี source/controller contract ที่ตรงจริง
+  หากไม่มีให้แสดง source facts กับ central deliveryแยกกัน ไม่ผลิต fullPASSปลอม
+- historyเก็บได้สูงสุด8ครั้ง ไม่รับรองว่าครบทุก failure ที่เคยเกิด
+- 12พ.ย.ให้แจ้งผลรอบ09:00/10:00ทั้งสองรอบตามคำขอที่รับแล้ว แม้ผลปกติ
+- ผิดปกติให้เช็กเจ้าของ/งานเดิมก่อน วิเคราะห์ readonlyและบันทึก timeline
+  แยก fact/hypothesis/unknown ไม่แก้ productionเอง
+
+ถ้า target offline/logout/appหยุด
+คง central checksและjournalตามเดิม แจ้ง sourceUNKNOWN/connection unavailable
+อย่าอ้างว่า Hourly failure และอย่าเปิด fallback ผ่านเครื่องผู้ใช้
+เมื่อเครื่องเดิมกลับมา ให้ใช้ grant/context เดิมหลังตรวจสิทธิ์อีกครั้ง
+อย่าสร้าง Task/service/บัญชี/credentials ใหม่เพราะ connectionชั่วคราวหาย
+
+Rollback
+ถอดเฉพาะ source step จาก cloud promptเดิมก่อน คง centralและตารางเดิม
+ถ้าจะ revoke native grant ต้องเป็น grantที่ onboardingนี้สร้างและไม่มีงานอื่นใช้
+ห้าม revoke grantที่มีอยู่เดิมหรือขัดงานคนอื่น ให้ผู้ดูแลทำผ่าน UIเมื่ออนุมัติ
+คง reader/auditไว้ก่อน ไม่ลบหลักฐานหรือ rollback CPU-v5
+
+ส่งกลับ: PASS_READ_ACCESS_ONLY/PARTIAL/BLOCKED, provenanceจริง, เวลา/host/identity
+ที่ยืนยันเป็นboolean, fileRead/task11/queueKnown, สิ่งที่ยังไม่รู้และสิทธิ์ที่ติด
+ผลจำลองไม่ใช่การทดสอบสิทธิ์จริง ไม่อ้างว่าพร้อมเมื่อมีแต่ Connected หรือ testผ่าน

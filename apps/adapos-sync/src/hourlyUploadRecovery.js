@@ -8,9 +8,18 @@ export function createHourlyUploadRecovery({ upload, guard, enabled = false, mon
   return async options => {
     if (!enabled) return upload(options);
     if (options.maxAttempts !== 1 || !Number.isSafeInteger(options.timeoutMs) || options.timeoutMs < 1 || options.timeoutMs > 30_000 || typeof guard !== "function") throw new TypeError("Recovery requires a single-layer bounded upload.");
-    const deadline = monotonic() + options.timeoutMs;
-    try { return await upload(options); } catch (error) {
-      if (error?.code !== "ECONNRESET" && error?.cause?.code !== "ECONNRESET") throw error;
+    // Retain the original primitive delivery inputs before invoking a provider.
+    // A reset after the server committed must resend the exact queued bytes,
+    // even if a provider mutates its options object before throwing.
+    if (typeof options.body !== "string" || !options.body.length) throw new TypeError("Recovery requires the original queued body.");
+    const original = Object.freeze({ ...options });
+    const deadline = monotonic() + original.timeoutMs;
+    try { return await upload({ ...original }); } catch (error) {
+      const plainReset = error?.code === "ECONNRESET";
+      const wrappedReset = error?.code == null && error?.cause?.code === "ECONNRESET";
+      // An inner transport cause never overrides an outer application/HTTP,
+      // authorization, timeout or acknowledgement stop reason.
+      if (error?.status != null || (!plainReset && !wrappedReset)) throw error;
       if (deadline - monotonic() < 1500) throw error;
       await wait(500);
       const remainingMs = Math.floor(deadline - monotonic());
@@ -19,7 +28,7 @@ export function createHourlyUploadRecovery({ upload, guard, enabled = false, mon
       const timeoutMs = Math.floor(deadline - monotonic());
       if (timeoutMs < 1000) throw error;
       emitHourlyDiagnostic(onDiagnostic, { stage: "upload", kind: "retry", retryCount: 1, remainingMs: timeoutMs });
-      return upload({ ...options, timeoutMs, maxAttempts: 1 });
+      return upload({ ...original, timeoutMs, maxAttempts: 1 });
     }
   };
 }

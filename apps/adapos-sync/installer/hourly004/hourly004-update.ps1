@@ -300,15 +300,30 @@ function Assert-HourlyInstalledSource {
   }}finally{$hasher.Dispose()}
 }
 function Get-HourlyTaskAttemptInfo {
+  param([scriptblock]$CreateService={New-Object -ComObject Schedule.Service},[scriptblock]$ReleaseService={param($Service) [void][Runtime.InteropServices.Marshal]::ReleaseComObject($Service)})
   $service=$null
   try {
-    $service=New-Object -ComObject Schedule.Service
+    $service=& $CreateService
     $service.Connect();$folder=$service.GetFolder('\');$latest=$null
     foreach($hour in 9..19){$task=$folder.GetTask(('Hourly Stock Evidence (Branch 004) - {0:00}00' -f $hour));if($task.LastRunTime.Year -ge 2000 -and ($null -eq $latest -or $task.LastRunTime -gt $latest.LastRunTime)){$latest=$task}}
     if($null -eq $latest){return @{verified=$false;startedAt=$null;running=$null}}
-    return @{verified=$true;startedAt=([datetimeoffset]$latest.LastRunTime).ToString('o');running=[int]$latest.State -eq 4}
+    [xml]$definition=$latest.Xml
+    $ns=New-Object Xml.XmlNamespaceManager($definition.NameTable);$ns.AddNamespace('t','http://schemas.microsoft.com/windows/2004/02/mit/task')
+    $exec=$definition.SelectNodes('//t:Actions/t:Exec',$ns)
+    $user=$definition.SelectSingleNode('//t:Principal/t:UserId',$ns).InnerText
+    $slot=$latest.Name.Substring($latest.Name.Length-4).Insert(2,':')
+    $entry=Join-Path $script:HourlySecure 'hourly-complete-launcher.mjs'
+    $verified=$false
+    if($exec.Count -eq 1){
+      $arguments=$exec[0].Arguments.Replace('/','\')
+      $verified=$exec[0].Command -ieq $script:HourlyNode -and $exec[0].WorkingDirectory -ieq $script:HourlyApp -and ($arguments -ceq ('"'+$entry+'" run '+$slot) -or $arguments -ceq ($entry+' run '+$slot))
+    }
+    $verified=$verified -and $user -in @('SYSTEM','S-1-5-18') -and $definition.SelectSingleNode('//t:ExecutionTimeLimit',$ns).InnerText -eq 'PT20M'
+    $taskState=[int]$latest.State
+    $running=if($taskState -eq 4){$true}elseif($taskState -eq 3){$false}else{$null}
+    return @{verified=$true;startedAt=([datetimeoffset]$latest.LastRunTime).ToUniversalTime().ToString('o');running=$running;enabled=[bool]$latest.Enabled;lastResult=[int]$latest.LastTaskResult;definitionVerified=[bool]$verified}
   } catch {return @{verified=$false;startedAt=$null;running=$null}}
-  finally {if($null -ne $service){[void][Runtime.InteropServices.Marshal]::ReleaseComObject($service)}}
+  finally {if($null -ne $service){& $ReleaseService $service}}
 }
 function Get-HourlyStatusNow {return [datetimeoffset]::Now.ToString('o')}
 function Get-HourlySafeStatus {
@@ -322,6 +337,9 @@ function Get-HourlySafeStatus {
   try{$folder=Join-Path $script:HourlyCache 'hourly-evidence-outbox\004';$report.queueNow.pending=@(Get-ChildItem -LiteralPath $folder -File -ErrorAction Stop | Where-Object {$_.Name -cmatch '^[a-f0-9]{64}\.json$'}).Count}catch{}
   $report.availability='unknown';$report.latestAttempt=@{status='unknown';slot=$null;observedProducts=$null;backendAcceptedRecords=$null;outboxPending=$null};$report.lastSuccess=$null;$report.failureCode=$null
   $meta=@{verified=$false;startedAt=$null;running=$null};try{$meta=Get-HourlyTaskAttemptInfo}catch{}
+  # Aggregate status only: no credentials, arguments, process query, SQL or task
+  # mutation. A cloud caller must independently establish device authorization.
+  $report.sourceObservation=@{schemaVersion='hourly004-source-observation-v1';observedAt=[datetimeoffset]::UtcNow.ToString('o');hostVerified=[Environment]::MachineName -ceq 'SERVER004';timeZoneVerified=[TimeZoneInfo]::Local.Id -ceq 'SE Asia Standard Time';taskAccessVerified=$meta.verified;task=@{startedAt=$meta.startedAt;running=$meta.running;enabled=$meta.enabled;lastResult=$meta.lastResult;definitionVerified=$meta.definitionVerified};sqlQueries=0;taskRuns=0;configurationChanges=0}
   $modeVerified=$state -in @('cpu-v5-installed','checkpoint-v4-installed','original-12-second-guard')
   $modeVerified=$modeVerified -and $inspection.state -eq 'idle'
   $request=@{file=(Join-Path $script:HourlySecure 'latest-slot-result.json');now=(Get-HourlyStatusNow);legacyMode=$state -eq 'original-12-second-guard';latestTaskStartedAt=$(if($meta.verified -and $modeVerified){$meta.startedAt}else{$null});taskRunning=$meta.running}|ConvertTo-Json -Compress

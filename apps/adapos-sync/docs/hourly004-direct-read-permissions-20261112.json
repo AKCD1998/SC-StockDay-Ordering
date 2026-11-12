@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "hourly004-read-permission-proposal-v1",
+  "state": "PROPOSED_NOT_APPLIED",
+  "targetHost": "SERVER004",
+  "existingIdentity": "SERVER004\\CodexSandboxOffline",
+  "requireTrustedNativeSidBinding": true,
+  "evidenceProfile": "DurableReceipt",
+  "fileReadMask": 1179785,
+  "readFiles": [
+    "C:\\ProgramData\\SC-StockDay-Ordering\\hourly-stock-evidence-004\\complete-on-20261022\\latest-slot-result.json.receipt-0.json",
+    "C:\\ProgramData\\SC-StockDay-Ordering\\hourly-stock-evidence-004\\complete-on-20261022\\latest-slot-result.json.receipt-1.json",
+    "C:\\ProgramData\\SC-StockDay-Ordering\\hourly-stock-evidence-004\\complete-on-20261022\\hourly-complete-launcher.mjs"
+  ],
+  "fileInheritance": "None",
+  "ancestorMetadataMask": 1048736,
+  "ancestorInheritance": "None",
+  "metadataDirectories": [
+    "C:\\ProgramData\\SC-StockDay-Ordering",
+    "C:\\ProgramData\\SC-StockDay-Ordering\\hourly-stock-evidence-004",
+    "C:\\ProgramData\\SC-StockDay-Ordering\\hourly-stock-evidence-004\\complete-on-20261022",
+    "C:\\ProgramData\\SC-StockDay-Ordering\\hourly-stock-evidence-004\\hourly-evidence-outbox"
+  ],
+  "queue": {
+    "path": "C:\\ProgramData\\SC-StockDay-Ordering\\hourly-stock-evidence-004\\hourly-evidence-outbox\\004",
+    "directoryMask": 1048737,
+    "directoryInheritance": "None",
+    "childMetadataMask": 1048704,
+    "childInheritance": "ContainerInherit,ObjectInherit,InheritOnly",
+    "payloadReadGranted": false
+  },
+  "taskReadMask": 1179785,
+  "taskNames": [
+    "Hourly Stock Evidence (Branch 004) - 0900",
+    "Hourly Stock Evidence (Branch 004) - 1000",
+    "Hourly Stock Evidence (Branch 004) - 1100",
+    "Hourly Stock Evidence (Branch 004) - 1200",
+    "Hourly Stock Evidence (Branch 004) - 1300",
+    "Hourly Stock Evidence (Branch 004) - 1400",
+    "Hourly Stock Evidence (Branch 004) - 1500",
+    "Hourly Stock Evidence (Branch 004) - 1600",
+    "Hourly Stock Evidence (Branch 004) - 1700",
+    "Hourly Stock Evidence (Branch 004) - 1800",
+    "Hourly Stock Evidence (Branch 004) - 1900"
+  ],
+  "taskFolderAclChanges": false,
+  "fullSyncTaskChanges": false,
+  "runtimeChanges": false,
+  "hourlyGuardBudgetMs": 12000,
+  "uploadRecoveryEnabled": false,
+  "automaticApply": false,
+  "automaticRetry": false
+}
