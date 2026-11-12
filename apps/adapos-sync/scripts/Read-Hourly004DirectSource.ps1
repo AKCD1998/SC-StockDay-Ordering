@@ -10,6 +10,7 @@ $ProgressPreference='SilentlyContinue'
 $script:H004Evidence='C:\ProgramData\SC-StockDay-Ordering\hourly-stock-evidence-004\complete-on-20261022'
 $script:H004Queue='C:\ProgramData\SC-StockDay-Ordering\hourly-stock-evidence-004\hourly-evidence-outbox\004'
 $script:H004App='C:\Users\Administrator\Desktop\RxAuu\apps\adapos-sync'
+$script:H004TaskVisibility=$null
 $script:H004Pointer=@'
 // The existing Task action and principal remain unchanged. Only this pointer
 // switches after a complete offline release is staged and verified.
@@ -87,8 +88,56 @@ function H004TaskProjection($Task,[int]$Hour){
 }
 function H004GetTasks {
   $service=New-Object -ComObject Schedule.Service
-  try{$service.Connect();$folder=$service.GetFolder('\');foreach($hour in 9..19){$t=$folder.GetTask(('Hourly Stock Evidence (Branch 004) - {0:00}00' -f $hour));H004TaskProjection $t $hour}}
+  $script:H004TaskVisibility=$null;$missing=$false;$denied=$false;$results=@{}
+  try{
+    $service.Connect();$folder=$service.GetFolder('\')
+    foreach($hour in 9..19){
+      try{$t=$folder.GetTask(('Hourly Stock Evidence (Branch 004) - {0:00}00' -f $hour));$results[$hour]=H004TaskProjection $t $hour}
+      catch{$code=H004SafeError $_;if($code -ceq 'NOT_FOUND'){$missing=$true};if($code -ceq 'ACCESS_DENIED'){$denied=$true};$results[$hour]=[pscustomobject]@{slot=('{0:00}:00' -f $hour);readStatus='unavailable';readError=$code;nativeFailure=(H004NativeFailure $_)}}
+    }
+    # This is the SAME local COM folder and token, not an alternate route.
+    # Only after NOT_FOUND, count the visible non-hidden root Task names in
+    # RAM. Never enumerate again after an explicit access-denied response.
+    if($missing -and -not $denied){
+      try{
+        $visible=$folder.GetTasks(0);$names=@();$candidates=@()
+        foreach($t in $visible){
+          if($names.Count -ge 256){break};$name=[string]$t.Name;$names+=,$name
+          if($name.StartsWith('Hourly Stock Evidence (Branch 004)',[StringComparison]::OrdinalIgnoreCase)){$candidates+=,[pscustomobject]@{Xml=$t.Xml;State=$t.State;Enabled=$t.Enabled;LastRunTime=$t.LastRunTime;LastTaskResult=$t.LastTaskResult;NextRunTime=$t.NextRunTime}}
+        }
+        $v=H004TaskVisibilityProjection $names ([string]$service.TargetServer) ([string]$folder.Path)
+        $v|Add-Member -NotePropertyName enumerationComplete -NotePropertyValue ($visible.Count -le 256)
+        $v|Add-Member -NotePropertyName maximumNameReads -NotePropertyValue 256
+        $resolved=H004ResolveVisibleTasks $candidates $results
+        $v|Add-Member -NotePropertyName definitionResolvedSlots -NotePropertyValue $resolved
+        $script:H004TaskVisibility=$v
+      }
+      catch{$script:H004TaskVisibility=[pscustomobject]@{availability='unavailable';safeError=(H004SafeError $_);nativeFailure=(H004NativeFailure $_);provesGlobalAbsence=$false}}
+    }
+    foreach($hour in 9..19){$results[$hour]}
+  }
   finally{if($null -ne $service){[void][Runtime.InteropServices.Marshal]::ReleaseComObject($service)}}
+}
+function H004NativeFailure($Record){
+  $e=$Record.Exception;$types=@('System.IO.FileNotFoundException','System.IO.DirectoryNotFoundException','System.UnauthorizedAccessException','System.Runtime.InteropServices.COMException','System.Management.Automation.MethodInvocationException','System.ComponentModel.Win32Exception')
+  $found=$null;for($i=0;$i -lt 4 -and $null -ne $e;$i++){$type=$e.GetType().FullName;if($type -cin $types -and $e.HResult -is [ValueType]){$found=[pscustomobject]@{type=$type;hresult=[int64]$e.HResult}};$e=$e.InnerException};return $found
+}
+function H004TaskVisibilityProjection([string[]]$Names,[string]$Target,[string]$Folder){
+  $expected=@{};foreach($h in 9..19){$expected[('Hourly Stock Evidence (Branch 004) - {0:00}00' -f $h)]=$true}
+  $exact=0;$candidate=0;foreach($name in $Names){if($expected.ContainsKey($name)){$exact++};if($name.StartsWith('Hourly Stock Evidence (Branch 004)',[StringComparison]::OrdinalIgnoreCase)){$candidate++}}
+  [pscustomobject]@{availability='read';scope='non-hidden-root-only';targetServerVerified=($Target.TrimStart('\') -ieq 'SERVER004');rootFolderVerified=($Folder -ceq '\');visibleRootTaskCount=$Names.Count;branch004CandidateCount=$candidate;exactExpectedNameMatches=$exact;provesGlobalAbsence=$false}
+}
+function H004ResolveVisibleTasks([object[]]$Candidates,[Collections.IDictionary]$Results){
+  $resolved=0
+  foreach($hour in 9..19){
+    if((H004Prop $Results[$hour] 'readError') -cne 'NOT_FOUND'){continue}
+    $matches=@();foreach($candidate in $Candidates){$p=H004TaskProjection $candidate $hour;if($p.definitionVerified){$matches+=,$p}}
+    # Only a unique object already visible to THIS token whose complete known
+    # action/principal/limit match this exact slot can resolve a naming lookup.
+    # Access-denied objects and ambiguous/mismatched definitions never qualify.
+    if($matches.Count -eq 1){$p=$matches[0];$p|Add-Member -NotePropertyName readMethod -NotePropertyValue 'visible-root-definition';$Results[$hour]=$p;$resolved++}
+  }
+  return $resolved
 }
 function H004GetQueue {
   H004AssertPath $script:H004Queue;$pending=0;$temporary=0;$unknown=0;$count=0;$locks=0
@@ -98,8 +147,11 @@ function H004GetQueue {
 function H004SafeTask($Task){
   $started=H004Time (H004Prop $Task 'startedAt');$next=H004Time (H004Prop $Task 'nextRun');$slot=H004Prop $Task 'slot'
   if($slot -isnot [string] -or $slot -cnotmatch '^(09|1[0-9]):00$'){H004Stop 'TASK_SET_UNVERIFIED'}
+  $readError=H004Prop $Task 'readError'
+  if($null -ne $readError){$allowed=@('ACCESS_DENIED','NOT_FOUND','TIMEOUT','READ_UNAVAILABLE');$failure=H004Prop $Task 'nativeFailure';$type=H004Prop $failure 'type';$hr=H004Prop $failure 'hresult';$safeFailure=$null;if($type -cin @('System.IO.FileNotFoundException','System.IO.DirectoryNotFoundException','System.UnauthorizedAccessException','System.Runtime.InteropServices.COMException','System.Management.Automation.MethodInvocationException','System.ComponentModel.Win32Exception') -and $hr -is [ValueType] -and $hr -ge -2147483648 -and $hr -le 2147483647){$safeFailure=@{type=$type;hresult=$hr}};return [pscustomobject]@{slot=$slot;readStatus='unavailable';safeError=$(if($readError -cin $allowed){$readError}else{'READ_UNAVAILABLE'});nativeFailure=$safeFailure;definitionVerified=$false;startedAt=$null}}
   $enabled=H004Prop $Task 'enabled';$running=H004Prop $Task 'running';$verified=H004Prop $Task 'definitionVerified'
-  [pscustomobject]@{slot=$slot;enabled=$(if($enabled -is [bool]){$enabled}else{$null});running=$(if($running -is [bool]){$running}else{$null});state=(H004Integer (H004Prop $Task 'state'));startedAt=$(if($null -ne $started){$started.ToUniversalTime().ToString('o')}else{$null});lastResult=(H004Integer (H004Prop $Task 'lastResult'));nextRun=$(if($null -ne $next){$next.ToString('o')}else{$null});definitionVerified=($verified -ceq $true)}
+  $method=H004Prop $Task 'readMethod'
+  [pscustomobject]@{slot=$slot;readStatus='read';readMethod=$(if($method -ceq 'visible-root-definition'){$method}else{'exact-name'});enabled=$(if($enabled -is [bool]){$enabled}else{$null});running=$(if($running -is [bool]){$running}else{$null});state=(H004Integer (H004Prop $Task 'state'));startedAt=$(if($null -ne $started){$started.ToUniversalTime().ToString('o')}else{$null});lastResult=(H004Integer (H004Prop $Task 'lastResult'));nextRun=$(if($null -ne $next){$next.ToString('o')}else{$null});definitionVerified=($verified -ceq $true)}
 }
 function H004SafeGuard($Guard){
   $reasons=@('HOST_UNVERIFIED','IDENTITY_UNVERIFIED','FULL_SYNC_BUSY','PROCESS_UNREADABLE','CPU_UNREADABLE','CPU_LIMIT','PROVIDER_TIMEOUT','ACCESS_DENIED','TASKS_UNAVAILABLE','PROCESSES_UNAVAILABLE','CPU_UNAVAILABLE','PLATFORM_UNAVAILABLE','BUDGET_EXHAUSTED','START_FAILED','DEADLINE','OUTPUT_LIMIT','INVALID_OUTPUT','CHILD_EXIT','READY_UNVERIFIED','CHILD_STILL_RUNNING','GUARD_LEASE_UNVERIFIED')
@@ -152,6 +204,7 @@ function Invoke-Hourly004DirectRead {
   param([scriptblock]$Context={H004GetContext},[scriptblock]$Read={param($Name) H004ReadKnown $Name},[scriptblock]$Tasks={H004GetTasks},[scriptblock]$Queue={H004GetQueue},[scriptblock]$Now={[DateTimeOffset]::UtcNow})
   $watch=[Diagnostics.Stopwatch]::StartNew();$stage='context';$at=& $Now
   $report=[ordered]@{schemaVersion='hourly004-direct-source-v1';checkedAt=$at.ToUniversalTime().ToString('o');branch='004';mode=$Mode;accessStatus='PARTIAL';failedStage=$null;safeError=$null;actualExecutionHostVerified=$false;existingIdentityVerified=$false;timeZoneVerified=$false;administratorToken=$null;platformAuthorization='NOT_EVALUATED_LOCALLY';requiresTrustedNativeAuthorization=$true;requiresNativeInvocationDeadlineMs=30000;fileRead='not-attempted';taskReadsExpected=11;taskReadsPassed=0;tasks=@();latestTask=$null;activePointerVersion='unknown';releaseIntegrity='NOT_FULLY_REVALIDATED';receiptState='unknown';evidence=$null;failureHistory=$null;queue=@{known=$false;pending=$null};expectedGuardBudgetMs=12000;expectedRecoveryEnabled=$false;guardChanged=$false;recoveryChanged=$false;sqlQueries=0;taskRuns=0;configurationChanges=0;permissionChanges=0;sourceFileWrites=0;newScheduledTasks=0;currentStockCertified=$false}
+  $report['readerRevision']='r2-visible-task-file-parts-1'
   try{
     $ctx=& $Context
     if($ctx.hostName -ine 'SERVER004'){H004Stop 'WRONG_EXECUTION_HOST'};$report.actualExecutionHostVerified=$true
@@ -159,12 +212,17 @@ function Invoke-Hourly004DirectRead {
     $kind=H004Prop $ctx 'identityKind';$report['executionIdentityKind']=$(if($kind -cin @('existing-owner','existing-native-sandbox')){$kind}else{'fixture-or-unreported'})
     if($ctx.timeZone -cne 'SE Asia Standard Time'){H004Stop 'WRONG_TIMEZONE'};$report.timeZoneVerified=$true
     if($ctx.edition -cne 'Desktop' -or $ctx.major -ne 5){H004Stop 'NATIVE_PS51_REQUIRED'};$report.administratorToken=$ctx.isAdministrator
-    $stage='task-read';$taskRows=@(& $Tasks|ForEach-Object {H004SafeTask $_})
-    if($taskRows.Count -ne 11 -or @($taskRows|Select-Object -ExpandProperty slot -Unique).Count -ne 11 -or @($taskRows|Where-Object {$_.slot -cnotmatch '^(09|1[0-9]):00$'}).Count -gt 0){H004Stop 'TASK_SET_UNVERIFIED'}
-    $report.tasks=$taskRows;$report.taskReadsPassed=$taskRows.Count
+    $stage='task-read';$taskRows=@();$taskProblem=$null;$report['taskReadFailure']=$null
+    try{
+      $taskRows=@(& $Tasks|ForEach-Object {H004SafeTask $_})
+      $report.tasks=$taskRows;$report.taskReadsPassed=@($taskRows|Where-Object {$_.readStatus -ceq 'read'}).Count
+      if($taskRows.Count -ne 11 -or @($taskRows|Select-Object -ExpandProperty slot -Unique).Count -ne 11){$taskProblem='TASK_SET_UNVERIFIED'}
+      $unread=@($taskRows|Where-Object {$_.readStatus -cne 'read'});if($unread.Count){$taskProblem=$unread[0].safeError}
+    }catch{$taskProblem=H004SafeError $_;$report.taskReadFailure=H004NativeFailure $_}
+    $report['taskVisibility']=$script:H004TaskVisibility
     $latest=@($taskRows|Where-Object {$null -ne (H004Time $_.startedAt)}|Sort-Object {[DateTimeOffset]::Parse($_.startedAt)} -Descending|Select-Object -First 1);if($latest.Count){$report.latestTask=$latest[0]}
     if($watch.ElapsedMilliseconds -gt 20000){H004Stop 'READ_DEADLINE'}
-    $stage='status-file';$bytes=[byte[]](& $Read 'status');$report.fileRead='passed';$view=$null;$viewInvalid=$false
+    $stage='status-file';try{$bytes=[byte[]](& $Read 'status');$report.fileRead='passed'}catch{$report.fileRead='unavailable';$report['fileReadFailure']=H004NativeFailure $_;throw};$view=$null;$viewInvalid=$false
     try{$view=H004Json $bytes}catch{if((H004SafeError $_) -cne 'INVALID_JSON'){throw};$viewInvalid=$true}
     $stage='pointer-read';$pointer=[Text.Encoding]::UTF8.GetString([byte[]](& $Read 'pointer'));$normalize={param($s) $s.Replace("`r`n","`n").TrimEnd([char[]]"`r`n")};if((&$normalize $pointer) -ceq (&$normalize $script:H004Pointer)){$report.activePointerVersion='cpu-v5'}
     $stage='receipt-read';$valid=@();$receiptIssues=@()
@@ -174,7 +232,7 @@ function Invoke-Hourly004DirectRead {
     $stage='evidence-validation';$seen=&$Now;$report.evidence=H004EvidenceProjection $view $selected $report.latestTask $seen;$report.failureHistory=H004History $selected $seen
     if($watch.ElapsedMilliseconds -gt 20000){H004Stop 'READ_DEADLINE'}
     $stage='queue-read';try{$report.queue=&$Queue}catch{$report.queue=@{known=$false;pending=$null;safeError=(H004SafeError $_)}}
-    if($viewInvalid){$report.accessStatus='PARTIAL';$report.failedStage='status-json';$report.safeError='INVALID_JSON'}else{$report.accessStatus='PASS_READ_ACCESS_ONLY'}
+    if($null -ne $taskProblem){$report.accessStatus='PARTIAL';$report.failedStage='task-read';$report.safeError=$taskProblem}elseif($viewInvalid){$report.accessStatus='PARTIAL';$report.failedStage='status-json';$report.safeError='INVALID_JSON'}else{$report.accessStatus='PASS_READ_ACCESS_ONLY'}
   }catch{$report.failedStage=$stage;$report.safeError=H004SafeError $_;$report.accessStatus=$(if($report.safeError -cin @('WRONG_EXECUTION_HOST','WRONG_EXISTING_IDENTITY','WRONG_TIMEZONE','NATIVE_PS51_REQUIRED','ACCESS_DENIED','PATH_UNVERIFIED')){'BLOCKED'}else{'PARTIAL'})}
   $report.elapsedMs=$watch.ElapsedMilliseconds
   [pscustomobject]$report

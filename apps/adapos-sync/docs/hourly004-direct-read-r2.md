@@ -1,5 +1,9 @@
 # Hourly004 direct source read R2 — 12 November 2026
 
+Actual deadline proof passed on SERVER004 after30049ms. The initial exact Task
+lookup returned NOT_FOUND before any file read. Current follow-up behavior and
+limits are in `hourly004-direct-read-r2-followup.md`; no source admission yet.
+
 Review version: `H004-DIRECT-READ-20261112-R2`. This supersedes the R1 access
 onboarding steps; it does not replace the Hourly runtime or the PR87 full-policy
 controller contract. PR81, guard12s and upload recovery OFF stay unchanged.
