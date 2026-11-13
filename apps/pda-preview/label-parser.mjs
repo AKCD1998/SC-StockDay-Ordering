@@ -1,6 +1,5 @@
 import {parsePrintedDate} from './label-dates.mjs';
 export const LABEL_ROLES=['lot','mfg','exp'];
-export const nextLabelRole=role=>LABEL_ROLES[(LABEL_ROLES.indexOf(role)+1)%3];
 export const ROLE_NAMES={lot:'LOT · เลขล็อต',mfg:'MFG · วันที่ผลิต',exp:'EXP · วันหมดอายุ'};
 const anchors=/\b(?:EXP(?:IRY|IRATION)?|USE\s*BY|BEST\s*BEFORE|MFG|MFD|MANUFACTURE[DR]?|PROD(?:UCTION)?(?:\s*DATE)?|LOT(?:\s*(?:NO\.?|NUMBER))?|BATCH(?:\s*(?:NO\.?|NUMBER))?|B\.?\s*N\.?)(?![A-Z])|วันหมดอายุ|หมดอายุ|วันที่ผลิต|วันผลิต|เลขที่ผลิต|เลขล็อต|批号|批號|有效期限|生产日期|製造日期/ig;
 const roleOf=t=>/EXP|USE|BEST|หมดอายุ|有效/i.test(t)?'exp':/MFG|MFD|MANUF|PROD|วันที่ผลิต|วันผลิต|生产|製造/i.test(t)?'mfg':'lot';

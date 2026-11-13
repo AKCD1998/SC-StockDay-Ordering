@@ -20,19 +20,18 @@ with sync_playwright() as p:
  page.locator('#labelClose').click();page.wait_for_function("window.__streams.every(s=>s.getTracks().every(t=>t.readyState==='ended'))")
  check('X closes label camera, stops tracks and preserves draft quantity and lot',page.locator('#lot-qty-0').input_value()=='7' and page.locator('#lot-code-0').input_value()=='KEEP')
  def wait_read():page.wait_for_function("!document.querySelector('#labelToReview').disabled && !document.querySelector('#labelBoxActions').hidden",timeout=120000)
- def tap(x,y):
+ def hold(x,y,role):
   pt=page.locator('#labelBoxes').evaluate('(s,p)=>{const d=new DOMPoint(p[0],p[1]).matrixTransform(s.getScreenCTM());return {x:d.x,y:d.y}}',[x,y])
-  page.touchscreen.tap(pt['x'],pt['y']);wait_read()
+  cdp=page.context.new_cdp_session(page);cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':pt['x'],'y':pt['y']}]});page.wait_for_timeout(650);cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]});cdp.detach()
+  page.locator('[data-label-role='+role+']').click();wait_read()
  if args.photo:
   page.locator('[data-label-photo]').first.click()
   with page.expect_file_chooser() as fc:page.locator('#labelFile').click()
   fc.value.set_files(args.photo);wait_read()
   check('provided busy-background photo honestly requires guidance',page.locator('#labelBoxes g').count()==0)
-  page.locator('#labelGuide').click();tap(420,540)
-  check('guided box starts green LOT',page.locator('#labelBoxes g text').last.text_content()=='LOT')
-  tap(420,540);check('same rectangle cycles to red MFG',page.locator('#labelBoxes g text').last.text_content()=='MFG' and page.locator('#labelBoxes g rect').nth(1).get_attribute('stroke')=='#bd283d')
-  tap(420,540);check('same rectangle cycles to blue EXP',page.locator('#labelBoxes g text').last.text_content()=='EXP' and page.locator('#labelBoxes g rect').nth(1).get_attribute('stroke')=='#2457d6')
-  tap(420,588);tap(650,569);tap(650,569)
+  hold(420,540,'exp')
+  check('photo guidance explicitly chooses expiry in blue',page.locator('#labelBoxes g[data-role=exp]').count()==1)
+  hold(420,588,'lot');hold(650,569,'mfg')
   page.locator('#labelToReview').click()
   values={r:page.locator('#label-review-'+r).input_value() for r in ['lot','mfg','exp']}
   print(json.dumps({'providedPhotoRead':values}),flush=True)

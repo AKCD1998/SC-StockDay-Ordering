@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {parsePrintedDate,validLabelDate,dateBounds,dateOrderInvalid,labelDateText} from '../label-dates.mjs';
-import {parseLabelText,proposeLabelBoxes,nextLabelRole} from '../label-parser.mjs';
+import {parseLabelText,proposeLabelBoxes} from '../label-parser.mjs';
 import {validateCount} from '../domain.mjs';
 test('example preserves exact LOT and month precision, never weight as quantity',()=>{
  const fields=parseLabelText('EXP 02/2026\nBN 202308 MFG 02/2023\nNet Weight: 800mg / pc');
@@ -26,11 +26,11 @@ test('calendar validation and month intervals do not invent stored days',()=>{
  assert.equal(dateOrderInvalid('2026-03','2026-02'),true);assert.equal(dateOrderInvalid('2026-02-27','2026-02'),false);
  assert.equal(labelDateText('2026-02'),'ก.พ. 2026 · เดือน/ปี');
 });
-test('automatic rectangles use OCR positions and exact colour role cycle',()=>{
+test('automatic rectangles use recognized text positions',()=>{
  const word=(text,x)=>({text,bbox:{x0:x,y0:20,x1:x+80,y1:50}});
  const data={text:'MFG 02/2023 EXP 02/2026 LOT A12',blocks:[{paragraphs:[{lines:[{bbox:{x0:0,y0:20,x1:600,y1:50},words:[word('MFG',0),word('02/2023',90),word('EXP',180),word('02/2026',270),word('LOT',360),word('A12',450)]}]}]}]};
  const p=proposeLabelBoxes(data);assert.equal(p.boxes.length,3);assert.equal(p.boxes.find(b=>b.role==='exp').bbox.x0,270);
- assert.equal(nextLabelRole('lot'),'mfg');assert.equal(nextLabelRole('mfg'),'exp');assert.equal(nextLabelRole('exp'),'lot');
+
 });
 test('preview validation accepts month evidence and explicit absent label fields',()=>{
  const base={complete:false,observedAt:'2026-11-13T05:00:00Z'};

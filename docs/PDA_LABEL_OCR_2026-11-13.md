@@ -1,5 +1,7 @@
 # Captured-label OCR preview — 13 November 2026
 
+Historical v8 evidence. The aiming and gesture flow is superseded by [live aiming v2](PDA_LIVE_LABEL_OCR_2026-11-13.md): automatic boxes now appear before capture and long press opens an explicit type menu. Other date/quantity/review constraints below remain applicable.
+
 Scope: the existing Sites phone preview and reusable source modules in this PDA project. The deployed baseline is the static v6 preview; saved v7 real-browser candidate remains separate and unactivated. No backend/admin deployment, schema, auth, audience, credentials, official stock write or APK change is part of this update.
 
 ## Employee flow
