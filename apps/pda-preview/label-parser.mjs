@@ -1,4 +1,4 @@
-import {parsePrintedDate} from './label-dates.mjs?aim=3';
+import {parsePrintedDate} from './label-dates.mjs?aim=5';
 export const LABEL_ROLES=['lot','mfg','exp'];
 export const ROLE_NAMES={lot:'LOT · เลขล็อต',mfg:'MFG · วันที่ผลิต',exp:'EXP · วันหมดอายุ'};
 const anchors=/\b(?:EXP(?:IRY|IRATION)?|USE\s*BY|BEST\s*BEFORE|MFG|MFD|MANUFACTURE[DR]?|PROD(?:UCTION)?(?:\s*DATE)?|LOT(?:\s*(?:NO\.?|NUMBER))?|BATCH(?:\s*(?:NO\.?|NUMBER))?|B\.?\s*N\.?)(?![A-Z])|วันหมดอายุ|หมดอายุ|วันที่ผลิต|วันผลิต|เลขที่ผลิต|เลขล็อต|批号|批號|有效期限|生产日期|製造日期/ig;
@@ -17,7 +17,7 @@ export function flattenOcr(data){
 }
 export function proposeLabelBoxes(data){
  const lines=flattenOcr(data),words=lines.flatMap(l=>l.words),fields=parseLabelText(data.text),boxes=[];
- for(const f of fields){const normalized=s=>String(s).replace(/\s/g,'').toUpperCase();const hits=words.filter(w=>normalized(w.text).includes(normalized(f.raw)));
+ for(const f of fields){const normalized=s=>String(s).replace(/\s/g,'').replace(/\./g,'/').toUpperCase();const hits=words.filter(w=>normalized(w.text).includes(normalized(f.raw)));
   // Printed month/year can be two OCR words, e.g. `03 2026`.
   for(const line of lines)for(let i=0;i<line.words.length;i++)for(let size=2;size<=3&&i+size<=line.words.length;size++){const span=line.words.slice(i,i+size);if(normalized(span.map(w=>w.text).join(' '))===normalized(f.raw))hits.push({text:f.raw,bbox:{x0:Math.min(...span.map(w=>w.bbox.x0)),y0:Math.min(...span.map(w=>w.bbox.y0)),x1:Math.max(...span.map(w=>w.bbox.x1)),y1:Math.max(...span.map(w=>w.bbox.y1))}});}
   if(!hits.length)continue;

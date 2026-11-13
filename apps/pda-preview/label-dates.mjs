@@ -13,13 +13,14 @@ export function labelDateText(value){
  if(!validLabelDate(value))return 'ไม่ระบุ';const p=value.split('-');return (p.length===3?p[2]+' ':'')+['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][+p[1]-1]+' '+p[0]+(p.length===2?' · เดือน/ปี':'');
 }
 export function parsePrintedDate(raw){
- const text=String(raw||'').trim();const year=text.match(/(?:^|[^0-9])(\d{4})(?:$|[^0-9])/);if(year&&(+year[1]<1900||+year[1]>=2200))return null;const p=text.replace(/[.]/g,'/').replace(/\s+/g,' ');let m;
+ const text=String(raw||'').trim();const year=text.match(/(?:^|[^0-9])(\d{4})(?:$|[^0-9])/);if(year&&(+year[1]<1900||+year[1]>=2200))return null;const p=text.replace(/[.]/g,'/').replace(/\s*([/-])\s*/g,'$1').replace(/\s+/g,' ');let m;
  if((m=p.match(/\b(\d{4})[-/]([01]?\d)[-/]([0-3]?\d)\b/))){const iso=[m[1],m[2].padStart(2,'0'),m[3].padStart(2,'0')].join('-');return validLabelDate(iso)?{value:iso,precision:'day',raw:m[0]}:null;}
  if((m=p.match(/\b([0-3]?\d)[-/]([0-3]?\d)[-/](\d{4})\b/))){const a=+m[1],b=+m[2],make=(d,n)=>`${m[3]}-${String(n).padStart(2,'0')}-${String(d).padStart(2,'0')}`,choices=[make(a,b),make(b,a)].filter(validLabelDate);const unique=[...new Set(choices)];return unique.length===1?{value:unique[0],precision:'day',raw:m[0]}:unique.length>1?{value:null,ambiguous:true,choices:unique,raw:m[0]}:null;}
  if((m=p.match(/\b([0-3]?\d)[ \t]+([0-3]?\d)[ \t]+(\d{4})\b/))){const values=[`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`,`${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`],choices=[...new Set(values.filter(validLabelDate))];return choices.length===1?{value:choices[0],precision:'day',raw:m[0]}:choices.length?{value:null,ambiguous:true,choices,raw:m[0]}:null;}
  if((m=p.match(/(?:^|[^\d])([01]?\d)[ \t]+((?:19|20|21)\d{2})(?!\d)/))){const iso=m[2]+'-'+m[1].padStart(2,'0');return validLabelDate(iso)?{value:iso,precision:'month',raw:m[1]+' '+m[2]}:null;}
  if((m=p.match(/\b([01]?\d)[-/](\d{4})\b/))){const iso=m[2]+'-'+m[1].padStart(2,'0');return validLabelDate(iso)?{value:iso,precision:'month',raw:m[0]}:null;}
  if((m=p.match(/\b(\d{4})[-/]([01]?\d)\b/))){const iso=m[1]+'-'+m[2].padStart(2,'0');return validLabelDate(iso)?{value:iso,precision:'month',raw:m[0]}:null;}
+ if((m=p.match(/\b((?:19|20|21)\d{2})[ \t]+([01]?\d)\b/))){const iso=m[1]+'-'+m[2].padStart(2,'0');return validLabelDate(iso)?{value:iso,precision:'month',raw:m[0]}:null;}
  const names=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];m=text.toUpperCase().match(/\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]*[ /.-]*(\d{4})\b/);
  if(m)return {value:m[2]+'-'+String(names.indexOf(m[1])+1).padStart(2,'0'),precision:'month',raw:m[0]};
  return null;

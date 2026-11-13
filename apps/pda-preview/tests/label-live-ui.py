@@ -60,6 +60,6 @@ with sync_playwright() as p:
  # X from aiming with menu open returns safely; late OCR must not reopen it.
  page.locator('[data-label-photo]').first.click();page.wait_for_function("document.querySelector('#labelVideo').videoWidth>0");hold(.6,.4);page.locator('#labelClose').click();page.wait_for_timeout(1200)
  check('X works with choice menu open and leaves no camera or late overlay',not page.locator('#labelCapture').is_visible() and page.evaluate("window.__labelFixture.streams.every(s=>s.getTracks().every(t=>t.readyState==='ended'))") and page.locator('#lot-qty-0').input_value()=='7')
- check('no uncaught browser errors',not errors);check('no photo or count upload',all(r['method']=='GET' for r in network))
+ check('no uncaught browser errors: '+json.dumps(errors),not errors);check('no photo or count upload',all(r['method']=='GET' for r in network))
  report={'scope':'cloud Chromium; real Tesseract, generated live camera stream; existing static preview','passed':len(checks),'checks':checks,'capturedValues':values,'errors':errors,'physicalPhoneVerified':False,'productionBackendChanged':False,'installedApkChanged':False,'cameraFixture':'synthetic generated frames, OCR engine is not mocked','photoUploaded':False}
  (out/'LIVE-BROWSER-RESULTS.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report),flush=True);b.close()
