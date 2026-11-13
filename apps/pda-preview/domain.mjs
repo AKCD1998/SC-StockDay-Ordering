@@ -1,3 +1,4 @@
+import {validLabelDate,dateOrderInvalid} from './label-dates.mjs';
 // Preview reference policy. No production reader imports this module.
 export const POLICY = Object.freeze({ human: 4 * 3600000, hourly: 90 * 60000, full: 24 * 3600000 });
 export function resolveStock({ human, hourly, full, now = Date.now() }) {
@@ -32,9 +33,9 @@ export function validateCount({ lots, complete, observedAt }, now = Date.now()) 
     if (typeof lot.quantity !== 'number' || !Number.isFinite(lot.quantity) || lot.quantity < 0 || lot.quantity > 1e9) errors.push(`${label}: จำนวนต้องเป็น 0 ขึ้นไปและไม่เกิน 1,000,000,000`);
     for (const key of ['mfg', 'exp']) {
       const value = lot[key];
-      if (value && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString().slice(0, 10) !== value)) errors.push(`${label}: วันที่ไม่ถูกต้อง`);
+      if (value && !validLabelDate(value)) errors.push(`${label}: วันที่ไม่ถูกต้อง`);
     }
-    if (lot.mfg && lot.exp && lot.mfg > lot.exp) errors.push(`${label}: วันหมดอายุต้องไม่ก่อนวันผลิต`);
+    if (dateOrderInvalid(lot.mfg,lot.exp)) errors.push(`${label}: วันหมดอายุต้องไม่ก่อนวันผลิต`);
     if (lot.mfg && lot.mfg > new Date(now + 7 * 3600000).toISOString().slice(0, 10)) errors.push(`${label}: วันผลิตอยู่ในอนาคต`);
     const key = `${lot.code.trim()}|${lot.mfg || ''}|${lot.exp || ''}`;
     if (seen.has(key)) errors.push(`${label}: ล็อตซ้ำ กรุณารวมจำนวนในแถวเดียว`);
