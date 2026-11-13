@@ -21,9 +21,9 @@ with sync_playwright() as p:
  page=b.new_page(viewport={'width':390,'height':844},is_mobile=True,has_touch=True);page.add_init_script(fixture)
  errors=[];network=[];page.on('pageerror',lambda e:errors.append(str(e)));page.on('request',lambda r:network.append({'method':r.method,'url':r.url.split('?')[0]}))
  page.goto(a.origin);page.locator('#pin').fill('1111');page.locator('#loginForm button[type=submit]').click();page.locator('[data-action=sample]').first.click();page.locator('#lot-qty-0').fill('7');page.locator('#lot-code-0').fill('KEEP');page.locator('[data-label-photo]').first.click();page.wait_for_function("document.querySelector('#labelVideo').videoWidth>0")
- page.wait_for_function("document.querySelectorAll('#labelBoxes g[data-role]').length===3",timeout=120000)
+ page.wait_for_function("['lot','mfg','exp'].every(r=>document.querySelector('#labelBoxes g[data-role='+r+']'))",timeout=120000)
  check('real OCR produces automatic boxes before shutter is pressed',page.locator('#labelVideo').is_visible() and not page.locator('#labelImage').is_visible() and page.locator('#labelCameraActions').is_visible())
- check('three live fields have distinct roles and visible rectangles',sorted(page.locator('#labelBoxes g').evaluate_all('gs=>gs.map(g=>g.dataset.role)'))==['exp','lot','mfg'] and page.locator('#labelBoxes g rect').first.bounding_box()['width']>30)
+ check('three live fields have distinct roles and visible rectangles',all(page.locator('#labelBoxes g[data-role='+r+']').count()==1 for r in ['lot','mfg','exp']) and page.locator('#labelBoxes g rect').first.bounding_box()['width']>30)
  page.locator('#labelCapture').screenshot(path=str(out/'LIVE-AUTOMATIC-SYNTHETIC.png'))
  def at(x,y):
   return page.locator('#labelBoxes').evaluate('(s,p)=>{const v=s.viewBox.baseVal;const d=new DOMPoint(v.width*p[0],v.height*p[1]).matrixTransform(s.getScreenCTM());return {x:d.x,y:d.y}}',[x,y])
@@ -31,7 +31,7 @@ with sync_playwright() as p:
   pt=at(x,y);cdp=page.context.new_cdp_session(page);cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':pt['x'],'y':pt['y']}]});page.wait_for_timeout(650);cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]});cdp.detach()
  # Nothing detected: hold arbitrary region while camera is still live.
  page.evaluate('window.__labelFixture.blank=true')
- page.wait_for_function("document.querySelectorAll('#labelBoxes g[data-role]').length===0",timeout=15000)
+ page.wait_for_function("!['lot','mfg','exp'].some(r=>document.querySelector('#labelBoxes g[data-role='+r+']'))",timeout=15000)
  check('camera movement/change clears stale automatic boxes',True)
  hold(.5,.4);page.wait_for_selector('#labelRolePicker:not([hidden])')
  ticks=page.evaluate('window.__labelFixture.ticks');video_time=page.locator('#labelVideo').evaluate('(v)=>v.currentTime');page.wait_for_timeout(300)

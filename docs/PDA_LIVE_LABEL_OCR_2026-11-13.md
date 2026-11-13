@@ -1,5 +1,7 @@
 # Live label aiming and hold-to-choose — 13 November 2026
 
+Historical v9 implementation. Its OCR-first aiming and whole-frame motion rejection are superseded by [the recorded-failure aiming fix](PDA_AIMING_FIX_2026-11-13.md). Long press, explicit review, quantity and backend boundaries remain applicable.
+
 This continues the same SCPDA project and private Sites preview. It replaces the v8 captured-photo-only aiming flow and tap-to-cycle interaction. Backend/admin/auth/count transports, installed R4 APK, official stock, audience and credentials are unchanged.
 
 ## Interaction

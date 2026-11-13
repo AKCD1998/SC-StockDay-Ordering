@@ -38,3 +38,14 @@ test('preview validation accepts month evidence and explicit absent label fields
  assert.deepEqual(validateCount({...base,lots:[{code:'202308',quantity:7,mfg:'2023-02',exp:'2026-02'}]},Date.parse('2026-11-13T06:00Z')),[]);
  assert.ok(validateCount({...base,lots:[{code:'A',quantity:7,mfg:'2026-03',exp:'2026-02'}]},Date.parse('2026-11-13T06:00Z')).length);
 });
+
+test('space-separated month/year from reported printed label is preserved',()=>{
+ assert.equal(parsePrintedDate('03 2026').value,'2026-03');assert.equal(parsePrintedDate('02 2028').value,'2028-02');
+ assert.equal(parsePrintedDate('13 03 2026').value,'2026-03-13');assert.equal(parsePrintedDate('03 04 2026').ambiguous,true);
+ assert.equal(parsePrintedDate('03 2626'),null);
+});
+test('two OCR words form one month-year rectangle without dropping leading zero',()=>{
+ const words=[['Mfg.:',0,35],['03',50,75],['2026',85,150]].map(([text,x0,x1])=>({text,bbox:{x0,y0:10,x1,y1:35}}));
+ const data={text:'Mfg.: 03 2026',blocks:[{paragraphs:[{lines:[{bbox:{x0:0,y0:10,x1:150,y1:35},words}]}]}]};
+ const boxes=proposeLabelBoxes(data).boxes;assert.equal(boxes.length,1);assert.equal(boxes[0].value,'2026-03');assert.equal(boxes[0].bbox.x0,50);assert.equal(boxes[0].bbox.x1,150);
+});
