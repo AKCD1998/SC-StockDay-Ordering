@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "./lib/apiClient.js";
 import "./MembersPanel.css";
 import AdaMemberLinking from './AdaMemberLinking.jsx';
+import MemberSyncLog from './MemberSyncLog.jsx';
 
 const base = "/api/admin/sccrm-members";
 const number = value => Number(value || 0).toLocaleString("th-TH", { maximumFractionDigits: 6 });
@@ -87,13 +88,15 @@ export default function MembersPanel({ isAdmin, csrfToken }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
+  const [syncMember, setSyncMember] = useState(null);
   const [denied, setDenied] = useState(false);
   const [showLinking, setShowLinking] = useState(false);
   const refreshMembers = useCallback(() => setQuery(value => ({ ...value, page: 1, refresh: value.refresh + 1 })), []);
   const close = useCallback(() => setSelected(null), []);
-  const accessDenied = useCallback(message => { setDenied(true); setSelected(null); setData(null); setError(message); }, []);
+  const closeSync = useCallback(() => setSyncMember(null), []);
+  const accessDenied = useCallback(message => { setDenied(true); setSelected(null); setSyncMember(null); setData(null); setError(message); }, []);
   useEffect(() => {
-    if (!isAdmin) { setData(null); setSelected(null); return; }
+    if (!isAdmin) { setData(null); setSelected(null); setSyncMember(null); return; }
     const controller = new AbortController();
     setData(null); setError(""); setDenied(false);
     get(`${base}?${new URLSearchParams({ search: query.search, page: String(query.page), limit: "25" })}`, controller.signal)
@@ -109,9 +112,15 @@ export default function MembersPanel({ isAdmin, csrfToken }) {
     {error && <p className="notice error" role="alert">{error}</p>}
     {!data && !error && <p role="status">กำลังโหลดสมาชิก…</p>}
     {data && <><div className="members-table-caption">พบ {number(data.total)} คน{query.search && ` · ผลค้นหา “${query.search}”`}</div>
-      {data.members.length ? <div className="members-table-scroll"><table className="members-table"><thead><tr><th>รหัสสมาชิก</th><th>ชื่อ–นามสกุล</th><th>เบอร์โทร</th><th>วันที่สมัคร</th><th>สถานะ</th><th>ประวัติการซื้อ</th></tr></thead><tbody>{data.members.map(member => <tr key={member.id}><td className="member-code">{member.memberCode || "—"}</td><td><strong>{member.name || "ไม่ระบุชื่อ"}</strong></td><td>{member.phone || "—"}</td><td>{date(member.registeredAt)}</td><td><span className={`member-status ${member.isActive ? "active" : "inactive"}`}>{member.isActive ? "ใช้งาน" : "ปิดใช้งาน"}</span></td><td><button type="button" className="member-history-button" aria-label={`ดูประวัติการซื้อ ${member.name || member.memberCode}`} onClick={() => setSelected(member)}>ดูประวัติการซื้อ <span aria-hidden="true">↗</span></button></td></tr>)}</tbody></table></div> : <p className="members-empty">{query.search ? "ไม่พบสมาชิกที่ตรงกับคำค้นหา" : "ยังไม่มีสมาชิก"}</p>}
+      {data.members.length ? <div className="members-table-scroll"><table className="members-table"><thead><tr><th>รหัสสมาชิก</th><th>ชื่อ–นามสกุล</th><th>เบอร์โทร</th><th>วันที่สมัคร</th><th>สถานะ</th><th>การส่งข้อมูล Ada</th><th>ประวัติการซื้อ</th></tr></thead><tbody>{data.members.map(member => <tr key={member.id}>
+        <td className="member-code">{member.memberCode || "—"}</td><td><strong>{member.name || "ไม่ระบุชื่อ"}</strong></td><td>{member.phone || "—"}</td><td>{date(member.registeredAt)}</td>
+        <td><span className={`member-status ${member.isActive ? "active" : "inactive"}`}>{member.isActive ? "ใช้งาน" : "ปิดใช้งาน"}</span></td>
+        <td><span className={`member-sync-small ${member.memberSync?.state || ''}`}>{member.memberSync?.label || 'ยังไม่มีผลตรวจการส่ง'}</span><button type="button" className="member-history-button" aria-label={`ดูสถานะการส่งข้อมูล ${member.name || member.memberCode}`} onClick={() => setSyncMember(member)}>ดูประวัติการส่ง</button></td>
+        <td><button type="button" className="member-history-button" aria-label={`ดูประวัติการซื้อ ${member.name || member.memberCode}`} onClick={() => setSelected(member)}>ดูประวัติการซื้อ <span aria-hidden="true">↗</span></button></td>
+      </tr>)}</tbody></table></div> : <p className="members-empty">{query.search ? "ไม่พบสมาชิกที่ตรงกับคำค้นหา" : "ยังไม่มีสมาชิก"}</p>}
       <nav className="members-pagination" aria-label="หน้าตารางสมาชิก"><span>หน้า {query.page} / {Math.max(1, Math.ceil(data.total / 25))}</span><div><button type="button" disabled={query.page === 1} onClick={() => setQuery(value => ({ ...value, page: value.page - 1 }))}>ก่อนหน้า</button><button type="button" disabled={query.page * 25 >= data.total} onClick={() => setQuery(value => ({ ...value, page: value.page + 1 }))}>ถัดไป</button></div></nav>
     </>}
     {selected && !denied && <PurchaseHistory key={selected.id} member={selected} onClose={close} onAccessDenied={accessDenied} />}
+    {syncMember && !denied && <MemberSyncLog key={syncMember.id} member={syncMember} csrfToken={csrfToken} onClose={closeSync} onAccessDenied={accessDenied} />}
   </section>;
 }

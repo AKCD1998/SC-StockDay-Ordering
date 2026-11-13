@@ -1,5 +1,16 @@
 /* Keep the register palette local so its controls follow the site theme without
    changing the stock view or relying on the global input/button cascade. */
+.ky9-archive-batches { display:flex;gap:8px;flex-wrap:wrap;margin:14px 0; }
+.ky9-archive-batches span { border:1px solid var(--ky9-border);border-radius:8px;padding:5px 9px;background:var(--ky9-inset);font-size:13px; }
+.ky9-archive-filters { display:grid;grid-template-columns:minmax(200px,2fr) repeat(4,minmax(115px,1fr));gap:12px; }
+.ky9-archive-scroll { overflow:auto;margin:12px 0; }
+.ky9-archive-table { border-collapse:collapse;width:100%;min-width:900px;font-size:14px; }
+.ky9-archive-table th,.ky9-archive-table td { border:1px solid var(--ky9-border);padding:12px;text-align:left;vertical-align:top; }
+.ky9-archive-table th { background:var(--ky9-inset); }
+.ky9-archive-table small { color:var(--ky9-muted); }
+.ky9-archive-detail { margin-top:18px;border-top:1px solid var(--ky9-border);padding-top:14px; }
+.ky9-archive-detail pre { overflow:auto;max-height:500px;white-space:pre-wrap;word-break:break-word;font-size:13px; }
+@media(max-width:1000px){.ky9-archive-filters{grid-template-columns:repeat(2,minmax(0,1fr));}.ky9-archive-filters>label:first-child{grid-column:1/-1;}}
 .ky9-documents {
   color-scheme: light;
   --ky9-text: #203c32;

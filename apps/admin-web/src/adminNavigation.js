@@ -12,6 +12,7 @@ export const adminOnlyViews = [
   "pos-admin",
   "shopee004-exceptions",
   "ky9-documents",
+  "pjk-documents",
 ];
 export const adminViewKeys = [
   defaultAdminView,
@@ -39,6 +40,7 @@ const ADMIN_VIEW_ROUTE_SEGMENTS = {
   "pos-admin": "pos-admin",
   "shopee004-exceptions": "shopee004-exceptions",
   "ky9-documents": "ky9-documents",
+  "pjk-documents": "pjk-documents",
   [stockCostAuditView]: "stock-cost-audit",
   "category-review": "category-review",
   "ingredient-dictionary": "ingredient-dictionary",
@@ -113,6 +115,14 @@ export function getNavigationGroups(isAdminUser, hideDashboard = false) {
         { label: "สมาชิก", view: "members", description: "เตรียมพื้นที่สำหรับฟังก์ชันสมาชิก" },
         ...(isAdminUser ? [{ label: "แอดมิน", view: "pos-admin", description: "โปรแกรมหน้าร้านและสิทธิ์เครื่องที่อนุญาต" }] : []),
       ],
+    },
+    {
+      id: "pharmacists",
+      hasDropdown: true,
+      label: "เภสัชกร",
+      shortLabel: "RX",
+      adminOnly: true,
+      items: [{ label: "จภก. 1", view: "pjk-documents", description: "คลังเอกสารปฏิบัติหน้าที่แทน แยกเดือนและสาขา" }],
     },
   ].filter((group) => (!group.adminOnly || isAdminUser) && (!hideDashboard || group.id !== "dashboard"));
 }

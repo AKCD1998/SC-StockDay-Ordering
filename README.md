@@ -1,5 +1,11 @@
 # SC-StockDay-Ordering
 
+SCCRM member sync log: open **สมาชิก → ดูประวัติการส่ง** on the member's row.
+The dialog shows SCCRM persistence, the approved HQ code and each branch's
+verified delivery separately, plus pending receipt delivery, event times and
+explicit retry. It refreshes while open and preserves the selected member.
+Only cookie-authenticated admins can read it; retry also requires session CSRF.
+
 SCCRM admin member linking: open **สมาชิก → จัดการรหัส Ada**, select a pending
 member, compare native code/name/phone and purchase dates, select a code, confirm
 the identity checkbox, then press **ยืนยันผูกรหัส Ada**. Only admins can approve;
