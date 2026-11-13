@@ -1,5 +1,7 @@
 # Empty aiming view: recorded-failure fix — 13 November 2026
 
+The detector described here remains in use. Its single-frame shutter and pre-initialization sampling are superseded by [capture stability v4](PDA_CAPTURE_STABILITY_2026-11-13.md).
+
 The supplied three-second phone recording showed the fixed outer guide, no detected text rectangles, and a reader-preparation message. Previous live checks used a clean generated video; they did not establish reliable operation on the user's handheld packaging. The recording alone cannot tell whether the phone's OCR initialization was still loading or stalled, and no physical-device fix is claimed from cloud tests.
 
 ## Changes in the same PDA project

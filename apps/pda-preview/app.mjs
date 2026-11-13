@@ -1,5 +1,5 @@
 import { apiMode, DemoApi, DurableOutbox, countRequest } from './api-client.mjs';
-import { LabelCapture } from './label-capture.mjs?aim=3';
+import { LabelCapture } from './label-capture.mjs?aim=4';
 import { dateField,bindDateFields } from './label-date-field.mjs';
 import { labelDateText,dateBounds } from './label-dates.mjs';
 import { CameraScanner } from './camera-scanner.mjs';

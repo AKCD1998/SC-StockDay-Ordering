@@ -35,15 +35,15 @@ export function patchFeature(frame,b){const out=new Float32Array(128);let sum=0;
 export function correlation(a,b){if(!a||!b)return -1;let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s;}
 export function matchPatch(track,candidates,frame){
  const b=track.region,expected={x0:b.x0*frame.w,y0:b.y0*frame.h,x1:b.x1*frame.w,y1:b.y1*frame.h};let best=null,score=-1;
- const stationary=correlation(track.feature,patchFeature(frame,expected));if(stationary>.82)return {bbox:expected};
+ const stationary=correlation(track.feature,patchFeature(frame,expected));if(stationary>.82)return {bbox:expected,similarity:stationary};
  for(const c of candidates){const r=c.bbox,ew=expected.x1-expected.x0,eh=expected.y1-expected.y0,hr=(r.y1-r.y0)/Math.max(1,eh),distance=Math.hypot((r.x0+r.x1-expected.x0-expected.x1)/2/frame.w,(r.y0+r.y1-expected.y0-expected.y1)/2/frame.h);if(hr<.5||hr>1.8||distance>.22)continue;
   const variants=[r],ww=ew*hr;
   if(r.x1-r.x0>ww*1.15)for(let i=0;i<=6;i++){const x=r.x0+(r.x1-r.x0-ww)*i/6;variants.push({x0:x,y0:r.y0,x1:x+ww,y1:r.y1});}
-  for(const rect of variants){const wr=(rect.x1-rect.x0)/Math.max(1,ew);if(wr<.5||wr>1.8)continue;const similarity=correlation(track.feature,patchFeature(frame,rect)),near=intersection(rect,expected),value=similarity-distance*.7;if(similarity>(near>.2?.48:.76)&&value>score){score=value;best={...c,bbox:rect};}}
+  for(const rect of variants){const wr=(rect.x1-rect.x0)/Math.max(1,ew);if(wr<.5||wr>1.8)continue;const similarity=correlation(track.feature,patchFeature(frame,rect)),near=intersection(rect,expected),value=similarity-distance*.7;if(similarity>(near>.2?.48:.76)&&value>score){score=value;best={...c,bbox:rect,similarity};}}
  }return best;
 }
 export class LabelVision {
- constructor({onFrame,onError}){this.onFrame=onFrame;this.onError=onError;this.busy=false;this.closed=false;this.worker=new Worker(new URL('./label-vision-worker.mjs?aim=3',import.meta.url),{type:'module'});this.worker.onmessage=e=>{this.busy=false;if(!this.closed)this.onFrame(e.data);};this.worker.onerror=()=>{this.busy=false;if(!this.closed)this.onError?.();};}
+ constructor({onFrame,onError}){this.onFrame=onFrame;this.onError=onError;this.busy=false;this.closed=false;this.worker=new Worker(new URL('./label-vision-worker.mjs?aim=4',import.meta.url),{type:'module'});this.worker.onmessage=e=>{this.busy=false;if(!this.closed)this.onFrame(e.data);};this.worker.onerror=()=>{this.busy=false;if(!this.closed)this.onError?.();};}
  scan(canvas){if(this.busy||this.closed)return;const frame=pixels(canvas);this.busy=true;this.worker.postMessage(frame,[frame.gray.buffer]);}
  close(){this.closed=true;this.worker.terminate();}
 }
