@@ -7,7 +7,18 @@ User instruction, 15 November 2026: place completed PDA app deliveries in Google
 - Verified parent: เภสัชอู๋, ID `1usItMowEj6llCqWYjdpMAkswB5bubGkD`.
 - Parent was found by exact name; the child was created under that verified parent. Existing sharing was preserved.
 
-## Current delivery — R7
+## Current delivery — R8
+
+| File | Bytes | Drive link |
+| --- | ---: | --- |
+| SCPDA-0.5.0-test.8.apk | 2995013 | [APK](https://drive.google.com/file/d/1igAC7S_aCmR7od_829EMimedASZYaV1p/view?usp=drivesdk) |
+| SCPDA-0.5.0-test.8-Android-001.zip | 3449625 | [Installation package](https://drive.google.com/file/d/1QaH0m_z9UTh5kiO_YeYjFzw5Tw0oSIC0/view?usp=drivesdk) |
+| START-HERE-SCPDA-0.5.0-test.8.txt | 6425 | [Instructions](https://drive.google.com/file/d/1mr4-n6IBzGNQcyWnAlAy14a8wjOpPQDU/view?usp=drivesdk) |
+| SCPDA-0.5.0-test.8-Price-Preview.png | 50686 | [Price-screen fixture preview](https://drive.google.com/file/d/1CpCfZsuyD8Ned2ujr3505W37LjV_Eumg/view?usp=drivesdk) |
+
+Same package/signing key. Three-tab shell and recorded-unit catalog price check; Preorder pending its accepted mobile adapter. Full Sync remains the current reader source; local counts do not replace it. The production count activation gate remains pending. ZIP contains an iOS icon asset, not an iOS app build. All four uploads verified by exact names/sizes/parent IDs; remote checksums unavailable. No credentials or sharing changes. Receipt: `/workspace/artifacts/scpda-price-check-2026-11-15/GOOGLE-DRIVE-DELIVERY.json`.
+
+## Earlier delivery — R7
 
 | File | Bytes | Drive link |
 | --- | ---: | --- |

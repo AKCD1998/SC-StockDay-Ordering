@@ -3,9 +3,9 @@
 - Owner: existing SCPDA smartphone/PDA chat.
 - Status: **ACTIVE_RETAINED**.
 - Actual current-thread ID: not exposed/verified here; do not substitute an attachment/source-relay ID.
-- Current R7 engineering checkout on original executor: `/workspace/reviews/scpda-recent-icon-r7`; original checkout `/workspace/SC-StockDay-Ordering` and its dirty documentation are preserved.
-- Current delivery branch: `codex/pda-recent-icon-r7` (existing project, isolated continuation).
-- Last app-code SHA: `6ef9f632a04463ddf0bbe69a54efa12aacbf9a11` (R7); R6 base `6f9fe19c005bad8fd9659a8a019af0121d70d296`.
+- Current R8 engineering checkout on original executor: `/workspace/reviews/scpda-price-check-r8`; original checkout `/workspace/SC-StockDay-Ordering` and its dirty documentation are preserved.
+- Current delivery branch: `codex/pda-price-check-r8` (existing project, isolated continuation).
+- Last app-code SHA: `537e0fdc25438c128734a1825dd10bb7960e6b8e` (R8); R7 base `6ef9f632a04463ddf0bbe69a54efa12aacbf9a11`.
 - Existing two unrelated dirty documentation files were preserved; this split did not stage or overwrite them.
 
 Last relevant delivery: user paused label OCR. Same private PDA Site last recorded v14 has manual lot/manufacture/expiry/quantity entry and barcode camera; manual save/reopen and scanner close were checked in a browser. Counts there are synthetic/browser-local. APK was not rebuilt by that change. This ledger update does not reverify today's hosted or physical-device state.
@@ -90,3 +90,16 @@ The user corrected the mode flow after reviewing the preview: **พรีออ�
 The user also requests a right-swipe action on each request row to cancel: password prompt, confirmation, then mandatory reason. This is represented in the local mock only; production secure authorization, cancellation persistence and audit details remain unimplemented. No cancellation password is part of the handoff contract.
 
 The product selection screen should search IC/legacy item codes, Thai/English names and barcodes. Put the barcode icon at the right end of the input; filter live while typing, and let **ตกลง** open the full Thai-name picker. Put blue **ตกลง** beside yellow **＋สินค้าใหม่** in one two-column row. Show long Thai names across wrapped lines. The new-item form takes a product photo and trade name, checks for an ADA match and asks whether to reuse the matched record with its code/barcode/price/stock. Otherwise keep it as an unregistered request line for central review; don't create ADA master data from the branch. See [event 010](../events/2026-11-15-010-product-lookup-and-unregistered-items.md) and [event 011](../events/2026-11-15-011-product-search-layout-and-live-results.md); the current prototype uses local fixtures and does not query ADA or upload files.
+
+
+## 15 November — R8 catalog price check and three-tab shell
+
+The user added **เช็คราคา** alongside **นับสต๊อก / พรีออเดอร์**. Delivered Android **0.5.0-test.8**, same package/signature, with IC/630/barcode lookup, full wrapped Thai names, recorded single/quantity-unit prices, branch001 Full Sync quantity and actual ingestion time. The approximate 08:30 routine is not substituted for actual source time. Unit labels such as `3 ชิ้น` are retained without inferred factors, promotion minima or price-level meaning. Local count drafts and saved observations do not override current stock.
+
+Preorder is a pending panel until an accepted registered-device auth/domain adapter exists; catalog เช็คราคา is distinct from customer สอบถามราคา. Read peer events 009–011 through canonical `18117da`, preserving their latest request-picker layout, mode lifecycle, member/new-product proposals and pending contracts. This is an acknowledgment through the common ledger, not direct cross-thread messaging or implementation of those preorder features. No peer implementation or owner checkpoint was changed.
+
+Validation: 31 model/reader/recent checks, 7 exact-APK price/navigation checks and 10 recent-list regressions with synthetic native reads and real browser IndexedDB; 320/390/496px wrapping/footer clearance, retained seven-unit draft and no stock override, unknown stock, late-read cancellation and native back JS behavior. Java native back compiled; no new physical-phone/Keystore/camera acceptance or authenticated production roundtrip claim. Signature/alignment/archive checks passed; compiled icon is byte-identical to R7 with safe radius 0.24349.
+
+Source `537e0fdc25438c128734a1825dd10bb7960e6b8e`; APK SHA-256 `498ad7a436df7b75e320add4d71dcef6fdb96b02f92f4931474041bae0afd69b`, 2,995,013 bytes. APK/ZIP/instructions/price preview uploaded to the existing Drive folder and metadata names/sizes/parents verified. [Delivery links](../DELIVERY_LOCATION.md). Evidence `/workspace/artifacts/scpda-price-check-2026-11-15/`. No PINs/setup/key files or sharing changes.
+
+The existing production count-activation approval remains pending. No backend/admin deploy, migration083, flag/device/account/CORS, Ada, CRM or current-stock-source change occurred. The read API still selects Full Sync only; adapting it to reviewed complete/unit-compatible PDA baselines with movement coverage is future server work, not enabled by the tab or an intake receipt. Next: physical R8 phone trial and separately accepted source-selection/mobile-preorder contracts.

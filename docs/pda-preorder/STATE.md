@@ -34,9 +34,9 @@ The current task is this verified destination chat. Separate review checkouts ar
 | Item | Evidence / state |
 |---|---|
 | Web main checked 15 Nov | `d6017807eaed1815f871c95d74db21929d123fad` |
-| PDA branch source | Original base `codex/pda-durable-demo`, `7018f122e757656ff7e8db9217e96ac427c63753`; current R5 work branch `codex/pda-unit-pastel-r5`, head `31f82782d77720b3f081648f2e833f77c485b682` |
-| Latest APK in Drive | [SCPDA 0.4.1-test.5](https://drive.google.com/file/d/1advJ-GvP1L7cRXU5FdB_G1UBVktsq2fp/view?usp=drivesdk), 15 Nov; includes count-send path behind production activation gate, no Preorder or bottom tabs |
-| Mobile integration request | User confirmed two bottom tabs, `นับสต๊อก` and `พรีออเดอร์`, and asked to include the feature in the next app update; design handoff in [MOBILE_PREORDER_TAB_HANDOFF.md](MOBILE_PREORDER_TAB_HANDOFF.md) and [event 005](events/2026-11-15-005-mobile-preorder-tab-request.md) |
+| PDA branch source | Current R8 `codex/pda-price-check-r8`, `537e0fdc25438c128734a1825dd10bb7960e6b8e`; [PDA owner checkpoint](owners/PDA.md) |
+| Latest APK in Drive | [SCPDA 0.5.0-test.8](https://drive.google.com/file/d/1igAC7S_aCmR7od_829EMimedASZYaV1p/view?usp=drivesdk), 15 Nov; three-tab shell, working catalog price check, Preorder pending its mobile adapter; count activation remains pending |
+| Mobile integration request | Latest direction: `นับสต๊อก / พรีออเดอร์ / เช็คราคา`; catalog price check is separate from customer price inquiry. R8 shell/price reads implemented; real mobile Preorder remains pending. [R8 event](events/2026-11-15-pda-r8-price-check.md) |
 | Customer lookup/sync request | User specified phone-first member lookup, single/multiple/no-match behavior, double-confirm for new members and SCCRM → ADA → all-branch SCPDA sync; detailed in [event 006](events/2026-11-15-006-mobile-member-lookup-sync.md); CRM/mobile integration not implemented |
 | Request-mode correction | User corrected the paths: Preorder skips `ตอบราคา`; price inquiry ends if declined and continues to status/receipt/allocation if accepted; [event 009](events/2026-11-15-009-corrected-mode-flow-and-cancel.md) supersedes event 007's flow interpretation |
 | Thai labels/member simulation | User requested UI label `พรีออเดอร์`, an existing-member fixture and a no-match/new-member simulation, and removed explanatory member-success copy; detailed in [event 008](events/2026-11-15-008-thai-label-member-simulation.md) |

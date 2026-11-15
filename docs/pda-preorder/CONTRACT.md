@@ -23,7 +23,7 @@ Contract register version: **R3-COORD-1**. This is a record of agreement/proposa
 
 ## User-confirmed mobile navigation direction (15 November)
 
-The user wants Preorder inside the same SCPDA Android app, reached through a separate bottom tab. The agreed top-level tabs are **นับสต๊อก** (the current scanner/count workflow) and **Preorder**. Keep the existing scanner and local count history in the count tab; keep preorder cases, customer decisions and lifecycle in the Preorder tab. Account/settings remain in the existing header control. Do not combine count observations with preorder receipt/allocation quantities.
+The user wants Preorder inside the same SCPDA Android app, reached through a separate bottom tab. The latest user-confirmed top-level tabs are **นับสต๊อก** (the current scanner/count workflow), **พรีออเดอร์**, and **เช็คราคา** (read the existing product catalog and stock). This supersedes the earlier two-tab direction. Keep the existing scanner and local count history in the count tab; keep preorder cases, customer decisions and lifecycle in the Preorder tab. Account/settings remain in the existing header control. Catalog **เช็คราคา** is distinct from customer **สอบถามราคา** inside the Preorder workflow; checking an existing price creates no customer request. Do not combine count observations with preorder receipt/allocation quantities.
 
 This is a confirmed navigation direction only. It does not accept mobile API authentication, role provisioning, server schema, offline guarantees or production activation. Role-specific screens must derive from authenticated server capabilities rather than a local role switch.
 
