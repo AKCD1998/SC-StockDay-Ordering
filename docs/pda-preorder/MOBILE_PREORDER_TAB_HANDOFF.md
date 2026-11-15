@@ -2,6 +2,8 @@
 
 **Status:** user-requested for the next SCPDA app update. The navigation direction is confirmed; mobile API/auth and the wider preorder lifecycle are not yet accepted or released.
 
+Read [the verified source map and continuation workflow](PDA_SOURCE_AND_CONTINUATION.md) before reporting a missing Android-source blocker. The source is on Git; the Drive folder holds installable deliveries.
+
 ## Current app baseline — PDA-owner R11 acknowledgment
 
 - Current delivered build: [SCPDA 0.6.1-test.11.apk](https://drive.google.com/file/d/1mOPGhFTpXWlInv-FmY0ZuQCJwUgKH2_l/view?usp=drivesdk), 15 November 2026. PDA source `codex/pda-count-send-r11`, `1d2c29569fd72435fd58315bdb1bca7f225040eb`. R9 catalog-price/stock-info UI is retained.

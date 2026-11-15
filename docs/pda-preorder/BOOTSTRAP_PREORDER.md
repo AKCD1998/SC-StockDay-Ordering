@@ -17,6 +17,8 @@ Record an admission event and update only `owners/PREORDER.md` plus a genuinely 
 
 ## Reuse exact existing work
 
+**Current source discovery:** read [PDA_SOURCE_AND_CONTINUATION.md](PDA_SOURCE_AND_CONTINUATION.md) before treating absent source files in Drive as a blocker. Android source is remotely verified at `codex/pda-count-send-r11`, commit `1d2c29569fd72435fd58315bdb1bca7f225040eb`, in the existing StockDay repository. Drive is a delivery destination. PDA owner still integrates/builds mobile; Preorder owner supplies the domain/mobile-auth contract and continues the existing web/API work. The SHA list below records admission-era source; fetch current PR heads and canonical ledger before proceeding.
+
 - Existing repository: `AKCD1998/SC-StockDay-Ordering`.
 - Existing preorder branch: `codex/preorder-three-role-readiness`.
 - Existing draft [PR #100](https://github.com/AKCD1998/SC-StockDay-Ordering/pull/100).

@@ -12,6 +12,7 @@ Scope: engineering decisions, ownership, interface contracts and evidence. This 
 4. [สถานะเจ้าของ PDA](owners/PDA.md) และ [สถานะเจ้าของ Preorder](owners/PREORDER.md)
 5. [เริ่มแชต Preorder](BOOTSTRAP_PREORDER.md) / [ทำงานต่อในแชต PDA](BOOTSTRAP_PDA.md)
 6. [การใช้ Cloud เดิมและการซิงก์ ledger](SYNC_AND_ENVIRONMENT.md)
+7. [ซอร์ส Android และวิธีรับช่วงกับ PDA](PDA_SOURCE_AND_CONTINUATION.md) — Git เป็นแหล่งซอร์ส, Drive เป็นชุดส่งมอบ; แผนที่ไฟล์ R11 และจุดเชื่อม Preorder ที่ต้องทำต่อ
 
 ## ข้อตกลงสั้น ๆ
 
