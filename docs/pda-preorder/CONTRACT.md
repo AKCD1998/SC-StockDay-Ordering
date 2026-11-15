@@ -12,6 +12,9 @@ Contract register version: **R3-COORD-1**. This is a record of agreement/proposa
 6. Documents can cover multiple requests and vice versa. Allocation must prevent double use. Document presence does not by itself prove physical receipt or a stock-ledger effect.
 7. Existing Ada/POS receipt/transfer/sale work remains in its authorized process. No app button silently creates official inventory or financial movements.
 8. Manual lot/manufacture/expiry entry remains. Optional preorder product photos do not re-enable label OCR.
+9. ADA's posted/approved supplier-receipt line is the source-document identity for an SCPDA notification. Replaying that line must not create a second ADA inventory movement. A mobile physical count/photo is a linked verification event; a mismatch holds allocation until the authorized inventory process reconciles it.
+10. A provisional ADA item name is not a canonical product identity. CEO/authorized product-data staff must map it to an existing ADA item or update/create one through the approved ADA operation. Requests become allocatable only after an acknowledged canonical item ID/code and unit are linked. Display-name similarity alone is not a safe merge key.
+11. FIFO is per canonical product identity and exact unit. Include active Preorders and only price inquiries accepted by the customer; exclude pending/declined inquiry, canceled, completed and previously allocated quantities. The server, not a phone's list snapshot, orders and atomically commits the allocation.
 
 ## Product, time and count invariants retained from PDA work
 
@@ -49,6 +52,16 @@ The backend branch proposes `POST /api/customer-preorders/cases/:publicId/items/
 Migration `080_add_preorder_hq_physical_receipts.sql` proposes a source-line batch/current count plus append-only `COUNTED`/`CORRECTED` events with actor, time, version chain, idempotency key and payload hash. Fulfillment allocation is limited to the current physical quantity and exact unit; a correction cannot lower it below active allocations. The migration is present in draft PR #61 for review only and has not been applied. This does not write Ada/POS inventory.
 
 This delta does not provide mobile authentication, dispatch/transfer counts, branch physical receipt or customer handover. Multi-shipment and partial quantity lifecycle remain pending. No phone client should call the proposed web-cookie route until the PDA owner reviews and an approved mobile adapter/transport is agreed. The web/API branch is a review artifact, not evidence of live staging behavior.
+
+### ADA receipt and product-master bridge — proposed, source/API unverified
+
+The user's StockDay Admin screenshot shows a **ใบรับสินค้า** page and **รออนุมัติ** / **CEO กดอนุมัติแล้ว** views, but does not reveal an ADA event feed, webhook, receipt/product API, stable item identifiers, exact placeholder codes or required product-master fields. Do not infer these from the screenshot or from the current ADA rebuild task.
+
+Proposed event/read contract: on an agreed finalized/approved ADA receipt line, send a signed server-side event or provide an authenticated read API with source document ID, source line ID, ADA item identity (including provisional identity when applicable), quantity, exact unit, approval state, source timestamp and event version. SCPDA stores the source identity idempotently and raises an HQ alert; it does not repost ADA inventory. Store a reconciliation record tying the photo/physical count and optional lot fields to that source line. If received quantity disagrees, hold allocation and route reconciliation; never auto-correct official stock.
+
+Proposed CEO product contract: branch request retains its own ID and optional label image/trade name; product review searches by exact ADA code/barcode/pack identity before name. CEO chooses **map existing item** or **update/create canonical item**. Use ADA-authorized server credentials, permission checks, duplicate prevention, audit actor/time, stable request/idempotency key and durable retry. Return ADA's canonical item ID/code, display names, barcode, exact unit, master-data version and acknowledged status. Until the ADA acknowledgement is durable, show **รอ ADA ยืนยัน** and block ordinary allocation. Publish the mapping and receipt link to HQ and affected branches only after acknowledgement.
+
+These contracts are design proposals only; no ADA endpoint, event consumer, notification, item write, photo upload, reconciliation hold or FIFO allocator has been implemented in the shared mobile backend. Determine actual approval semantics, required item fields and supported write path from read-only ADA source/API evidence before proposing implementation.
 
 Authentication/enrollment, private photo handling and offline cold-reopen must be validated against an approved reachable staging service before a mobile production-ready claim. Component tests and a local mockup do not replace a UI → API → durable store → receipt → another-client/restart proof.
 
