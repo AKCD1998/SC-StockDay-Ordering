@@ -12,6 +12,14 @@ Status: **LEDGER_PREPARED / PREORDER_CHAT_NOT_YET_CLAIMED**. This file records v
 
 Do not invent thread IDs. The current tools do not expose a create/fork/message-other-chat operation. The user must open/branch the destination chat through their client, then that chat records its actual admission.
 
+### User-identified destination (15 November)
+
+The user supplied the existing destination chat **เพิ่มฟีเจอร์ใหม่ในแอพและเว็บ**:
+
+`codex://threads/6af923e6-aeb8-8191-8f37-c6ca3bacb094?hostId=durable`
+
+This is a user-provided routing reference, not a verified owner/environment admission. Direct sending was unavailable in the PDA session: no cross-thread messaging tool was callable, and the collaboration tree exposed only its current root. A handoff is posted in [event 002](events/2026-11-15-002-destination-identified.md). **Direct delivery and destination acknowledgment remain pending.** The destination can resume by reading BOOTSTRAP_PREORDER.md and recording admission; no replacement chat/agent was created.
+
 ## User-confirmed corrections
 
 - **CEO** decides availability, customer sale price and purchasing. CEO uses their admin account; no new account has been created here.
