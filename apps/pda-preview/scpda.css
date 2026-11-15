@@ -58,3 +58,15 @@
 .scpda-price-stock>strong{font-size:32px;line-height:1.4;color:#0b1fb8;overflow-wrap:anywhere;max-width:100%;font-variant-numeric:tabular-nums}
 .scpda-price-stock>p,.scpda-price-stock>small{flex-basis:100%;margin:0}
 .scpda-preorder-pending h2{margin-bottom:12px}
+
+.scpda-stock-heading{display:flex;align-items:center;gap:2px;flex-basis:100%;min-width:0}
+.scpda-stock-heading h3{margin:0;min-width:0}
+.scpda-stock-info{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:44px;height:44px;padding:0;background:transparent;color:#b6530b}
+.scpda-stock-info span{display:flex;align-items:center;justify-content:center;width:21px;height:21px;border:1.5px solid currentColor;border-radius:50%;font:600 15px/1 Georgia,serif}
+.scpda-price-stock>strong{flex-basis:100%;font-size:56px;line-height:1.2;text-align:left}
+.scpda-price-stock>strong.scpda-stock-missing{font-size:24px}
+.scpda-stock-info-list{display:grid;gap:14px;margin:18px 0}
+.scpda-stock-info-list>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:12px}
+.scpda-stock-info-list dt{font-size:13px;color:#596981}
+.scpda-stock-info-list dd{margin:0;font-size:14px;color:#172644;overflow-wrap:anywhere}
+@media(max-width:360px){.scpda-stock-info-list>div{grid-template-columns:minmax(0,1fr);gap:3px}}

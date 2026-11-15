@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {priceCheckModel,priceCheckHtml} from '../scpda-price-check.mjs';
+import {priceCheckModel,priceCheckHtml,priceStockInfoHtml} from '../scpda-price-check.mjs';
 import {normalizeStockDayProduct} from '../stockday-live-contract.mjs';
 
 const product=(stock={},prices=[
@@ -27,13 +27,14 @@ test('unknown base unit shows unit prices without inventing a single or discount
 test('zero, negative, fractional and absent reference stock remain distinct',()=>{
  for(const n of [0,-3,1.5,null])assert.equal(priceCheckModel(product({quantity:n})).quantity,n);
  assert.match(priceCheckHtml(product({quantity:null})),/ยังไม่มียอด/);
- assert.match(priceCheckHtml(product({quantity:0})),/<strong>0<\/strong>/);
- assert.match(priceCheckHtml(product({quantity:-3})),/<strong>-3<\/strong>/);
+ assert.match(priceCheckHtml(product({quantity:0})),/>0<\/strong>/);
+ assert.match(priceCheckHtml(product({quantity:-3})),/>-3<\/strong>/);
 });
 test('shows actual ingestion time; approximate morning routine is not an observation timestamp',()=>{
- const html=priceCheckHtml(product());assert.match(html,/08:21/);assert.match(html,/ประมาณ 08:30/);
+ const html=priceStockInfoHtml(product());assert.match(html,/08:21/);assert.match(html,/ประมาณ 08:30/);
+ const main=priceCheckHtml(product());assert.doesNotMatch(main,/08:21|08:30|สาขา 001/);assert.match(main,/รหัส SKU/);assert.match(main,/priceStockInfoButton/);
  assert.equal(priceCheckModel(product()).source,'stockday-full-sync-web-view');
- assert.match(priceCheckHtml(product({websiteTableSyncedAt:null})),/ซิงก์เข้าระบบ: ไม่ระบุ/);
+ assert.match(priceStockInfoHtml(product({websiteTableSyncedAt:null})),/ซิงก์เข้าระบบ<\/dt><dd>ไม่ระบุ/);
 });
 test('full names and codes are escaped, currencies and missing/zero prices preserved',()=>{
  const p=product({},[{unit:'<unit>',amount:0,currency:'USD'},{unit:null,amount:null,currency:'THB'}]);

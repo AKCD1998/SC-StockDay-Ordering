@@ -1,4 +1,5 @@
-import {priceCheckHtml} from './scpda-price-check.mjs';
+import {priceCheckHtml,priceStockInfoHtml} from './scpda-price-check.mjs';
+import {PriceCheckRefresh} from './scpda-price-refresh.mjs';
 import {RecentProductBook,recentProduct,touchRecent} from './scpda-recent-products.mjs';
 import {ScpdaCountUI} from './scpda-count-ui.mjs';
 import { StockDayLookup, requireScpda001 } from './stockday-live-contract.mjs';
@@ -9,12 +10,13 @@ const recentBook=new RecentProductBook();
 window.__scpdaReceive=(id,reply)=>{const row=pending.get(id);if(!row)return;clearTimeout(row.timer);pending.delete(id);if(reply.ok)row.resolve(reply.data);else{const e=Object.assign(new Error(reply.error||'เชื่อมต่อระบบไม่ได้'),{status:reply.status,code:reply.code});row.reject(e);}};
 function native(op,body={}){return new Promise((resolve,reject)=>{if(!window.SCPDAHost?.invoke){reject(new Error('เปิดผ่านแอป SCPDA บน Android เพื่อเชื่อมระบบจริง'));return;}const id=String(++serial),timer=setTimeout(()=>{pending.delete(id);reject(new Error('ระบบตอบช้า กรุณาลองใหม่'));},op==='activateDevice'?300000:45000);pending.set(id,{resolve,reject,timer});try{window.SCPDAHost.invoke(id,op,JSON.stringify(body));}catch{clearTimeout(timer);pending.delete(id);reject(new Error('เชื่อมกับแอปไม่ได้ กรุณาเปิดแอปใหม่'));}});}
 function status(text,tone='error'){$('#status').hidden=!text;$('#status').textContent=text;$('#status').dataset.tone=tone;}
-function loggedOut(){countUI?.disconnect();actor=null;selected=null;activeTab='count';currentView='lookup';recentItems=[];renderRecent();generation++;$('#sessionBar').hidden=true;$('#mainTabs').hidden=true;$('#preorderPane').hidden=true;$('#pricePane').hidden=true;camera.close();$('#activationPane').hidden=paired;$('#loginPane').hidden=!paired;$('#lookupPane').hidden=true;$('#productPane').hidden=true;$('#choices').hidden=true;$('#profile').textContent='ยังไม่ได้เชื่อมบัญชี';$('#logoutButton').hidden=true;$('#accountDialog').close();}
+function loggedOut(){priceRefresh.stop();$('#priceStockInfo').close();countUI?.disconnect();actor=null;selected=null;activeTab='count';currentView='lookup';recentItems=[];renderRecent();generation++;$('#sessionBar').hidden=true;$('#mainTabs').hidden=true;$('#preorderPane').hidden=true;$('#pricePane').hidden=true;camera.close();$('#activationPane').hidden=paired;$('#loginPane').hidden=!paired;$('#lookupPane').hidden=true;$('#productPane').hidden=true;$('#choices').hidden=true;$('#profile').textContent='ยังไม่ได้เชื่อมบัญชี';$('#logoutButton').hidden=true;$('#accountDialog').close();}
 function handle(e){if(e.code==='LOGIN_REJECTED'||e.code==='DEVICE_PROOF_INVALID'){status(e.message);return;}if(['DEVICE_CERT_INVALID','DEVICE_ACTIVATION_REQUIRED','DEVICE_REVOKED'].includes(e.code)){paired=false;loggedOut();status(e.message);return;}if(e.status===401){loggedOut();status('เซสชันหมดอายุ กรุณาใส่ PIN อีกครั้ง');}else status(e.message||'เชื่อมต่อระบบไม่ได้');}
 async function request(op,body){try{return await native(op,body);}catch(e){if(e.status===401)loggedOut();throw e;}}
 const lookup=new StockDayLookup(request);
 function countNavigate(view){
  if(['count','history'].includes(view)&&activeTab!=='count'){countUI.close();return;}
+ if(view!=='price'){priceRefresh.stop();$('#priceStockInfo').close();}
  currentView=view;
  if(view!=='lookup')camera.close();
  $('#localCountPane').hidden=view!=='count';$('#localHistoryPane').hidden=view!=='history';
@@ -24,13 +26,24 @@ function countNavigate(view){
 }
 function switchTab(tab){
  if(!actor||!['count','preorder','price'].includes(tab))return;
- if(currentView==='count')countUI.autosave();camera.close();countUI.close();generation++;selected=null;activeTab=tab;currentView='lookup';
+ if(currentView==='count')countUI.autosave();priceRefresh.stop();$('#priceStockInfo').close();camera.close();countUI.close();generation++;selected=null;activeTab=tab;currentView='lookup';
  status('');$('#lookupPane').hidden=tab==='preorder';$('#preorderPane').hidden=tab!=='preorder';$('#localHistoryButton').hidden=tab!=='count';
  for(const b of document.querySelectorAll('[data-app-tab]'))b.setAttribute('aria-pressed',String(b.dataset.appTab===tab));
- $('#scanActionLabel').textContent=tab==='price'?'สแกนเช็คราคา':'ใช้กล้องสแกน';$('#lookupLabel').textContent=tab==='price'?'บาร์โค้ด / รหัส IC / 630':'บาร์โค้ด / รหัส IC';$('#barcode').inputMode=tab==='price'?'text':'numeric';
+ $('#scanActionLabel').textContent=tab==='price'?'สแกนเช็คราคา':'ใช้กล้องสแกน';$('#lookupLabel').textContent=tab==='price'?'บาร์โค้ด / รหัส SKU':'บาร์โค้ด / รหัส IC';$('#barcode').inputMode=tab==='price'?'text':'numeric';
  if(tab!=='preorder')countNavigate('lookup');
 }
-function showPriceProduct(p){countUI.close();const root=$('#pricePane');root.innerHTML=priceCheckHtml(p);root.querySelector('#priceCheckBack').onclick=()=>countNavigate('lookup');countNavigate('price');}
+let priceInfoState={refreshing:false,error:null};
+const priceLookup=new StockDayLookup(native);
+const priceRefresh=new PriceCheckRefresh({
+ load:async p=>{const r=await priceLookup.candidates(p.productCode),matches=r.candidates.filter(c=>c.code===p.productCode&&(p.skuId===null||String(c.skuId)===p.skuId));if(matches.length!==1)throw Object.assign(Error('รหัสสินค้าเปลี่ยน กรุณาสแกนใหม่'),{code:'IDENTITY_CHANGED'});return priceLookup.resolve(matches[0],r.query,r.stockRows);},
+ onData:p=>{selected=p;renderPriceProduct();},
+ onState:s=>{priceInfoState=s;if(s.error?.code==='IDENTITY_CHANGED'){countNavigate('lookup');status(s.error.message);return;}if(s.error&&(s.error.status===401||['DEVICE_CERT_INVALID','DEVICE_ACTIVATION_REQUIRED','DEVICE_REVOKED'].includes(s.error.code))){handle(s.error);return;}renderPriceInfo();}
+});
+function renderPriceInfo(){if(selected&&$('#priceStockInfo').open)$('#priceStockInfoBody').innerHTML=priceStockInfoHtml(selected,priceInfoState);}
+function renderPriceProduct(){const root=$('#pricePane');root.innerHTML=priceCheckHtml(selected);root.querySelector('#priceCheckBack').onclick=()=>countNavigate('lookup');root.querySelector('#priceStockInfoButton').onclick=()=>{$('#priceStockInfoBody').innerHTML=priceStockInfoHtml(selected,priceInfoState);$('#priceStockInfo').showModal();priceRefresh.refresh();};renderPriceInfo();}
+function showPriceProduct(p){countUI.close();selected=p;priceInfoState={refreshing:false,error:null};renderPriceProduct();countNavigate('price');priceRefresh.start(p);}
+$('#closePriceStockInfo').onclick=()=>$('#priceStockInfo').close();
+
 
 function renderRecent(){
  const pane=$('#recentPane'),list=$('#recentList');if(!pane||!list)return;
@@ -76,7 +89,9 @@ class LiveCamera extends CameraScanner {
  async showResult(result){const token=this.token;this.release();this.message('กำลังตรวจบาร์โค้ดใน StockDay…');try{const r=await lookup.candidates(result.value);if(token!==this.token||!this.dialog.open)return;if(r.candidates.length!==1){this.close();$('#barcode').value=result.value;await search(result.value);return;}this.resolved=await lookup.resolve(r.candidates[0],r.query,r.stockRows);if(token!==this.token||!this.dialog.open)return;super.showResult({...result,kind:'known',product:{barcode:result.value,name:this.resolved.name}});this.q('#cameraResult small').textContent='ตรวจชื่อสินค้าแล้วเปิดรายละเอียด ยังไม่มีการส่งผลนับ';this.message('อ่านสำเร็จ · กล้องหยุดแล้ว');}catch(e){if(token!==this.token||!this.dialog.open)return;this.result=null;this.update('error');this.message(e.message||'ตรวจข้อมูลไม่ได้ กรุณาลองใหม่');if(e.status===401)handle(e);}}
 }
 const camera=new LiveCamera({catalog:[],onConfirm:barcode=>{$('#barcode').value=barcode;if(camera.resolved&&actor){acceptProduct(camera.resolved,activeTab==='price'?'price':'recent').catch(handle);status('');}}});
-window.addEventListener('scpda-background',()=>camera.close());
+window.addEventListener('scpda-background',()=>{camera.close();priceRefresh.pause(true);});
+window.addEventListener('scpda-foreground',()=>priceRefresh.pause(false));
+document.addEventListener('visibilitychange',()=>priceRefresh.pause(document.hidden));
 $('#scanButton').onclick=()=>{if(actor&&!busy&&activeTab!=='preorder')camera.open();};window.addEventListener('scpda-volume',()=>{if(!actor||busy||activeTab==='preorder')return;if(!camera.dialog.open)camera.open();else if(camera.phase==='aiming')camera.capture();});
 $('#accountButton').onclick=()=>$('#accountDialog').showModal();$('#closeAccount').onclick=()=>$('#accountDialog').close();$('#logoutButton').onclick=async()=>{loggedOut();status('ออกจากระบบแล้ว','info');try{await native('logout');}catch{/* Native logout clears its reader token even on network failure. */}};
 $('#websiteButton').onclick=()=>native('openWebsite').catch(handle);$('#demoButton').onclick=()=>native('openDemo').catch(handle);

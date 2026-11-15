@@ -34,7 +34,7 @@ public abstract class AssetActivity extends Activity {
  static boolean trusted(Uri u){return u!=null&&"https".equals(u.getScheme())&&"appassets.androidplatform.net".equals(u.getHost())&&u.getPort()==-1;}
  static WebResourceResponse denied(){return new WebResourceResponse("text/plain","UTF-8",403,"Forbidden",Collections.<String,String>emptyMap(),new ByteArrayInputStream(new byte[0]));}
  @Override protected void onPause(){super.onPause();if(web!=null){web.evaluateJavascript("window.dispatchEvent(new Event('scpda-background'));",null);web.onPause();}}
- @Override protected void onResume(){super.onResume();if(web!=null)web.onResume();}
+ @Override protected void onResume(){super.onResume();if(web!=null){web.onResume();web.evaluateJavascript("window.dispatchEvent(new Event('scpda-foreground'));",null);}}
  @Override protected void onDestroy(){if(cameraRequest!=null){cameraRequest.deny();cameraRequest=null;}if(web!=null){web.removeJavascriptInterface("SCPDAHost");web.destroy();}super.onDestroy();}
  @Override public void onBackPressed(){if(web!=null)web.evaluateJavascript("(()=>{const d=document.querySelector('dialog[open]');if(d){const b=d.querySelector('#cameraClose,#closeAccount');if(b)b.click();else d.close();return true;}return typeof window.__scpdaBack==='function'&&window.__scpdaBack()===true;})()",r->{if(!"true".equals(r))finish();});else super.onBackPressed();}
 }

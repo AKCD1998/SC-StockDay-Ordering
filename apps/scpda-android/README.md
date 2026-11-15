@@ -2,7 +2,15 @@
 
 This is the Android target of the existing SC StockDay PDA project. It retains the navy/yellow/white identity, manual camera capture, decoder and separate count demo. It does not publish the existing Site.
 
-## Current Android build — R8
+## Current Android build — R9
+
+Version `0.5.1-test.9` (code 9) follows the user's annotated price-screen feedback. The company IC/630 identity is labeled **รหัส SKU**; its underlying identifier is unchanged. Stock is 56px, and an orange information icon immediately after **จำนวนตาม StockDay** opens branch, source, actual sync timestamp, approximate normal morning routine and last successful read time. The icon has a 44px touch target; metadata is removed from the main stock card.
+
+The existing reader refreshes this active price view every 60 seconds, on opening the information dialog, and on returning from background. Requests coalesce; tab changes, logout, background and replaced views invalidate late results. Failed refreshes retain the last successful values/timestamps and show an explicit failure in the information dialog. A read does not update the source's ingestion timestamp or prove a new physical observation. The normal 08:30 routine remains user-provided metadata, not a verified scheduler API.
+
+Source/authentication, per-unit pricing, local count storage and production activation boundaries are unchanged. Java resume now notifies the page to refresh. Validation uses 37 model/reader/refresh checks and exact-APK browser fixtures; physical Android lifecycle acceptance remains pending. See [R9 evidence](../../docs/SCPDA_PRICE_INFO_R9_2026-11-15.md).
+
+## Historical Android build — R8
 
 Version `0.5.0-test.8` (code 8) adds authenticated bottom navigation: **นับสต๊อก / พรีออเดอร์ / เช็คราคา**. The price tab reuses the registered-device reader and exact barcode/company-code lookup, including `IC-…` and `630…`. Thai product names wrap in full. It shows the price matching the recorded Ada unit as ซื้อเดี่ยว, then the other stored unit prices without inferring bundle factors, quantity thresholds or POS promotions. Unknown base units stay unclassified. The shared ten-item recent list is still identity-only and re-reads each shortcut.
 
