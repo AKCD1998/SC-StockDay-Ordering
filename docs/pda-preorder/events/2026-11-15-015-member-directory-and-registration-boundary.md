@@ -2,10 +2,10 @@
 
 - Date: 15 November 2026
 - Owner: Preorder web/API workstream
-- Status: **Existing-member lookup implemented in draft PR #61; new-member bridge not implemented**
+- Status: **Existing-member lookup implemented in draft PR #61; CI passed; new-member bridge not implemented**
 - Backend commit: `9c206b1543198380cdfa6caf8670bf20590188c8` (`Add branch-scoped preorder member lookup`)
 - PR: [PaaSRTSM-project #61](https://github.com/AKCD1998/PaaSRTSM-project/pull/61)
-- CI: run [#43710628130](https://github.com/AKCD1998/PaaSRTSM-project/actions/runs/43710628130) was in progress at last check
+- CI: run [#43710628130](https://github.com/AKCD1998/PaaSRTSM-project/actions/runs/43710628130) passed
 
 ## Implemented in the API branch
 
@@ -33,7 +33,6 @@ Do not bypass the existing staff-device credential or manufacture consent. If op
 
 ## Remaining gates
 
-- CI run for `9c206b1` must complete successfully.
 - PDA owner must review and integrate the API contract; no Android client change is included in this Preorder branch.
 - Draft PR #61 remains unmerged and undeployed, feature flags remain off, and migration 085 remains unapplied.
 - Existing-member lookup does not complete the member-create, ADA delivery, branch fanout, or mobile notification flow.
