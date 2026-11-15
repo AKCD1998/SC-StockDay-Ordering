@@ -41,6 +41,7 @@ The current task is this verified destination chat. Separate review checkouts ar
 | Request-mode correction | User corrected the paths: Preorder skips `ตอบราคา`; price inquiry ends if declined and continues to status/receipt/allocation if accepted; [event 009](events/2026-11-15-009-corrected-mode-flow-and-cancel.md) supersedes event 007's flow interpretation |
 | Thai labels/member simulation | User requested UI label `พรีออเดอร์`, an existing-member fixture and a no-match/new-member simulation, and removed explanatory member-success copy; detailed in [event 008](events/2026-11-15-008-thai-label-member-simulation.md) |
 | Request cancellation interaction | User requested swipe-right row action, password check, confirmation and required cancellation reason; simulation only, no production cancellation API; detailed in [event 009](events/2026-11-15-009-corrected-mode-flow-and-cancel.md) |
+| Product lookup/new item flow | User specified code/name/barcode search, live-filtered Thai catalog choices, separated scan action, and an ADA duplicate check before adding an unregistered request line; detailed in [event 010](events/2026-11-15-010-product-lookup-and-unregistered-items.md); mock data only |
 | Current-recorded private PDA browser preview | `https://sc-stockday-pda-lab.scgroup1989-it.chatgpt.site/`, last published Site v14; manual fields/scanner tested on 13 Nov; synthetic browser-local counts, not a live preorder integration |
 | Preorder preparation | `codex/preorder-three-role-readiness`, updated to `7b7c1f63e25b33e7c7b2b3c31e3e3721869a2183` |
 | Web review | [Draft PR #100](https://github.com/AKCD1998/SC-StockDay-Ordering/pull/100); open/draft, head `7b7c1f63e25b33e7c7b2b3c31e3e3721869a2183`, base `d6017807eaed1815f871c95d74db21929d123fad`; not merged or deployed |
@@ -64,6 +65,8 @@ User-confirmed request-form detail: phone first with orange **เช็คสม
 User specified a per-request switch between **พรีออเดอร์** and **สอบถามราคา** with distinct queues, lifecycle and colors. The corrected Preorder path has six stages and goes from status to actual receipt/allocation without `ตอบราคา`. Price inquiry has six initial stages ending at `ตอบราคา`; decline closes it, acceptance adds status tracking and actual receipt/allocation. This correction supersedes event 007's earlier flow interpretation.
 
 The request list should reveal a red **ยกเลิกคำสั่งซื้อ** action when swiped right. The user confirmed password check, a second cancellation confirmation and a required reason after confirmation. Only the local mock simulates this; the production server/API and secure authorization/audit handling are not implemented.
+
+Product lookup should accept company and legacy codes, Thai/English names and barcodes. Confirmation opens a live-filtered Thai-name list; barcode scan is a separate action. **สินค้าใหม่** collects a trade name and optional photo, then checks ADA for a match. Reuse an existing ADA item when confirmed; otherwise add a request-only unregistered line for central product review and ADA item creation/mapping. The local catalog and lookup are simulated only; there is no ADA query or file upload integration.
 
 **Pending before enabling the new flow:**
 
