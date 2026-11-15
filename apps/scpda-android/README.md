@@ -2,7 +2,15 @@
 
 This is the Android target of the existing SC StockDay PDA project. It retains the navy/yellow/white identity, manual camera capture, decoder and separate count demo. It does not publish the existing Site.
 
-## Current Android build — R9
+## Current Android build — R10
+
+Version `0.6.0-test.10` (code10) supports the user's requested alphanumeric credential for existing reader01001. The login field is **รหัสผ่าน**, accepts text up to64characters, disables automatic capitalization/correction and preserves the exact value. Existing four-digit readers remain compatible. Android Java, the shared browser host and backend validation accept the same legacy4digits or6–64visible-ASCII password policy. The request key `pin` stays compatible with reader-v1. No production password/hash is in the APK or this repository.
+
+Install over R9 with the same signing key/package to retain enrollment and local drafts/counts. Log in again after the server changes01001's credential; peer accounts remain unchanged. Device proof, rate limits, scope and password/token non-persistence are retained. This build does not create a new production registration or enable count intake.
+
+Validation includes38 model/reader/refresh checks,5 exact-APK → shipping JVM → isolated HTTP/PostgreSQL assertions with a synthetic alphanumeric password,9 price-screen checks and10 recent-list regressions. Hardware/Keystore and the user's production phone login remain separate. See [R10 delivery notes](../../docs/SCPDA_PASSWORD_R10_2026-11-15.md).
+
+## Historical Android build — R9
 
 Version `0.5.1-test.9` (code 9) follows the user's annotated price-screen feedback. The company IC/630 identity is labeled **รหัส SKU**; its underlying identifier is unchanged. Stock is 56px, and an orange information icon immediately after **จำนวนตาม StockDay** opens branch, source, actual sync timestamp, approximate normal morning routine and last successful read time. The icon has a 44px touch target; metadata is removed from the main stock card.
 

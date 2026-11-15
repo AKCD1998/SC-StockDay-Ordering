@@ -1,3 +1,4 @@
+import {validScpdaCredential} from './scpda-credential.mjs';
 // Browser transport for the existing SCPDA device/PIN/count contracts.
 // No shared keys, credentials, fallback fixtures, proxy or arbitrary URLs.
 export const API_ORIGIN='https://paasrtsm-project.onrender.com';
@@ -49,7 +50,7 @@ export class BrowserSession {
   if(typeof r.deviceCertificate!=='string')throw error(502,'DEVICE_CERT_INVALID','ระบบไม่ส่งใบยืนยันเครื่อง');await this.device.certificate(r.deviceCertificate);const status=await this.device.status();if(!status.paired)throw error(502,'DEVICE_CERT_INVALID','ใบยืนยันเครื่องไม่ตรงกัน');return status;
  }
  async login({username,password}){
-  this.#reader=this.#counter=null;if(!/^0[123]001$/.test(username||'')||!/^\d{4}$/.test(password||''))throw error(400,'LOGIN_INVALID','เลือกผู้ใช้งานและกรอก PIN 4 หลัก');if(!(await this.device.status()).paired)throw error(409,'DEVICE_ACTIVATION_REQUIRED','เชื่อมเครื่องก่อนเริ่มใช้งาน');
+  this.#reader=this.#counter=null;if(!/^0[123]001$/.test(username||'')||!validScpdaCredential(password))throw error(400,'LOGIN_INVALID','เลือกผู้ใช้งานและกรอกรหัสผ่าน');if(!(await this.device.status()).paired)throw error(409,'DEVICE_ACTIVATION_REQUIRED','เชื่อมเครื่องก่อนเริ่มใช้งาน');
   try{const cert=await this.device.certificate(),c=await this.call('/api/scpda/auth/challenge',{method:'POST',body:{deviceCertificate:cert}}),signature=await this.device.sign(['SCPDA-LOGIN-V1',c.challengeId,c.nonce,username,c.deviceRef].join('\n'));
    const r=await this.call('/api/scpda/auth/login',{method:'POST',body:{operatorCode:username,pin:password,deviceCertificate:cert,challengeId:c.challengeId,signature}});
    if(typeof r.token!=='string'||r.user?.operatorCode!==username||r.user?.branchCode!=='001'||r.user?.role!=='reader')throw error(502,'IDENTITY_INVALID','ข้อมูลบัญชีไม่ตรงกัน');this.#reader=r.token;

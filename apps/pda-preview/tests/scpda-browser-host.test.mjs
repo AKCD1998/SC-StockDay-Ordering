@@ -16,3 +16,9 @@ test('existing reader-only deployment keeps product reads while count submit is 
 test('browser uses credential-free fixed-origin transport with redirects rejected',async()=>{const {session,calls}=fixture();await session.execute('login',{username:'01001',password:'1111'});for(const c of calls){assert.ok(c.url.startsWith(API_ORIGIN+'/api/scpda/'));assert.equal(c.options.credentials,'omit');assert.equal(c.options.redirect,'error');}assert.throws(()=>new BrowserSession({origin:'https://example.com',device:{}}),/Fixed SCPDA/);});
 test('wrong branch response cannot become a reader identity',async()=>{const {session}=fixture({badBranch:true});await assert.rejects(session.execute('login',{username:'01001',password:'1111'}),e=>e.code==='CONTRACT_INVALID');await assert.rejects(session.execute('products',{keyword:'0001234567890'}),e=>e.code==='LOGIN_REQUIRED');});
 test('failed logout still clears local session capability',async()=>{const {session}=fixture({logoutFails:true});await session.execute('login',{username:'01001',password:'1111'});await assert.rejects(session.execute('logout'));await assert.rejects(session.execute('products',{keyword:'0001234567890'}),e=>e.code==='LOGIN_REQUIRED');});
+
+test('alphanumeric password crosses the bridge unchanged; whitespace and excess input are rejected',async()=>{
+ const {session,calls}=fixture();await session.execute('login',{username:'01001',password:'qaRead7!'});
+ const sent=JSON.parse(calls.find(c=>c.url.endsWith('/auth/login')).options.body);assert.equal(sent.pin,'qaRead7!');
+ for(const password of [' qaRead7!','qaRead7! ','qaRead7!\n','4567\n','a'.repeat(65),'12345'])await assert.rejects(fixture().session.execute('login',{username:'01001',password}),e=>e.code==='LOGIN_INVALID');
+});
