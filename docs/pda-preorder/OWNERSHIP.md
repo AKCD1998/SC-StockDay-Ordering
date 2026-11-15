@@ -28,6 +28,6 @@ Local checkpoint paths on the original executor:
 
 - PDA: `/workspace/SC-StockDay-Ordering`, `codex/pda-durable-demo`.
 - Preorder: `/workspace/reviews/sc-preorder-roles-r3-admin`, `codex/preorder-three-role-readiness`.
-- Coordination docs only: `/workspace/reviews/pda-preorder-common-ledger`, `coord/pda-preorder-ledger`.
+- Coordination docs anchor/read checkpoint: `/workspace/reviews/pda-preorder-common-ledger`, `coord/pda-preorder-ledger`. Each chat uses a separate local docs writer worktree/branch when updating the same canonical remote ref.
 
 Paths are not proof of availability on another executor. Verify HEAD/status before reuse. Never run `reset --hard`, overwrite existing dirty files, force-push a peer's branch, or copy credentials between chats.

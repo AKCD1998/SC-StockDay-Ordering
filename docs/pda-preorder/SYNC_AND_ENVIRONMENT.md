@@ -27,12 +27,18 @@ These commands do not switch/reset the engineering branch. If using the connecte
 
 ## Write after significant progress
 
-On the original executor the dedicated docs worktree is `/workspace/reviews/pda-preorder-common-ledger/`. Reuse it only after checking HEAD/status and ensuring another writer is not actively editing it. On separate executors, use an isolated docs checkout/worktree tracking the same canonical ref.
+On the original executor `/workspace/reviews/pda-preorder-common-ledger/` is the coordination anchor/read checkpoint. **Each chat should use its own uniquely named local docs branch/worktree**, created from the freshly fetched canonical ref, even if both chats share one machine. Do not concurrently edit or stage files in that anchor or another chat's docs worktree. Separate local writer branches still publish to the one canonical remote branch; they are not competing ledgers.
 
 1. Fetch the latest canonical branch. Check dirty files and remote/local differences before editing.
 2. Edit only your own `owners/PDA.md` or `owners/PREORDER.md`. Add a uniquely named event file. Update shared STATE/CONTRACT only when their facts actually change.
 3. Record the distinction between planned / implemented / tested / fixture / blocked. Include source SHAs, evidence links and the next concrete dependency. Do not mark a sent handoff as received without the destination's actual admission.
-4. Review the exact documentation diff, commit and push **only** `coord/pda-preorder-ledger`.
+4. Review the exact documentation diff and ensure it is confined to `docs/pda-preorder/**`, with no engineering/application commits mixed in. Commit on your own docs writer branch, then explicitly push its HEAD to the canonical remote ref:
+
+   ```sh
+   git push origin HEAD:refs/heads/coord/pda-preorder-ledger
+   ```
+
+   Do not push an engineering branch's HEAD to that ref or accidentally publish to a second similarly named remote ledger.
 5. If push is rejected, fetch and merge the peer's ledger update, resolve a real overlap without erasing their record, then retry. Never force-push. Stop and report a conflict you cannot resolve from evidence.
 
 Do not share one mutable working tree for simultaneous engineering changes. Separate owner files and append-only event files reduce ledger collisions; Git still requires synchronization. There is no automatic watcher/daemon/schedule in this design, and no cross-chat wake-up is claimed.
