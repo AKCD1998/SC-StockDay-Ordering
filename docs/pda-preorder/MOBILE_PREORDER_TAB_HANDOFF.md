@@ -27,6 +27,17 @@ Add two persistent bottom tabs in the same app:
 - Use the same bottom bar for branch and HQ accounts; render the tab contents/actions from authenticated server capabilities. Do not add a local role selector.
 - When a camera scan resolves a catalog item, offer an explicit “add to Preorder” action. Copy the exact SKU and unit snapshot into the request draft; never submit or count it implicitly. Unknown items remain an explicit freeform request. No label OCR is part of this feature.
 
+### Customer member lookup and creation (user-confirmed UX, 15 November)
+
+On the branch request form, show **เบอร์ติดต่อ** first and place an orange **เช็คสมาชิก** action inside the right side of that input. Keep the phone value in place after a lookup or customer selection. A member match fills **ชื่อลูกค้า** and makes that field read-only. Pressing **เช็คสมาชิก** again reruns the lookup and reopens selection so staff can replace a mistaken match.
+
+- One match: fill and lock the member name.
+- Multiple members on the same number: open a selection popup with a dropdown. Selecting one fills and locks the name while preserving the entered phone number.
+- No match: show **“ไม่พบสมาชิก สร้างลูกค้าใหม่?”** with **ตกลง / ยกเลิก**. Cancel returns to the unchanged form. Confirm preserves the phone number and unlocks the name field.
+- In new-member mode, the primary action reads **“ต่อไป · เลือกสินค้า + เพิ่มสมาชิกใหม่”**. It opens a second confirmation **“ยืนยันสร้างสมาชิกใหม่?”** with **ตกลง / ยกเลิก**. Cancel creates no record; confirm starts the create-and-sync flow.
+
+The requested propagation path starts with SCCRM member creation, delivery to ADA Software, then synchronized member data in SCCRM, ADA Software and SCPDA on every branch phone. Show the member ID and each system's acknowledged sync state; do not claim all devices are current until their sync acknowledgements arrive. The mobile lookup/create endpoint, SCCRM-to-ADA field/identity contract, duplicate handling, durable retries and registered-device auth are still pending. The UI mockup is local and does not query or write CRM data.
+
 ## Role-aware Preorder content
 
 | Server profile | Preorder tab content |
@@ -45,4 +56,4 @@ No role can mark customer handover merely because an item was scanned, counted l
 4. The current backend proposal does not implement dispatch/transfer, branch physical receipt, customer handover or the full multi-shipment/partial-quantity lifecycle. Keep those actions hidden until their separate APIs and events exist.
 5. Test the bottom bar with Android back navigation, keyboard, scan overlay and system safe area; changing tabs must not clear a count or preorder draft.
 
-The user's instruction and this design are recorded in [event 005](events/2026-11-15-005-mobile-preorder-tab-request.md). Direct cross-thread messaging is unavailable; the PDA owner should read this handoff in the common ledger. This records the user's request, not the PDA owner's implementation acknowledgment.
+The user's navigation request is recorded in [event 005](events/2026-11-15-005-mobile-preorder-tab-request.md); the member-lookup and cross-system sync request is recorded in [event 006](events/2026-11-15-006-mobile-member-lookup-sync.md). Direct cross-thread messaging is unavailable; the PDA owner should read this handoff in the common ledger. This records the user's request, not the PDA owner's implementation acknowledgment.

@@ -37,6 +37,7 @@ The current task is this verified destination chat. Separate review checkouts ar
 | PDA branch source | Original base `codex/pda-durable-demo`, `7018f122e757656ff7e8db9217e96ac427c63753`; current R5 work branch `codex/pda-unit-pastel-r5`, head `31f82782d77720b3f081648f2e833f77c485b682` |
 | Latest APK in Drive | [SCPDA 0.4.1-test.5](https://drive.google.com/file/d/1advJ-GvP1L7cRXU5FdB_G1UBVktsq2fp/view?usp=drivesdk), 15 Nov; includes count-send path behind production activation gate, no Preorder or bottom tabs |
 | Mobile integration request | User confirmed two bottom tabs, `นับสต๊อก` and `Preorder`, and asked to include Preorder in the next app update; design handoff in [MOBILE_PREORDER_TAB_HANDOFF.md](MOBILE_PREORDER_TAB_HANDOFF.md) and [event 005](events/2026-11-15-005-mobile-preorder-tab-request.md) |
+| Customer lookup/sync request | User specified phone-first member lookup, single/multiple/no-match behavior, double-confirm for new members and SCCRM → ADA → all-branch SCPDA sync; detailed in [event 006](events/2026-11-15-006-mobile-member-lookup-sync.md); CRM/mobile integration not implemented |
 | Current-recorded private PDA browser preview | `https://sc-stockday-pda-lab.scgroup1989-it.chatgpt.site/`, last published Site v14; manual fields/scanner tested on 13 Nov; synthetic browser-local counts, not a live preorder integration |
 | Preorder preparation | `codex/preorder-three-role-readiness`, updated to `7b7c1f63e25b33e7c7b2b3c31e3e3721869a2183` |
 | Web review | [Draft PR #100](https://github.com/AKCD1998/SC-StockDay-Ordering/pull/100); open/draft, head `7b7c1f63e25b33e7c7b2b3c31e3e3721869a2183`, base `d6017807eaed1815f871c95d74db21929d123fad`; not merged or deployed |
@@ -54,6 +55,8 @@ The current task is this verified destination chat. Separate review checkouts ar
 Prepared in isolated web/API branches: subject-bound server workspace manifests and capability checks; purchasing, HQ fulfillment and branch profile scopes; fulfillment-safe case DTOs; branch session mapping into existing staff workflow handlers only under an authorized branch profile; and append-only physical HQ receipt count/correction events separate from receipt documents. The web receipt panel records a physical quantity before HQ fulfillment can allocate the source and keeps an idempotency key across a page reopen. Both feature flags remain off by default. Draft PRs #100 and #61 are unmerged and undeployed.
 
 User-confirmed mobile UX direction: add bottom tabs **นับสต๊อก** and **Preorder** inside the existing app. A handoff for the PDA owner is ready in [MOBILE_PREORDER_TAB_HANDOFF.md](MOBILE_PREORDER_TAB_HANDOFF.md). No mobile source was changed in the Preorder checkout; no direct cross-thread message tool is available, and this ledger entry is not proof that the PDA owner has accepted the implementation work.
+
+User-confirmed request-form detail: phone first with orange **เช็คสมาชิก**, read-only name on match, popup selection for shared numbers, create-new confirmation on no match, and a second confirmation before creating a member. The requested propagation is SCCRM → ADA Software → SCCRM/ADA/SCPDA on all branch phones. The updated phone prototype is local-only; CRM APIs and sync acknowledgements remain pending.
 
 **Pending before enabling the new flow:**
 
