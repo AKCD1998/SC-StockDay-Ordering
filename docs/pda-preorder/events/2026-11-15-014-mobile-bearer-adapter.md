@@ -25,9 +25,9 @@ The existing `/api/customer-preorders` router accepted the web session cookie on
 
 ## Scope not delivered
 
-This is an API adapter, not the Android implementation or production rollout. The PDA client has not yet called it. It does not add SCCRM member lookup/create or sync receipts, offline retries, HQ purchasing/fulfillment on PDA, dispatch/transfer counts, branch physical receipt or customer handover. No flag/profile was enabled, no account/permission provisioned, no migration applied, and no ADA/POS/CRM write or deployment occurred.
+This is an API adapter, not the Android implementation or production rollout. The PDA client has not yet called it. Member lookup was added later in commit `9c206b1` and is documented in [event 015](2026-11-15-015-member-directory-and-registration-boundary.md). SCCRM member creation/sync receipts, offline retries, HQ purchasing/fulfillment on PDA, dispatch/transfer counts, branch physical receipt or customer handover are still not included. No flag/profile was enabled, no account/permission provisioned, no migration applied, and no ADA/POS/CRM write or deployment occurred.
 
-The backend changed files passed `node --check` and `git diff --check`; no separate local test suite was run for `e9057f1`. GitHub Actions CI run `43709199891` later completed successfully. Staging exercise, PDA-owner acceptance and app roundtrip remain separate evidence gates. The implementation does not make Preorder end-to-end complete.
+The backend changed files for `e9057f1` passed `node --check` and `git diff --check`; no separate local test suite was run for that commit. GitHub Actions CI run `43709199891` later completed successfully. Commit `9c206b1` adds the existing-member directory adapter and migration `085_add_preorder_customer_member_id.sql`; CI run `43710628130` was in progress at last check. Staging exercise, PDA-owner acceptance and app roundtrip remain separate evidence gates. The implementation does not make Preorder end-to-end complete.
 
 ## PDA-owner handoff
 
