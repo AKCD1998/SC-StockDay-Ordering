@@ -25,3 +25,13 @@
 
 .scpda-category-value{min-height:56px;display:flex;align-items:center;padding:12px 14px;border-radius:12px;background:#eff3fa;color:#243d74;font-size:16px;font-weight:600;overflow-wrap:anywhere}
 .scpda-round-hint{display:block;margin-top:6px;font-size:12px;color:#596981}
+
+/* Ten navigation shortcuts, separate from immutable count history. */
+.scpda-recent{border:1px solid #dce4f1;border-radius:16px;background:#fff;padding:10px 14px;margin-bottom:16px;min-width:0}
+.scpda-recent>header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:4px 0 9px}
+.scpda-recent h2{font-size:14px;font-weight:600;margin:0;color:#344a6a}
+#recentCount{font-size:12px;color:#596981;font-variant-numeric:tabular-nums}
+#recentList{list-style:none;padding:0;margin:0}
+.scpda-recent-row{display:flex;align-items:center;gap:10px;min-height:54px;border-top:1px solid #edf1f7;min-width:0}
+.scpda-recent-open{flex:1;min-width:0;min-height:44px;text-align:left;padding:8px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:transparent;color:#172644;font-size:14px}
+.scpda-recent-count{flex-shrink:0;min-height:44px;padding:7px 11px;border:1px solid #d4def4;border-radius:9px;background:#edf2ff;color:#0b1fb8;font-size:14px;white-space:nowrap}

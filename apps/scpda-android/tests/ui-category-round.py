@@ -47,7 +47,7 @@ try:
    if page.locator('#activationPane').is_visible():page.locator('#activateDevice').click()
    page.locator('#loginPane').wait_for(state='visible');page.locator('#username').select_option('01001');page.locator('#password').fill('1111');page.locator('#loginButton').click();page.locator('#lookupPane').wait_for(state='visible')
    def lookup():
-    page.locator('#barcode').fill('0001234567890');page.locator('#lookupButton').click();page.locator('#productPane').wait_for(state='visible');page.locator('#startLocalCount').click();page.locator('#localCountForm').wait_for()
+    page.locator('#barcode').fill('0001234567890');page.locator('#lookupButton').click();page.locator('.scpda-recent-count').first.wait_for();page.locator('.scpda-recent-count').first.click();page.locator('#localCountForm').wait_for()
    lookup();return ctx,page,lookup
   ctx,page,lookup=open_count('เภสัช ยาทดสอบ 500 มก.')
   assert page.locator('#localCategory').input_value()=='pharma' and page.locator('#localCategory').get_attribute('type')=='hidden'

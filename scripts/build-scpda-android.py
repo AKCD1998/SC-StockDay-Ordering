@@ -10,7 +10,22 @@ marker=work/'.scpda-local-build'
 if work.exists() and not marker.exists():raise RuntimeError('Refusing to overwrite unmarked build directory')
 work.mkdir(exist_ok=True);marker.write_text('SCPDA internal-test build only')
 assets=work/'assets';run('node',root/'scripts/build-scpda-android-assets.mjs','--out',assets)
-res=work/'res';shutil.copytree(app/'res',res,dirs_exist_ok=True);(res/'drawable-nodpi').mkdir(exist_ok=True);im=Image.open(app/'branding/scpda-icon-source.png');im.resize((432,432),Image.Resampling.LANCZOS).save(res/'drawable-nodpi/scpda_foreground.png')
+res=work/'res';shutil.copytree(app/'res',res,dirs_exist_ok=True);(res/'drawable-nodpi').mkdir(exist_ok=True);im=Image.open(app/'branding/scpda-icon-source.png').convert('RGBA')
+# Android layers are 108dp; all brand ink must fit inside the 66dp safe circle.
+# A stricter 0.29 radius leaves extra tolerance. Opaque blue is background only.
+if im.width!=im.height or im.width<1024:raise RuntimeError('A square 1024px+ icon master is required')
+points=[]
+for y in range(im.height):
+ for x in range(im.width):
+  red,green,blue,alpha=im.getpixel((x,y))
+  if alpha>128 and ((red>180 and green>180 and blue>180) or (red>180 and green>160 and blue<180)):points.append((x,y))
+if len(points)<1000:raise RuntimeError('SC white/yellow mark is missing')
+center=(im.width-1)/2;radius=max(((x-center)**2+(y-center)**2)**0.5 for x,y in points)/im.width
+if radius>0.29:raise RuntimeError('SC mark exceeds launcher safe zone; do not ship a cropped icon')
+icon_check={'sourceSize':im.size,'inkBounds':[min(x for x,y in points),min(y for x,y in points),max(x for x,y in points),max(y for x,y in points)],'maximumInkRadiusFraction':radius,'requiredMaximumRadiusFraction':0.29,'androidLayerDp':108,'androidSafeCircleDiameterDp':66,'safeZoneVerified':True,'physicalOemOrIphoneAcceptance':False}
+(out/'ICON-SAFEZONE.json').write_text(json.dumps(icon_check,indent=2))
+im.convert('RGB').resize((1024,1024),Image.Resampling.LANCZOS).save(out/'SCPDA-AppIcon-iOS-1024.png')
+im.resize((432,432),Image.Resampling.LANCZOS).save(res/'drawable-nodpi/scpda_foreground.png')
 # Keep only three explicit assets and notices in the APK, never build/source/DB files.
 if (work/'count-demo-build').exists():shutil.rmtree(work/'count-demo-build')
 (assets/'demo-build').rename(work/'count-demo-build')

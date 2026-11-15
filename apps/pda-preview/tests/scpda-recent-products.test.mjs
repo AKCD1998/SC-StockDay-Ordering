@@ -1,0 +1,7 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {RECENT_LIMIT,recentProduct,recentProducts,touchRecent} from '../scpda-recent-products.mjs';
+const product=i=>({productCode:'000IC'+i,skuId:String(i),barcode:'00012345678'+String(i).padStart(2,'0'),name:'เภสัช สินค้า '+i});
+test('eleventh distinct product evicts the oldest shortcut, keeping ten',()=>{let rows=[];for(let i=1;i<=11;i++)rows=touchRecent(rows,product(i));assert.equal(rows.length,RECENT_LIMIT);assert.deepEqual(rows.map(x=>x.productCode),[11,10,9,8,7,6,5,4,3,2].map(i=>'000IC'+i));});
+test('repeated or alternate barcode lookups move the product to the front without duplication',()=>{let rows=[product(3),product(2),product(1)];rows=touchRecent(rows,{...product(1),barcode:'0000000000999'});assert.equal(rows.length,3);assert.equal(rows[0].productCode,'000IC1');assert.equal(rows[0].lookupCode,'0000000000999');});
+test('shortcuts preserve exact identity strings and never persist stock, price or auth material',()=>{const row=recentProduct({...product(1),stock:{quantity:99},prices:[{amount:1}],token:'must-not-store',pin:'must-not-store'});assert.deepEqual(Object.keys(row),['productCode','skuId','lookupCode','name']);assert.equal(row.productCode,'000IC1');assert.equal(row.lookupCode,'0001234567801');});
+test('damaged local rows are ignored; stock-only identities remain explicit',()=>{assert.deepEqual(recentProducts([null,{},product(1),product(1),{...product(2),skuId:null}]).map(x=>x.skuId),['1',null]);assert.throws(()=>recentProduct({...product(1),skuId:'wrong'}));});
