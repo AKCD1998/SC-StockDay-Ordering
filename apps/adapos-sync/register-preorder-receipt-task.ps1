@@ -36,7 +36,7 @@ $settings = New-ScheduledTaskSettingsSet `
 $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal `
-  -Description "Read-only approved AdaPOS receipt poll for the preorder HQ queue (branch 000, every 15 minutes)." | Out-Null
+  -Description "Read-only pending and approved AdaPOS receipt poll for the preorder HQ queue (branch 000, every 15 minutes)." | Out-Null
 
 if ($Enable) { Enable-ScheduledTask -TaskName $TaskName | Out-Null }
 else { Disable-ScheduledTask -TaskName $TaskName | Out-Null }
