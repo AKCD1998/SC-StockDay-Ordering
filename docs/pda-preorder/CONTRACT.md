@@ -21,6 +21,12 @@ Contract register version: **R3-COORD-1**. This is a record of agreement/proposa
 - Dates retain actual precision; do not invent a day. Missing label information is allowed. Do not use estimated FEFO/hourly data as an actual count.
 - Client observation, server receipt and source-document times are separate. Offline upload does not relabel a stale observation as current.
 
+## User-confirmed mobile navigation direction (15 November)
+
+The user wants Preorder inside the same SCPDA Android app, reached through a separate bottom tab. The agreed top-level tabs are **นับสต๊อก** (the current scanner/count workflow) and **Preorder**. Keep the existing scanner and local count history in the count tab; keep preorder cases, customer decisions and lifecycle in the Preorder tab. Account/settings remain in the existing header control. Do not combine count observations with preorder receipt/allocation quantities.
+
+This is a confirmed navigation direction only. It does not accept mobile API authentication, role provisioning, server schema, offline guarantees or production activation. Role-specific screens must derive from authenticated server capabilities rather than a local role switch.
+
 ## Existing source evidence, not today's runtime proof
 
 The inspected preorder backend has authenticated web-session routes under `/api/customer-preorders` for cases, quotes, customer decisions, mark-ordered, case-level branch arrival/notification/completion, messages/photos, receipt/transfer evidence links and ETA. Its available source uses admin/staff checks.
@@ -29,7 +35,7 @@ The inspected mobile enrollment/scan routes under `/api/mobile` and lookup alias
 
 ## Proposed, not accepted as deployed
 
-PR #100's gated UI and backend draft PR #61 propose `GET /api/customer-preorders/workspace` with version **`sc-preorder-three-role-r3-v1`**, `subjectUserId`, `workRole` (`purchasing`/`fulfillment`/`branch`), branch scope and capabilities. PR #61 adds server profiles, the manifest endpoint, capability checks and fulfillment-safe case DTOs. Its source config example is `PREORDER_WORKSPACE_PROFILES=subject=purchasing;subject=fulfillment;subject=branch:001`; the feature flag defaults off. Neither PR is merged/deployed or accepted as a shared mobile contract. Missing/unknown/mismatched admission fails closed; never grant Boom global admin to bypass it.
+PR #100's gated UI and backend draft PR #61 propose `GET /api/customer-preorders/workspace` with version **`sc-preorder-three-role-r3-v1`**, `subjectUserId`, `workRole` (`purchasing`/`fulfillment`/`branch`), branch scope and capabilities. PR #61 adds server profiles, the manifest endpoint, capability checks and fulfillment-safe case DTOs. Its source config example is `PREORDER_WORKSPACE_PROFILES=subject=purchasing;subject=fulfillment;subject=branch:001`; the feature flag defaults off. Neither PR is merged/deployed or accepted as a shared mobile contract. The endpoint is still behind the web-session auth middleware; the SCPDA registered-device transport adapter is not implemented. Missing/unknown/mismatched admission fails closed; never grant Boom global admin to bypass it.
 
 ### Proposed physical HQ receipt delta — PR #61, not accepted
 

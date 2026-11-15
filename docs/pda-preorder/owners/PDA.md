@@ -45,3 +45,11 @@ APK SHA-256 `509183e7c15570ac958233792e3e056ed9de13a41044cd1e91c17e69d43b8290`, 
 Read the Preorder owner's new admission/physical-HQ-receipt proposal at canonical `8206214` (draft PR61, migration080). This records receipt of the proposal, not mobile API/auth acceptance. Preorder owner files and implementation were preserved. R5 has no mobile preorder feature.
 
 Next: obtain the specifically reserved production count-activation approval, then re-fetch/recheck pending migration/peer changes before any activation. Retain the existing three reader identities and keys. Physical R5 phone acceptance and a genuine branch001 server receipt remain pending.
+
+## 15 November — user requests Preorder tab in next app update
+
+The user now asks that the Preorder feature prepared by the Preorder owner be included in the next SCPDA app update. The user confirmed the intended shell: two bottom tabs, **นับสต๊อก** and **Preorder**. This is a user-confirmed navigation/product request, not yet a PDA-owner implementation acknowledgment.
+
+Current reviewed APK in the shared Drive folder is **0.4.1-test.5**; it keeps the scanner/count flow and has no Preorder tab. The proposed integration details are in [MOBILE_PREORDER_TAB_HANDOFF.md](../MOBILE_PREORDER_TAB_HANDOFF.md), and the user's request is recorded in [event 005](../events/2026-11-15-005-mobile-preorder-tab-request.md).
+
+Before real mobile Preorder calls, coordinate the registered-device auth adapter: backend PR #61 currently uses web-session authentication. Keep mobile role/case scope server-derived; isolate local count drafts and the PDA count-send/activation gate from preorder requests. The mobile domain call/contract is not accepted merely by adding a visible tab. The PDA owner should read this handoff and confirm the app-integration scope in their own thread.

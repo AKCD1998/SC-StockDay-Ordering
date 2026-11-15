@@ -34,7 +34,9 @@ The current task is this verified destination chat. Separate review checkouts ar
 | Item | Evidence / state |
 |---|---|
 | Web main checked 15 Nov | `d6017807eaed1815f871c95d74db21929d123fad` |
-| PDA branch source | `codex/pda-durable-demo`, `7018f122e757656ff7e8db9217e96ac427c63753`; label OCR entry removed |
+| PDA branch source | Original base `codex/pda-durable-demo`, `7018f122e757656ff7e8db9217e96ac427c63753`; current R5 work branch `codex/pda-unit-pastel-r5`, head `31f82782d77720b3f081648f2e833f77c485b682` |
+| Latest APK in Drive | [SCPDA 0.4.1-test.5](https://drive.google.com/file/d/1advJ-GvP1L7cRXU5FdB_G1UBVktsq2fp/view?usp=drivesdk), 15 Nov; includes count-send path behind production activation gate, no Preorder or bottom tabs |
+| Mobile integration request | User confirmed two bottom tabs, `นับสต๊อก` and `Preorder`, and asked to include Preorder in the next app update; design handoff in [MOBILE_PREORDER_TAB_HANDOFF.md](MOBILE_PREORDER_TAB_HANDOFF.md) and [event 005](events/2026-11-15-005-mobile-preorder-tab-request.md) |
 | Current-recorded private PDA browser preview | `https://sc-stockday-pda-lab.scgroup1989-it.chatgpt.site/`, last published Site v14; manual fields/scanner tested on 13 Nov; synthetic browser-local counts, not a live preorder integration |
 | Preorder preparation | `codex/preorder-three-role-readiness`, updated to `7b7c1f63e25b33e7c7b2b3c31e3e3721869a2183` |
 | Web review | [Draft PR #100](https://github.com/AKCD1998/SC-StockDay-Ordering/pull/100); open/draft, head `7b7c1f63e25b33e7c7b2b3c31e3e3721869a2183`, base `d6017807eaed1815f871c95d74db21929d123fad`; not merged or deployed |
@@ -45,11 +47,13 @@ The current task is this verified destination chat. Separate review checkouts ar
 | Earlier R3 evidence | 8 workspace tests + 9 existing preorder helper tests + 4 navigation/session tests passed; admin-web production build passed with existing bundle-size warning, before continuation commits |
 | Continuation checks | `git diff --check` passed for both continuation patches. No tests were run for web `7b7c1f6` or backend `4ae6990` |
 | R3 review mockup | 17 browser checks; one synthetic request supplied in two rounds 2+1, 15 in-memory actions; not a durable API/database/auth proof |
-| Installed APK | Not rebuilt or changed by the OCR pause/R3 preparation/ledger work; current physical-phone runtime not reverified |
+| APK status | Latest recorded build is 0.4.1-test.5 at the Drive link above; physical-device acceptance remains pending |
 
 ## Implemented vs pending
 
 Prepared in isolated web/API branches: subject-bound server workspace manifests and capability checks; purchasing, HQ fulfillment and branch profile scopes; fulfillment-safe case DTOs; branch session mapping into existing staff workflow handlers only under an authorized branch profile; and append-only physical HQ receipt count/correction events separate from receipt documents. The web receipt panel records a physical quantity before HQ fulfillment can allocate the source and keeps an idempotency key across a page reopen. Both feature flags remain off by default. Draft PRs #100 and #61 are unmerged and undeployed.
+
+User-confirmed mobile UX direction: add bottom tabs **นับสต๊อก** and **Preorder** inside the existing app. A handoff for the PDA owner is ready in [MOBILE_PREORDER_TAB_HANDOFF.md](MOBILE_PREORDER_TAB_HANDOFF.md). No mobile source was changed in the Preorder checkout; no direct cross-thread message tool is available, and this ledger entry is not proof that the PDA owner has accepted the implementation work.
 
 **Pending before enabling the new flow:**
 

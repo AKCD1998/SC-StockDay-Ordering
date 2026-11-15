@@ -20,4 +20,4 @@ Continuation prepared for review: gated server workspace profiles/capabilities a
 
 Still pending: accepted mobile auth/transport adapter; dispatch/transfer, branch physical receipt and customer handover quantities; multi-shipment/partial quantity lifecycle and staging/device evidence. The PDA owner acknowledged the ownership admission through canonical ledger commit `20ef7cf`; there is no direct cross-chat message or approval of this new API delta.
 
-Next: review draft PRs #100 and #61. Consult the PDA owner on the proposed physical receipt request/retry contract through the common ledger before adding mobile transport. Keep both feature flags off until role provisioning and approved staging roundtrips pass.
+Next: review draft PRs #100 and #61. The user has requested that Preorder join the next SCPDA update through a separate bottom tab; the handoff is in [MOBILE_PREORDER_TAB_HANDOFF.md](../MOBILE_PREORDER_TAB_HANDOFF.md) and event 005. The PDA owner needs to confirm mobile auth/transport and implementation fit in their thread. Keep both feature flags off until role provisioning and approved staging roundtrips pass.
