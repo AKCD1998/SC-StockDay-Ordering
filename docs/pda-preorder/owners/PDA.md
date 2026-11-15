@@ -2,6 +2,8 @@
 
 **Current R11 checkpoint — 15 November, 17:29 Bangkok:** the user's new explicit request authorized production count intake for **01001 / branch001** and the website stock-check catalog for existing branch001/admin accounts. This supersedes the pending count-activation gate in the historical R5–R9 sections below, within this precise scope. Backend and website are live, migration083 and the three pilot flags are verified, and APK **0.6.1-test.11** is delivered in Drive. Password compatibility and the separately requested01001 credential change are active; no secret is recorded here. Physical phone/first real count acceptance remains pending. [Exact deployment, test and delivery event](../events/2026-11-15-pda-r11-count-activation.md).
 
+User-requested Preorder coordination clarification: [source map and continuation guide](../PDA_SOURCE_AND_CONTINUATION.md) now identifies the remotely verified R11 Git source, WebView/native entrypoints, build/tests and the mobile adapter work to coordinate. User-authorized notices on PR100/61 were posted and read back; recipient acknowledgment remains unconfirmed. [Coordination event and comment links](../events/2026-11-15-pda-source-handoff-clarification.md). Mobile ownership and production state are unchanged by this documentation/notification work.
+
 - Owner: existing SCPDA smartphone/PDA chat.
 - Status: **ACTIVE_RETAINED**.
 - Actual current-thread ID: not exposed/verified here; do not substitute an attachment/source-relay ID.
