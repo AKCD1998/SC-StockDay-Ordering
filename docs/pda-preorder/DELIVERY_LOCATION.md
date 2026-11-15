@@ -7,7 +7,19 @@ User instruction, 15 November 2026: place completed PDA app deliveries in Google
 - Verified parent: เภสัชอู๋, ID `1usItMowEj6llCqWYjdpMAkswB5bubGkD`.
 - Parent was found by exact name; the child was created under that verified parent. Existing sharing was preserved.
 
-## Current delivery
+## Current delivery — R5
+
+| File | Bytes | Drive link |
+| --- | ---: | --- |
+| SCPDA-0.4.1-test.5.apk | 3023685 | [APK](https://drive.google.com/file/d/1advJ-GvP1L7cRXU5FdB_G1UBVktsq2fp/view?usp=drivesdk) |
+| SCPDA-0.4.1-test.5-Android-001.zip | 2826348 | [Installation package](https://drive.google.com/file/d/12JNF4nVKnrBfrJC_LxI3dlibJpEuyf3N/view?usp=drivesdk) |
+| START-HERE-SCPDA-0.4.1-test.5.txt | 4457 | [Instructions](https://drive.google.com/file/d/1b-nleeLpYZnoYqVpBtHGCgQ-FULDAALu/view?usp=drivesdk) |
+
+R5 was rebuilt with the same package/signing key. Unit defaults and pastel lot-field groups changed; production count collection remains pending the existing activation approval. All three new files have verified upload completion, names, sizes and parent IDs; remote checksums were unavailable. No credentials/setup/signing material or sharing changes.
+
+Sanitized R5 receipt: `/workspace/artifacts/scpda-unit-pastel-2026-11-15/GOOGLE-DRIVE-DELIVERY.json`.
+
+## Earlier delivery — R4
 
 | File | Bytes | Drive link |
 | --- | ---: | --- |

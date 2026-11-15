@@ -3,9 +3,9 @@
 - Owner: existing SCPDA smartphone/PDA chat.
 - Status: **ACTIVE_RETAINED**.
 - Actual current-thread ID: not exposed/verified here; do not substitute an attachment/source-relay ID.
-- Engineering checkout on original executor: `/workspace/SC-StockDay-Ordering`.
-- Branch: `codex/pda-durable-demo`.
-- Last app-code SHA: `7018f122e757656ff7e8db9217e96ac427c63753`.
+- Current R5 engineering checkout on original executor: `/workspace/reviews/scpda-unit-pastel-r5`; original checkout `/workspace/SC-StockDay-Ordering` and its dirty documentation are preserved.
+- Current delivery branch: `codex/pda-unit-pastel-r5` (existing project, isolated continuation).
+- Last app-code SHA: `31f82782d77720b3f081648f2e833f77c485b682` (R5); base `7018f122e757656ff7e8db9217e96ac427c63753`.
 - Existing two unrelated dirty documentation files were preserved; this split did not stage or overwrite them.
 
 Last relevant delivery: user paused label OCR. Same private PDA Site last recorded v14 has manual lot/manufacture/expiry/quantity entry and barcode camera; manual save/reopen and scanner close were checked in a browser. Counts there are synthetic/browser-local. APK was not rebuilt by that change. This ledger update does not reverify today's hosted or physical-device state.
@@ -29,3 +29,19 @@ Owner delivery: `/workspace/artifacts/scpda-android-readiness-2026-11-15/`, incl
 ## 15 November — Google Drive delivery preference
 
 The user requested completed PDA deliveries in **เภสัชอู๋ / pdaAppProject**. The verified child folder now contains the existing APK, versioned installation ZIP and start instructions. Upload completion and exact metadata readback verified all three files' names, sizes and parent folder; remote checksums were not available. Reuse this destination for future completed PDA app deliveries. See [delivery location and current links](../DELIVERY_LOCATION.md). No private access/setup/signing material was uploaded and no sharing, application, backend or production configuration was changed.
+
+## 15 November — R5 unit/pastel feedback and requested real count collection
+
+The user's image annotations request an Ada smallest-unit default, all quantity labels following the selected count unit, and subtle SC-theme grouping for lot/manufacture/expiry fields. Implemented in existing app code, new APK **0.4.1-test.5**, versionCode 5, same package/certificate as R4. Fresh/empty-unit drafts use the existing Ada branch-stock unit label; explicit saved/correction units and quantities are retained. Missing labels remain unselected, with no inference from price order or conversion factor. Exporter evidence at backend main `46985c9`, `scripts/lib/ada_sync_agent.js` selects `COALESCE(FTPdtSUnit, FTPdtMUnit, FTPdtLUnit)`. This supplies a count-entry label and does not certify stock-unit basis or scanned-pack conversion. All lot/total labels follow the selected unit.
+
+The user reports testing branch001 with operator01001 today and asks to send physical counts into StockDay as a primary evidence source. Do not record the supplied PIN in this ledger. Reused the existing count backend draft PR52 (`db904a4`) and admin draft PR92 (`f7b2753`); no replacement domain/owner/project. New checks: 19 model/reader contract checks, 13 isolated real HTTP/PostgreSQL checks, and 10 linked exact-APK-assets → shipping host-JVM → fixture HTTP/PG → real admin-component assertions. Included server receipt, review return, retries, lost response, offline cold reopen, correction lineage, matching units and preserved draft quantity. All passed. These are isolated Cloud checks, not production count writes or Android hardware acceptance.
+
+Read-only production preflight confirmed all four PDA evidence tables absent, migration079 recorded with Linux slash style, and migration083 unrecorded. Render backend currently auto-deploys after checks and runs the migration predeploy command. No production merge, migration, deploy, flag, account/PIN/device, CORS or stock-source change was performed. The existing `docs/SCPDA_COUNT_PILOT_001.md` activation boundary reserves separate explicit approval for migration083 + reviewed backend deployment + `FEATURE_SCPDA_COUNTS_001=true` + reviewed admin deployment with `VITE_FEATURE_SCPDA_LOTS_001=true`. This Android request does not require browser admission/CORS flags or new invitations. Official Ada stock adjustment remains outside this collection path.
+
+PDA counts are primary physical observations at their count time; an intake receipt is distinct from review, complete-product baseline, common-unit proof and complete movement coverage for adopting any current stock balance. Existing pending local counts stay local until an explicit send by the same operator; enabling the server alone will not silently upload historical local-only records. Fresh login negotiates count access when the server is approved and enabled.
+
+APK SHA-256 `509183e7c15570ac958233792e3e056ed9de13a41044cd1e91c17e69d43b8290`, 3,023,685 bytes. Delivered APK/ZIP/instructions to the verified Google Drive destination; see [delivery location](../DELIVERY_LOCATION.md). Original executor evidence: `/workspace/artifacts/scpda-unit-pastel-2026-11-15/`. Only owned fixture API/Vite and task-labelled PostgreSQL were stopped; fixture data retained, unrelated listeners untouched.
+
+Read the Preorder owner's new admission/physical-HQ-receipt proposal at canonical `8206214` (draft PR61, migration080). This records receipt of the proposal, not mobile API/auth acceptance. Preorder owner files and implementation were preserved. R5 has no mobile preorder feature.
+
+Next: obtain the specifically reserved production count-activation approval, then re-fetch/recheck pending migration/peer changes before any activation. Retain the existing three reader identities and keys. Physical R5 phone acceptance and a genuine branch001 server receipt remain pending.
