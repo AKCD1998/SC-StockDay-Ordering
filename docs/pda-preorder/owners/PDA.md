@@ -4,6 +4,8 @@
 
 User-requested Preorder coordination clarification: [source map and continuation guide](../PDA_SOURCE_AND_CONTINUATION.md) now identifies the remotely verified R11 Git source, WebView/native entrypoints, build/tests and the mobile adapter work to coordinate. User-authorized notices on PR100/61 were posted and read back; recipient acknowledgment remains unconfirmed. [Coordination event and comment links](../events/2026-11-15-pda-source-handoff-clarification.md). Mobile ownership and production state are unchanged by this documentation/notification work.
 
+User's latest correction explicitly asks this PDA workstream to continue mobile integration; the older “split request itself does not ask this chat to begin” sentence below is superseded. Source is verified in Git at `codex/pda-count-send-r11` / `1d2c29569fd72435fd58315bdb1bca7f225040eb`; the Drive ZIP is delivery-only. Current source/auth and exact adapter gap are recorded in [the mobile auth review event](../events/2026-11-15-pda-mobile-preorder-auth-review.md).
+
 - Owner: existing SCPDA smartphone/PDA chat.
 - Status: **ACTIVE_RETAINED**.
 - Actual current-thread ID: not exposed/verified here; do not substitute an attachment/source-relay ID.
@@ -16,7 +18,7 @@ Last relevant delivery: user paused label OCR. Same private PDA Site last record
 
 Mobile preorder UI/transport is still to integrate against an accepted domain/auth contract. Existing source/fixtures and earlier isolated count tests are reusable evidence with their own scopes, not a new production multi-phone proof. Keep Full Sync/unknown observation time, identity/unit rules and official-stock-write boundaries.
 
-Next mobile action: read the preorder owner's actual admission and current contract before implementing mobile preorder transport. The split request itself does not ask this chat to begin another mobile feature immediately.
+Next mobile action: implement the client against a reviewed mobile identity/capability contract. Do not use the branch-001 reader or count token for preorder mutations. A mobile enrollment-token path exists, but no mobile adapter to `/api/customer-preorders` or branch-scoped SCCRM member lookup/creation is currently implemented; the API-side mapping must be confirmed before the app sends real preorder calls. Continue the app UI/build work that does not assume an unimplemented endpoint.
 
 ## 15 November — Android trial readiness and peer admission receipt
 
