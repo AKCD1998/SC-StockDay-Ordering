@@ -38,8 +38,9 @@ The current task is this verified destination chat. Separate review checkouts ar
 | Latest APK in Drive | [SCPDA 0.4.1-test.5](https://drive.google.com/file/d/1advJ-GvP1L7cRXU5FdB_G1UBVktsq2fp/view?usp=drivesdk), 15 Nov; includes count-send path behind production activation gate, no Preorder or bottom tabs |
 | Mobile integration request | User confirmed two bottom tabs, `นับสต๊อก` and `พรีออเดอร์`, and asked to include the feature in the next app update; design handoff in [MOBILE_PREORDER_TAB_HANDOFF.md](MOBILE_PREORDER_TAB_HANDOFF.md) and [event 005](events/2026-11-15-005-mobile-preorder-tab-request.md) |
 | Customer lookup/sync request | User specified phone-first member lookup, single/multiple/no-match behavior, double-confirm for new members and SCCRM → ADA → all-branch SCPDA sync; detailed in [event 006](events/2026-11-15-006-mobile-member-lookup-sync.md); CRM/mobile integration not implemented |
-| Request-mode separation | User specified a create-form switch for separate Preorder vs internal price-inquiry categories, queues, lifecycle and colors; price inquiry has no customer quote/decision or CEO price-entry step; detailed in [event 007](events/2026-11-15-007-preorder-vs-price-inquiry.md) |
+| Request-mode correction | User corrected the paths: Preorder skips `ตอบราคา`; price inquiry ends if declined and continues to status/receipt/allocation if accepted; [event 009](events/2026-11-15-009-corrected-mode-flow-and-cancel.md) supersedes event 007's flow interpretation |
 | Thai labels/member simulation | User requested UI label `พรีออเดอร์`, an existing-member fixture and a no-match/new-member simulation, and removed explanatory member-success copy; detailed in [event 008](events/2026-11-15-008-thai-label-member-simulation.md) |
+| Request cancellation interaction | User requested swipe-right row action, password check, confirmation and required cancellation reason; simulation only, no production cancellation API; detailed in [event 009](events/2026-11-15-009-corrected-mode-flow-and-cancel.md) |
 | Current-recorded private PDA browser preview | `https://sc-stockday-pda-lab.scgroup1989-it.chatgpt.site/`, last published Site v14; manual fields/scanner tested on 13 Nov; synthetic browser-local counts, not a live preorder integration |
 | Preorder preparation | `codex/preorder-three-role-readiness`, updated to `7b7c1f63e25b33e7c7b2b3c31e3e3721869a2183` |
 | Web review | [Draft PR #100](https://github.com/AKCD1998/SC-StockDay-Ordering/pull/100); open/draft, head `7b7c1f63e25b33e7c7b2b3c31e3e3721869a2183`, base `d6017807eaed1815f871c95d74db21929d123fad`; not merged or deployed |
@@ -60,7 +61,9 @@ User-confirmed mobile UX direction: add bottom tabs **นับสต๊อก**
 
 User-confirmed request-form detail: phone first with orange **เช็คสมาชิก**, read-only name on match, popup selection for shared numbers, create-new confirmation on no match, and a second confirmation before creating a member. The requested propagation is SCCRM → ADA Software → SCCRM/ADA/SCPDA on all branch phones. The updated phone prototype is local-only; CRM APIs and sync acknowledgements remain pending.
 
-User also specified a per-request switch for **Preorder** versus **สอบถามราคา**, persisted as separate request categories that route to distinct queues and lifecycles. Price inquiry stays internal and has no quote-to-customer or customer decision step; the prototype uses a distinct blue accent for it and hides purchasing receipt flow.
+User specified a per-request switch between **พรีออเดอร์** and **สอบถามราคา** with distinct queues, lifecycle and colors. The corrected Preorder path has six stages and goes from status to actual receipt/allocation without `ตอบราคา`. Price inquiry has six initial stages ending at `ตอบราคา`; decline closes it, acceptance adds status tracking and actual receipt/allocation. This correction supersedes event 007's earlier flow interpretation.
+
+The request list should reveal a red **ยกเลิกคำสั่งซื้อ** action when swiped right. The user confirmed password check, a second cancellation confirmation and a required reason after confirmation. Only the local mock simulates this; the production server/API and secure authorization/audit handling are not implemented.
 
 **Pending before enabling the new flow:**
 

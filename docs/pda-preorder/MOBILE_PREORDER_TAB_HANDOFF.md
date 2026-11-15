@@ -38,21 +38,26 @@ On the branch request form, show **เบอร์ติดต่อ** first and
 
 The requested propagation path starts with SCCRM member creation, delivery to ADA Software, then synchronized member data in SCCRM, ADA Software and SCPDA on every branch phone. Show the member ID and each system's acknowledged sync state; do not claim all devices are current until their sync acknowledgements arrive. The mobile lookup/create endpoint, SCCRM-to-ADA field/identity contract, duplicate handling, durable retries and registered-device auth are still pending. The local mockup shows the supplied matching-member example and a no-match/new-member path; it does not query or write CRM data.
 
-### Per-request mode: พรีออเดอร์ or price inquiry (user-confirmed UX, 15 November)
+### Per-request mode: พรีออเดอร์ or สอบถามราคา (corrected flow, user-confirmed 15 November)
 
 Place a switch in the create-request heading row so a staff member can choose **พรีออเดอร์** or **สอบถามราคา** before submitting. Persist this as the request's category in the server record and route it to the matching queue and state transitions; changing the screen color alone is not sufficient. Use stable, distinct page accents and show the category in the request list, detail and review so the type is recognizable at a glance. Once created, keep the selected category with the request and derive its later screens from that stored value.
 
-- **พรีออเดอร์:** retains the customer-facing quote and exact-version customer decision steps; an accepted request can continue through purchase/fulfillment.
-- **สอบถามราคา:** routes to an internal price inquiry queue and returns its result to staff. Do not send a quotation to the customer, add customer accept/reject steps, or require the CEO to key in a price to ask whether the customer wants to buy. This category is for asking/checking price before an order.
+- **พรีออเดอร์:** six stages: รายการคำขอ → สร้างคำขอ → เพิ่มสินค้า → ตรวจและส่ง → ติดตามสถานะ → รับจริงและจัดสรร. It does not include a `ตอบราคา` stage.
+- **สอบถามราคา:** first six stages: รายการคำขอ → สร้างคำขอ → เพิ่มสินค้า → ตรวจและส่ง → ติดตามสถานะ → ตอบราคา. If the customer does not want it, close the request there. If the customer wants it, continue with two conditional stages: ติดตามสถานะ → รับจริงและจัดสรร. Keep this path linked to the original inquiry request.
+- Renumber visible stages for each path so Preorder still ends at step 6; after an accepted price inquiry, show all 8 stages. Use the selected category to drive the list, queue, lifecycle and page accent.
 
-The switch, accent changes, review label and mode-specific flow are represented in the local preview. The accepted request type enum/field, authorization, separate queue routing and API lifecycle still need implementation. Do not silently convert a price inquiry into a Preorder; require an explicit later action if that product transition is needed.
+The switch, accent changes, review label, conditional stages and accept/end choice are represented in the local preview. The accepted request type enum/field, authorization, separate queue routing and API lifecycle still need implementation. Do not silently convert a price inquiry into a Preorder; require an explicit later action if that product transition is needed.
+
+### Cancel from the request list (user-confirmed UX, 15 November)
+
+Swipe a request row to the right to reveal the red **ยกเลิกคำสั่งซื้อ** action. Pressing it opens a password prompt; a wrong password blocks progress. A correct password closes that prompt and opens **ต้องการยกเลิกคำสั่งซื้อ?** with **ไม่ยกเลิก** and **ยืนยันยกเลิก**. Choosing **ไม่ยกเลิก** returns to the ordinary list with the request unchanged. Choosing **ยืนยันยกเลิก** opens a required reason field; do not allow confirmation without a reason. The local preview uses a test-only password and updates only its sample row. Production must validate authorization securely and record the cancellation reason and audit details in the server request; the prototype is not a security or cancellation API.
 
 ## Role-aware พรีออเดอร์ content
 
 | Server profile | พรีออเดอร์ tab content |
 |---|---|
-| Branch | Create a customer request, review its returned request ID, see branch-scoped requests, provide missing information, record a decision against an exact quote version, and follow the case timeline. |
-| HQ fulfillment | See ordered cases, record an actual physical HQ count separately from the imported receipt document, and allocate only verified remaining quantity. Add dispatch actions only after separate dispatch events are implemented. |
+| Branch | Create a request, review its returned request ID, see branch-scoped requests, provide missing information, and follow the timeline. For price inquiry, record the customer's choice after `ตอบราคา`; continue to fulfillment only after acceptance. |
+| HQ fulfillment | See accepted/order cases, record an actual physical HQ count separately from the imported receipt document, and allocate only verified remaining quantity. Add dispatch actions only after separate dispatch events are implemented. |
 | Purchasing / CEO | Keep detailed quote, price and purchase work primarily in the existing web queue; mobile may show a read-only summary/next actions if requested by product design. |
 
 No role can mark customer handover merely because an item was scanned, counted locally or received at HQ. Use the same server-issued case/item IDs on mobile and web.
@@ -65,4 +70,4 @@ No role can mark customer handover merely because an item was scanned, counted l
 4. The current backend proposal does not implement dispatch/transfer, branch physical receipt, customer handover or the full multi-shipment/partial-quantity lifecycle. Keep those actions hidden until their separate APIs and events exist.
 5. Test the bottom bar with Android back navigation, keyboard, scan overlay and system safe area; changing tabs must not clear a count or preorder draft.
 
-The user's navigation request is recorded in [event 005](events/2026-11-15-005-mobile-preorder-tab-request.md), member-lookup and cross-system sync in [event 006](events/2026-11-15-006-mobile-member-lookup-sync.md), request-mode separation in [event 007](events/2026-11-15-007-preorder-vs-price-inquiry.md), and Thai-label/mock-simulation refinement in [event 008](events/2026-11-15-008-thai-label-member-simulation.md). Direct cross-thread messaging is unavailable; the PDA owner should read this handoff in the common ledger. This records the user's request, not the PDA owner's implementation acknowledgment.
+The user's navigation request is recorded in [event 005](events/2026-11-15-005-mobile-preorder-tab-request.md), member-lookup and cross-system sync in [event 006](events/2026-11-15-006-mobile-member-lookup-sync.md), initial mode request in [event 007](events/2026-11-15-007-preorder-vs-price-inquiry.md), Thai-label/mock-simulation refinement in [event 008](events/2026-11-15-008-thai-label-member-simulation.md), and the corrected mode paths and cancel interaction in [event 009](events/2026-11-15-009-corrected-mode-flow-and-cancel.md). Event 009 supersedes event 007's flow interpretation. Direct cross-thread messaging is unavailable; the PDA owner should read this handoff in the common ledger. This records the user's request, not the PDA owner's implementation acknowledgment.
