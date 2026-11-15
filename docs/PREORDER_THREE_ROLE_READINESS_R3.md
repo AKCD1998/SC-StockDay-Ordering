@@ -47,15 +47,17 @@ All quantities retain verified product identity and the exact unit. Never assume
 Source inspected read-only:
 
 - Web `AKCD1998/SC-StockDay-Ordering`, fresh `origin/main` at `d6017807eaed1815f871c95d74db21929d123fad` on 15 November. Existing `preorders/` components and the existing top navigation/themes are reused.
-- Available backend checkout at `40ef239a43b7ba2104376aad296242b062ba28d1`: `routes/customer-preorders.js`, `services/preorderWorkflow.js`, receipt/transfer evidence services and `auth/middleware.js`. This is local source evidence, not a 15 November production runtime assertion.
+- Backend `AKCD1998/PaaSRTSM-project` main at `46985c97491529311ccaa4366ab5905b2c4759fc`: `routes/customer-preorders.js`, `services/preorderWorkflow.js`, receipt/transfer evidence services and `auth/middleware.js`. This is repository source evidence, not a 15 November production runtime assertion.
 - Existing routes provide quotes, customer decisions, mark-ordered, case-level arrival/notification/completion, receipt links, transfer links and ETA. The inspected services use admin/staff checks. Dedicated Boom privileges, per-shipment physical receipt/handover events, partial-fulfillment counters and mobile auth admission for this domain are not verified as available live.
 
-This branch prepares the **real web code**, without deploying it:
+The review branches prepare the **real web and API code**, without deploying it:
 
 - New `VITE_FEATURE_PREORDER_ROLE_WORKSPACE=false` flag. With it off, the current PreorderPanel/API behavior remains; the proposed endpoint is never called.
 - With it on, `PreorderRoleWorkspace` first requires the proposed authenticated server `GET /api/customer-preorders/workspace` manifest. Unknown/missing versions, wrong subject, wrong branch and missing read permission fail closed; the UI does not fall back to legacy administrator mode.
-- Role-aware central/branch queues, action admission, internal-note visibility, SKU matching, receipt/transfer evidence editing and ETA controls. Logistics access is not represented by setting `isAdmin=true`. CEO purchasing and HQ logistics use separate capability allowlists. Branch confirmation is not granted to CEO merely because they are an administrator in the new workspace.
+- Role-aware central/branch queues, action admission, internal-note visibility, purchasing SKU matching, receipt controls and ETA controls. Logistics access is not represented by setting `isAdmin=true`. CEO purchasing and HQ fulfillment use separate capability allowlists. The role workspace does not expose transfer editing or grant branch receipt/handover actions yet.
 - The new role profile is not selected by a URL/local storage, a client username allowlist or the role selector in a mockup. The server must provision it through an accepted policy.
+- Backend review branch `AKCD1998/PaaSRTSM-project:codex/preorder-hq-physical-receipt` adds fail-closed server profiles, capability checks, fulfillment-safe case fields, and a separate append-only physical HQ receipt count/correction endpoint. The proposal migration is `080_add_preorder_hq_physical_receipts.sql`; it has not been applied.
+- The web receipt panel records an explicit physical count before fulfillment can allocate the linked receipt. Retries retain an idempotency key across a page reopen. The fulfillment capability set does not expose transfer linking or branch/customer actions yet.
 
 ## Proposed workspace API contract — not deployed
 
@@ -73,7 +75,9 @@ The route must be authenticated and derive subject, business role, branch and ca
 
 Proposed purchasing capabilities: `cases.read.all`, `commercial.review`, `commercial.quote`, `commercial.order`, `commercial.unavailable`, `commercial.reopen`, `catalog.match`, `messages.send`, `messages.internal`.
 
-Proposed HQ-document capabilities: `cases.read.all`, `receipts.link`, `transfers.link`, `eta.override`, `messages.send`. These expose existing evidence UI after server support; they **do not** assert physical HQ receipt or dispatch counts. The separate physical-event API/quantity model is still required.
+Prepared fulfillment capabilities: `cases.read.all`, `receipts.link`, `receipts.physical.record`, `eta.override`. The physical receipt endpoint separates counted quantity from imported document quantity, records observed time and actor, requires a reason for corrections or a count above the document, checks exact product/unit, and rejects reductions below existing allocations. Transfer/dispatch and branch receipt capabilities remain unimplemented.
+
+Prepared branch capabilities in this patch: `cases.read.branch`, `cases.create`, `customer.decision`, `customer.info`, `messages.send`. Actual branch receipt, customer contact confirmation, handover and completion need separate quantity events and are not exposed yet. The broader target role design below is not all implemented.
 
 Proposed branch capabilities: `cases.read.branch`, `cases.create`, `customer.decision`, `customer.info`, `branch.arrival`, `customer.notify`, `customer.complete`, `cases.cancel`, `messages.send`. Existing case-level actions must not be advertised for partial lines until the server enforces the new quantity/disposition rules.
 
@@ -81,8 +85,8 @@ The mobile app must use an approved mobile-auth adapter into this same service. 
 
 ## Gates before enabling the new workspace
 
-1. Accept/provision the server business-role policy and manifest contract; authorize every exposed action and filter response fields on the server. This branch makes no account, permission or environment changes.
-2. Implement/review the separate physical quantity events and multi-shipment persistence, constraints, receipt/idempotency/version semantics and migration plan. No migration is created or applied here.
+1. Accept/provision the server business-role policy and manifest contract; authorize every exposed action and filter response fields on the server. These branches make no account, permission or environment changes.
+2. Review the prepared physical receipt event schema, quantity constraints, idempotency/version semantics and migration plan. The migration is present for review only and has not been applied. Multi-shipment persistence remains pending.
 3. Verify app authentication, branch/product/unit identity, private photo upload, offline retries and round trips on an approved reachable staging service. Source/mockup/component tests do not prove live compatibility.
 4. Review the concrete web/API changes and approve rollout. Keep the new flag off until these gates pass. The existing Render frontend auto-deploy behavior makes merging a release action; no merge/push to main is part of this work.
 
@@ -90,4 +94,4 @@ The mobile app must use an approved mobile-auth adapter into this same service. 
 
 `/workspace/artifacts/sc-preorder-roles-r3-2026-11-15/` contains the corrected young-CEO workflow poster and an interactive, in-memory three-role example built from the existing StockDay header/navigation/CSS. Its role buttons are for reviewing the proposal, not logging into real accounts. It demonstrates partial supply in two rounds, quantity guards and the same request staying open; it does not execute backend auth or Ada/POS operations.
 
-The real website changes are in `/workspace/reviews/sc-preorder-roles-r3-admin/`, branch `codex/preorder-three-role-readiness`. Build/test evidence and the exact patch/commit are included in the delivery package. Existing PDA theme/barcode/manual lot-date controls and the paused label OCR are not modified.
+The website changes are on branch `codex/preorder-three-role-readiness` (draft PR #100); API and migration changes are on the separate backend branch named above. Tests were not run for this continuation. Existing PDA theme/barcode/manual lot-date controls and the paused label OCR are not modified.

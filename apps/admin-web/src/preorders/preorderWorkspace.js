@@ -1,8 +1,8 @@
 // Proposed R3 server contract. This is UI admission, never backend authorization.
-// The separate build flag stays off until the server implements/provisions it.
+// The separate build flag stays off until the server policy is provisioned and reviewed.
 const PURCHASE=['cases.read.all','commercial.review','commercial.quote','commercial.order','commercial.unavailable','commercial.reopen','catalog.match','messages.send','messages.internal'];
-const FULFILLMENT=['cases.read.all','receipts.link','transfers.link','eta.override','messages.send'];
-const BRANCH=['cases.read.branch','cases.create','customer.decision','customer.info','branch.arrival','customer.notify','customer.complete','cases.cancel','messages.send'];
+const FULFILLMENT=['cases.read.all','receipts.link','receipts.physical.record','eta.override'];
+const BRANCH=['cases.read.branch','cases.create','customer.decision','customer.info','messages.send'];
 const ALLOWED={purchasing:PURCHASE,fulfillment:FULFILLMENT,branch:BRANCH};
 export const WORKSPACE_CONTRACT='sc-preorder-three-role-r3-v1';
 export function admitWorkspace(data,{userId,isAdmin,branchCode}={}){
