@@ -7,7 +7,19 @@ User instruction, 15 November 2026: place completed PDA app deliveries in Google
 - Verified parent: เภสัชอู๋, ID `1usItMowEj6llCqWYjdpMAkswB5bubGkD`.
 - Parent was found by exact name; the child was created under that verified parent. Existing sharing was preserved.
 
-## Current delivery — R8
+## Current delivery — R9
+
+| File | Bytes | Drive link |
+| --- | ---: | --- |
+| SCPDA-0.5.1-test.9.apk | 2995013 | [APK](https://drive.google.com/file/d/1G32jeACScvq_v2frMB7bvykuY8EKbFWu/view?usp=drivesdk) |
+| SCPDA-0.5.1-test.9-Android-001.zip | 3516703 | [Installation package](https://drive.google.com/file/d/1Ssk9digNlOgQxNy-H4819Uor1cCP9eW-/view?usp=drivesdk) |
+| START-HERE-SCPDA-0.5.1-test.9.txt | 4705 | [Instructions](https://drive.google.com/file/d/1nDT-gqGGxvCH1a_PKOg4UlJTE_bPQKAf/view?usp=drivesdk) |
+| SCPDA-0.5.1-test.9-Price-Preview.png | 44380 | [Main-screen fixture preview](https://drive.google.com/file/d/19k81IbuiQXdGnj5_TgUqGzuV7IbUV2kI/view?usp=drivesdk) |
+| SCPDA-0.5.1-test.9-Stock-Info.png | 72871 | [Information-popup fixture preview](https://drive.google.com/file/d/1jWcgt53kveXub8UOon-5pC0tOo0b0Dfj/view?usp=drivesdk) |
+
+Same package/signing key. SKU label and enlarged stock with an orange metadata popup. Active price view refreshes on popup open, every60seconds and foreground return; background reads pause. Actual source/read times remain distinct and failure is explicit. Full Sync and pending production count/mobile Preorder boundaries are unchanged. All five uploads verified by exact names/sizes/parent IDs; remote checksums unavailable. No credentials or sharing changes. Receipt: `/workspace/artifacts/scpda-price-info-2026-11-15/GOOGLE-DRIVE-DELIVERY.json`. ZIP contains an iOS icon asset, not an iOS app build.
+
+## Earlier delivery — R8
 
 | File | Bytes | Drive link |
 | --- | ---: | --- |

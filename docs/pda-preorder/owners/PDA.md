@@ -3,9 +3,9 @@
 - Owner: existing SCPDA smartphone/PDA chat.
 - Status: **ACTIVE_RETAINED**.
 - Actual current-thread ID: not exposed/verified here; do not substitute an attachment/source-relay ID.
-- Current R8 engineering checkout on original executor: `/workspace/reviews/scpda-price-check-r8`; original checkout `/workspace/SC-StockDay-Ordering` and its dirty documentation are preserved.
-- Current delivery branch: `codex/pda-price-check-r8` (existing project, isolated continuation).
-- Last app-code SHA: `537e0fdc25438c128734a1825dd10bb7960e6b8e` (R8); R7 base `6ef9f632a04463ddf0bbe69a54efa12aacbf9a11`.
+- Current R9 engineering checkout on original executor: `/workspace/reviews/scpda-price-info-r9`; original checkout `/workspace/SC-StockDay-Ordering` and its dirty documentation are preserved.
+- Current delivery branch: `codex/pda-price-info-r9` (existing project, isolated continuation).
+- Last app-code SHA: `6cd7d160fa928c9c98ce0b696387885b214f7769` (R9); R8 base `537e0fdc25438c128734a1825dd10bb7960e6b8e`.
 - Existing two unrelated dirty documentation files were preserved; this split did not stage or overwrite them.
 
 Last relevant delivery: user paused label OCR. Same private PDA Site last recorded v14 has manual lot/manufacture/expiry/quantity entry and barcode camera; manual save/reopen and scanner close were checked in a browser. Counts there are synthetic/browser-local. APK was not rebuilt by that change. This ledger update does not reverify today's hosted or physical-device state.
@@ -104,3 +104,16 @@ Source `537e0fdc25438c128734a1825dd10bb7960e6b8e`; APK SHA-256 `498ad7a436df7b75
 
 The existing production count-activation approval remains pending. No backend/admin deploy, migration083, flag/device/account/CORS, Ada, CRM or current-stock-source change occurred. The read API still selects Full Sync only; adapting it to reviewed complete/unit-compatible PDA baselines with movement coverage is future server work, not enabled by the tab or an intake receipt. Next: physical R8 phone trial and separately accepted source-selection/mobile-preorder contracts.
 The example search chips must stay on one horizontal row; the two adjacent actions have equal heights. Use one heading for the pending and added products. Each selected row has a trash-can button, and one request can include multiple products. See [event 012](../events/2026-11-15-012-multiple-request-items-and-selection-cleanup.md); the local mock supports adding and deleting multiple lines.
+
+
+## 15 November — R9 annotated price-screen refinements
+
+The user sent two comments from the R8 annotation board: label company identity **รหัส SKU**, enlarge stock and move branch/sync/routine details behind a small orange **i** immediately after **จำนวนตาม StockDay**, keeping that hidden information updated. Delivered **0.5.1-test.9**, same package/key, 56px quantity and44px info touch target. Exact IC/630 identity remains unchanged. Metadata is removed from the main card; the popup also carries actual last-successful read time and source/unit references.
+
+The active/foreground price view reads the existing authorized catalog/stock paths every60seconds, on opening i and on foreground return. Requests coalesce; background, replaced products, navigation/logout invalidate late data and errors. Failed refreshes preserve the last response/time and explicitly report failure in the popup. Reads never create a new source sync timestamp; the approximate08:30 routine is user-reported and not a live scheduler contract. Full Sync remains the source; no local count or receipt overrides it.
+
+Validation:37 model/reader/recent/refresh tests;9 exact-APK price/navigation checks including controlled-clock minute refresh, popup updates, background/resume and in-flight tab isolation;10 exact-APK recent-list regressions. UI uses synthetic native reads and real IndexedDB; Java resume hook compiled, physical Android/Keystore/WebView/camera and fresh production login remain separate pending evidence. Signature/alignment/archive passed; icon resource unchanged from R8 with radius0.24349.
+
+Source `6cd7d160fa928c9c98ce0b696387885b214f7769`; APK SHA-256 `bae3b676407c9430e2f2dc88d99d223babd201c26f262de3817d1f2c7254c405`,2,995,013bytes. Uploaded APK/ZIP/instructions/main and info screenshots to the same [Drive destination](../DELIVERY_LOCATION.md), all five names/sizes/parents verified. Evidence `/workspace/artifacts/scpda-price-info-2026-11-15/`. No credentials/setup/key/sharing changes.
+
+Read peer events012–013 through canonical `7c81960`: multi-item requests and saved-ADA-receipt/CEO-mapping/FIFO-allocation direction acknowledged and retained as queued domain/mobile integration, not accepted APIs or R9 implementation. No direct chat message, takeover, backend/admin deploy, migration/flag/account/device/CORS, Ada/CRM write or stock-source activation. Existing explicit production count-activation approval remains pending. Next: physical R9 phone acceptance and separately accepted server contracts.

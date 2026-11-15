@@ -2,9 +2,9 @@
 
 **Status:** user-requested for the next SCPDA app update. The navigation direction is confirmed; mobile API/auth and the wider preorder lifecycle are not yet accepted or released.
 
-## Current app baseline — PDA-owner R8 acknowledgment
+## Current app baseline — PDA-owner R9 acknowledgment
 
-- Current delivered build: [SCPDA 0.5.0-test.8.apk](https://drive.google.com/file/d/1igAC7S_aCmR7od_829EMimedASZYaV1p/view?usp=drivesdk), 15 November 2026. PDA source `codex/pda-price-check-r8`, `537e0fdc25438c128734a1825dd10bb7960e6b8e`.
+- Current delivered build: [SCPDA 0.5.1-test.9.apk](https://drive.google.com/file/d/1G32jeACScvq_v2frMB7bvykuY8EKbFWu/view?usp=drivesdk), 15 November 2026. PDA source `codex/pda-price-info-r9`, `6cd7d160fa928c9c98ce0b696387885b214f7769`.
 - Three bottom tabs now exist. Count and catalog price-check screens use the existing reader; Preorder is an honest pending panel until the mobile auth/domain adapter is accepted. No mock customer cases or role picker are shipped.
 - The prior 0.4.1-test.5 baseline had no bottom tabs. Count submission remains subject to the existing separate production activation boundary. Preserve on-device counts, enrollment, source/time semantics and preorder isolation.
 
@@ -20,7 +20,7 @@ The latest user request adds **เช็คราคา** as a third persistent 
 └─────────────┴──────────────┴─────────────┘
 ```
 
-- **เช็คราคา:** existing catalog IC/630 identity, full Thai name, recorded unit prices and current reader stock/time. It creates no customer inquiry and remains distinct from the request mode **สอบถามราคา**. R8 still reads Full Sync; reviewed PDA current-balance selection needs a separate server contract.
+- **เช็คราคา:** existing catalog IC/630 identity, full Thai name, recorded unit prices and current reader stock/time. It creates no customer inquiry and remains distinct from the request mode **สอบถามราคา**. R9 still reads Full Sync; reviewed PDA current-balance selection needs a separate server contract.
 - **นับสต๊อก:** retain the current scanner, product lookup, count entry and count history.
 - **พรีออเดอร์:** provide the user's preorder inbox, request creation, status and next action. Keep its local draft, server request ID and timeline separate from count drafts/receipts.
 - Keep account/settings in the current header control. Keep the scanner as the first/default tab for the current branch-reader use case. Show independent pending badges on each tab.

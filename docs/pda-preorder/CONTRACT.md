@@ -30,6 +30,10 @@ The user wants Preorder inside the same SCPDA Android app, reached through a sep
 
 This is a confirmed navigation direction only. It does not accept mobile API authentication, role provisioning, server schema, offline guarantees or production activation. Role-specific screens must derive from authenticated server capabilities rather than a local role switch.
 
+## Confirmed catalog stock presentation — R9
+
+The company IC/630 display is labeled **รหัส SKU**; the identifier is not replaced by internal numeric `sku_id`. Show a large quantity and orange information action after **จำนวนตาม StockDay**. Branch/source/actual sync time/approximate morning routine move into that popup. R9 refreshes existing reads on popup open, every60seconds while active/foreground and on foreground return; failed reads retain last-successful values/times with explicit popup failure. A read is not a new source sync or physical observation, and the approximate08:30 routine is user-provided rather than a scheduler API. No stock-source selection contract changes.
+
 ## Confirmed count-entry refinements — 15 November 2026
 
 - Use the leading product-name category token เภสัช / สามัญ / ปกติ as a default; unknown prefixes require explicit selection. Preserve previously selected draft/correction context. This is UI convenience, not server authorization or an inventory override.

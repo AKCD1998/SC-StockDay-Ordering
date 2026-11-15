@@ -34,8 +34,8 @@ The current task is this verified destination chat. Separate review checkouts ar
 | Item | Evidence / state |
 |---|---|
 | Web main checked 15 Nov | `d6017807eaed1815f871c95d74db21929d123fad` |
-| PDA branch source | Current R8 `codex/pda-price-check-r8`, `537e0fdc25438c128734a1825dd10bb7960e6b8e`; [PDA owner checkpoint](owners/PDA.md) |
-| Latest APK in Drive | [SCPDA 0.5.0-test.8](https://drive.google.com/file/d/1igAC7S_aCmR7od_829EMimedASZYaV1p/view?usp=drivesdk), 15 Nov; three-tab shell, working catalog price check, Preorder pending its mobile adapter; count activation remains pending |
+| PDA branch source | Current R9 `codex/pda-price-info-r9`, `6cd7d160fa928c9c98ce0b696387885b214f7769`; [PDA owner checkpoint](owners/PDA.md) |
+| Latest APK in Drive | [SCPDA 0.5.1-test.9](https://drive.google.com/file/d/1G32jeACScvq_v2frMB7bvykuY8EKbFWu/view?usp=drivesdk), 15 Nov; SKU label, large stock, orange metadata popup and active-view refresh. Three tabs retained; mobile Preorder and production count activation remain pending |
 | Mobile integration request | Latest direction: `นับสต๊อก / พรีออเดอร์ / เช็คราคา`; catalog price check is separate from customer price inquiry. R8 shell/price reads implemented; real mobile Preorder remains pending. [R8 event](events/2026-11-15-pda-r8-price-check.md) |
 | Customer lookup/sync request | User specified phone-first member lookup, single/multiple/no-match behavior, double-confirm for new members and SCCRM → ADA → all-branch SCPDA sync; detailed in [event 006](events/2026-11-15-006-mobile-member-lookup-sync.md); CRM/mobile integration not implemented |
 | Request-mode correction | User corrected the paths: Preorder skips `ตอบราคา`; price inquiry ends if declined and continues to status/receipt/allocation if accepted; [event 009](events/2026-11-15-009-corrected-mode-flow-and-cancel.md) supersedes event 007's flow interpretation |
