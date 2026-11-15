@@ -1,0 +1,13 @@
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=p=>p.amount===null?'ยังไม่มีราคา':new Intl.NumberFormat('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}).format(p.amount)+' '+(p.currency==='THB'?'บาท':p.currency);
+const when=v=>v&&Number.isFinite(Date.parse(v))?new Date(v).toLocaleString('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'ไม่ระบุ';
+export function priceCheckModel(product){
+ const prices=product.prices||[],unit=product.stock?.displayUnit;
+ // Match the known Ada unit label, never choose a single price by amount/order.
+ const single=unit?prices.find(p=>p.unit===unit)||null:null;
+ return {single,other:prices.filter(p=>p!==single),quantity:product.stock?.quantity??null,source:'stockday-full-sync-web-view',syncAt:product.stock?.websiteTableSyncedAt||null};
+}
+export function priceCheckHtml(product){
+ const m=priceCheckModel(product),priceRow=p=>`<div class="scpda-price-unit"><span>${esc(p.unit||'หน่วยไม่ระบุ')}</span><strong>${esc(money(p))}</strong></div>`;
+ return `<button type="button" class="scpda-back" id="priceCheckBack">← ค้นหาสินค้า</button><p class="scpda-price-code">รหัส IC / 630 <strong>${esc(product.productCode)}</strong></p><h2 class="scpda-price-name">${esc(product.name)}</h2><section class="scpda-price-section scpda-price-single"><h3>${m.single?'ซื้อเดี่ยว':'ราคาขายตามหน่วย'}</h3>${m.single?priceRow(m.single):m.other.length?m.other.map(priceRow).join(''): '<p class="subtle">ยังไม่มีข้อมูลราคา</p>'}</section>${m.single&&m.other.length?`<section class="scpda-price-section scpda-price-bundles"><h3>ราคาเป็นชุด / หน่วยอื่น</h3>${m.other.map(priceRow).join('')}</section>`:''}<section class="scpda-price-stock" data-stock-source="${m.source}"><div><h3>จำนวนตาม StockDay</h3><span>สาขา ${esc(product.branchCode||'001')} · ยอดซิงก์ระบบ</span></div><strong>${m.quantity===null?'ยังไม่มียอด':esc(new Intl.NumberFormat('th-TH',{maximumFractionDigits:20}).format(m.quantity))}</strong><p>ซิงก์เข้าระบบ: ${esc(when(m.syncAt))}</p><small>รอบปกติประมาณ 08:30 น.</small></section>${product.stock?.zeroMayRepresentMissing?'<p class="scpda-warning">ยอด 0 นี้ยังต้องตรวจข้อมูลเพิ่มเติม</p>':''}<details class="scpda-meta"><summary>ข้อมูลอ้างอิง</summary><p>ราคาตามหน่วยขายที่ StockDay บันทึกไว้<br>ชื่อหน่วยชุดไม่ได้ระบุเงื่อนไขส่วนลดอัตโนมัติของ POS<br>หน่วยบนเว็บไซต์: ${esc(product.stock?.displayUnit||'ไม่ระบุ')}<br>หน่วยอ้างอิงของยอดและเวลาตรวจสต๊อกจริง: ยังไม่ยืนยัน<br>ตรวจข้อมูลเมื่อ ${esc(when(product.fetchedAt))}</p></details>`;
+}

@@ -2,7 +2,19 @@
 
 This is the Android target of the existing SC StockDay PDA project. It retains the navy/yellow/white identity, manual camera capture, decoder and separate count demo. It does not publish the existing Site.
 
-## Local count capture R3
+## Current Android build — R8
+
+Version `0.5.0-test.8` (code 8) adds authenticated bottom navigation: **นับสต๊อก / พรีออเดอร์ / เช็คราคา**. The price tab reuses the registered-device reader and exact barcode/company-code lookup, including `IC-…` and `630…`. Thai product names wrap in full. It shows the price matching the recorded Ada unit as ซื้อเดี่ยว, then the other stored unit prices without inferring bundle factors, quantity thresholds or POS promotions. Unknown base units stay unclassified. The shared ten-item recent list is still identity-only and re-reads each shortcut.
+
+Stock in this reader remains branch-001 **Full Sync**. Show the returned table-ingestion timestamp, not a physical observation time or an invented daily 08:30 timestamp. The approximate morning routine is the user's stated schedule. Missing/zero/negative/fractional references remain distinct. Local drafts and saved observations never override the reference balance. Reviewed PDA balance selection needs a separate accepted server read contract; it is not enabled by this APK.
+
+Preorder is a visible pending tab until the other workstream supplies an accepted registered-device auth/domain adapter. Catalog **เช็คราคา** is separate from the future customer **สอบถามราคา** workflow. No mock cases, role selector or customer writes are shipped. Tab changes preserve count drafts, close the camera and reject late reads; Android back returns within the app before exiting.
+
+Count upload negotiation from R4 and later is retained, but production collection activation is still pending the existing explicit activation boundary. This build does not activate a migration/flag, deploy a backend or select PDA stock as the current balance. The package, signing certificate, safe-zone icon, local count database and operator identities remain compatible with R7; install over the existing app without clearing data.
+
+Validation: 31 model/reader/recent tests, 7 exact-APK price/navigation checks and 10 recent-list regression checks. Browser UI checks use a synthetic native host and real IndexedDB; they are not fresh authenticated production or physical-phone tests. See [R8 delivery evidence](../../docs/SCPDA_PRICE_CHECK_R8_2026-11-15.md).
+
+## Historical local count capture R3
 
 Version `0.3.0-test.3` uses dedicated SCPDA readers `01001`, `02001`, `03001`, each with a reusable four-digit PIN. These are separate from existing StockDay web/mobile accounts. First activate this installation by selecting the privately supplied device-setup JSON, then choose an operator and enter its PIN. The PIN rotation reminder is six months; it does not change PINs automatically.
 
@@ -25,7 +37,7 @@ python scripts/build-scpda-android.py \
   --signing-dir /absolute/private/scpda-signing
 ```
 
-Retain the private signing directory for installable updates. The same app ID and internal signing certificate are used as R1. Signing files are excluded from source and delivery archives. Result: `SCPDA-0.3.0-test.3.apk`, `APK-IDENTITY.json` and generated build files; Android 8+, target 35. Public-store signing/distribution and iPhone acceptance are separate decisions.
+Retain the private signing directory for installable updates. The same app ID and internal signing certificate are used as R1. Signing files are excluded from source and delivery archives. Result: the versioned APK from AndroidManifest.xml, `APK-IDENTITY.json` and generated build files; Android 8+, target 35. Public-store signing/distribution and iPhone acceptance are separate decisions.
 
 ## Verification boundaries
 
