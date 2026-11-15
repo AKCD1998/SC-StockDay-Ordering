@@ -8,9 +8,9 @@
 - Branch: `codex/preorder-three-role-readiness`.
 - Admission source SHA: `69c78cdae320b202857d2978af4d709e9e859fd9`; web branch latest: `c388247225c32639d69bcd179994d1a080fb66b8`.
 - Base: `d6017807eaed1815f871c95d74db21929d123fad`.
-- [Draft PR #100](https://github.com/AKCD1998/SC-StockDay-Ordering/pull/100): open/draft, head `c388247225c32639d69bcd179994d1a080fb66b8`, base `d6017807eaed1815f871c95d74db21929d123fad`, CI run `43712453471` in progress, not merged/deployed.
+- [Draft PR #100](https://github.com/AKCD1998/SC-StockDay-Ordering/pull/100): open/draft, head `c388247225c32639d69bcd179994d1a080fb66b8`, base `d6017807eaed1815f871c95d74db21929d123fad`, CI run `43712453471` passed, not merged/deployed.
 - Backend main: `46985c97491529311ccaa4366ab5905b2c4759fc`; root `AGENTS.md` read from `/workspace/sc-preorder-backend`.
-- Backend branch `codex/preorder-hq-physical-receipt`: `/workspace/sc-preorder-backend`, latest pushed head `c5a28bf16391f0ae22838c6a7bc31f30d6a49098`; [draft PR #61](https://github.com/AKCD1998/PaaSRTSM-project/pull/61), notification CI run `43712475237` in progress, not merged/deployed. Existing PaaS PR #52 remains PDA-related and outside this workstream.
+- Backend branch `codex/preorder-hq-physical-receipt`: `/workspace/sc-preorder-backend`, latest pushed head `c5a28bf16391f0ae22838c6a7bc31f30d6a49098`; [draft PR #61](https://github.com/AKCD1998/PaaSRTSM-project/pull/61), notification CI run `43712475237` passed, not merged/deployed. Existing PaaS PR #52 remains PDA-related and outside this workstream.
 
 Ready: corrected three-role R3 design, ten-scene young-CEO illustration, shared-request/two-shipment mockup and gated web capability UI. Reuse existing work; do not create a new project, another owner or another PR for the same preparation.
 
