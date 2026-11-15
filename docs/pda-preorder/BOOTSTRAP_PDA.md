@@ -2,7 +2,7 @@
 
 This chat retains ownership of the existing SCPDA smartphone app. Do not transfer the entire project to the preorder chat or create another mobile owner. Read the current common ledger and [Preorder owner status](owners/PREORDER.md) before changing the mobile preorder interface.
 
-Your files and existing work remain in the current PDA branch/worktree. The last app-code checkpoint recorded here is `7018f122e757656ff7e8db9217e96ac427c63753`: label OCR entry is paused; manual lot/date/count fields and barcode scanning remain. Do not assume the static hosted browser preview, installed APK, isolated server demos and production integration are the same runtime.
+Your files and existing work remain in the current PDA branch/worktree. The current delivered R11 app checkpoint is `1d2c29569fd72435fd58315bdb1bca7f225040eb`, branch `codex/pda-count-send-r11`, Android0.6.1-test.11. Label OCR remains paused; manual lot/date/count fields and barcode scanning remain. The user explicitly authorized production count intake for01001/branch001 and the branch001/admin website catalog; these are now live as recorded in [the R11 event](events/2026-11-15-pda-r11-count-activation.md). Physical-phone acceptance remains pending. Do not assume the static hosted browser preview, installed APK, isolated server demos and production integration are the same runtime.
 
 You own the new preorder views inside the smartphone app, device/camera/scanner behavior, mobile transport and offline UI. The preorder chat owns domain rules/web/domain API. Implement against an accepted, verified contract rather than a diagram or a mockup transport. Do not silently change business quantities/states to fit a mobile screen.
 

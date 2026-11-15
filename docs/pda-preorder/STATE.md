@@ -1,6 +1,6 @@
 # Shared checkpoint — 15 November 2026 (Bangkok)
 
-Status: **PREORDER_CHAT_CLAIMED / ISOLATED_REVIEW_DRAFTS_READY**. This file records verified source/artifact checkpoints, not a fresh production-service health check.
+Status: **PDA_COUNT_01001_LIVE / PREORDER_CHAT_CLAIMED / PREORDER_REVIEW_DRAFTS_READY**. The R11 PDA event records a fresh read-only production deployment/config/schema check at 10:29 UTC (17:29 Bangkok); physical-phone acceptance remains pending. Preorder drafts remain isolated and undeployed.
 
 ## Ownership admission
 
@@ -33,9 +33,10 @@ The current task is this verified destination chat. Separate review checkouts ar
 
 | Item | Evidence / state |
 |---|---|
-| Web main checked 15 Nov | `d6017807eaed1815f871c95d74db21929d123fad` |
-| PDA branch source | Current R9 `codex/pda-price-info-r9`, `6cd7d160fa928c9c98ce0b696387885b214f7769`; [PDA owner checkpoint](owners/PDA.md) |
-| Latest APK in Drive | [SCPDA 0.5.1-test.9](https://drive.google.com/file/d/1G32jeACScvq_v2frMB7bvykuY8EKbFWu/view?usp=drivesdk), 15 Nov; SKU label, large stock, orange metadata popup and active-view refresh. Three tabs retained; mobile Preorder and production count activation remain pending |
+| Web main checked 15 Nov | `9ed98328e0ed84beb805446711fc4dcbb2001e0a`, live for the R11 stock-check release |
+| PDA branch source | Current R11 `codex/pda-count-send-r11`, `1d2c29569fd72435fd58315bdb1bca7f225040eb`; [PDA owner checkpoint](owners/PDA.md) |
+| Latest APK in Drive | [SCPDA 0.6.1-test.11](https://drive.google.com/file/d/1mOPGhFTpXWlInv-FmY0ZuQCJwUgKH2_l/view?usp=drivesdk), 15 Nov; alphanumeric password support and authorized01001 count upload. R9 price/refresh/three-tab UI retained; mobile Preorder remains pending |
+| PDA count activation / web stock check | Explicitly authorized in the PDA chat; backend `38d8a4a1a2143276fcf02f9083bdb964fbdc23dd` and web above live. Only01001 can send; existing branch001/admin web accounts can read **ข้อมูลสินค้า → เช็คสินค้า**. Migration083 applied; latest server receipt first, category filters, lot quantities/dates and review status. No official Ada stock adjustment/current-source override. [R11 evidence](events/2026-11-15-pda-r11-count-activation.md) |
 | Mobile integration request | Latest direction: `นับสต๊อก / พรีออเดอร์ / เช็คราคา`; catalog price check is separate from customer price inquiry. R8 shell/price reads implemented; real mobile Preorder remains pending. [R8 event](events/2026-11-15-pda-r8-price-check.md) |
 | Customer lookup/sync request | User specified phone-first member lookup, single/multiple/no-match behavior, double-confirm for new members and SCCRM → ADA → all-branch SCPDA sync; detailed in [event 006](events/2026-11-15-006-mobile-member-lookup-sync.md); CRM/mobile integration not implemented |
 | Request-mode correction | User corrected the paths: Preorder skips `ตอบราคา`; price inquiry ends if declined and continues to status/receipt/allocation if accepted; [event 009](events/2026-11-15-009-corrected-mode-flow-and-cancel.md) supersedes event 007's flow interpretation |
@@ -47,14 +48,14 @@ The current task is this verified destination chat. Separate review checkouts ar
 | Current-recorded private PDA browser preview | `https://sc-stockday-pda-lab.scgroup1989-it.chatgpt.site/`, last published Site v14; manual fields/scanner tested on 13 Nov; synthetic browser-local counts, not a live preorder integration |
 | Preorder preparation | `codex/preorder-three-role-readiness`, updated to `7b7c1f63e25b33e7c7b2b3c31e3e3721869a2183` |
 | Web review | [Draft PR #100](https://github.com/AKCD1998/SC-StockDay-Ordering/pull/100); open/draft, head `7b7c1f63e25b33e7c7b2b3c31e3e3721869a2183`, base `d6017807eaed1815f871c95d74db21929d123fad`; not merged or deployed |
-| Web flag | `VITE_FEATURE_PREORDER_ROLE_WORKSPACE=false` by default; backend role-workspace flag also defaults off; no runtime flag changed |
+| Preorder flags | `VITE_FEATURE_PREORDER_ROLE_WORKSPACE=false` by default; backend role-workspace flag also defaults off; no Preorder runtime flag changed by R11 |
 | Backend source inspected for R3 | `AKCD1998/PaaSRTSM-project` `main` at `46985c97491529311ccaa4366ab5905b2c4759fc`; root `AGENTS.md` read from the actual checkout |
 | Backend review | [Draft PR #61](https://github.com/AKCD1998/PaaSRTSM-project/pull/61), head `4ae69908ef1d690432ce01a04aadc6abb7411f9e`, base `46985c97491529311ccaa4366ab5905b2c4759fc`; open/draft, not merged/deployed |
-| Migration | `080_add_preorder_hq_physical_receipts.sql` is in PR #61 for review; no migration applied. Current main highest is 079 |
+| Preorder migration | `080_add_preorder_hq_physical_receipts.sql` remains in PR #61 for review and is not applied. Backend main now includes the separately authorized PDA migration083, verified applied 15 Nov10:19 UTC; re-fetch before selecting another migration number |
 | Earlier R3 evidence | 8 workspace tests + 9 existing preorder helper tests + 4 navigation/session tests passed; admin-web production build passed with existing bundle-size warning, before continuation commits |
 | Continuation checks | `git diff --check` passed for both continuation patches. No tests were run for web `7b7c1f6` or backend `4ae6990` |
 | R3 review mockup | 17 browser checks; one synthetic request supplied in two rounds 2+1, 15 in-memory actions; not a durable API/database/auth proof |
-| APK status | Latest recorded build is 0.4.1-test.5 at the Drive link above; physical-device acceptance remains pending |
+| APK status | Latest delivered build is 0.6.1-test.11 at the Drive link above, same package/signing key; physical-device and first genuine production-count acceptance remain pending |
 
 ## Implemented vs pending
 

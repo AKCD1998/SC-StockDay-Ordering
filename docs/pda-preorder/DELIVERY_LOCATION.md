@@ -7,7 +7,17 @@ User instruction, 15 November 2026: place completed PDA app deliveries in Google
 - Verified parent: เภสัชอู๋, ID `1usItMowEj6llCqWYjdpMAkswB5bubGkD`.
 - Parent was found by exact name; the child was created under that verified parent. Existing sharing was preserved.
 
-## Current delivery — R9
+## Current delivery — R11
+
+| File | Bytes | Drive link |
+| --- | ---: | --- |
+| SCPDA-0.6.1-test.11.apk | 2995013 | [APK](https://drive.google.com/file/d/1mOPGhFTpXWlInv-FmY0ZuQCJwUgKH2_l/view?usp=drivesdk) |
+| SCPDA-0.6.1-test.11-Android-001.zip | 2739668 | [Installation package](https://drive.google.com/file/d/1V1jp72iFJlJPAllhKuiNBdIkC8SYK2yi/view?usp=drivesdk) |
+| START-HERE-SCPDA-0.6.1-test.11.txt | 6384 | [Instructions](https://drive.google.com/file/d/1m5kQnni1JNIa4YUZ6a_A6Q0xuAdXjKXp/view?usp=drivesdk) |
+
+Same package/signing key; install over the existing app and fresh-login with01001. R10 alphanumeric password support included, R9 UI retained. User-authorized count intake is now live only for01001/branch001, including optional lot manufacture/expiry data; website stock-check catalog is live for branch001/admin. Receipt is collection/review evidence, not an automatic Ada stock adjustment/current-balance override. Physical phone/first genuine count remains pending. APK SHA-256 `e358f44fbad5d6d7c288baff8bbdceaaea72b8a6fa7df0f4e2dd0f7868870035`. All three upload names/sizes/parent IDs read back; remote checksums unavailable. ZIP contains only APK, instructions and sanitized identity/deployment/test/hash evidence; no credentials, invitations, private keys or fixtures. Sharing unchanged. Original executor receipt `/workspace/artifacts/scpda-count-send-2026-11-15/GOOGLE-DRIVE-DELIVERY.json`; [R11 event](events/2026-11-15-pda-r11-count-activation.md).
+
+## Earlier delivery — R9
 
 | File | Bytes | Drive link |
 | --- | ---: | --- |

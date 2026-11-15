@@ -39,6 +39,14 @@ The company IC/630 display is labeled **รหัส SKU**; the identifier is no
 - Use the leading product-name category token เภสัช / สามัญ / ปกติ as a default; unknown prefixes require explicit selection. Preserve previously selected draft/correction context. This is UI convenience, not server authorization or an inventory override.
 - Current manager-operated PDA pilot may submit a first or second independent round immediately without waiting for all three. A partial product count may be collected with its scope explicit. Rounds remain separate; collection is distinct from acceptance as a complete/current stock baseline. Additional lower-staff restrictions are future work, not a role/permission change in R6.
 
+## Deployed PDA count intake and website catalog — R11 addendum
+
+The user subsequently explicitly authorized the prepared count pilot, initially **operator01001 / branch001**. Backend `38d8a4a` and web `9ed9832` are verified live. This supersedes the old pending count activation in prior PDA checkpoints; it does not activate the proposed Preorder domain/mobile contracts below.
+
+Existing registered-device reader authentication negotiates separate count-purpose access. `SCPDA_COUNT_OPERATORS_001=01001` is an explicit server allowlist; absent admission denies everyone. Other readers/counter tokens cannot send. `scpda-counts-001-v1` preserves exact product/barcode/unit/category/round/scope, immutable quantities/lots, optional manufacture/expiry dates, original observation time, server receipt, idempotency and correction lineage. Historical local-only records need the original operator's explicit send. The separately requested01001 password change preserves username, device keys and other operators; no password belongs in this ledger.
+
+`GET /api/stock-check` / `scpda-stock-check-001-v1` uses existing web-cookie auth for admin or both original/effective branch001. The website **ข้อมูลสินค้า → เช็คสินค้า** shows actual catalog products, latest PDA server receipt per product first, never-submitted products last, categories เภสัช/ปกติ/สามัญ, quantities/lots/dates and review status. Branch001 reads; admin has review actions. This **เช็คสินค้า** evidence catalog is distinct from mobile **เช็คราคา** and Preorder customer **สอบถามราคา**. Intake and admin review do not themselves replace current Full Sync balances or adjust Ada stock. [Deployment/test/delivery evidence](events/2026-11-15-pda-r11-count-activation.md).
+
 ## Existing source evidence, not today's runtime proof
 
 The inspected preorder backend has authenticated web-session routes under `/api/customer-preorders` for cases, quotes, customer decisions, mark-ordered, case-level branch arrival/notification/completion, messages/photos, receipt/transfer evidence links and ETA. Its available source uses admin/staff checks.

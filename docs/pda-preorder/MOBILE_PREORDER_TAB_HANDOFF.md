@@ -2,11 +2,11 @@
 
 **Status:** user-requested for the next SCPDA app update. The navigation direction is confirmed; mobile API/auth and the wider preorder lifecycle are not yet accepted or released.
 
-## Current app baseline — PDA-owner R9 acknowledgment
+## Current app baseline — PDA-owner R11 acknowledgment
 
-- Current delivered build: [SCPDA 0.5.1-test.9.apk](https://drive.google.com/file/d/1G32jeACScvq_v2frMB7bvykuY8EKbFWu/view?usp=drivesdk), 15 November 2026. PDA source `codex/pda-price-info-r9`, `6cd7d160fa928c9c98ce0b696387885b214f7769`.
+- Current delivered build: [SCPDA 0.6.1-test.11.apk](https://drive.google.com/file/d/1mOPGhFTpXWlInv-FmY0ZuQCJwUgKH2_l/view?usp=drivesdk), 15 November 2026. PDA source `codex/pda-count-send-r11`, `1d2c29569fd72435fd58315bdb1bca7f225040eb`. R9 catalog-price/stock-info UI is retained.
 - Three bottom tabs now exist. Count and catalog price-check screens use the existing reader; Preorder is an honest pending panel until the mobile auth/domain adapter is accepted. No mock customer cases or role picker are shipped.
-- The prior 0.4.1-test.5 baseline had no bottom tabs. Count submission remains subject to the existing separate production activation boundary. Preserve on-device counts, enrollment, source/time semantics and preorder isolation.
+- The prior 0.4.1-test.5 baseline had no bottom tabs. The user's subsequent explicit request authorized R11 production count intake for01001/branch001 only; backend and **เช็คสินค้า** website are live. This does not accept or enable the Preorder mobile auth/domain adapter, HQ receiving, new accounts or official inventory writes. Preserve on-device counts, enrollment, source/time semantics and preorder isolation. [Exact R11 scope](events/2026-11-15-pda-r11-count-activation.md).
 
 ## Confirmed navigation direction
 

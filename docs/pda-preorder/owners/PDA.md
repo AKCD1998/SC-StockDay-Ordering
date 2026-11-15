@@ -1,11 +1,13 @@
 # PDA owner checkpoint
 
+**Current R11 checkpoint — 15 November, 17:29 Bangkok:** the user's new explicit request authorized production count intake for **01001 / branch001** and the website stock-check catalog for existing branch001/admin accounts. This supersedes the pending count-activation gate in the historical R5–R9 sections below, within this precise scope. Backend and website are live, migration083 and the three pilot flags are verified, and APK **0.6.1-test.11** is delivered in Drive. Password compatibility and the separately requested01001 credential change are active; no secret is recorded here. Physical phone/first real count acceptance remains pending. [Exact deployment, test and delivery event](../events/2026-11-15-pda-r11-count-activation.md).
+
 - Owner: existing SCPDA smartphone/PDA chat.
 - Status: **ACTIVE_RETAINED**.
 - Actual current-thread ID: not exposed/verified here; do not substitute an attachment/source-relay ID.
-- Current R9 engineering checkout on original executor: `/workspace/reviews/scpda-price-info-r9`; original checkout `/workspace/SC-StockDay-Ordering` and its dirty documentation are preserved.
-- Current delivery branch: `codex/pda-price-info-r9` (existing project, isolated continuation).
-- Last app-code SHA: `6cd7d160fa928c9c98ce0b696387885b214f7769` (R9); R8 base `537e0fdc25438c128734a1825dd10bb7960e6b8e`.
+- Current R11 engineering checkout on original executor: `/workspace/reviews/scpda-count-send-app-r11`; original checkout `/workspace/SC-StockDay-Ordering` and its dirty documentation are preserved.
+- Current delivery branch: `codex/pda-count-send-r11` (existing project, isolated continuation).
+- Last app-code SHA: `1d2c29569fd72435fd58315bdb1bca7f225040eb` (R11); R10 password-compatible base `1682323045f8a4526b8d61cb7535cdbf31e805bf`.
 - Existing two unrelated dirty documentation files were preserved; this split did not stage or overwrite them.
 
 Last relevant delivery: user paused label OCR. Same private PDA Site last recorded v14 has manual lot/manufacture/expiry/quantity entry and barcode camera; manual save/reopen and scanner close were checked in a browser. Counts there are synthetic/browser-local. APK was not rebuilt by that change. This ledger update does not reverify today's hosted or physical-device state.
