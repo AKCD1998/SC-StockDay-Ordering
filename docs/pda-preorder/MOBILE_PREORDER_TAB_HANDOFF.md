@@ -38,6 +38,15 @@ On the branch request form, show **เบอร์ติดต่อ** first and
 
 The requested propagation path starts with SCCRM member creation, delivery to ADA Software, then synchronized member data in SCCRM, ADA Software and SCPDA on every branch phone. Show the member ID and each system's acknowledged sync state; do not claim all devices are current until their sync acknowledgements arrive. The mobile lookup/create endpoint, SCCRM-to-ADA field/identity contract, duplicate handling, durable retries and registered-device auth are still pending. The UI mockup is local and does not query or write CRM data.
 
+### Per-request mode: Preorder or price inquiry (user-confirmed UX, 15 November)
+
+Place a switch in the create-request heading row so a staff member can choose **Preorder** or **สอบถามราคา** before submitting. Persist this as the request's category in the server record and route it to the matching queue and state transitions; changing the screen color alone is not sufficient. Use stable, distinct page accents and show the category in the request list, detail and review so the type is recognizable at a glance. Once created, keep the selected category with the request and derive its later screens from that stored value.
+
+- **Preorder:** retains the customer-facing quote and exact-version customer decision steps; an accepted request can continue through purchase/fulfillment.
+- **สอบถามราคา:** routes to an internal price inquiry queue and returns its result to staff. Do not send a quotation to the customer, add customer accept/reject steps, or require the CEO to key in a price to ask whether the customer wants to buy. This category is for asking/checking price before an order.
+
+The switch, accent changes, review label and mode-specific flow are represented in the local preview. The accepted request type enum/field, authorization, separate queue routing and API lifecycle still need implementation. Do not silently convert a price inquiry into a Preorder; require an explicit later action if that product transition is needed.
+
 ## Role-aware Preorder content
 
 | Server profile | Preorder tab content |
@@ -56,4 +65,4 @@ No role can mark customer handover merely because an item was scanned, counted l
 4. The current backend proposal does not implement dispatch/transfer, branch physical receipt, customer handover or the full multi-shipment/partial-quantity lifecycle. Keep those actions hidden until their separate APIs and events exist.
 5. Test the bottom bar with Android back navigation, keyboard, scan overlay and system safe area; changing tabs must not clear a count or preorder draft.
 
-The user's navigation request is recorded in [event 005](events/2026-11-15-005-mobile-preorder-tab-request.md); the member-lookup and cross-system sync request is recorded in [event 006](events/2026-11-15-006-mobile-member-lookup-sync.md). Direct cross-thread messaging is unavailable; the PDA owner should read this handoff in the common ledger. This records the user's request, not the PDA owner's implementation acknowledgment.
+The user's navigation request is recorded in [event 005](events/2026-11-15-005-mobile-preorder-tab-request.md), member-lookup and cross-system sync in [event 006](events/2026-11-15-006-mobile-member-lookup-sync.md), and request-mode separation in [event 007](events/2026-11-15-007-preorder-vs-price-inquiry.md). Direct cross-thread messaging is unavailable; the PDA owner should read this handoff in the common ledger. This records the user's request, not the PDA owner's implementation acknowledgment.
