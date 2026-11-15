@@ -17,6 +17,7 @@ export const adminOnlyViews = [
 export const adminViewKeys = [
   defaultAdminView,
   "branch-stock",
+  "stock-check",
   "branch-stock-history",
   "stock-recommendations",
   "movement-trace",
@@ -30,6 +31,7 @@ export const adminViewKeys = [
 const ADMIN_VIEW_ROUTE_SEGMENTS = {
   receipts: "receipts",
   "branch-stock": "branch-stock",
+  "stock-check": "stock-check",
   "branch-stock-history": "branch-stock-history",
   "stock-recommendations": "stock-recommendations",
   "movement-trace": "movement-trace",
@@ -53,7 +55,11 @@ const ADMIN_VIEW_BY_SEGMENT = Object.fromEntries(
   Object.entries(ADMIN_VIEW_ROUTE_SEGMENTS).map(([viewKey, segment]) => [segment, viewKey]),
 );
 
-export function getNavigationGroups(isAdminUser, hideDashboard = false) {
+export function canUseStockCheck({enabled,role,branchCode,actorBranchCode}) {
+  return enabled === true && (role === "admin" || role === "branch" && branchCode === "001" && (actorBranchCode || branchCode) === "001");
+}
+
+export function getNavigationGroups(isAdminUser, hideDashboard = false, stockCheckAllowed = false) {
   return [
     {
       id: "dashboard",
@@ -70,6 +76,7 @@ export function getNavigationGroups(isAdminUser, hideDashboard = false) {
       items: [
         { label: "ใบรับสินค้า", view: "receipts", description: "ตรวจใบรับสินค้าและโลโก้ Supplier" },
         { label: "สต็อกสาขา", view: "branch-stock", description: "สถานะสต็อกแยกตามสาขา" },
+        ...(stockCheckAllowed ? [{label:"เช็คสินค้า",view:"stock-check",description:"ผลนับจาก PDA สาขา 001"}] : []),
         { label: "สต๊อกดูย้อนหลัง", view: "branch-stock-history", description: "ประวัติสต๊อกสะสมตามรอบเวลา sync" },
         { label: "คำแนะนำสต๊อก", view: "stock-recommendations", description: "ระบบแนะนำว่าควรถือสต๊อก ขอสาขาอื่น หรือซื้อเพิ่มเท่าไหร่" },
         { label: "คำขอสินค้า", view: "stock-requests", description: "ส่งและติดตามคำขอสินค้าระหว่างสาขา" },
