@@ -1,3 +1,4 @@
+import ScpdaLotsWorkspace from "./ScpdaLotsWorkspace.jsx";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import BranchStockRecommendationSuggestion from "./BranchStockRecommendationSuggestion";
 import { shopee004StockStatusMessage, shopee004StockStatusShortMessage } from "./lib/shopee004StockStatus.js";
@@ -312,6 +313,8 @@ export function BranchStockPanel({
     branchCode || (isOnlineMarketingStaff ? "000" : ""),
   );
   const isBranchStockScopeUser = !isAdminUser && Boolean(scopedBranchCode);
+  const [scpdaLots,setScpdaLots]=useState(null);
+  const scpdaLotsEnabled=isAdminUser && import.meta.env.VITE_FEATURE_SCPDA_LOTS_001 === "true";
   const branchStockScopeOptions = useMemo(
     () => getBranchStockScopeOptions(scopedBranchCode),
     [scopedBranchCode],
@@ -1194,7 +1197,7 @@ export function BranchStockPanel({
 
   function renderBranchStockCell(row, column) {
     if (column.key === "productCode") {
-      return <strong>{row.productCode}</strong>;
+      return <><strong>{row.productCode}</strong>{scpdaLotsEnabled&&<button type="button" className="scpda-admin-entry" onClick={()=>setScpdaLots({productCode:row.productCode})} aria-label={`ล็อต PDA ${row.productCode}`}>ล็อต / ผลนับ PDA</button>}</>;
     }
     if (column.key === "category") {
       return (
@@ -1409,6 +1412,8 @@ export function BranchStockPanel({
         ) : null}
       </div>
 
+      {scpdaLotsEnabled&&<button type="button" className="scpda-admin-entry" onClick={()=>setScpdaLots({productCode:null})}>คิวทบทวนผลนับ PDA · 001</button>}
+      {scpdaLotsEnabled&&scpdaLots&&<ScpdaLotsWorkspace productCode={scpdaLots.productCode} csrfToken={csrfToken} onClose={()=>setScpdaLots(null)}/>}
       {!branchCode && !isAdminUser ? (
         <p className="notice warning compact">
           ต้องเลือกสาขาที่จะใช้งานใน session ก่อน จึงจะเปิดใช้งานคำขอสินค้าได้อย่างปลอดภัย

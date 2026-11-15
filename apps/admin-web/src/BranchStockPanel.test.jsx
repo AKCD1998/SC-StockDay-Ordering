@@ -137,8 +137,25 @@ describe("BranchStockPanel branch scope", () => {
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllEnvs();
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it('keeps PDA entry default-off and restricted to admin when enabled', async () => {
+    renderPanel({isAdminUser:true});
+    await screen.findByText('A001');
+    expect(screen.queryByRole('button',{name:'ล็อต PDA A001'})).not.toBeInTheDocument();
+    cleanup();
+    vi.stubEnv('VITE_FEATURE_SCPDA_LOTS_001','true');
+    renderPanel({isAdminUser:false});
+    await screen.findByText('A001');
+    expect(screen.queryByRole('button',{name:'ล็อต PDA A001'})).not.toBeInTheDocument();
+    cleanup();
+    renderPanel({isAdminUser:true});
+    await screen.findByText('A001');
+    expect(screen.getByRole('button',{name:'ล็อต PDA A001'})).toBeVisible();
+    expect(screen.getByRole('button',{name:'คิวทบทวนผลนับ PDA · 001'})).toBeVisible();
   });
 
   function hourlyResponse(quantity = 0) {

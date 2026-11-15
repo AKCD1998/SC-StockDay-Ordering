@@ -18,6 +18,7 @@ import PosAdminPanel from "./PosAdminPanel.jsx";
 import MembersPanel from "./MembersPanel.jsx";
 import Shopee004ExceptionsPanel from "./Shopee004ExceptionsPanel.jsx";
 import SpecialVigilantProducts from "./SpecialVigilantProducts.jsx";
+import StockCheckPanel from "./StockCheckPanel.jsx";
 import LoginScreen from "./LoginScreen.jsx";
 import AdminNavigation from "./AdminNavigation.jsx";
 import AdminAccountActions from "./AdminAccountActions.jsx";
@@ -27,6 +28,7 @@ import { apiFetch, subscribeToUnauthorizedResponse } from "./lib/apiClient.js";
 import {
   adminOnlyViews,
   getNavigationGroups,
+  canUseStockCheck,
   stockCostAuditView,
   taxonomyReviewView,
   taxonomyView,
@@ -1819,11 +1821,12 @@ export default function App() {
     return filteredStock.slice(startIndex, startIndex + pageSize);
   }, [filteredStock, pageSize, safeCurrentPage]);
   const isAdminUser = session?.user?.role === "admin";
+  const stockCheckAllowed = canUseStockCheck({enabled:import.meta.env.VITE_FEATURE_SCPDA_LOTS_001 === "true",role:session?.user?.role,branchCode,actorBranchCode:session?.user?.actor_branch_code});
   const isOnlineMarketingStaff =
     String(session?.user?.id || "").trim().toLowerCase() === ONLINE_MARKETING_STAFF_USER_ID;
   const navigationGroups = useMemo(
-    () => getNavigationGroups(isAdminUser, isOnlineMarketingStaff),
-    [isAdminUser, isOnlineMarketingStaff],
+    () => getNavigationGroups(isAdminUser, isOnlineMarketingStaff, stockCheckAllowed),
+    [isAdminUser, isOnlineMarketingStaff, stockCheckAllowed],
   );
 
   useEffect(() => {
@@ -1851,10 +1854,10 @@ export default function App() {
   }, [accountMenuOpen]);
 
   useEffect(() => {
-    if (session && !isAdminUser && adminOnlyViews.includes(view)) {
+    if (session && ((!isAdminUser && adminOnlyViews.includes(view)) || view === "stock-check" && !stockCheckAllowed)) {
       setView("receipts");
     }
-  }, [session, isAdminUser, view]);
+  }, [session, isAdminUser, view, stockCheckAllowed]);
 
   useEffect(() => {
     if (isOnlineMarketingStaff && view === "focus-products") {
@@ -1942,6 +1945,8 @@ export default function App() {
           canEditLogos={isAdminUser}
           csrfToken={session.csrfToken}
         />
+      ) : view === "stock-check" && stockCheckAllowed ? (
+        <StockCheckPanel isAdminUser={isAdminUser} csrfToken={session.csrfToken} />
       ) : view === "branch-stock" ? (
         <BranchStockPanel
           csrfToken={session.csrfToken}
