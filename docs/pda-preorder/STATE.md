@@ -51,10 +51,10 @@ The current task is this verified destination chat. Separate review checkouts ar
 | Web review | [Draft PR #100](https://github.com/AKCD1998/SC-StockDay-Ordering/pull/100); observed open/draft at head `4aa5f1a2af07af7be0708eb982821b062fd51db1`, latest CI success; targets main, not merged/deployed. Fetch current head before continuation |
 | Preorder flags | `VITE_FEATURE_PREORDER_ROLE_WORKSPACE=false` by default; backend role-workspace flag also defaults off; no Preorder runtime flag changed by R11 |
 | Backend source inspected for R3 | `AKCD1998/PaaSRTSM-project` `main` at `46985c97491529311ccaa4366ab5905b2c4759fc`; root `AGENTS.md` read from the actual checkout |
-| Backend review | [Draft PR #61](https://github.com/AKCD1998/PaaSRTSM-project/pull/61), updated to `e9057f1` with the enrolled-PDA bearer adapter; CI for this commit is pending. It targets main and remains open/draft, not merged/deployed. |
+| Backend review | [Draft PR #61](https://github.com/AKCD1998/PaaSRTSM-project/pull/61), updated to `e9057f1` with the enrolled-PDA bearer adapter; CI run `43709199891` passed. It targets main and remains open/draft, not merged/deployed. |
 | Preorder migration | `080_add_preorder_hq_physical_receipts.sql` remains in PR #61 for review and is not applied. Backend main now includes the separately authorized PDA migration083, verified applied 15 Nov10:19 UTC; re-fetch before selecting another migration number |
 | Earlier R3 evidence | 8 workspace tests + 9 existing preorder helper tests + 4 navigation/session tests passed; admin-web production build passed with existing bundle-size warning, before continuation commits |
-| Continuation checks | Latest mobile-adapter source passed `node --check` for the changed API files and `git diff --check`; no tests were run for commit `e9057f1`, and its CI is pending |
+| Continuation checks | Latest mobile-adapter source passed `node --check` for the changed API files and `git diff --check`; CI run `43709199891` passed for commit `e9057f1`. No separate local test suite was run for this commit |
 | R3 review mockup | 17 browser checks; one synthetic request supplied in two rounds 2+1, 15 in-memory actions; not a durable API/database/auth proof |
 | APK status | Latest delivered build is 0.6.1-test.11 at the Drive link above, same package/signing key; physical-device and first genuine production-count acceptance remain pending |
 

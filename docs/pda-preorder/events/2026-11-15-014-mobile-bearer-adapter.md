@@ -2,7 +2,7 @@
 
 - Date: 15 November 2026
 - Owner: Preorder web/API workstream
-- Status: **Implemented in draft PR, pending CI/review and PDA-owner acceptance**
+- Status: **Implemented in draft PR; CI passed; pending code review and PDA-owner acceptance**
 - Backend branch: `codex/preorder-hq-physical-receipt`
 - Commit: `e9057f1` (`Add enrolled PDA access to preorder API`)
 - PR: [PaaSRTSM-project #61](https://github.com/AKCD1998/PaaSRTSM-project/pull/61)
@@ -27,7 +27,7 @@ The existing `/api/customer-preorders` router accepted the web session cookie on
 
 This is an API adapter, not the Android implementation or production rollout. The PDA client has not yet called it. It does not add SCCRM member lookup/create or sync receipts, offline retries, HQ purchasing/fulfillment on PDA, dispatch/transfer counts, branch physical receipt or customer handover. No flag/profile was enabled, no account/permission provisioned, no migration applied, and no ADA/POS/CRM write or deployment occurred.
 
-The backend changed files passed `node --check` and `git diff --check`; no automated tests were run for `e9057f1`, and CI was pending at the time this record was written. A green CI result, staging exercise, PDA-owner acceptance and app roundtrip remain separate evidence gates. The implementation does not make Preorder end-to-end complete.
+The backend changed files passed `node --check` and `git diff --check`; no separate local test suite was run for `e9057f1`. GitHub Actions CI run `43709199891` later completed successfully. Staging exercise, PDA-owner acceptance and app roundtrip remain separate evidence gates. The implementation does not make Preorder end-to-end complete.
 
 ## PDA-owner handoff
 

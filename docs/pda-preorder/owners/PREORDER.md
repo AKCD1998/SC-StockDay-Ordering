@@ -10,7 +10,7 @@
 - Base: `d6017807eaed1815f871c95d74db21929d123fad`.
 - [Draft PR #100](https://github.com/AKCD1998/SC-StockDay-Ordering/pull/100): open/draft, head `7b7c1f63e25b33e7c7b2b3c31e3e3721869a2183`, base `d6017807eaed1815f871c95d74db21929d123fad`, not merged/deployed.
 - Backend main: `46985c97491529311ccaa4366ab5905b2c4759fc`; root `AGENTS.md` read from `/workspace/sc-preorder-backend`.
-- Backend branch `codex/preorder-hq-physical-receipt`: `/workspace/sc-preorder-backend`, latest pushed head `e9057f1` adds an enrolled-PDA Bearer adapter to the same case API; [draft PR #61](https://github.com/AKCD1998/PaaSRTSM-project/pull/61), CI pending, not merged/deployed. Existing PaaS PR #52 remains PDA-related and outside this workstream.
+- Backend branch `codex/preorder-hq-physical-receipt`: `/workspace/sc-preorder-backend`, latest pushed head `e9057f1` adds an enrolled-PDA Bearer adapter to the same case API; [draft PR #61](https://github.com/AKCD1998/PaaSRTSM-project/pull/61), CI run `43709199891` passed, not merged/deployed. Existing PaaS PR #52 remains PDA-related and outside this workstream.
 
 Ready: corrected three-role R3 design, ten-scene young-CEO illustration, shared-request/two-shipment mockup and gated web capability UI. Reuse existing work; do not create a new project, another owner or another PR for the same preparation.
 
