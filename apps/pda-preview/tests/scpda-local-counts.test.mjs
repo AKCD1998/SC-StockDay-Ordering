@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {prepareLocalCount} from '../scpda-local-counts.mjs';
+import {prepareLocalCount,defaultAdaCountUnit} from '../scpda-local-counts.mjs';
 const who={operatorCode:'01001',branchCode:'001'},product={productCode:'000IC',skuId:'001',barcode:'0001234567890',name:'ทดสอบ',stock:{quantity:6,observedAt:null,unitBasis:'unknown'},prices:[]};
 const lot={code:'LOT-A',codeUnknown:false,manufacturedOn:'2026-01-01',mfgUnknown:false,expiresOn:'2027-01-01',expUnknown:false,quantity:'3'};
 const input=()=>({who,product,draft:{id:'fixture-record',category:'pharma',round:1,unit:'เม็ด',completeProduct:false,lots:[{...lot}]},now:'2026-11-08T12:00:00Z'});
@@ -8,3 +8,10 @@ test('zero is deliberate input; missing quantity and fractional/negative amounts
 test('unknown lot/date fields must be explicit and stay null; dates never inferred',()=>{const i=input();i.draft.lots[0]={code:'',codeUnknown:true,manufacturedOn:'',mfgUnknown:true,expiresOn:'',expUnknown:true,quantity:'1'};const r=prepareLocalCount(i);assert.deepEqual([r.lots[0].code,r.lots[0].manufacturedOn,r.lots[0].expiresOn],[null,null,null]);i.draft.lots[0].mfgUnknown=false;assert.throws(()=>prepareLocalCount(i));});
 test('invalid/reversed/future dates and duplicate lots are rejected',()=>{for(const patch of [{manufacturedOn:'2026-02-31'},{expiresOn:'2025-01-01'},{manufacturedOn:'2028-01-01'}]){const i=input();Object.assign(i.draft.lots[0],patch);assert.throws(()=>prepareLocalCount(i));}const i=input();i.draft.lots.push({...lot});assert.throws(()=>prepareLocalCount(i));});
 test('rounds stay independent and a correction preserves count time with a required reason',()=>{const i=input();i.draft.round=2;assert.equal(prepareLocalCount(i).quantity,3);i.draft.supersedesId='original';i.draft.originalCountedAt='2026-11-07T10:00:00Z';assert.throws(()=>prepareLocalCount(i));i.draft.reason='พบอีกล็อต';const r=prepareLocalCount(i);assert.equal(r.quantity,3);assert.equal(r.countedAt,i.draft.originalCountedAt);assert.equal(r.supersedesId,'original');});
+
+test('Ada source unit defaults ahead of alphabetic price units; absent source stays unknown',()=>{
+ const product={stock:{displayUnit:' เม็ด '},prices:[{unit:'กล่อง'},{unit:'เม็ด'}]};
+ assert.equal(defaultAdaCountUnit(product),'เม็ด');
+ for(const displayUnit of [null,undefined,'',123,'x'.repeat(81)])assert.equal(defaultAdaCountUnit({...product,stock:{displayUnit}}),'');
+ assert.equal(defaultAdaCountUnit({prices:[{unit:'กล่อง'}]}),'');
+});

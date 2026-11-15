@@ -1,5 +1,11 @@
 import {parseCountMilli} from './quantity-policy.mjs';
 const clone=v=>JSON.parse(JSON.stringify(v));
+// Ada branch-stock export selects FTPdtSUnit before M/L. This label does not
+// verify the stock quantity basis, scanned pack or a conversion factor.
+export function defaultAdaCountUnit(product){
+ const unit=typeof product?.stock?.displayUnit==='string'?product.stock.displayUnit.trim():'';
+ return unit&&unit.length<=80?unit:'';
+}
 export const localId=()=>globalThis.crypto.randomUUID?.()||'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const n=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?n:(n&3)|8).toString(16);});
 export const draftKey=(who,p)=>JSON.stringify([who.branchCode,who.operatorCode,p.skuId,p.productCode,p.barcode]);
 function date(value,unknown,label){
