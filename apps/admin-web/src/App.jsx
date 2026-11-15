@@ -13,7 +13,7 @@ import SyncLogPanel from "./SyncLogPanel.jsx";
 import StockCostAuditPanel from "./StockCostAuditPanel.jsx";
 import ReviewQueuePanel from "./ReviewQueuePanel.jsx";
 import IngredientDictionaryPanel from "./IngredientDictionaryPanel.jsx";
-import PreorderPanel from "./preorders/PreorderPanel";
+import PreorderRoleWorkspace from "./preorders/PreorderRoleWorkspace";
 import PosAdminPanel from "./PosAdminPanel.jsx";
 import MembersPanel from "./MembersPanel.jsx";
 import Shopee004ExceptionsPanel from "./Shopee004ExceptionsPanel.jsx";
@@ -65,6 +65,7 @@ import woothiLogoUrl from "./assets/woothi-logo.svg";
 import orexTradingLogoUrl from "./assets/orex-trading-logo.svg";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
+const preorderRoleWorkspaceEnabled = String(import.meta.env.VITE_FEATURE_PREORDER_ROLE_WORKSPACE || "").toLowerCase() === "true";
 const customerPreordersEnabled = String(import.meta.env.VITE_FEATURE_CUSTOMER_PREORDERS || "").toLowerCase() === "true";
 const adminThemeStorageKey = "sc-stockday-admin-theme";
 const ONLINE_MARKETING_STAFF_USER_ID = "onlinemarketingstaff";
@@ -2001,7 +2002,7 @@ export default function App() {
       ) : view === "sync-log" && isAdminUser ? (
         <SyncLogPanel onUnauthorized={handleUnauthorized} />
       ) : view === "preorder" ? (
-        <PreorderPanel enabled={customerPreordersEnabled} csrfToken={session.csrfToken} isAdmin={isAdminUser} branchCode={branchCode} apiBaseUrl={apiBaseUrl} onBadgeChanged={refreshPreorderBadgeCount} />
+        <PreorderRoleWorkspace roleWorkspaceEnabled={preorderRoleWorkspaceEnabled} userId={session.user.id} enabled={customerPreordersEnabled} csrfToken={session.csrfToken} isAdmin={isAdminUser} branchCode={branchCode} apiBaseUrl={apiBaseUrl} onBadgeChanged={refreshPreorderBadgeCount} />
       ) : view === "pos-admin" && isAdminUser ? (
         <PosAdminPanel />
       ) : view === "members" ? (

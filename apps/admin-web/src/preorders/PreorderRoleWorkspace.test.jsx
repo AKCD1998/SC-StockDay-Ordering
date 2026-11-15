@@ -1,0 +1,19 @@
+import React from 'react';
+import {test,expect,vi,afterEach} from 'vitest';
+import {render,screen,waitFor,fireEvent,cleanup} from '@testing-library/react';
+import PreorderRoleWorkspace from './PreorderRoleWorkspace.jsx';
+import {WORKSPACE_CONTRACT} from './preorderWorkspace.js';
+afterEach(()=>{cleanup();vi.unstubAllGlobals();});
+const base={enabled:true,csrfToken:'fixture-csrf',isAdmin:false,branchCode:'001',apiBaseUrl:'',userId:'fixture-boom'};
+const detail={public_id:'PRE-DEMO-001',branch_code:'001',customer_name:'PRIVATE CUSTOMER',customer_phone:'0000000000',intent:'ORDER_REQUEST',status:'ORDERED',version:1,items:[{item_id:1,item_kind:'CATALOG',display_name_snapshot:'FIXTURE PRODUCT',requested_qty:3,confirmed_qty:3,unit_snapshot:'BOX'}],evidence:[],quotes:[],procurementOutcomes:[],timeline:[],attachments:[]};
+function fixture(manifest){const requests=[];vi.stubGlobal('fetch',vi.fn(async(url,options={})=>{requests.push({url:String(url),method:options.method||'GET'});let data={};if(String(url).endsWith('/workspace'))data=manifest;else if(String(url).endsWith('/cases'))data={items:[detail]};else if(String(url).includes('/cases/PRE-DEMO-001')&&!String(url).endsWith('/read'))data=detail;return {ok:true,json:async()=>data};}));return requests;}
+test('default flag keeps existing staff route and never calls proposed workspace API',async()=>{const requests=fixture(null);render(<PreorderRoleWorkspace {...base}/>);await screen.findByRole('button',{name:'สร้างรายการพรีออเดอร์'});await waitFor(()=>expect(requests.some(r=>r.url==='/api/customer-preorders/cases')).toBe(true));expect(requests.some(r=>r.url.endsWith('/workspace'))).toBe(false);});
+test('enabled workspace with missing contract never falls back to a legacy admin/staff view',async()=>{const requests=fixture({error:'Not found'});render(<PreorderRoleWorkspace {...base} roleWorkspaceEnabled/>);await screen.findByRole('alert');expect(requests.map(r=>r.url)).toEqual(['/api/customer-preorders/workspace']);expect(screen.queryByRole('button',{name:'สร้างรายการพรีออเดอร์'})).toBeNull();});
+test('HQ profile loads the central queue but exposes document work instead of commercial/customer commands',async()=>{
+ const requests=fixture({contractVersion:WORKSPACE_CONTRACT,subjectUserId:base.userId,workRole:'fulfillment',capabilities:['cases.read.all','receipts.link','transfers.link','commercial.quote','commercial.order','messages.send']});render(<PreorderRoleWorkspace {...base} roleWorkspaceEnabled/>);
+ await screen.findByText('พี่บูม · รับของและจัดส่ง');await screen.findByRole('button',{name:'ดูรายละเอียด'});expect(screen.queryByRole('button',{name:'สร้างรายการพรีออเดอร์'})).toBeNull();fireEvent.click(screen.getByRole('button',{name:'ดูรายละเอียด'}));await screen.findByRole('button',{name:'ค้นหาใบรับเข้ารหัสตรงกัน'});
+ for(const name of ['แจ้งราคา','บันทึกว่าสั่งแล้ว','ยืนยันรับสินค้าที่สาขา','ปิดงานเสร็จสิ้น'])expect(screen.queryByRole('button',{name})).toBeNull();expect(screen.queryByText('PRIVATE CUSTOMER')).toBeNull();expect(screen.queryByText('0000000000')).toBeNull();expect(requests.some(r=>/quotes|mark-ordered|complete/.test(r.url))).toBe(false);
+});
+test('late workspace reply for an old subject cannot render its grants after sign-in changes',async()=>{
+ let resolveOld;const oldReply=new Promise(resolve=>{resolveOld=resolve;});vi.stubGlobal('fetch',vi.fn((url)=>String(url).endsWith('/workspace')?oldReply:Promise.resolve({ok:true,json:async()=>({items:[]})})));const {rerender}=render(<PreorderRoleWorkspace {...base} roleWorkspaceEnabled/>);rerender(<PreorderRoleWorkspace {...base} userId="different-user" roleWorkspaceEnabled/>);resolveOld({ok:true,json:async()=>({contractVersion:WORKSPACE_CONTRACT,subjectUserId:base.userId,workRole:'fulfillment',capabilities:['cases.read.all','receipts.link']})});await screen.findByRole('alert');expect(screen.queryByText('พี่บูม · รับของและจัดส่ง')).toBeNull();
+});
