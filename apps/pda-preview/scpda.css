@@ -22,3 +22,6 @@
 .scpda .scpda-lot .local-unit-label{padding:6px 10px;border-radius:8px;background:#edf2fb;color:#243d74;font-weight:600}
 .scpda .scpda-lot input[type=date]{font-size:15px;padding:10px;min-height:56px}
 @media(max-width:420px){.scpda-lot-dates{grid-template-columns:minmax(0,1fr)}}
+
+.scpda-category-value{min-height:56px;display:flex;align-items:center;padding:12px 14px;border-radius:12px;background:#eff3fa;color:#243d74;font-size:16px;font-weight:600;overflow-wrap:anywhere}
+.scpda-round-hint{display:block;margin-top:6px;font-size:12px;color:#596981}

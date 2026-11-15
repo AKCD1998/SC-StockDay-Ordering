@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {prepareLocalCount,defaultAdaCountUnit} from '../scpda-local-counts.mjs';
+import {prepareLocalCount,defaultAdaCountUnit,countCategoryFromName} from '../scpda-local-counts.mjs';
 const who={operatorCode:'01001',branchCode:'001'},product={productCode:'000IC',skuId:'001',barcode:'0001234567890',name:'ทดสอบ',stock:{quantity:6,observedAt:null,unitBasis:'unknown'},prices:[]};
 const lot={code:'LOT-A',codeUnknown:false,manufacturedOn:'2026-01-01',mfgUnknown:false,expiresOn:'2027-01-01',expUnknown:false,quantity:'3'};
 const input=()=>({who,product,draft:{id:'fixture-record',category:'pharma',round:1,unit:'เม็ด',completeProduct:false,lots:[{...lot}]},now:'2026-11-08T12:00:00Z'});
@@ -14,4 +14,14 @@ test('Ada source unit defaults ahead of alphabetic price units; absent source st
  assert.equal(defaultAdaCountUnit(product),'เม็ด');
  for(const displayUnit of [null,undefined,'',123,'x'.repeat(81)])assert.equal(defaultAdaCountUnit({...product,stock:{displayUnit}}),'');
  assert.equal(defaultAdaCountUnit({prices:[{unit:'กล่อง'}]}),'');
+});
+
+test('category follows the leading product-name token, with safe manual fallback',()=>{
+ for(const [name,category]of [['เภสัช เซอร์ลิฟ 50 มก 30 เม็ด','pharma'],[' สามัญ: สำลี','common'],['ปกติ-ครีม','normal'],['\u200Bเภสัช · ยา','pharma']])assert.equal(countCategoryFromName(name),category);
+ for(const name of ['ยา เภสัช ทดสอบ','เภสัชกร','สามัญชน','สินค้าใหม่',null])assert.equal(countCategoryFromName(name),'');
+});
+test('an admitted pilot operator can prepare round one and round two independently',()=>{
+ const first=input();first.draft.uploadIntent=true;const a=prepareLocalCount(first);
+ const second=input();second.draft.id='another-round';second.draft.round=2;second.draft.lots[0].quantity='5';second.draft.uploadIntent=true;const b=prepareLocalCount(second);
+ assert.equal(a.operatorCode,b.operatorCode);assert.equal(a.round,1);assert.equal(b.round,2);assert.equal(a.quantity,3);assert.equal(b.quantity,5);assert.equal(a.uploadIntent,true);assert.equal(b.uploadIntent,true);assert.equal(a.completeProduct,false);assert.equal(b.completeProduct,false);
 });

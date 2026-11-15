@@ -6,6 +6,12 @@ export function defaultAdaCountUnit(product){
  const unit=typeof product?.stock?.displayUnit==='string'?product.stock.displayUnit.trim():'';
  return unit&&unit.length<=80?unit:'';
 }
+// Treat only a leading category token as the product naming convention.
+export function countCategoryFromName(name){
+ if(typeof name!=='string')return '';
+ const match=name.replace(/^[\s\uFEFF\u200B]+/u,'').match(/^(เภสัช|สามัญ|ปกติ)(?=$|[\s:：./·\-–—])/u);
+ return match?({'เภสัช':'pharma','สามัญ':'common','ปกติ':'normal'})[match[1]]:'';
+}
 export const localId=()=>globalThis.crypto.randomUUID?.()||'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const n=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?n:(n&3)|8).toString(16);});
 export const draftKey=(who,p)=>JSON.stringify([who.branchCode,who.operatorCode,p.skuId,p.productCode,p.barcode]);
 function date(value,unknown,label){
