@@ -7,7 +7,19 @@ User instruction, 15 November 2026: place completed PDA app deliveries in Google
 - Verified parent: เภสัชอู๋, ID `1usItMowEj6llCqWYjdpMAkswB5bubGkD`.
 - Parent was found by exact name; the child was created under that verified parent. Existing sharing was preserved.
 
-## Current delivery — R6
+## Current delivery — R7
+
+| File | Bytes | Drive link |
+| --- | ---: | --- |
+| SCPDA-0.4.3-test.7.apk | 2990917 | [APK](https://drive.google.com/file/d/18RY06U6pQ199n0umzPUspcFIzlxqcNcV/view?usp=drivesdk) |
+| SCPDA-0.4.3-test.7-Android-001.zip | 3497001 | [Installation package](https://drive.google.com/file/d/1v4C7QphLplqwBZjgkv52sPqHdO7TOhkt/view?usp=drivesdk) |
+| START-HERE-SCPDA-0.4.3-test.7.txt | 7586 | [Instructions](https://drive.google.com/file/d/1EW8lmVJgx_GZvq2uqrDd9fzu_qaHL6P3/view?usp=drivesdk) |
+| SCPDA-0.4.3-test.7-Icon-Masks.png | 41688 | [Mask simulation](https://drive.google.com/file/d/1sDkeelNmyf89mrpGcAt8vUus4erhgxcA/view?usp=drivesdk) |
+| SCPDA-0.4.3-test.7-Recent-Preview.png | 66110 | [Recent-list fixture preview](https://drive.google.com/file/d/1h94eWhA2rLFR49qMEWkpqJc2HPpshKsu/view?usp=drivesdk) |
+
+Same package/signing key. Smaller safe-zone-checked icon; requested refresh button removed; ten navigation-only shortcuts in a compact frame. ZIP includes the 1024px iOS icon asset, not an iOS app build. Production count activation still pending. All five uploads verified by exact names/sizes/parent IDs; remote checksums unavailable. No credentials or sharing changes. Receipt: `/workspace/artifacts/scpda-recent-safe-icon-2026-11-15/GOOGLE-DRIVE-DELIVERY.json`.
+
+## Earlier delivery — R6
 
 | File | Bytes | Drive link |
 | --- | ---: | --- |

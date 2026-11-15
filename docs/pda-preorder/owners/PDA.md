@@ -3,9 +3,9 @@
 - Owner: existing SCPDA smartphone/PDA chat.
 - Status: **ACTIVE_RETAINED**.
 - Actual current-thread ID: not exposed/verified here; do not substitute an attachment/source-relay ID.
-- Current R6 engineering checkout on original executor: `/workspace/reviews/scpda-category-round-r6`; original checkout `/workspace/SC-StockDay-Ordering` and its dirty documentation are preserved.
-- Current delivery branch: `codex/pda-category-round-r6` (existing project, isolated continuation).
-- Last app-code SHA: `6f9fe19c005bad8fd9659a8a019af0121d70d296` (R6); R5 base `31f82782d77720b3f081648f2e833f77c485b682`.
+- Current R7 engineering checkout on original executor: `/workspace/reviews/scpda-recent-icon-r7`; original checkout `/workspace/SC-StockDay-Ordering` and its dirty documentation are preserved.
+- Current delivery branch: `codex/pda-recent-icon-r7` (existing project, isolated continuation).
+- Last app-code SHA: `6ef9f632a04463ddf0bbe69a54efa12aacbf9a11` (R7); R6 base `6f9fe19c005bad8fd9659a8a019af0121d70d296`.
 - Existing two unrelated dirty documentation files were preserved; this split did not stage or overwrite them.
 
 Last relevant delivery: user paused label OCR. Same private PDA Site last recorded v14 has manual lot/manufacture/expiry/quantity entry and barcode camera; manual save/reopen and scanner close were checked in a browser. Counts there are synthetic/browser-local. APK was not rebuilt by that change. This ledger update does not reverify today's hosted or physical-device state.
@@ -71,3 +71,17 @@ The user has now specified the branch member lookup/create interaction and cross
 The user also requests a heading-row mode switch between **Preorder** and **สอบถามราคา**. Persist the mode as a distinct database request category and route it to a separate lifecycle; price inquiry is internal only and has no customer quote/decision or CEO price-keying step. See [event 007](../events/2026-11-15-007-preorder-vs-price-inquiry.md). The current app/API has not implemented this.
 
 The user requests the visible label **พรีออเดอร์** in Thai and a cleaner member-check result: show the matched name in the locked name field without the redundant helper copy. The updated local simulation contains the user-specified matching member and the no-match/new-member confirmation path. See [event 008](../events/2026-11-15-008-thai-label-member-simulation.md); no CRM or mobile app write has been made.
+
+## 15 November — R7 icon safe margins and ten recent-product shortcuts
+
+User's physical Android screenshots showed the R6 launcher SC crowded by the adaptive mask. R7 **0.4.3-test.7**, versionCode7, uses the same selected A design/palette with a smaller centered mark. Build-time source validation now rejects white/yellow ink outside radius0.29 of the 108dp layer, stricter than the documented 66dp safe-circle radius33/108. The compiled 432px APK resource was checked separately: max ink radius0.24349. Four common Android masks were simulated; an opaque 1024px iOS icon asset is included for future work. This is geometry/export evidence, not all-OEM or iPhone runtime acceptance; no iOS app build exists.
+
+Removed the requested `ตรวจข้อมูลอีกครั้ง` button. Home now shows one framed `ค้นหาล่าสุด` list with single-line product names and a right-hand `นับสินค้า` action. Keep ten distinct products; successful repeat/alias lookup promotes the same product, and the eleventh evicts the oldest shortcut. Tap a name to open fresh price/stock details separately, or count directly after a fresh validated read. Stale cached stock/prices are never used. Changed SKU identity or failed reads cannot silently open cached count data.
+
+Shortcut persistence uses separate `scpda-recent-products-v1` IndexedDB, scoped to branch/operator and limited to identity/name/query fields. It does not alter the count DB schema or delete count records/drafts on shortcut eviction. No migration, native auth or permission changes. Tests checked a saved count still appears after its shortcut is evicted, an unfinished count quantity survives navigation, account-switch separation, reopen persistence and late-result cancellation on logout.
+
+Passed: 25 focused model/reader/recent checks and 10 exact-APK browser/real-IndexedDB checks with a synthetic read bridge; 320/390/496px layouts, escaping, fresh reads, 10-item eviction and removed-button behavior. Signature/alignment/archive checks and compiled-icon geometry passed. Existing R6 HTTP/JVM/Postgres receipt evidence is historical and separate; R7 does not claim a new live authenticated read/count write or physical-phone acceptance.
+
+Source `6ef9f632a04463ddf0bbe69a54efa12aacbf9a11`; APK SHA-256 `8237892026566c66bea673e879cfd0e4e06ff4f33ea476173d72e0a695e64b61`, 2,990,917 bytes, same package/signing certificate. Uploaded APK, ZIP, instructions, mask preview and UI preview to [the verified existing Drive destination](../DELIVERY_LOCATION.md), names/sizes/parent IDs read back. Evidence `/workspace/artifacts/scpda-recent-safe-icon-2026-11-15/`. No credentials or sharing changes. Ephemeral QA browser/server closed; unrelated listeners preserved.
+
+The prior explicit production count-activation approval remains pending. No backend/admin deploy, migration083, production flags, credentials, device invitation, CORS, source-selection, Ada or CRM writes occurred. R7 remains count/lookup UI scope; the Preorder/member/price-inquiry handoffs through ledger `456bfe8` remain queued with their API/auth/staging prerequisites, not implemented or accepted by this release. Peer owner/implementation files were preserved.
