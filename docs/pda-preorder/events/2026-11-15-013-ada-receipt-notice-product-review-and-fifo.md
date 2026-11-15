@@ -10,7 +10,7 @@ The screenshot shows a StockDay Admin receipt page with **รออนุมั�
 
 ## Proposed flow
 
-1. Warehouse staff enter a supplier receipt once in ADA. After the receipt reaches its agreed posted/approved state, a backend connector notifies SCPDA with a stable ADA receipt-document and line ID, product identity, quantity, exact unit, approval state, source time and event version. Idempotent ingestion prevents a repeated notice or duplicate ADA stock entry.
+1. Warehouse staff enter a supplier receipt once in ADA. A backend connector notifies SCPDA when that receipt is first saved, with a stable receipt-document and line ID, product identity, quantity, exact unit, current approval state, source time and event version. If the state is **รออนุมัติ**, the row appears in the app but is blocked from allocation; a later CEO approval event updates that same row. Idempotent ingestion prevents a repeated notice or duplicate ADA stock entry.
 2. HQ opens the matching item, takes/attaches an arrival photo, records actual physical count and can expand optional lot/manufacture/expiry fields. SCPDA stores a verification/allocation record tied to the ADA document; it does not repeat the ADA inventory write.
 3. Reconcile document quantity against physical count. On discrepancy, hold allocation and route it to an authorized reconciliation process; don't silently edit official stock. Only reconciled, unreserved quantity can be allocated.
 4. For a provisional ADA item such as a placeholder, keep the request/receipt in **รอ CEO ระบุชื่อ/ตรวจรายการซ้ำ** and exclude it from ordinary allocations. Branch's label photo and trade name travel with the product-review request.
