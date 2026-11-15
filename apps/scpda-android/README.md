@@ -2,7 +2,15 @@
 
 This is the Android target of the existing SC StockDay PDA project. It retains the navy/yellow/white identity, manual camera capture, decoder and separate count demo. It does not publish the existing Site.
 
-## Current Android build — R10
+## Current Android build — R11
+
+Version `0.6.1-test.11` (code11) delivers the user-authorized count pilot. Existing operator01001 receives separate count-purpose access after a fresh registered-device/password login when the server enables it. Other readers remain read/local-only. Submit quantity/unit, lots and available manufacturing/expiry dates; unknowns stay null. Server receipts, explicit retries, offline queues, lost-response recovery and linked corrections are retained. Old local-only records are not silently uploaded.
+
+Reports appear on the existing website at **ข้อมูลสินค้า → เช็คสินค้า**, `#/stock-check`, for branch001 web accounts and admins. The page sorts latest server-received PDA reports first, unsubmitted products last, filters เภสัช/ปกติ/สามัญ and expands lot/date/receipt details. This reports count evidence; it does not overwrite Ada/Full Sync or sum independent rounds into a balance.
+
+The R10 alphanumeric-password support is included. Keep the existing package/signing key, installation registration and local data; install over the old app and log in again. No password/private setup file is packaged. Exact-APK/shipping-JVM/HTTP/PostgreSQL/admin UI tests passed, including manufacturing/expiry, offline cold reopen, duplicate recovery and correction. Live activation evidence and physical phone acceptance remain distinct; see [R11 notes](../../docs/SCPDA_COUNT_SEND_R11_2026-11-15.md).
+
+## Historical Android build — R10
 
 Version `0.6.0-test.10` (code10) supports the user's requested alphanumeric credential for existing reader01001. The login field is **รหัสผ่าน**, accepts text up to64characters, disables automatic capitalization/correction and preserves the exact value. Existing four-digit readers remain compatible. Android Java, the shared browser host and backend validation accept the same legacy4digits or6–64visible-ASCII password policy. The request key `pin` stays compatible with reader-v1. No production password/hash is in the APK or this repository.
 
