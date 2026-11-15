@@ -7,7 +7,18 @@ User instruction, 15 November 2026: place completed PDA app deliveries in Google
 - Verified parent: เภสัชอู๋, ID `1usItMowEj6llCqWYjdpMAkswB5bubGkD`.
 - Parent was found by exact name; the child was created under that verified parent. Existing sharing was preserved.
 
-## Current delivery — R5
+## Current delivery — R6
+
+| File | Bytes | Drive link |
+| --- | ---: | --- |
+| SCPDA-0.4.2-test.6.apk | 3031877 | [APK](https://drive.google.com/file/d/1wCL-tTel_zuyTEQoW64BOwgP7nXgEKQi/view?usp=drivesdk) |
+| SCPDA-0.4.2-test.6-Android-001.zip | 3792429 | [Installation package](https://drive.google.com/file/d/1EGmfgLZUkMBiM65cz3yCTcqF0x3Sg0B0/view?usp=drivesdk) |
+| START-HERE-SCPDA-0.4.2-test.6.txt | 5354 | [Instructions](https://drive.google.com/file/d/1Quk4rXWtbsvje80sVJ953PgzPV_SFq6n/view?usp=drivesdk) |
+| SCPDA-Icon-A-SC-Colours-2026-11-15.png | 1205912 | [Selected logo](https://drive.google.com/file/d/1p7fHzMWwEkzAetBDpynGl0CTa7ARV90f/view?usp=drivesdk) |
+
+R6 adds prefix category defaults, per-round submission clarity and the selected recolored A icon. Same package/signing key; production count activation still pending. All four names/sizes/parent IDs verified after upload; no remote checksum claim, sharing changes or credential uploads. Sanitized receipt: `/workspace/artifacts/scpda-category-brand-2026-11-15/GOOGLE-DRIVE-DELIVERY.json`.
+
+## Earlier delivery — R5
 
 | File | Bytes | Drive link |
 | --- | ---: | --- |

@@ -27,6 +27,11 @@ The user wants Preorder inside the same SCPDA Android app, reached through a sep
 
 This is a confirmed navigation direction only. It does not accept mobile API authentication, role provisioning, server schema, offline guarantees or production activation. Role-specific screens must derive from authenticated server capabilities rather than a local role switch.
 
+## Confirmed count-entry refinements — 15 November 2026
+
+- Use the leading product-name category token เภสัช / สามัญ / ปกติ as a default; unknown prefixes require explicit selection. Preserve previously selected draft/correction context. This is UI convenience, not server authorization or an inventory override.
+- Current manager-operated PDA pilot may submit a first or second independent round immediately without waiting for all three. A partial product count may be collected with its scope explicit. Rounds remain separate; collection is distinct from acceptance as a complete/current stock baseline. Additional lower-staff restrictions are future work, not a role/permission change in R6.
+
 ## Existing source evidence, not today's runtime proof
 
 The inspected preorder backend has authenticated web-session routes under `/api/customer-preorders` for cases, quotes, customer decisions, mark-ordered, case-level branch arrival/notification/completion, messages/photos, receipt/transfer evidence links and ETA. Its available source uses admin/staff checks.

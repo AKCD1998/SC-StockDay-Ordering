@@ -3,9 +3,9 @@
 - Owner: existing SCPDA smartphone/PDA chat.
 - Status: **ACTIVE_RETAINED**.
 - Actual current-thread ID: not exposed/verified here; do not substitute an attachment/source-relay ID.
-- Current R5 engineering checkout on original executor: `/workspace/reviews/scpda-unit-pastel-r5`; original checkout `/workspace/SC-StockDay-Ordering` and its dirty documentation are preserved.
-- Current delivery branch: `codex/pda-unit-pastel-r5` (existing project, isolated continuation).
-- Last app-code SHA: `31f82782d77720b3f081648f2e833f77c485b682` (R5); base `7018f122e757656ff7e8db9217e96ac427c63753`.
+- Current R6 engineering checkout on original executor: `/workspace/reviews/scpda-category-round-r6`; original checkout `/workspace/SC-StockDay-Ordering` and its dirty documentation are preserved.
+- Current delivery branch: `codex/pda-category-round-r6` (existing project, isolated continuation).
+- Last app-code SHA: `6f9fe19c005bad8fd9659a8a019af0121d70d296` (R6); R5 base `31f82782d77720b3f081648f2e833f77c485b682`.
 - Existing two unrelated dirty documentation files were preserved; this split did not stage or overwrite them.
 
 Last relevant delivery: user paused label OCR. Same private PDA Site last recorded v14 has manual lot/manufacture/expiry/quantity entry and barcode camera; manual save/reopen and scanner close were checked in a browser. Counts there are synthetic/browser-local. APK was not rebuilt by that change. This ledger update does not reverify today's hosted or physical-device state.
@@ -53,3 +53,15 @@ The user now asks that the Preorder feature prepared by the Preorder owner be in
 Current reviewed APK in the shared Drive folder is **0.4.1-test.5**; it keeps the scanner/count flow and has no Preorder tab. The proposed integration details are in [MOBILE_PREORDER_TAB_HANDOFF.md](../MOBILE_PREORDER_TAB_HANDOFF.md), and the user's request is recorded in [event 005](../events/2026-11-15-005-mobile-preorder-tab-request.md).
 
 Before real mobile Preorder calls, coordinate the registered-device auth adapter: backend PR #61 currently uses web-session authentication. Keep mobile role/case scope server-derived; isolate local count drafts and the PDA count-send/activation gate from preorder requests. The mobile domain call/contract is not accepted merely by adding a visible tab. The PDA owner should read this handoff and confirm the app-integration scope in their own thread.
+
+## 15 November — R6 category/round policy and selected SC logo
+
+User selected logo concept A (side-by-side SC plus yellow underline), requested the existing SC royal-blue/lemon/white palette, and clarified the current manager-operated pilot may submit round1 or round2 independently. R6 **0.4.2-test.6**, versionCode6, implements the selected recolored icon in launcher/header. It retains R5 unit defaults and pastel lot/date groups. A leading product-name token `เภสัช`, `สามัญ` or `ปกติ` defaults the category and displays it without a dropdown; unknown names allow an explicit selection. Existing chosen draft/correction categories and quantities are preserved. Prefix matching requires a token boundary and does not misclassify internal words/เภสัชกร. The round control now says `ส่งได้ทีละรอบ`; no third-round or complete-product prerequisite was introduced for collection. No server roles/accounts/permissions changed; future lower-staff restrictions are pending policy work.
+
+Passed: 21 focused model/reader-contract checks, signature/alignment/archive checks, and 7 linked exact-R6-APK → shipping host-JVM → marked fixture HTTP/PostgreSQL checks. The same operator01001 received distinct durable receipts for round1 quantity2 and round2 quantity3, with complete-product false in both; reference stock stayed 6/null/-2 and quantities were not added. Categories across all three prefixes, safe unknown-name selection, draft retention, unit default and 320/390/496px layout were checked. This is synthetic fixture evidence, not a genuine branch001 receipt or Android/WebView hardware acceptance. R5 admin review evidence retains its own dated scope.
+
+APK SHA-256 `7519d548d41c0c3c04be4185c1641d216738e8db958e145654664cd69bb0a1fa`, 3,031,877 bytes; same package/certificate. [Current Drive delivery](../DELIVERY_LOCATION.md) has APK, ZIP, instructions and selected logo master, with names/sizes/parent IDs read back. No credentials were uploaded. Exact local evidence: `/workspace/artifacts/scpda-category-brand-2026-11-15/`. Original generated images are retained. Only the owned fixture listener/container were stopped; previous fixture state/data and original product name retained.
+
+The R5 live collection activation request is **still pending**; the latest UI/round/logo feedback does not approve migration083, production deployments or flags. No production schema, backend/admin deploy, account/PIN/device/CORS or stock-source/Ada adjustment changes were performed. Current APK continues to negotiate the pending count service rather than pretending local saves have receipts.
+
+PDA owner read the new Preorder bottom-tab handoff at canonical `9ea3589` and acknowledges the requested two-tab navigation scope for the next integration work. R6 was already built/tested for the active count-entry/logo changes and contains no Preorder tab. No mobile preorder API/auth acceptance or production readiness is claimed; the registered-device adapter and draft server capability contract remain prerequisites. Keep that requested integration queued and coordinate through this ledger, preserving count drafts/receipts and the separate Preorder owner. No new owner/project or direct chat message was created.
