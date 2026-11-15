@@ -1,6 +1,6 @@
 # Shared checkpoint — 15 November 2026 (Bangkok)
 
-Status: **PREORDER_CHAT_CLAIMED / ISOLATED_WORK_PENDING**. This file records verified source/artifact checkpoints, not a fresh production-service health check.
+Status: **PREORDER_CHAT_CLAIMED / ISOLATED_REVIEW_DRAFTS_READY**. This file records verified source/artifact checkpoints, not a fresh production-service health check.
 
 ## Ownership admission
 
@@ -10,7 +10,7 @@ Status: **PREORDER_CHAT_CLAIMED / ISOLATED_WORK_PENDING**. This file records ver
 | Preorder business domain, web and domain API | User-opened chat **เพิ่มฟีเจอร์ใหม่ในแอพและเว็บ** (`01a1dd34-c898-7689-a2a9-fe3f962c212d`; thread `6af923e6-aeb8-8191-8f37-c6ca3bacb094`) | Active owner admission recorded 15 Nov 2026; work remains isolated from PDA code |
 | Shared mobile ↔ preorder interface | Both owners, contract changes recorded here | Business roles confirmed; new API contract still proposed |
 
-Do not invent thread IDs. The actual destination thread and user message were verified with `read_thread`. No cross-thread messaging operation is callable, so no message to the PDA chat is claimed.
+Do not invent thread IDs. The actual destination thread and user message were verified with `read_thread`. No direct cross-thread messaging operation is callable. The PDA owner later acknowledged the admission through the common Git ledger in [the Android readiness event](events/2026-11-15-pda-android-readiness.md); this is not a direct chat message or a claim of shared executor access.
 
 ### User-identified destination (15 November)
 
@@ -18,7 +18,7 @@ The user supplied the existing destination chat **เพิ่มฟีเจอ
 
 `codex://threads/6af923e6-aeb8-8191-8f37-c6ca3bacb094?hostId=durable`
 
-The current task is this verified destination chat. The attached executor is a different Cloud environment: `/workspace/Chavit` is the only local project checkout, on branch `work` at `de95067` with a clean worktree; no StockDay or PaaS checkout is present. GitHub read access confirmed the source branches and draft PR. A handoff is posted in [event 002](events/2026-11-15-002-destination-identified.md). Cross-thread delivery to the PDA chat remains unavailable; this admission does not claim PDA-owner acknowledgment. No replacement chat/agent was created.
+The current task is this verified destination chat. Separate review checkouts are now available at `/workspace/sc-preorder-web` and `/workspace/sc-preorder-backend`; their current branch/commit and PR records are below. The ownership handoff is in [event 002](events/2026-11-15-002-destination-identified.md). Direct cross-thread messaging remains unavailable; the peer acknowledgment came through this shared ledger. No replacement chat/agent was created.
 
 ## User-confirmed corrections
 
@@ -36,23 +36,25 @@ The current task is this verified destination chat. The attached executor is a d
 | Web main checked 15 Nov | `d6017807eaed1815f871c95d74db21929d123fad` |
 | PDA branch source | `codex/pda-durable-demo`, `7018f122e757656ff7e8db9217e96ac427c63753`; label OCR entry removed |
 | Current-recorded private PDA browser preview | `https://sc-stockday-pda-lab.scgroup1989-it.chatgpt.site/`, last published Site v14; manual fields/scanner tested on 13 Nov; synthetic browser-local counts, not a live preorder integration |
-| Preorder preparation | `codex/preorder-three-role-readiness`, `69c78cdae320b202857d2978af4d709e9e859fd9` |
-| Review | [Draft PR #100](https://github.com/AKCD1998/SC-StockDay-Ordering/pull/100); freshly checked open/draft at head `69c78cdae320b202857d2978af4d709e9e859fd9`, base `d6017807eaed1815f871c95d74db21929d123fad`; not merged or deployed by this work |
-| Feature flag | `VITE_FEATURE_PREORDER_ROLE_WORKSPACE=false` by default; no runtime flag changed |
-| Backend source inspected for R3 | Available local checkout `40ef239a43b7ba2104376aad296242b062ba28d1`; not a claim about today's live revision |
-| Current backend source ref | `AKCD1998/PaaSRTSM-project` `main` at `46985c97491529311ccaa4366ab5905b2c4759fc`; `AGENTS.md` read remotely; no local checkout yet |
-| R3 tests | 8 workspace tests + 9 existing preorder helper tests + 4 navigation/session tests passed; admin-web production build passed with existing bundle-size warning |
+| Preorder preparation | `codex/preorder-three-role-readiness`, updated to `7b7c1f63e25b33e7c7b2b3c31e3e3721869a2183` |
+| Web review | [Draft PR #100](https://github.com/AKCD1998/SC-StockDay-Ordering/pull/100); open/draft, head `7b7c1f63e25b33e7c7b2b3c31e3e3721869a2183`, base `d6017807eaed1815f871c95d74db21929d123fad`; not merged or deployed |
+| Web flag | `VITE_FEATURE_PREORDER_ROLE_WORKSPACE=false` by default; backend role-workspace flag also defaults off; no runtime flag changed |
+| Backend source inspected for R3 | `AKCD1998/PaaSRTSM-project` `main` at `46985c97491529311ccaa4366ab5905b2c4759fc`; root `AGENTS.md` read from the actual checkout |
+| Backend review | [Draft PR #61](https://github.com/AKCD1998/PaaSRTSM-project/pull/61), head `4ae69908ef1d690432ce01a04aadc6abb7411f9e`, base `46985c97491529311ccaa4366ab5905b2c4759fc`; open/draft, not merged/deployed |
+| Migration | `080_add_preorder_hq_physical_receipts.sql` is in PR #61 for review; no migration applied. Current main highest is 079 |
+| Earlier R3 evidence | 8 workspace tests + 9 existing preorder helper tests + 4 navigation/session tests passed; admin-web production build passed with existing bundle-size warning, before continuation commits |
+| Continuation checks | `git diff --check` passed for both continuation patches. No tests were run for web `7b7c1f6` or backend `4ae6990` |
 | R3 review mockup | 17 browser checks; one synthetic request supplied in two rounds 2+1, 15 in-memory actions; not a durable API/database/auth proof |
 | Installed APK | Not rebuilt or changed by the OCR pause/R3 preparation/ledger work; current physical-phone runtime not reverified |
 
 ## Implemented vs pending
 
-Implemented in isolated web code: separate workspace admission, subject/branch binding, purchasing/logistics/branch capability allowlists, role-specific action/evidence/internal-note UI, no legacy-admin fallback when the new workspace contract is absent. When its flag is off, the existing preorder UI remains.
+Prepared in isolated web/API branches: subject-bound server workspace manifests and capability checks; purchasing, HQ fulfillment and branch profile scopes; fulfillment-safe case DTOs; branch session mapping into existing staff workflow handlers only under an authorized branch profile; and append-only physical HQ receipt count/correction events separate from receipt documents. The web receipt panel records a physical quantity before HQ fulfillment can allocate the source and keeps an idempotency key across a page reopen. Both feature flags remain off by default. Draft PRs #100 and #61 are unmerged and undeployed.
 
 **Pending before enabling the new flow:**
 
-1. Accepted authenticated server workspace manifest, provisioning of the dedicated HQ business role, server action authorization and field filtering.
-2. Physical HQ/branch receipt, shipment planning/dispatch and customer handover quantities, partial supply, corrections, idempotency/version receipts and durable shared persistence. Existing receipt/transfer evidence links are not physical count events.
+1. Review/accept and provision the server role policy/manifest and dedicated HQ profile; verify capability and DTO filtering against staging.
+2. Review migration 080 before application. Multi-shipment persistence, dispatch, branch physical receipt, customer handover, partial supply and their correction/idempotency/version events remain pending. Existing transfer/document links are not physical movement events.
 3. Accepted mobile auth/identity adapter into the same preorder domain and private attachment/offline behavior.
 4. Approved reachable staging service and verified UI → API → durable store → receipt → second client/restart/offline retry, before any rollout approval.
 

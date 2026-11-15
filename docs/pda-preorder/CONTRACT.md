@@ -29,9 +29,15 @@ The inspected mobile enrollment/scan routes under `/api/mobile` and lookup alias
 
 ## Proposed, not accepted as deployed
 
-PR #100's gated UI proposes `GET /api/customer-preorders/workspace` with version **`sc-preorder-three-role-r3-v1`**, `subjectUserId`, `workRole` (`purchasing`/`fulfillment`/`branch`), branch scope and capabilities. The backend endpoint/provisioning is not implemented by that PR. The new web flag stays false. Missing/unknown/mismatched admission fails closed; never grant Boom global admin to bypass it.
+PR #100's gated UI and backend draft PR #61 propose `GET /api/customer-preorders/workspace` with version **`sc-preorder-three-role-r3-v1`**, `subjectUserId`, `workRole` (`purchasing`/`fulfillment`/`branch`), branch scope and capabilities. PR #61 adds server profiles, the manifest endpoint, capability checks and fulfillment-safe case DTOs. Its source config example is `PREORDER_WORKSPACE_PROFILES=subject=purchasing;subject=fulfillment;subject=branch:001`; the feature flag defaults off. Neither PR is merged/deployed or accepted as a shared mobile contract. Missing/unknown/mismatched admission fails closed; never grant Boom global admin to bypass it.
 
-Physical count/receipt, planning/dispatch and partial handover APIs, DTOs and durable schema remain to be accepted. New work must specify stable IDs, verified units, actor/branch scope, quantities, expected versions, append-only corrections, idempotency keys that survive retries, server receipts and ambiguity/conflict handling. No official endpoint name or schema is implied by a diagram/mockup.
+### Proposed physical HQ receipt delta — PR #61, not accepted
+
+The backend branch proposes `POST /api/customer-preorders/cases/:publicId/items/:itemId/receipt-verifications` for the `receipts.physical.record` capability. The body has `expectedVersion`, `expectedBatchVersion`, `quantity` (up to 4 decimal places), exact `unit`, timezone-explicit `observedAt`, `idempotencyKey`, and a source approved-receipt reference (`sourceBranch`, `docNo`, `seqNo`); `reason` is required for corrections and counts above document quantity. The response includes `receiptEventId`, `quantity`, `unit`, `observedAt`, resulting case/batch versions and whether the request was replayed.
+
+Migration `080_add_preorder_hq_physical_receipts.sql` proposes a source-line batch/current count plus append-only `COUNTED`/`CORRECTED` events with actor, time, version chain, idempotency key and payload hash. Fulfillment allocation is limited to the current physical quantity and exact unit; a correction cannot lower it below active allocations. The migration is present in draft PR #61 for review only and has not been applied. This does not write Ada/POS inventory.
+
+This delta does not provide mobile authentication, dispatch/transfer counts, branch physical receipt or customer handover. Multi-shipment and partial quantity lifecycle remain pending. No phone client should call the proposed web-cookie route until the PDA owner reviews and an approved mobile adapter/transport is agreed. The web/API branch is a review artifact, not evidence of live staging behavior.
 
 Authentication/enrollment, private photo handling and offline cold-reopen must be validated against an approved reachable staging service before a mobile production-ready claim. Component tests and a local mockup do not replace a UI → API → durable store → receipt → another-client/restart proof.
 
