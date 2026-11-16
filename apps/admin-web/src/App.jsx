@@ -16,6 +16,7 @@ import ReviewQueuePanel from "./ReviewQueuePanel.jsx";
 import IngredientDictionaryPanel from "./IngredientDictionaryPanel.jsx";
 import PreorderPanel from "./preorders/PreorderPanel";
 import PosAdminPanel from "./PosAdminPanel.jsx";
+import AppCenterPanel from "./AppCenterPanel.jsx";
 import MembersPanel from "./MembersPanel.jsx";
 import Shopee004ExceptionsPanel from "./Shopee004ExceptionsPanel.jsx";
 import SpecialVigilantProducts from "./SpecialVigilantProducts.jsx";
@@ -2012,6 +2013,8 @@ export default function App() {
         <PreorderPanel enabled={customerPreordersEnabled} csrfToken={session.csrfToken} isAdmin={isAdminUser} branchCode={branchCode} apiBaseUrl={apiBaseUrl} onBadgeChanged={refreshPreorderBadgeCount} />
       ) : view === "pos-admin" && isAdminUser ? (
         <PosAdminPanel />
+      ) : view === "app-center" ? (
+        <AppCenterPanel isAdminUser={isAdminUser} csrfToken={session.csrfToken} />
       ) : view === "members" ? (
         <MembersPanel isAdmin={isAdminUser} csrfToken={session.csrfToken} />
       ) : (

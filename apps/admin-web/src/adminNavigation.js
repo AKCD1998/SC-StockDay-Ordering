@@ -26,6 +26,7 @@ export const adminViewKeys = [
   "focus-products",
   "preorder",
   "members",
+  "app-center",
   ...adminOnlyViews,
 ];
 
@@ -40,6 +41,7 @@ const ADMIN_VIEW_ROUTE_SEGMENTS = {
   "focus-products": "focus-products",
   preorder: "preorder",
   members: "members",
+  "app-center": "app-center",
   "pos-admin": "pos-admin",
   "shopee004-exceptions": "shopee004-exceptions",
   "ky9-documents": "ky9-documents",
@@ -63,6 +65,7 @@ export function canUseStockCheck({enabled,role,branchCode,actorBranchCode}) {
 
 export function getNavigationGroups(isAdminUser, hideDashboard = false, stockCheckAllowed = false) {
   return [
+    { id: "company-apps", label: "SC App Center", shortLabel: "AP", items: [{label:"แอปบริษัท",view:"app-center",description:"ติดตั้งและอัปเดตแอปของ SC"}] },
     {
       id: "dashboard",
       label: "Dashboard",
