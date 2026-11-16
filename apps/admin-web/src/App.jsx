@@ -16,6 +16,7 @@ import ReviewQueuePanel from "./ReviewQueuePanel.jsx";
 import IngredientDictionaryPanel from "./IngredientDictionaryPanel.jsx";
 import PreorderPanel from "./preorders/PreorderPanel";
 import PosAdminPanel from "./PosAdminPanel.jsx";
+import AppCenterPanel from "./AppCenterPanel.jsx";
 import MembersPanel from "./MembersPanel.jsx";
 import Shopee004ExceptionsPanel from "./Shopee004ExceptionsPanel.jsx";
 import SpecialVigilantProducts from "./SpecialVigilantProducts.jsx";
@@ -1886,6 +1887,10 @@ export default function App() {
         onSubmit={handleLogin}
       />
     );
+  }
+
+  if (view === "app-center") {
+    return <div className="ac-standalone-page"><AppCenterPanel isAdminUser={isAdminUser} csrfToken={session.csrfToken} userLabel={session.user.id} onBack={() => setView("receipts")} onLogout={handleLogout} /></div>;
   }
 
   return (
