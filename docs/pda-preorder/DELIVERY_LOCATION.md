@@ -7,7 +7,19 @@ User instruction, 15 November 2026: place completed PDA app deliveries in Google
 - Verified parent: เภสัชอู๋, ID `1usItMowEj6llCqWYjdpMAkswB5bubGkD`.
 - Parent was found by exact name; the child was created under that verified parent. Existing sharing was preserved.
 
-## Current delivery — R14
+## Current delivery — R15 / App Center
+
+| File | Bytes | Drive link |
+| --- | ---: | --- |
+| SCPDA-0.7.0-test.15.apk | 3007301 | [Download](https://drive.google.com/file/d/1fUfOJ1jyHog285g-SyvkgEMOfhQPhbVe/view?usp=drivesdk) |
+| SCPDA-0.7.0-test.15-Android-AppCenter.zip | 2871374 | [Download](https://drive.google.com/file/d/1rKoskh2gQPQ9d3Vjt5Ur1PeMMkGl66il/view?usp=drivesdk) |
+| START-HERE-SCPDA-0.7.0-test.15.txt | 4132 | [Download](https://drive.google.com/file/d/1OoMPmq7bmX42a3DS08rFSUHSTg0wWoF2/view?usp=drivesdk) |
+| SC-App-Center-Home.png | 53884 | [Download](https://drive.google.com/file/d/18sCjqA3c02klXtFhxlH2y-c_qUs3A4KH/view?usp=drivesdk) |
+| SC-App-Center-App-Details.png | 67456 | [Download](https://drive.google.com/file/d/1Lvh31snAAo1sgB3gHoCZvxSDXZ4KBu3P/view?usp=drivesdk) |
+
+Also published in [live SC App Center](https://sc-stockday-ordering.onrender.com/#/app-center). Install R15 over the paired app once to bootstrap update checks; same account/package/signature/storage, no new setup file. APK SHA256 `075620ecd49ba69b71d8698925e3deab7f08934c5753148d9b4afdd07e20f594`. Backend/web/publication verified live; browser/Java/exact-APK checks passed with their separate scopes, physical Android installation still pending. All five names/sizes/parent IDs read back; existing owner/writer sharing preserved, no public/domain permissions or credentials in delivery. No remote checksum claim. Previews are SC fixture captures; third-party research images are excluded. [R15 source/evidence](events/2026-11-16-pda-r15-app-center.md); original executor receipt `/workspace/artifacts/sc-app-center-2026-11-16/GOOGLE-DRIVE-DELIVERY.json`.
+
+## Earlier delivery — R14
 
 | File | Bytes | Drive link |
 | --- | ---: | --- |

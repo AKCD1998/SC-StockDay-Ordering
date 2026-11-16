@@ -1,6 +1,6 @@
 # Shared checkpoint — 16 November 2026 (Bangkok)
 
-Status: **PDA_COUNT_001_AND_005_LIVE / PREORDER_CHAT_CLAIMED / PREORDER_REVIEW_DRAFTS_READY**. R12 deployment/config/schema verified16 Nov09:37 Bangkok; a genuine005 receipt was matched at10:16. R13 combined mobile UI delivered11:20; R14 adds automatic date slashes/explicit Gregorian labels and is delivered. Physical R14 acceptance remains pending. Preorder drafts remain separate and undeployed.
+Status: **PDA_COUNT_001_AND_005_LIVE / SC_APP_CENTER_LIVE / PREORDER_CHAT_CLAIMED / PREORDER_REVIEW_DRAFTS_READY**. R12 deployment/config/schema verified16 Nov09:37 Bangkok; a genuine005 receipt was matched at10:16. R13 combined mobile UI delivered11:20; R14 adds automatic date slashes/explicit Gregorian labels and is delivered. R15/App Center is live and delivered; first updater build needs manual install once. Physical Android installer acceptance remains pending. Preorder drafts remain separate and undeployed.
 
 ## Ownership admission
 
@@ -33,12 +33,12 @@ The current task is this verified destination chat. Separate review checkouts ar
 
 | Item | Evidence / state |
 |---|---|
-| Web main checked 16 Nov | `f9bf49d4054cb8424573800806d2552c548d4c52`, live R12 admin005 selector |
-| PDA branch source | Current R14 `codex/scpda-next-ui-batch`, compiled/pushed `786ce19074433de96626f3f8b8067fde8e356669`; [PDA owner checkpoint](owners/PDA.md) |
-| Combined mobile UI batch | R13 queue-only panel/direct date/year/month selector included; R14 follow-up auto-inserts slashes during typing and labels day/month/Gregorian year. [R14 event](events/2026-11-16-pda-r14-date-mask.md) |
+| Web main checked 16 Nov | `350771b0977693d9a74dd23c42b0484ddfe6ffa0`, live standalone App Center storefront (includes previous001/005 count catalog and print-register work) |
+| PDA branch source | Current R15 `codex/scpda-app-center-r15`, compiled `27ea94cdffa64be7c5fc14ea1019cff37c6b6f2e`, QA-only head `d99c106084bd5a00923890e42da400fadbbbb860`; [PDA owner checkpoint](owners/PDA.md) |
+| Combined mobile UI batch | R13 pending-only medicine queue, R14 live date slashes/Gregorian labels and R15 App Center update client are included in delivered R15. [R15 event](events/2026-11-16-pda-r15-app-center.md) |
 | Android source handoff | [Verified source paths, fetch instructions and joint workflow](PDA_SOURCE_AND_CONTINUATION.md); source exists in Git, Drive is delivery only. User requested clarification to Preorder owner; receiver acknowledgment is not yet recorded |
 | Latest APK in Drive | [SCPDA0.6.2-test.12](https://drive.google.com/file/d/1K-JEn0hS76QUIlwQnZ6PggjrMse2H4DE/view?usp=drivesdk),16 Nov; new01005/005 phone trial and existing001 support. Same package/signing key and R9 UI; mobile Preorder remains separate |
-| PDA count activation / web stock check | User-authorized01001/001 and01005/005 count intake live. Backend `f4e617eef9a9eb805bec3383828a5ac97705e4e2`, web above, migration083/084 applied. Admin sees001/005 separately; branch001 web access remains001-only. No005 web login, Ada adjustment or current-stock-source override. [R12 evidence](events/2026-11-16-pda-branch005-pilot.md) |
+| PDA count activation / web stock check | User-authorized01001/001 and01005/005 count intake live. Backend `79852be0b3a34f5fa760b362d52febec57b631bc`, web above, migration083/084 applied. Admin sees001/005 separately; branch001 web access remains001-only. No005 web login, Ada adjustment or current-stock-source override. [R12 evidence](events/2026-11-16-pda-branch005-pilot.md) |
 | Mobile integration request | Latest direction: `นับสต๊อก / พรีออเดอร์ / เช็คราคา`; catalog price check is separate from customer price inquiry. R8 shell/price reads implemented. A registered-device Bearer adapter into the existing Preorder domain is now in draft PR #61; Android client integration is still pending. [R8 event](events/2026-11-15-pda-r8-price-check.md), [adapter event](events/2026-11-15-014-mobile-bearer-adapter.md) |
 | Customer lookup/sync request | User specified phone-first member lookup, single/multiple/no-match behavior, double-confirm for new members and SCCRM → ADA → all-branch SCPDA sync; detailed in [event 006](events/2026-11-15-006-mobile-member-lookup-sync.md). Draft API now supports exact-phone existing-member lookup and stable member reference on a preorder case (`9c206b1`, PR #61); SCCRM member creation and downstream sync receipt remain unimplemented. See [event 015](events/2026-11-15-015-member-directory-and-registration-boundary.md) |
 | Request-mode correction | User corrected the paths: Preorder skips `ตอบราคา`; price inquiry ends if declined and continues to status/receipt/allocation if accepted; [event 009](events/2026-11-15-009-corrected-mode-flow-and-cancel.md) supersedes event 007's flow interpretation |
@@ -53,11 +53,15 @@ The current task is this verified destination chat. Separate review checkouts ar
 | Preorder flags | `VITE_FEATURE_PREORDER_ROLE_WORKSPACE=false` by default; backend role-workspace flag also defaults off; no Preorder runtime flag changed by R11 |
 | Backend source inspected for R3 | `AKCD1998/PaaSRTSM-project` `main` at `46985c97491529311ccaa4366ab5905b2c4759fc`; root `AGENTS.md` read from the actual checkout |
 | Backend review | [Draft PR #61](https://github.com/AKCD1998/PaaSRTSM-project/pull/61), latest head `c5a28bf16391f0ae22838c6a7bc31f30d6a49098`; adds enrolled-PDA bearer adapter (`e9057f1`), exact existing-member lookup (`9c206b1`), API contract docs (`61e8bb7`) and pending/approved HQ receipt notifications (`c5a28bf`). CI runs `43709199891`, `43710628130` and `43712475237` passed. Open/draft, not merged/deployed. |
-| Preorder migration | `080_add_preorder_hq_physical_receipts.sql` remains in PR61 for review, not applied. Backend main now includes separately authorized PDA083 and084; highest084 verified16 Nov. Re-fetch before choosing another number |
+| Preorder migration | `080_add_preorder_hq_physical_receipts.sql` remains in PR61 for review, not applied. Backend main now includes separately authorized PDA083 and084; highest086 verified16 Nov (App Center metadata only). Re-fetch before choosing another number |
 | Earlier R3 evidence | 8 workspace tests + 9 existing preorder helper tests + 4 navigation/session tests passed; admin-web production build passed with existing bundle-size warning, before continuation commits |
 | Continuation checks | `e9057f1` changed API files passed `node --check` and `git diff --check`; CI run `43709199891` passed. Member-directory commit `9c206b1` changed API files and `git diff --check` passed; CI run `43710628130` passed. Pending/approved notification code commit `c5a28bf` passed `git diff --check`; CI run `43712475237` passed. Web receipt-task commit `c388247` passed `git diff --check`; CI run `43712453471` passed. No separate local test suite was run for these continuation commits |
 | R3 review mockup | 17 browser checks; one synthetic request supplied in two rounds 2+1, 15 in-memory actions; not a durable API/database/auth proof |
-| APK status | Latest delivered0.6.4-test.14;12 focused model and13 source-UI checks passed, signed/aligned with the same package/key. Physical R14 trial pending. Earlier R13 native/admin-web proof remains scoped to R13. Prior005 real receipt/review/current-balance distinction preserved. [Delivery](events/2026-11-16-pda-r14-date-mask.md) |
+| APK status | Delivered0.7.0-test.15; same package/signing key/storage. First updater-capable install is manual once. Host/source/exact-APK tests passed; physical Android installer acceptance pending. Live App Center publishes signed APK15. [Evidence/delivery](events/2026-11-16-pda-r15-app-center.md) |
+
+## SC App Center
+
+[Live storefront](https://sc-stockday-ordering.onrender.com/#/app-center); existing web login, published-app catalog only for staff/branches and separate admin Manage. Backend `79852be0b3a34f5fa760b362d52febec57b631bc`, web `350771b0977693d9a74dd23c42b0484ddfe6ffa0`, migration086 additive; first real R15 release `9f580a30-93ab-46e7-9300-089ec8cd6205`. Device-proof checks are download-only and grant no stock/Preorder permissions. Private R2 bytes, scoped build publisher and app-source/delivery evidence are in [R15 event](events/2026-11-16-pda-r15-app-center.md). App source is on its own branch, not the coordination branch or the older app files on main. No iOS or Google Play publication is claimed.
 
 ## Implemented vs pending
 

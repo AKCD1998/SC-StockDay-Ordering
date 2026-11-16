@@ -1,0 +1,40 @@
+# SCPDA R15 and SC App Center — live
+
+16 November2026. User authorized GitHub know-how research followed by a working SC App Center, then steered the visual design toward familiar Google Play/App Store examples. The web storefront was revised before publication: search/apps screen, separate product page with SC app screenshots and install action, Updates, and an admin-only Manage tab. Existing StockDay login is retained; the storefront has its own page shell/account return to StockDay.
+
+## Sources and design
+
+- Researched [Zealot](https://github.com/tryzealot/zealot) (MIT release/history workflow), [AppUpdater](https://github.com/jenly1314/AppUpdater) (MIT prompt/download/installer workflow), actual Google Play/Apple App Store product-page screenshots, Apple product-page guidance and Material search/app bars. Avoided adding a separate Rails/login stack. Actually reused Apache2 `@devicefarmer/adbkit-apkreader@3.2.4` for the binary Android manifest; existing SC cookie auth, private R2 and device identities are reused.
+- SC blue/yellow/white, SC’s own app icon/screenshots. No third-party screenshots ship in product assets and no invented app counts, ratings, reviews or popularity claims. The first catalog app is SCPDA Android; this is a private SC portal, not publication to Google Play/Apple App Store or an iOS app build.
+- App compiled source `27ea94cdffa64be7c5fc14ea1019cff37c6b6f2e`, branch `codex/scpda-app-center-r15`. QA-only harness head `d99c106084bd5a00923890e42da400fadbbbb860` is pushed; no app asset/code changed after the build. Original checkout `/workspace/reviews/scpda-app-center-r15-20261116`.
+- Backend [PR65](https://github.com/AKCD1998/PaaSRTSM-project/pull/65), source `5f3ae1edc5d418a42214f07099f1192160bf49be`, merged/live `79852be0b3a34f5fa760b362d52febec57b631bc`. Web [PR104](https://github.com/AKCD1998/SC-StockDay-Ordering/pull/104), final source `f4961570983cce89a33a8550f5c75c64c64db1f3`, merged/live `350771b0977693d9a74dd23c42b0484ddfe6ffa0`. App source is separate from web main; do not use an older app directory on main as the delivered APK source.
+
+## Deployment and release
+
+- Backend deploy `dep-dbt94vdbedkc73d0ovcg` live05:21:57UTC; website `dep-dbt9cf5bedkc73d0vp0g` live05:36:11UTC. Existing services/workspace reused; actual auto-deploy is enabled (backend after checks, static web on commit). The new scoped publisher env update also triggered a harmless previous-commit config deploy `dep-dbt92667bikc73ddr7v0`, superseded by the new code. No duplicate manual code deploy was triggered.
+- Migration **086_add_sc_app_center.sql** is additive, applied by the configured Linux pre-deploy runner; production paths were verified through085 beforehand. Highest backend migration is now086; re-fetch before choosing a later number. New release metadata only; no count/stock tables changed.
+- Existing private R2 stores immutable APK bytes under `sc-app-center/production/scpda/`; publication re-reads/hashes the actual stored bytes. No new paid service or public bucket/sharing change. Administrator cookie/CSRF can upload drafts/publish/withdraw. A dedicated private `SC_APP_CENTER_PUBLISHER_TOKEN` allows signed-SCPDA build publication only, with audit actor `system:scpda-build`; it is not an admin impersonation credential and is excluded from all deliveries. Original executor private location is `/workspace/private/sc-app-center/publisher-token.txt`. In this Cloud executor, the Node publication command needed `NODE_USE_ENV_PROXY=1`; the initial direct-fetch failure made no release, retry succeeded idempotently.
+- First real published release `9f580a30-93ab-46e7-9300-089ec8cd6205`, **0.7.0-test.15**, versionCode15, at05:29:28UTC. Actual release row/status/private namespace and hash verified read-only after publication. APK **3,007,301bytes**, SHA256 `075620ecd49ba69b71d8698925e3deab7f08934c5753148d9b4afdd07e20f594`; same package/signing certificate as prior releases.
+- [Live SC App Center](https://sc-stockday-ordering.onrender.com/#/app-center). Website bundle/styles/API origin verified from the live static response. Backend health200; anonymous catalog, reader session and count admission401. No production device was created and no stock/count observation or Ada adjustment was written for this work.
+
+## Phone behavior and proof limits
+
+Already paired phones use a fresh, purpose-bound EC device challenge before operator login. Reader/count tokens are not reused. Download tickets are short-lived and artifact-only. Android checks versionCode, size, SHA256, package, platform and existing certificate; a non-exported read-only provider grants access to exactly the checked APK. Android’s installation-source permission and final confirmation are still required. No silent install is claimed.
+
+R15 is the first updater-capable APK, so install it over the existing paired release once. No uninstall/clear-data/new invitation. Later published versions are checked at startup; Settings has **SC App Center · ตรวจอัปเดต**. Current-version/offline startup does not block login. Counts/drafts/upload receipts/Keystore alias/WebView origin/storage schema remain; autosave is awaited before installation handoff. R13 pending-only queue and R14 numeric date mask/labels are included. A server receipt remains count evidence, not official Ada/current-balance adoption. Preorder identity/ownership and paused OCR are unchanged.
+
+- Signed/tampered actual APK + real HTTP/Postgres publication/auth/device/replay/download/withdrawal tests passed;7 POS/branch regressions passed. Backend PR CI and main CI passed.
+-15 navigation regressions and web build passed; final web PR CI passed.7 revised-storefront browser checks passed through actual React/HTTP/Postgres with synthetic private object storage, including actual signed R15 upload, draft isolation, preview/back/search, exact downloaded hash and320/390/496px layouts. Earlier5-check catalog proof is retained with its earlier scope.
+-7 source-phone update UI checks,3 exact-APK update UI checks,13 date and8 queue browser regressions passed. Shipping Java update-client device proof/newer/equal-version/private download hash roundtrip passed against the isolated HTTP server. Android sources compile and APK archive/alignment/v2/v3 signature/icon-safe-zone checks passed. Host browser/native-bridge/installer simulations are not physical Android installation acceptance; that remains next on the user’s phone.
+- Original artifacts `/workspace/artifacts/sc-app-center-2026-11-16/`: `DEPLOYMENT.json`, `PUBLICATION.json`, `VERIFIED-APK.json`, test reports, `APK-IDENTITY.json`, `PACKAGE.json`, `GOOGLE-DRIVE-DELIVERY.json` and scoped previews. Own HTTP/Vite/disposable PostgreSQL resources were stopped; existing worktrees/test stores preserved.
+
+## Delivery
+
+Verified **เภสัชอู๋ / pdaAppProject**, existing individually shared owner/writer permissions, no anyone/domain sharing:
+
+- [APK](https://drive.google.com/file/d/1fUfOJ1jyHog285g-SyvkgEMOfhQPhbVe/view?usp=drivesdk),3,007,301bytes.
+- [Android/App Center ZIP](https://drive.google.com/file/d/1rKoskh2gQPQ9d3Vjt5Ur1PeMMkGl66il/view?usp=drivesdk),2,871,374bytes.
+- [Instructions](https://drive.google.com/file/d/1OoMPmq7bmX42a3DS08rFSUHSTg0wWoF2/view?usp=drivesdk),4,132bytes.
+- [Home preview](https://drive.google.com/file/d/18sCjqA3c02klXtFhxlH2y-c_qUs3A4KH/view?usp=drivesdk),53,884bytes; [app detail preview](https://drive.google.com/file/d/1Lvh31snAAo1sgB3gHoCZvxSDXZ4KBu3P/view?usp=drivesdk),67,456bytes. These are scoped fixture previews, not screenshots of a logged-in production user.
+
+All five names/sizes/parent IDs were read back; no remote checksum claim. Allowlisted ZIP contains no passwords, invitations, private keys, publisher token, fixture data or third-party research images. Future normal releases can be uploaded/published from **Manage → เพิ่มรุ่นใหม่** without redeploying the website; owner build automation can reuse backend `scripts/publish_scpda_release.js` with its private scoped token. Existing operator credentials are unchanged; app01001/01005 identities are not StockDay web logins.
