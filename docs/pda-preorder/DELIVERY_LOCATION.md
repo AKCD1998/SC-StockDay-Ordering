@@ -7,7 +7,18 @@ User instruction, 15 November 2026: place completed PDA app deliveries in Google
 - Verified parent: เภสัชอู๋, ID `1usItMowEj6llCqWYjdpMAkswB5bubGkD`.
 - Parent was found by exact name; the child was created under that verified parent. Existing sharing was preserved.
 
-## Current delivery — R15 / App Center
+## Current delivery — R16 / new004 phone
+
+| File | Bytes | Drive link |
+| --- | ---: | --- |
+| SCPDA-0.7.1-test.16.apk | 3007301 | [Download](https://drive.google.com/file/d/1uZaynccoz8P-n67XPBbrN31znPQELoqf/view?usp=drivesdk) |
+| SCPDA-004-device-setup.json | 290 | [Download](https://drive.google.com/file/d/1wq2_uolNesVdQHYbEDxYRejwFKMT_hLw/view?usp=drivesdk) |
+| START-HERE-SCPDA-004-R16.txt | 4255 | [Download](https://drive.google.com/file/d/1ilx5E9sfFSvSqyaW89rwej0ZfPInoBi_/view?usp=drivesdk) |
+| SCPDA-0.7.1-test.16-Android-004.zip | 2752754 | [Download](https://drive.google.com/file/d/1ef-C4BOqsjLjMHC_EDSWCBRkUJhBClah/view?usp=drivesdk) |
+
+R16 is also published in [SC App Center](https://sc-stockday-ordering.onrender.com/#/app-center). Existing001/005 phones install over the same app; the separate004 setup is only for the user-confirmed new004 phone. Enrollment expires20 Nov23:59 Bangkok; the account does not expire with that file. Existing private sharing retained and metadata verified. [Source/activation/tests](events/2026-11-16-pda-branch004-r16.md). No password or private key is in the APK/ordinary ZIP; no physical004 phone acceptance claimed.
+
+## Earlier delivery — R15 / App Center
 
 | File | Bytes | Drive link |
 | --- | ---: | --- |

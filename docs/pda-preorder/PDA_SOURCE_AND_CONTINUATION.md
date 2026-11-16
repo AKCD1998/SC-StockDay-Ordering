@@ -1,6 +1,6 @@
 # วิธีรับช่วงงานร่วมกับ PDA และหาซอร์สแอป
 
-**Current16 November — R15:** delivered APK source `27ea94cdffa64be7c5fc14ea1019cff37c6b6f2e`, branch `codex/scpda-app-center-r15`; QA-only head `d99c106084bd5a00923890e42da400fadbbbb860`. [App Center/source/deployment/delivery](events/2026-11-16-pda-r15-app-center.md). R13/R14 queue/date changes and001/005 support are included. Web App Center is separately on main `350771b0977693d9a74dd23c42b0484ddfe6ffa0`, backend main `79852be0b3a34f5fa760b362d52febec57b631bc`. Preserve separate Preorder identity/ownership and dated historical evidence below.
+**Current R16 —16 November:** user-authorized01004 / new branch004 Android pilot for Thursday19 November. App **0.7.1-test.16**, branch `codex/scpda-004-r16`, source `98f479db1edd479cb3b218dabc3e7d3568892a57`; published in SC App Center and delivered in the existing Drive folder. Backend PR66/migration087 and admin web PR105 are live;001/005 credentials, enrollment and evidence preserved. [Source, activation and delivery](events/2026-11-16-pda-branch004-r16.md). Counts are physical evidence pending review, not an Ada/current-stock adjustment. Physical004 Android enrollment/first count remains pending. The separate Local product-connector candidate is not included; preserve its work and its single TEST-round ownership.
 
 ผู้ใช้ขอให้ PDA owner ชี้แจงวิธีทำงานให้แชต Preorder หลังมีรายงานว่าใน Drive มี APK/รายงานแต่ไม่มีซอร์สให้ต่อหน้า Preorder เอกสารนี้แก้จุดส่งต่องานนั้น ไม่ได้โอน ownership หรืออนุญาตเขียนข้อมูลจริงใน ADA
 
@@ -14,32 +14,32 @@
 ## ซอร์ส Android ที่ตรวจจาก remote แล้ว
 
 - Repository: **`AKCD1998/SC-StockDay-Ordering`**
-- Branch: **`codex/scpda-app-center-r15`**
-- Commit: **`27ea94cdffa64be7c5fc14ea1019cff37c6b6f2e`**
-- รุ่นส่งมอบ: **0.7.0-test.15**, versionCode15
-- [เปิดซอร์สที่ commit นี้](https://github.com/AKCD1998/SC-StockDay-Ordering/tree/27ea94cdffa64be7c5fc14ea1019cff37c6b6f2e)
+- Branch: **`codex/scpda-004-r16`**
+- Commit: **`98f479db1edd479cb3b218dabc3e7d3568892a57`**
+- รุ่นส่งมอบ: **0.7.1-test.16**, versionCode16
+- [เปิดซอร์สที่ commit นี้](https://github.com/AKCD1998/SC-StockDay-Ordering/tree/98f479db1edd479cb3b218dabc3e7d3568892a57)
 
 ใช้ checkout ของ repository เดิม ตรวจ remote/status/worktree ก่อน อย่าสลับหรือ merge ใส่ branch ที่ผู้อื่นกำลังทำงาน ตัวอย่างคำสั่งตรวจแบบไม่เปลี่ยน engineering branch:
 
 ```sh
-git fetch origin coord/pda-preorder-ledger codex/scpda-app-center-r15
+git fetch origin coord/pda-preorder-ledger codex/scpda-004-r16
 git show origin/coord/pda-preorder-ledger:docs/pda-preorder/STATE.md
 git show origin/coord/pda-preorder-ledger:docs/pda-preorder/CONTRACT.md
-git show 27ea94cdffa64be7c5fc14ea1019cff37c6b6f2e:apps/scpda-android/README.md
-git ls-tree -r --name-only 27ea94cdffa64be7c5fc14ea1019cff37c6b6f2e apps/scpda-android apps/pda-preview scripts
+git show 98f479db1edd479cb3b218dabc3e7d3568892a57:apps/scpda-android/README.md
+git ls-tree -r --name-only 98f479db1edd479cb3b218dabc3e7d3568892a57 apps/scpda-android apps/pda-preview scripts
 ```
 
 ถ้าต้องอ่านหลายไฟล์ ให้ใช้ worktree สำหรับอ่านโดยเฉพาะ หลังตรวจว่าปลายทางยังไม่มีและไม่มีเจ้าของใช้งาน:
 
 ```sh
-git worktree add --detach /workspace/preorder-pda-r15-source-review 27ea94cdffa64be7c5fc14ea1019cff37c6b6f2e
+git worktree add --detach /workspace/preorder-pda-r16-source-review 98f479db1edd479cb3b218dabc3e7d3568892a57
 ```
 
 path นี้เป็นตัวอย่างใหม่บนเครื่องของผู้รับ ไม่ใช่การอ้างว่าเข้าถึงเครื่อง PDA owner แล้ว ห้าม merge coordination branch เข้า app/Preorder branch เพื่อให้เห็นเอกสาร และไม่ต้อง merge/cherry-pick ทั้ง R11 เข้า PR100 เพียงเพื่ออ่านไฟล์
 
 ## แผนที่ไฟล์ที่เกี่ยวข้องจริง
 
-| งาน | ไฟล์ในซอร์ส R15 |
+| งาน | ไฟล์ในซอร์ส R16 |
 |---|---|
 | หน้าจอหลัก/สามแท็บ/การสลับแท็บและคงร่าง | `apps/pda-preview/scpda.html`, `scpda-ui.mjs`, `scpda.css` |
 | หน้าตาและคิวผลนับเดิม | `apps/pda-preview/scpda-count-ui.mjs`, `scpda-count-sync.mjs`, `scpda-local-counts.mjs` |

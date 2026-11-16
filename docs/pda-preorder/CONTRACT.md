@@ -86,3 +86,7 @@ Authentication/enrollment, private photo handling and offline cold-reopen must b
 For a material shared change, add a new event with: ID, proposer/owner, current version, proposed change, affected clients/services, compatibility/migration implications, implemented/tested/stub/pending status, source SHAs and evidence. Record the other owner's actual review when received. A sent message, elapsed time, file creation or user liking a picture is not technical API acceptance. Preserve prior records; supersede rather than erase.
 
 Production deployment, schema migration, permission/account/CORS changes, added costs and official inventory writes remain outside this coordination action. Prepare reviewable code first and record the smallest real gate instead of inventing approval or bypassing a denial.
+
+### 16 November — user-authorized004 Android count pilot (R16)
+
+Add01004→004 with independently default-off004 admission, explicit count allowlist and branch-bound004 device/reader/count audiences/DTOs. Preserve001/005 credentials and identities. Admin004 evidence reads do not create a004 web account. Migration087 extends only immutable evidence constraints; no official Ada/current-stock writes. AndroidR16 and App Center support004; browser enrollment transport remains001-only. New004 account does not grant enrolled Preorder/product/CEO rights. Local controls the separate product-writer TEST round. [Verified source/deployment/delivery](events/2026-11-16-pda-branch004-r16.md).
