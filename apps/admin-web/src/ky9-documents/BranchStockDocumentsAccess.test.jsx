@@ -43,10 +43,11 @@ describe("KY9 main navigation", () => {
     expect(await screen.findByRole("heading", { name: "สต็อกแยกตามสาขา" })).toBeVisible();
     expect(screen.queryByRole("tablist", { name: "สต็อกและเอกสาร" })).not.toBeInTheDocument();
     const menu = screen.getByRole("navigation", { name: "เมนูหลัก" });
-    await user.click(within(menu).getByRole("button", { name: "เอกสาร ขย.9", exact: true }));
+    await user.click(within(menu).getByRole("button", { name: "เอกสาร ขย.9/10/11", exact: true }));
+    await user.click(within(menu).getByRole("menuitem", { name: /เอกสาร ขย.9 ติดตามงวดเอกสาร/ }));
     expect(await screen.findByRole("heading", { name: "เอกสาร ขย.9" })).toBeVisible();
     expect(window.location.hash).toBe("#/ky9-documents");
-    expect(within(menu).getByRole("button", { name: "เอกสาร ขย.9", exact: true })).toHaveClass("active");
+    expect(within(menu).getByRole("button", { name: "เอกสาร ขย.9/10/11", exact: true })).toHaveClass("active");
     expect(screen.queryByRole("heading", { name: "สต็อกแยกตามสาขา" })).not.toBeInTheDocument();
   });
 

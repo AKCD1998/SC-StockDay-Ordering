@@ -12,6 +12,7 @@ export const adminOnlyViews = [
   "pos-admin",
   "shopee004-exceptions",
   "ky9-documents",
+  "report-print-register",
   "pjk-documents",
 ];
 export const adminViewKeys = [
@@ -42,6 +43,7 @@ const ADMIN_VIEW_ROUTE_SEGMENTS = {
   "pos-admin": "pos-admin",
   "shopee004-exceptions": "shopee004-exceptions",
   "ky9-documents": "ky9-documents",
+  "report-print-register": "report-print-register",
   "pjk-documents": "pjk-documents",
   [stockCostAuditView]: "stock-cost-audit",
   "category-review": "category-review",
@@ -90,11 +92,12 @@ export function getNavigationGroups(isAdminUser, hideDashboard = false, stockChe
     },
     {
       id: "documents",
-      label: "เอกสาร ขย.9",
+      label: "เอกสาร ขย.9/10/11",
       shortLabel: "DC",
       adminOnly: true,
       items: [
         { label: "เอกสาร ขย.9", view: "ky9-documents", description: "ติดตามงวดเอกสารและข้อยุติของแต่ละสาขา" },
+        { label: "ทะเบียนพิมพ์ ขย.9/10/11", view: "report-print-register", description: "ยืนยันสาขา รุ่น และหน้าที่พิมพ์กระดาษแล้ว" },
       ],
     },
     {
