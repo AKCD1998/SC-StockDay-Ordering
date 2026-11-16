@@ -28,4 +28,17 @@ describe('paper print register',()=>{
   apiFetch.mockResolvedValue(response({documents:[{...doc,monthPagesMapped:false,status:'confirmed_printed',allConfirmedRanges:'1-10',confirmedPages:null,scopeTotalPages:null}],unmappedEvidence:[{id:'photo',report_kind:'KY9',branch_code:'005',month:'2026-09',summary:'photo version unknown',evidence_reference:'synthetic photo'}]}));
   render(<ReportPrintRegister csrfToken="test"/>);expect(await screen.findByText('photo version unknown')).toBeVisible();expect(screen.getByText('เลขหน้าแยกเดือนยังรอยืนยัน')).toBeVisible();expect(apiFetch.mock.calls.every(([,o])=>!o?.method)).toBe(true);
  });
+ it('previews a history file without recording confirmations until explicit import',async()=>{
+  const user=userEvent.setup(),seed={schema:'sc.report-print-register.private-seed.v1',documents:[],confirmations:[],unmappedEvidence:[]};
+  const original=apiFetch.getMockImplementation();apiFetch.mockImplementation((path,opts)=>path.endsWith('/imports/preview')?Promise.resolve(response({digest:'test-digest',documents:1,paperConfirmations:0,unmappedEvidence:1})):original(path,opts));
+  render(<ReportPrintRegister csrfToken="csrf-import"/>);await screen.findByText('synthetic.pdf');
+  await user.click(screen.getByText('นำเข้าประวัติที่เตรียมไว้เป็นชุด'));
+  const file=new File([JSON.stringify(seed)],'synthetic-history.json',{type:'application/json'});file.text=async()=>JSON.stringify(seed);
+  await user.upload(screen.getByLabelText('ไฟล์ทะเบียนที่เตรียมไว้ (JSON)'),file);
+  await user.click(screen.getByRole('button',{name:'ตรวจรายการก่อนนำเข้า'}));
+  expect(await screen.findByLabelText('ผลตรวจชุดนำเข้า')).toBeVisible();expect(apiFetch.mock.calls.some(([p])=>p.endsWith('/imports'))).toBe(false);
+  await user.click(screen.getByRole('button',{name:'นำเข้าตามหลักฐานที่ตรวจแล้ว'}));
+  await waitFor(()=>expect(apiFetch.mock.calls.some(([p])=>p.endsWith('/imports'))).toBe(true));
+  const [,options]=apiFetch.mock.calls.find(([p])=>p.endsWith('/imports'));expect(JSON.parse(options.body).confirmImport).toBe(true);expect(options.headers['X-CSRF-Token']).toBe('csrf-import');
+ });
 });
