@@ -6,8 +6,14 @@ only the accepted source step to the existing monitor. It does not authorize a
 production Hourly change, new permissions, account changes, merge or deployment.
 
 1. Read the canonical Hourly004 Cloud Monitor Journal, ownership and latest
-   human command. Reuse /root/verify_direct_read_access, the existing dedicated
-   native read context. Do not spawn, interrupt or reuse unrelated workers.
+   human command. Retain Ozymandias and the existing Hourly004 incident owner.
+   Reuse an active matching read invocation; do not start overlapping work or
+   interrupt/reuse unrelated workers. The historical child name
+   /root/verify_direct_read_access is not a permanent device/access binding.
+   If that child is gone, a fresh bounded read invocation may use the SAME
+   currently authorized SERVER004 connection/account/non-admin read-only policy.
+   Revalidate that authority first. No new visible chat, security grant, account,
+   profile, transport, schedule or substitute computer follows from this rule.
 2. Refresh actual SERVER004 connected-device authorization. Do not use a saved
    cloud build environment as device evidence. Do not relay via SCPRODUCTDEV.
 3. Fetch only the exact provided R2 review artifact in the cloud workspace.
@@ -22,7 +28,9 @@ production Hourly change, new permissions, account changes, merge or deployment.
    the same tool session to finish; yield_time_ms is not cancellation. Require
    PASS_DEADLINE_ONLY, deadlineProbePassed, ownedChildExited, approximately30s,
    sourceExecutionCount0 and no mutations. Do not retry an uncertain invocation.
-5. Then execute the verified Status command text once in that SAME context.
+5. Then execute the verified Status command text once in that SAME verified
+   execution context as its accepted deadline proof. This binds the proof/read
+   pair, not every future invocation to one long-lived child-agent object.
    It launches the approved PS5.1 reader in RAM, without writing a native file.
    It recognizes the existing CodexSandboxOffline caller without elevation.
    Access denied means stop that part. No RunAs, ACL, security/credential or
@@ -38,12 +46,18 @@ production Hourly change, new permissions, account changes, merge or deployment.
    09:25–19:25 Asia/Bangkok schedule and existing notification behavior. Do not
    create another schedule or activate local hourly-004. Keep source and
    central status separate. Do not fabricate the PR87 full-policy contract.
-8. Confirm saved prompt fields/readback and the next natural scheduled reuse
-   of the same native context. An immediate read is not scheduled reuse. Keep
+8. Confirm saved prompt fields/readback and the next natural scheduled read
+   through the same authorized computer/account/policy. Resolve current native
+   capabilities again; a retired child reference is not a permission revocation.
+   An immediate read is not scheduled reuse. Keep
    the explicit12Nov09:00/10:00 reporting request and old missing slots open.
 
 If a parent/runtime call is interrupted before a complete result, record
 UNKNOWN, do not retry/add repeated reads, and do not kill a business process.
+This interrupted-execution rule is distinct from discovery failing BEFORE any
+native read started. For a known-ended transient discovery timeout, one bounded
+retry with backoff on the same registered connection is allowed; never stack
+unresolved calls, switch channels after denial or use Connected as authorization.
 No source-files/Task execution/settings writes, SQL, Sync, replay, compensation,
 manual capture/upload, runtime/cohort change, or Full Sync/Delta001/004/003/005
 change. Hourly guard12s and upload recovery OFF remain unchanged. The monitor's

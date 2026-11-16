@@ -56,11 +56,24 @@ Do not kill a business process to clear uncertainty.
 
 ## Actual acceptance before changing the existing monitor
 
-Use the existing dedicated native read context `/root/verify_direct_read_access`
-owned by Ozymandias; do not create or reuse an unrelated repair worker. Refresh
-trusted native inventory and task authorization, verify actual SERVER004 and
-existing caller, and retain native invocation provenance. Main-laptop SMB is
-not this path. One local JSON report cannot establish cloud authorization.
+Retain Ozymandias as owner and the existing authorized SERVER004 connection.
+The historical child `/root/verify_direct_read_access` is not a persistent access
+credential or a required forever-running worker. Reuse matching active work;
+when that child is gone, resolve the SAME registered computer and start a fresh
+bounded read invocation within the currently verified account/non-admin read-only
+policy. Do not create a visible chat, duplicate repair, account/profile/transport,
+security grant or schedule to repair a reference. Refresh trusted inventory and
+task authorization, verify actual SERVER004/current caller, and retain native
+invocation provenance. Main-laptop SMB is not this path. A local JSON report or
+Connected label cannot establish cloud authorization. A deadline proof/read pair
+must share a verified execution context; later independent invocations require
+fresh provenance rather than pretending a retired child is still available.
+
+Recovery bootstrap is separate from full source admission. The initial bounded
+test may read only the two already-authorized receipts and queue, returning safe
+verification booleans/counts. Two successful independent invocations establish
+only file/queue execution re-entry. They do not pass eleven-Task/ACK admission,
+authorize a new permission or justify adding the source step to the monitor.
 
 Record the real deadline selftest and Status results in the existing journal
 using revision preconditions and exact readback. Require fileRead passed,
