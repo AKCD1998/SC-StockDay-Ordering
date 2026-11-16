@@ -5,6 +5,7 @@ import BranchStockHistoryPanel from "./BranchStockHistoryPanel";
 import StockRecommendationsPanel from "./StockRecommendationsPanel";
 import { BranchStockPanel } from "./BranchStockPanel.jsx";
 import Ky9DocumentsPanel from "./ky9-documents/Ky9DocumentsPanel.jsx";
+import ReportPrintRegister from "./report-print-register/ReportPrintRegister.jsx";
 import PjkDocumentsPanel from "./pjk-documents/PjkDocumentsPanel.jsx";
 import { IncomingRequestsTab, MyRequestsTab, StockRequestsPanel } from "./StockRequestsPanel.jsx";
 import ProductTaxonomyPanel from "./ProductTaxonomyPanel";
@@ -1962,6 +1963,8 @@ export default function App() {
         />
       ) : view === "ky9-documents" && isAdminUser ? (
         <Ky9DocumentsPanel isAdminUser={isAdminUser} csrfToken={session.csrfToken} />
+      ) : view === "report-print-register" && isAdminUser ? (
+        <ReportPrintRegister csrfToken={session.csrfToken} />
       ) : view === "pjk-documents" && isAdminUser ? (
         <PjkDocumentsPanel />
       ) : view === "branch-stock-history" ? (
