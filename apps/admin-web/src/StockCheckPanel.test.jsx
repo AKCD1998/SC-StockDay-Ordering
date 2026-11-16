@@ -17,6 +17,17 @@ it('only admin can select005 and response must match the requested branch',async
   render(<StockCheckPanel/>);expect(screen.queryByRole('combobox',{name:'สาขาผลนับ PDA'})).not.toBeInTheDocument();
  }finally{vi.unstubAllEnvs();}
 });
+it('only admin can select004 and response must match the requested branch',async()=>{
+ vi.stubEnv('VITE_FEATURE_SCPDA_BRANCH_004','true');
+ try{
+  fetch.mockImplementation(async url=>({ok:true,status:200,json:async()=>({contract:'scpda-stock-check-001-v1',branchCode:new URL(url,'http://fixture').searchParams.get('branchCode')||'001',records,pagination:{total:2,limit:50,offset:0}})}));
+  const view=render(<StockCheckPanel isAdminUser/>);await screen.findByText(records[0].name);
+  fireEvent.change(screen.getByRole('combobox',{name:'สาขาผลนับ PDA'}),{target:{value:'004'}});
+  await waitFor(()=>expect(fetch.mock.calls.at(-1)[0]).toContain('branchCode=004'));
+  expect(await screen.findByText(records[0].name)).toBeVisible();view.unmount();
+  render(<StockCheckPanel/>);expect(screen.queryByRole('combobox',{name:'สาขาผลนับ PDA'})).not.toBeInTheDocument();
+ }finally{vi.unstubAllEnvs();}
+});
 it('shows latest PDA receipt, full names, zero and unsubmitted products distinctly',async()=>{
  render(<StockCheckPanel/>);expect(await screen.findByText(records[0].name)).toBeVisible();expect(screen.getByText('ยังไม่มีผลนับ')).toBeVisible();expect(screen.getByText('0')).toBeVisible();
  fireEvent.click(screen.getByRole('button',{name:'ดูล็อต / วันที่'}));expect(screen.getByText('ล็อต LOT-A')).toBeVisible();expect(screen.getByText('ผลิต ไม่ระบุ')).toBeVisible();expect(screen.getByText(/หมดอายุ/)).toBeVisible();expect(screen.queryByRole('button',{name:'ทบทวน'})).not.toBeInTheDocument();
