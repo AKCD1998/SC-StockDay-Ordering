@@ -35,6 +35,7 @@ The current task is this verified destination chat. Separate review checkouts ar
 |---|---|
 | Web main checked 16 Nov | `f9bf49d4054cb8424573800806d2552c548d4c52`, live R12 admin005 selector |
 | PDA branch source | Current R12 `codex/scpda-005-app-r12`, `c74eaeb2ccd5de25e698a6e5912715c10d44954d`; [PDA owner checkpoint](owners/PDA.md) |
+| Pending mobile UI batch | Update1 queue-only medicine panel prepared/tested at `codex/scpda-next-ui-batch` / `ec2227b7d89e12ed4999eb38b21d3c0aeb4d0dbd`; user explicitly said wait for their second update before any APK build. Current delivery remains R12. [Pending event](events/2026-11-16-pda-next-ui-update1.md) |
 | Android source handoff | [Verified source paths, fetch instructions and joint workflow](PDA_SOURCE_AND_CONTINUATION.md); source exists in Git, Drive is delivery only. User requested clarification to Preorder owner; receiver acknowledgment is not yet recorded |
 | Latest APK in Drive | [SCPDA0.6.2-test.12](https://drive.google.com/file/d/1K-JEn0hS76QUIlwQnZ6PggjrMse2H4DE/view?usp=drivesdk),16 Nov; new01005/005 phone trial and existing001 support. Same package/signing key and R9 UI; mobile Preorder remains separate |
 | PDA count activation / web stock check | User-authorized01001/001 and01005/005 count intake live. Backend `f4e617eef9a9eb805bec3383828a5ac97705e4e2`, web above, migration083/084 applied. Admin sees001/005 separately; branch001 web access remains001-only. No005 web login, Ada adjustment or current-stock-source override. [R12 evidence](events/2026-11-16-pda-branch005-pilot.md) |
@@ -56,7 +57,7 @@ The current task is this verified destination chat. Separate review checkouts ar
 | Earlier R3 evidence | 8 workspace tests + 9 existing preorder helper tests + 4 navigation/session tests passed; admin-web production build passed with existing bundle-size warning, before continuation commits |
 | Continuation checks | `e9057f1` changed API files passed `node --check` and `git diff --check`; CI run `43709199891` passed. Member-directory commit `9c206b1` changed API files and `git diff --check` passed; CI run `43710628130` passed. Pending/approved notification code commit `c5a28bf` passed `git diff --check`; CI run `43712475237` passed. Web receipt-task commit `c388247` passed `git diff --check`; CI run `43712453471` passed. No separate local test suite was run for these continuation commits |
 | R3 review mockup | 17 browser checks; one synthetic request supplied in two rounds 2+1, 15 in-memory actions; not a durable API/database/auth proof |
-| APK status | Latest delivered0.6.2-test.12, same package/signing certificate. New005 enrollment/first genuine count and physical-device acceptance remain pending |
+| APK status | Latest delivered0.6.2-test.12, same package/signing certificate. User's005 Android screenshot and matching production receipt confirm an upload16 Nov10:16 Bangkok; quantity review/current-balance adoption and remaining hardware checks are separate. Pending UI update1 is not built/shipped |
 
 ## Implemented vs pending
 
