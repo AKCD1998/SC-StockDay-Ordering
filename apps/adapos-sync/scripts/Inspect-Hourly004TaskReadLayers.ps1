@@ -10,6 +10,16 @@ function New-H004ServiceRootCandidate([byte[]]$Descriptor,[Security.Principal.Se
  $copy.DiscretionaryAcl.InsertAce($at,[Security.AccessControl.CommonAce]::new([Security.AccessControl.AceFlags]::None,[Security.AccessControl.AceQualifier]::AccessAllowed,1,$Caller,$false,$null))
  [byte[]]$result=New-Object byte[] $copy.BinaryLength;$copy.GetBinaryForm($result,0);return ,$result
 }
+function Get-H004ServiceRootRollback([byte[]]$Before,[byte[]]$After,[byte[]]$Current,[Security.Principal.SecurityIdentifier]$Caller){
+ # Review-only rollback planner: produces bytes in RAM, with NO write adapter.
+ # A future operator must additionally verify live object/build/identity and
+ # repeat the comparison immediately before its separately approved write.
+ [byte[]]$expected=New-H004ServiceRootCandidate $Before $Caller
+ if(-not[Linq.Enumerable]::SequenceEqual([byte[]]$expected,[byte[]]$After)){throw 'SERVICE_BEFORE_AFTER_UNVERIFIED'}
+ if([Linq.Enumerable]::SequenceEqual([byte[]]$Before,[byte[]]$Current)){return ,([byte[]]$Before.Clone())}
+ if(-not[Linq.Enumerable]::SequenceEqual([byte[]]$After,[byte[]]$Current)){throw 'FOREIGN_SERVICE_PERMISSION_CHANGE'}
+ return ,([byte[]]$Before.Clone())
+}
 function New-H004ServiceAccessBindings {
  $a=[AppDomain]::CurrentDomain.DefineDynamicAssembly([Reflection.AssemblyName]::new('H004ServiceAccess'),[Reflection.Emit.AssemblyBuilderAccess]::Run)
  $t=$a.DefineDynamicModule('Memory').DefineType('H004ServiceAccessNative',[Reflection.TypeAttributes]'Public,Sealed,Abstract')

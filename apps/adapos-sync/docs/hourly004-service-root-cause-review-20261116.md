@@ -72,6 +72,37 @@ NativePS5.1 local fixtures cover24 AccessCheck comparisons, existing ACE/owner/
 group/control preservation, a deny that the candidate cannot override, unchanged
 non-read rights, real native open/close/error handling and the wrong-host gate.
 They use synthetic descriptors/local disposable data, no production registry.
+The same script includes `Get-H004ServiceRootRollback`, a **RAM-only planner**,
+not a production rollback controller. Sixteen local cases exercise exact prior
+restoration/already-restored results and rejection of foreign changes or a
+tampered before/after pair. It has no registry/ACL write adapter. These results
+must not be presented as an Apply/Status/Rollback production roundtrip.
+
+### Actual coordination result,12:10 Bangkok
+
+The pinned read-only evaluation was NOT executed on SERVER004. Ozymandias found
+the prior native context absent from its live agent tree; followup could not
+resolve it. SERVER004 was listed connected, but discovery reached its deadline,
+so current authorization/identity/profile and an existing supervisor reference
+could not be re-established. It stopped without creating a new agent, connection,
+profile or using Main SMB as native proof. Canonical journal event
+`H004-COORDINATION-CONTEXT-UNAVAILABLE-20261116T0510Z` was independently read back.
+This is a coordination/discovery failure, not an observed source permission
+revocation, Task loss, or a new0x80070003 measurement. Actual10:44 remains the
+latest same-caller Task-root result. Service SD/candidate decisions remain UNKNOWN.
+
+Separately Main's original authorized read at12:12:00.972 found GetFolder(root)
+and all11 exact Hourly Tasks readable; all11 enabled/not running/20-minute limits,
+and both FullSync Tasks readable/enabled. No SQL/TaskRun/source write. This proves
+the namespace exists and is readable to Main, not native admission or capture/ACK.
+
+CI for the read-only evaluation revision3c29dbe succeeded
+([run43808009474](https://github.com/AKCD1998/SC-StockDay-Ordering/actions/runs/43808009474)).
+The local focused tests include actual Windows PowerShell5.1. A broader local
+suite could not complete cleanly because this isolated checkout lacks dotenv and
+other installed workspace dependencies; an npm attempt also lacked node on its
+child-shell PATH. These are local validation limitations, not SERVER004 failures.
+Linux CI's clean install/test/build passed; neither result certifies a natural run.
 
 ## Permission proposal boundary
 

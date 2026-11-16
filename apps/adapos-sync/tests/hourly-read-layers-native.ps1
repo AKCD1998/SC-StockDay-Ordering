@@ -16,6 +16,14 @@ try{
   if($scenario.allow){$text+='(A;;0x'+$scenario.allow.ToString('x')+';;;'+$caller.Value+')'}
   $raw=[Security.AccessControl.RawSecurityDescriptor]::new($text);[byte[]]$before=New-Object byte[] $raw.BinaryLength;$raw.GetBinaryForm($before,0)
   [byte[]]$candidate=New-H004ServiceRootCandidate $before $caller
+  [byte[]]$rollback=Get-H004ServiceRootRollback $before $candidate $candidate $caller
+  [byte[]]$already=Get-H004ServiceRootRollback $before $candidate $before $caller
+  if(-not[Linq.Enumerable]::SequenceEqual([byte[]]$rollback,[byte[]]$before) -or -not[Linq.Enumerable]::SequenceEqual([byte[]]$already,[byte[]]$before)){throw 'FIXTURE_ROLLBACK_DIFF_FAILED'}
+  $foreign=[byte[]]$candidate.Clone();$foreign[3]=$foreign[3] -bxor 4
+  $stopped=$false;try{[void](Get-H004ServiceRootRollback $before $candidate $foreign $caller)}catch{if($_.Exception.Message -ne 'FOREIGN_SERVICE_PERMISSION_CHANGE'){throw};$stopped=$true}
+  if(-not$stopped){throw 'FIXTURE_FOREIGN_ROLLBACK_ACCEPTED'}
+  $stopped=$false;try{[void](Get-H004ServiceRootRollback $before $foreign $candidate $caller)}catch{if($_.Exception.Message -ne 'SERVICE_BEFORE_AFTER_UNVERIFIED'){throw};$stopped=$true}
+  if(-not$stopped){throw 'FIXTURE_BAD_BACKUP_ACCEPTED'}
   $after=[Security.AccessControl.RawSecurityDescriptor]::new($candidate,0)
   if($after.Owner -ne $raw.Owner -or $after.Group -ne $raw.Group -or $after.ControlFlags -ne $raw.ControlFlags -or $after.DiscretionaryAcl.Count -ne $raw.DiscretionaryAcl.Count+1){throw 'FIXTURE_CANDIDATE_PRESERVATION_FAILED'}
   $ace=$after.DiscretionaryAcl[$after.DiscretionaryAcl.Count-1]
@@ -37,5 +45,5 @@ try{
  foreach($mask in @([uint32]129,[uint32]8,[uint32]2147483648)){$v=Invoke-H004ReadLayerOpen $native $dir $mask;if(-not$v.opened -or -not$v.handleClosed -or $null -ne $v.nativeError){throw 'FIXTURE_OPEN_FAILED'};$checks+=@{mask=$mask;opened=$true;closed=$true}}
  $missing=Invoke-H004ReadLayerOpen $native (Join-Path $dir 'not-created') 129
  if($missing.opened -or $missing.nativeError -notin @(2,3) -or $null -ne $missing.handleClosed){throw 'FIXTURE_NOT_FOUND_FAILED'}
- [pscustomobject]@{simulation=$true;nativePs=$PSVersionTable.PSVersion.ToString();signaturesVerified=5;checks=$checks;serviceRamDecisions=$serviceChecks;registryQueries=0;missingErrorRetained=$true;productionSourceReads=0;permissionChanges=0;taskRuns=0;compilerUsed=$false}|ConvertTo-Json -Depth 5 -Compress
+ [pscustomobject]@{simulation=$true;nativePs=$PSVersionTable.PSVersion.ToString();signaturesVerified=5;checks=$checks;serviceRamDecisions=$serviceChecks;rollbackRamCases=16;registryQueries=0;missingErrorRetained=$true;productionSourceReads=0;permissionChanges=0;taskRuns=0;compilerUsed=$false}|ConvertTo-Json -Depth 5 -Compress
 }finally{foreach($h in @($duplicate,$primary)){if($h -ne [IntPtr]::Zero){[void]$native::CloseHandle($h)}};$full=[IO.Path]::GetFullPath($dir);if(-not$full.StartsWith([IO.Path]::GetFullPath([IO.Path]::GetTempPath()),[StringComparison]::OrdinalIgnoreCase) -or (Split-Path $full -Leaf) -notlike 'h004-layer-fixture-*'){throw 'FIXTURE_CLEANUP_SCOPE'};if([IO.Directory]::Exists($full)){Remove-Item -LiteralPath $full -Force}}

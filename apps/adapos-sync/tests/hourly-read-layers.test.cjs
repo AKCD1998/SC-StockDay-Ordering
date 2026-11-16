@@ -15,7 +15,7 @@ test('native PS5.1 bindings/open/close/error are tested on a local disposable di
  const exe=path.join(process.env.SystemRoot,'System32/WindowsPowerShell/v1.0/powershell.exe');
  const run=spawnSync(exe,['-NoProfile','-NonInteractive','-ExecutionPolicy','RemoteSigned','-File',path.join(__dirname,'hourly-read-layers-native.ps1'),'-Probe',script],{encoding:'utf8',windowsHide:true,timeout:10000,maxBuffer:16384});
  let value;try{value=JSON.parse(run.stdout.trim())}catch{assert.fail('Read-layer fixture unavailable')}
- assert.equal(run.status,0,JSON.stringify(value));assert.equal(value.signaturesVerified,5);assert.equal(value.serviceRamDecisions,24);assert.equal(value.registryQueries,0);assert.equal(value.checks.length,3);assert.equal(value.missingErrorRetained,true);assert.equal(value.permissionChanges,0);assert.equal(value.compilerUsed,false);
+ assert.equal(run.status,0,JSON.stringify(value));assert.equal(value.signaturesVerified,5);assert.equal(value.serviceRamDecisions,24);assert.equal(value.rollbackRamCases,16);assert.equal(value.registryQueries,0);assert.equal(value.checks.length,3);assert.equal(value.missingErrorRetained,true);assert.equal(value.permissionChanges,0);assert.equal(value.compilerUsed,false);
  if(process.env.COMPUTERNAME?.toUpperCase()!=='SERVER004'){
   const wrong=spawnSync(exe,['-NoProfile','-NonInteractive','-ExecutionPolicy','RemoteSigned','-File',script],{encoding:'utf8',windowsHide:true,timeout:5000,maxBuffer:16384});const gate=JSON.parse(wrong.stdout.trim());assert.equal(gate.hostMatched,false);assert.equal(gate.failedStage,'context');assert.equal(gate.rootMetadataRead,false);assert.equal(gate.comCreated,false);assert.equal(gate.permissionChanges,0);
  }
