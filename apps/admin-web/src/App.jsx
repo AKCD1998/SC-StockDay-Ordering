@@ -1906,21 +1906,6 @@ export default function App() {
           </div>
         </div>
 
-        <AdminNavigation
-          navigationGroups={navigationGroups}
-          view={view}
-          openNavGroup={openNavGroup}
-          navigationMenuRef={navigationMenuRef}
-          stockRequestBadgeCount={stockRequestBadgeCount}
-          syncFailureBadgeCount={syncFailureBadgeCount}
-          preorderBadgeCount={preorderBadgeCount}
-          handleNavigate={handleNavigate}
-          closeNavGroup={closeNavGroup}
-          setOpenNavGroup={setOpenNavGroup}
-          handleNavTriggerKeyDown={handleNavTriggerKeyDown}
-          handleNavItemKeyDown={handleNavItemKeyDown}
-        />
-
         <AdminAccountActions
           session={session}
           branchCode={branchCode}
@@ -1937,6 +1922,21 @@ export default function App() {
           accountMenuOpen={accountMenuOpen}
           setAccountMenuOpen={setAccountMenuOpen}
           handleLogout={handleLogout}
+        />
+
+        <AdminNavigation
+          navigationGroups={navigationGroups}
+          view={view}
+          openNavGroup={openNavGroup}
+          navigationMenuRef={navigationMenuRef}
+          stockRequestBadgeCount={stockRequestBadgeCount}
+          syncFailureBadgeCount={syncFailureBadgeCount}
+          preorderBadgeCount={preorderBadgeCount}
+          handleNavigate={handleNavigate}
+          closeNavGroup={closeNavGroup}
+          setOpenNavGroup={setOpenNavGroup}
+          handleNavTriggerKeyDown={handleNavTriggerKeyDown}
+          handleNavItemKeyDown={handleNavItemKeyDown}
         />
       </div>
 
