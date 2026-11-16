@@ -20,7 +20,7 @@ function date(value,unknown,label){
  try{return normalizeManualDate(value);}catch{throw Error('ระบุ'+label+'ให้ถูกต้อง หรือเลือกไม่ทราบ');}
 }
 export function prepareLocalCount({who,product,draft,now=new Date().toISOString()}){
- if(!who||({'01001':'001','02001':'001','03001':'001','01005':'005'})[who.operatorCode]!==who.branchCode)throw Error('เข้าสู่ระบบก่อนบันทึก');
+ if(!who||({'01001':'001','02001':'001','03001':'001','01004':'004','01005':'005'})[who.operatorCode]!==who.branchCode)throw Error('เข้าสู่ระบบก่อนบันทึก');
  if(!product?.productCode||typeof product.barcode!=='string'||product.branchCode&&product.branchCode!==who.branchCode)throw Error('ตรวจสินค้าก่อนนับ');
  if(!['pharma','common','normal'].includes(draft.category)||![1,2,3].includes(Number(draft.round)))throw Error('เลือกหมวดและรอบนับ');
  const unit=String(draft.unit||'').trim();if(!unit||unit.length>80)throw Error('ระบุหน่วยที่นับ');

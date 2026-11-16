@@ -12,7 +12,7 @@ export function recentProducts(rows){
  return result;
 }
 export function touchRecent(rows,product){const row=recentProduct(product);return [row,...recentProducts(rows).filter(x=>x.productCode!==row.productCode)].slice(0,RECENT_LIMIT);}
-function scope(who){if(who?.branchCode!=='001'||!['01001','02001','03001'].includes(who.operatorCode))throw Error('เข้าสู่ระบบก่อนเปิดรายการล่าสุด');return JSON.stringify([who.branchCode,who.operatorCode]);}
+function scope(who){if(!who||({'01001':'001','02001':'001','03001':'001','01004':'004','01005':'005'})[who.operatorCode]!==who.branchCode)throw Error('เข้าสู่ระบบก่อนเปิดรายการล่าสุด');return JSON.stringify([who.branchCode,who.operatorCode]);}
 export class RecentProductBook{
  constructor(){this.ready=new Promise((ok,no)=>{try{const r=indexedDB.open('scpda-recent-products-v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('recent',{keyPath:'scope'});r.onsuccess=()=>{r.result.onversionchange=()=>r.result.close();ok(r.result);};r.onerror=r.onblocked=()=>no(Error('เก็บรายการล่าสุดไม่ได้'));}catch(e){no(e);}});this.ready.catch(()=>{});}
  async list(who){const key=scope(who),db=await this.ready;return new Promise((ok,no)=>{const t=db.transaction('recent'),r=t.objectStore('recent').get(key);r.onsuccess=()=>ok(recentProducts(r.result?.items));r.onerror=()=>no(Error('อ่านรายการล่าสุดไม่ได้'));});}
