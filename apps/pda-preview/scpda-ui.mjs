@@ -3,6 +3,7 @@ import {priceCheckHtml,priceStockInfoHtml} from './scpda-price-check.mjs';
 import {PriceCheckRefresh} from './scpda-price-refresh.mjs';
 import {RecentProductBook,recentProduct,touchRecent} from './scpda-recent-products.mjs';
 import {ScpdaCountUI} from './scpda-count-ui.mjs';
+import {ScpdaAppCenter} from './scpda-app-center.mjs';
 import { StockDayLookup, requireScpdaActor } from './stockday-live-contract.mjs';
 import { CameraScanner } from './camera-scanner.mjs';
 const $=s=>document.querySelector(s),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -102,4 +103,6 @@ $('#activateDevice').onclick=$('#activateFromSettings').onclick=activate;
 for(const b of document.querySelectorAll('[data-app-tab]'))b.onclick=()=>switchTab(b.dataset.appTab);
 window.__scpdaBack=()=>{if(!actor)return false;if(currentView!=='lookup'){if(currentView==='count')countUI.autosave();countUI.close();countNavigate('lookup');return true;}if(activeTab!=='count'){switchTab('count');return true;}return false;};
 
-loggedOut();if(!window.SCPDAHost?.invoke){$('#activationPane').hidden=true;$('#loginPane').hidden=false;$('#hostHint').hidden=false;$('#loginButton').disabled=true;}else native('status').then(s=>{paired=s.paired===true;deviceBranch(s);loggedOut();}).catch(handle);
+const appCenter=new ScpdaAppCenter({request:native,prepareInstall:async()=>{camera.close();if(!countUI.root.hidden)await countUI.autosave();}});
+$('#openScpdaAppCenter').onclick=()=>appCenter.check({manual:true});
+loggedOut();if(!window.SCPDAHost?.invoke){$('#activationPane').hidden=true;$('#loginPane').hidden=false;$('#hostHint').hidden=false;$('#loginButton').disabled=true;}else native('status').then(s=>{paired=s.paired===true;deviceBranch(s);loggedOut();if(paired)void appCenter.check();}).catch(handle);
