@@ -7,7 +7,17 @@ User instruction, 15 November 2026: place completed PDA app deliveries in Google
 - Verified parent: เภสัชอู๋, ID `1usItMowEj6llCqWYjdpMAkswB5bubGkD`.
 - Parent was found by exact name; the child was created under that verified parent. Existing sharing was preserved.
 
-## Current delivery — R13
+## Current delivery — R14
+
+| File | Bytes | Drive link |
+| --- | ---: | --- |
+| SCPDA-0.6.4-test.14.apk | 2999109 | [Download](https://drive.google.com/file/d/1Btt4V6W1Ub30hAds_xhoJqy7RBxoVZeQ/view?usp=drivesdk) |
+| SCPDA-0.6.4-test.14-Android-Update.zip | 2742437 | [Download](https://drive.google.com/file/d/1VUxbFinzxGIfyHV8M6o1hs0w8p5Aozle/view?usp=drivesdk) |
+| START-HERE-SCPDA-0.6.4-test.14.txt | 2788 | [Download](https://drive.google.com/file/d/1BynolB8F3FQF3FQNurSdggpyVcZVqujF/view?usp=drivesdk) |
+
+Adds automatic `/` while typing and explicit day/month/Gregorian-year labels, including all R13 UI changes. Install over the paired app; no R13 prerequisite or new enrollment file.12 focused model and13 source-browser checks passed; signed/archive/alignment/safe-zone checks passed. No fresh R14 database/hardware acceptance claim. APK SHA256 `ba153eb628e1f3a3bfe1e2487491fd1e4d80d1573df29f299814dedd828576e4`. Metadata names/sizes/parents verified for all three; existing sharing preserved, no public/domain permissions or secrets in the ZIP; remote checksums unavailable. [R14 source/evidence](events/2026-11-16-pda-r14-date-mask.md). Receipt `/workspace/artifacts/scpda-date-mask-r14-2026-11-16/GOOGLE-DRIVE-DELIVERY.json`.
+
+## Earlier delivery — R13
 
 | File | Bytes | Drive link |
 | --- | ---: | --- |
