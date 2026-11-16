@@ -1,1 +1,11 @@
 .print-register-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:16px}.print-register-counts{display:flex;flex-wrap:wrap;gap:12px}.print-register-counts>span{padding:10px 15px;background:var(--ky9-surface);border:1px solid var(--ky9-border);border-radius:12px}.print-register-table{min-width:1080px}.print-register-file{max-width:350px;overflow-wrap:anywhere}.print-register-status{display:inline-block;font-weight:700;border:1px solid var(--ky9-border);border-radius:8px;padding:5px 9px}.print-register-status.confirmed_printed{color:var(--ky9-on-success);background:var(--ky9-success)}.print-register-status.partially_confirmed,.print-register-status.confirmed_scope_unknown{background:var(--ky9-inset);color:var(--ky9-accent)}.print-register-table small{display:block;margin-top:6px}.print-register-form{display:grid;gap:14px}.print-register-form h4{margin-top:22px}.print-register-form fieldset>.ky9-field,.print-register-form fieldset>.ky9-inline{margin:14px 0}.print-register-evidence{border-top:1px solid var(--ky9-border);padding:16px 0;overflow-wrap:anywhere}.print-register-evidence>button{margin-left:12px}.print-register-detail{scroll-margin-top:20px}.print-register fieldset{min-width:0}.print-register details{overflow-wrap:anywhere}.print-register p,.print-register li{line-height:1.7}
+.print-register .print-register-table { table-layout:fixed; }
+.print-register .print-register-table th,
+.print-register .print-register-table td { white-space:normal; overflow-wrap:anywhere; }
+.print-register .print-register-table th:nth-child(1) { width:11%; }
+.print-register .print-register-table th:nth-child(2) { width:21%; }
+.print-register .print-register-table th:nth-child(3) { width:29%; }
+.print-register .print-register-table th:nth-child(4) { width:14%; }
+.print-register .print-register-table th:nth-child(5) { width:12%; }
+.print-register .print-register-table th:nth-child(6) { width:13%; }
+.print-register .print-register-table button { white-space:normal; max-width:100%; }
