@@ -84,3 +84,32 @@
 .scpda .scpda-pending-send{display:block;width:100%;min-height:48px;margin-top:14px;border:1px solid #be123c;border-radius:12px;background:#be123c;color:#fff;font-weight:600}
 .scpda .scpda-pending-send:disabled{opacity:.55;cursor:default}
 .scpda-pending-hint{font-size:13px;line-height:1.6;margin:10px 0 0}
+
+.scpda-manual-date-field{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:7px;align-items:stretch}
+.scpda .scpda-date-open{display:flex;align-items:center;justify-content:center;min-height:56px;padding:0;border:1px solid #bdc9dc;border-radius:12px;background:#fff;color:#0b1fb8}
+.scpda-date-open svg{width:22px;height:22px}
+.scpda .local-manual-date{font-size:16px;padding:12px 10px;font-variant-numeric:tabular-nums}
+.scpda-manual-date-dialog{width:min(420px,calc(100% - 24px));max-height:calc(100dvh - 24px);margin:auto;padding:20px;border:0;border-radius:22px;overflow:auto;color:#172644;background:#fff;font-family:'SC Plex',system-ui,sans-serif}
+.scpda-manual-date-dialog::backdrop{background:#14254d99}
+.scpda-manual-date-header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.scpda-manual-date-header h2{font-size:22px;line-height:1.5;margin:0}
+.scpda .scpda-manual-date-header button{width:42px;height:42px;border-radius:12px;background:#eff3fa;color:#172644;font-size:27px;padding:0}
+.scpda .scpda-manual-date-dialog label{margin:16px 0 7px;font-size:14px}
+.scpda #manualDateText{font-size:21px;letter-spacing:.5px;font-variant-numeric:tabular-nums}
+.scpda-manual-date-hint{font-size:12px;color:#596981;margin:7px 0 15px}
+.scpda-manual-date-error{font-size:13px;color:#9f1239;background:#fff1f2;border-radius:10px;padding:9px 11px;margin:8px 0}
+.scpda-manual-date-nav{display:flex;align-items:center;justify-content:space-between;gap:5px;margin:4px 0 12px}
+.scpda-manual-date-nav>div{display:flex;align-items:center;justify-content:center;gap:3px;min-width:0}
+.scpda .scpda-manual-date-nav button{min-height:44px;padding:5px 7px;background:#f0f4ff;border-radius:10px;color:#0b1fb8;font-size:14px}
+.scpda .scpda-manual-date-nav>button{flex-shrink:0;white-space:nowrap;font-size:12px;background:transparent}
+.scpda-day-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;text-align:center}
+.scpda .scpda-day-grid button{min-height:40px;padding:5px 0;border-radius:10px;color:#172644;background:#f8faff;font-size:15px;font-variant-numeric:tabular-nums}
+.scpda-weekday{font-size:12px;color:#64738a;padding:5px 0}
+.scpda-period-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.scpda .scpda-period-grid button{min-height:48px;padding:9px 4px;border-radius:12px;background:#f0f4ff;color:#172644;font-size:14px}
+.scpda .scpda-day-grid button[aria-pressed=true],.scpda .scpda-period-grid button[aria-pressed=true]{background:#0b1fb8;color:#fff}
+.scpda-year-range{font-size:14px;color:#536580;text-align:center;margin:4px 0 12px}
+.scpda-manual-date-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px}
+.scpda .scpda-manual-date-actions button{min-height:48px;border-radius:12px;border:1px solid #bcc9df;background:white;color:#0b1fb8;font-size:16px}
+.scpda .scpda-manual-date-actions #manualDateApply{background:#0b1fb8;border-color:#0b1fb8;color:white}
+@media(max-width:480px){.scpda-lot-dates{grid-template-columns:minmax(0,1fr)}}

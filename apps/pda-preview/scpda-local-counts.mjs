@@ -1,4 +1,5 @@
 import {parseCountMilli} from './quantity-policy.mjs';
+import {normalizeManualDate} from './manual-label-date.mjs';
 const clone=v=>JSON.parse(JSON.stringify(v));
 // Ada branch-stock export selects FTPdtSUnit before M/L. This label does not
 // verify the stock quantity basis, scanned pack or a conversion factor.
@@ -16,8 +17,7 @@ export const localId=()=>globalThis.crypto.randomUUID?.()||'xxxxxxxx-xxxx-4xxx-y
 export const draftKey=(who,p)=>JSON.stringify([who.branchCode,who.operatorCode,p.skuId,p.productCode,p.barcode]);
 function date(value,unknown,label){
  if(unknown)return null;
- if(!/^\d{4}-\d{2}-\d{2}$/.test(value||'')||!Number.isFinite(Date.parse(value))||new Date(value).toISOString().slice(0,10)!==value)throw Error('ระบุ'+label+' หรือเลือกไม่ทราบ');
- return value;
+ try{return normalizeManualDate(value);}catch{throw Error('ระบุ'+label+'ให้ถูกต้อง หรือเลือกไม่ทราบ');}
 }
 export function prepareLocalCount({who,product,draft,now=new Date().toISOString()}){
  if(!who||({'01001':'001','02001':'001','03001':'001','01005':'005'})[who.operatorCode]!==who.branchCode)throw Error('เข้าสู่ระบบก่อนบันทึก');
