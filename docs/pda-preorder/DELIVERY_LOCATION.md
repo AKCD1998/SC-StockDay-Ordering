@@ -7,7 +7,17 @@ User instruction, 15 November 2026: place completed PDA app deliveries in Google
 - Verified parent: เภสัชอู๋, ID `1usItMowEj6llCqWYjdpMAkswB5bubGkD`.
 - Parent was found by exact name; the child was created under that verified parent. Existing sharing was preserved.
 
-## Current delivery — R12
+## Current delivery — R13
+
+| File | Bytes | Drive link |
+| --- | ---: | --- |
+| SCPDA-0.6.3-test.13.apk | 2999109 | [Download](https://drive.google.com/file/d/14oyKj_gsejrguUes9QLcVefrfwcuvVDz/view?usp=drivesdk) |
+| SCPDA-0.6.3-test.13-Android-Update.zip | 2773004 | [Download](https://drive.google.com/file/d/1z7wHjDHxLkVUa-rvqwZXEzzNX89hQ41S/view?usp=drivesdk) |
+| START-HERE-SCPDA-0.6.3-test.13.txt | 3768 | [Download](https://drive.google.com/file/d/1hrYN2CGIEiuEueQcOP0id4qUXUQk6f--/view?usp=drivesdk) |
+
+Combined pending-count panel and direct numeric/year-month-day date entry. Install over the paired app using the existing account; no new setup file is required. APK SHA256 `93969624752039529cfbfa78f94ad6052cac428a7bc47adb31e5653d1128bd3b`, same package/signing certificate.38 model,18 source-browser and9 exact-APK/native/admin-web checks passed; physical R13 acceptance remains pending. All three names/sizes/parents were verified by readback; existing owner/writer sharing preserved without anyone/domain access or permission changes. Remote checksums unavailable. ZIP contains no passwords/invitations/private keys/fixtures. [R13 source and evidence](events/2026-11-16-pda-r13-dates-and-pending-panel.md). Receipt `/workspace/artifacts/scpda-ui-r13-2026-11-16/GOOGLE-DRIVE-DELIVERY.json`.
+
+## Earlier delivery — R12
 
 | File | Bytes | Drive link |
 | --- | ---: | --- |

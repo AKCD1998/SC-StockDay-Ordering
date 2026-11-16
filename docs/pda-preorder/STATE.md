@@ -1,6 +1,6 @@
 # Shared checkpoint — 16 November 2026 (Bangkok)
 
-Status: **PDA_COUNT_001_AND_005_LIVE / PREORDER_CHAT_CLAIMED / PREORDER_REVIEW_DRAFTS_READY**. R12 deployment/config/schema verified16 Nov09:37 Bangkok; actual new005 phone acceptance remains pending. Preorder drafts remain separate and undeployed.
+Status: **PDA_COUNT_001_AND_005_LIVE / PREORDER_CHAT_CLAIMED / PREORDER_REVIEW_DRAFTS_READY**. R12 deployment/config/schema verified16 Nov09:37 Bangkok; a genuine005 receipt was matched at10:16. R13 combined mobile UI delivered11:20; physical R13 acceptance remains pending. Preorder drafts remain separate and undeployed.
 
 ## Ownership admission
 
@@ -34,8 +34,8 @@ The current task is this verified destination chat. Separate review checkouts ar
 | Item | Evidence / state |
 |---|---|
 | Web main checked 16 Nov | `f9bf49d4054cb8424573800806d2552c548d4c52`, live R12 admin005 selector |
-| PDA branch source | Current R12 `codex/scpda-005-app-r12`, `c74eaeb2ccd5de25e698a6e5912715c10d44954d`; [PDA owner checkpoint](owners/PDA.md) |
-| Pending mobile UI batch | Update1 queue-only medicine panel prepared/tested at `codex/scpda-next-ui-batch` / `ec2227b7d89e12ed4999eb38b21d3c0aeb4d0dbd`; user explicitly said wait for their second update before any APK build. Current delivery remains R12. [Pending event](events/2026-11-16-pda-next-ui-update1.md) |
+| PDA branch source | Current R13 `codex/scpda-next-ui-batch`, compiled `65324c4bef39659c3bdcf71eb7391e34e925166e`, QA/docs head `7c8cf60b7bff2137f06b0138936b3cfc1e80237b`; [PDA owner checkpoint](owners/PDA.md) |
+| Combined mobile UI batch | User’s second date update is included with the queue-only pale-red medicine panel in R13; one combined APK built/tested/delivered. Numeric date entry and direct year/month/day selection; receipt ISO/null contract preserved. [R13 event](events/2026-11-16-pda-r13-dates-and-pending-panel.md) |
 | Android source handoff | [Verified source paths, fetch instructions and joint workflow](PDA_SOURCE_AND_CONTINUATION.md); source exists in Git, Drive is delivery only. User requested clarification to Preorder owner; receiver acknowledgment is not yet recorded |
 | Latest APK in Drive | [SCPDA0.6.2-test.12](https://drive.google.com/file/d/1K-JEn0hS76QUIlwQnZ6PggjrMse2H4DE/view?usp=drivesdk),16 Nov; new01005/005 phone trial and existing001 support. Same package/signing key and R9 UI; mobile Preorder remains separate |
 | PDA count activation / web stock check | User-authorized01001/001 and01005/005 count intake live. Backend `f4e617eef9a9eb805bec3383828a5ac97705e4e2`, web above, migration083/084 applied. Admin sees001/005 separately; branch001 web access remains001-only. No005 web login, Ada adjustment or current-stock-source override. [R12 evidence](events/2026-11-16-pda-branch005-pilot.md) |
@@ -57,7 +57,7 @@ The current task is this verified destination chat. Separate review checkouts ar
 | Earlier R3 evidence | 8 workspace tests + 9 existing preorder helper tests + 4 navigation/session tests passed; admin-web production build passed with existing bundle-size warning, before continuation commits |
 | Continuation checks | `e9057f1` changed API files passed `node --check` and `git diff --check`; CI run `43709199891` passed. Member-directory commit `9c206b1` changed API files and `git diff --check` passed; CI run `43710628130` passed. Pending/approved notification code commit `c5a28bf` passed `git diff --check`; CI run `43712475237` passed. Web receipt-task commit `c388247` passed `git diff --check`; CI run `43712453471` passed. No separate local test suite was run for these continuation commits |
 | R3 review mockup | 17 browser checks; one synthetic request supplied in two rounds 2+1, 15 in-memory actions; not a durable API/database/auth proof |
-| APK status | Latest delivered0.6.2-test.12, same package/signing certificate. User's005 Android screenshot and matching production receipt confirm an upload16 Nov10:16 Bangkok; quantity review/current-balance adoption and remaining hardware checks are separate. Pending UI update1 is not built/shipped |
+| APK status | Latest delivered0.6.3-test.13, same package/signing certificate;38 model,18 source-browser and9 exact-APK/native/admin-web checks passed. R13 physical trial pending. Prior005 screenshot/production receipt confirms R12 upload16 Nov10:16; quantity review/current-balance adoption remain separate. [Delivery](events/2026-11-16-pda-r13-dates-and-pending-panel.md) |
 
 ## Implemented vs pending
 
