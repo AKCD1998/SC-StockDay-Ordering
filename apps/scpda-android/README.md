@@ -2,7 +2,13 @@
 
 This is the Android target of the existing SC StockDay PDA project. It retains the navy/yellow/white identity, manual camera capture, decoder and separate count demo. It does not publish the existing Site.
 
-## Current Android build — R11
+## Current Android build — R12
+
+Version `0.6.2-test.12` (code12) supports the user's new branch005 phone/account01005 as well as existing001 installations. Import the separately supplied005 device-setup JSON once; the new phone then selects01005 automatically. Native proof, reader/count audiences, response contracts, stock quantities, local records and server receipts all retain branch scope. Existing001 accounts/data/package/signing certificate remain compatible. Admins can select005 in the existing stock-check page; this does not create a005 web account.
+
+Label OCR/Preorder remain unchanged. Counts are observations pending review, not live balances or Ada adjustments. The new-device and count roundtrip uses software proof in Cloud QA; actual Android enrollment/camera/first real count must be verified on the user's phone. No password, invitation secret or private key is compiled into the APK.
+
+## Historical Android build — R11
 
 Version `0.6.1-test.11` (code11) delivers the user-authorized count pilot. Existing operator01001 receives separate count-purpose access after a fresh registered-device/password login when the server enables it. Other readers remain read/local-only. Submit quantity/unit, lots and available manufacturing/expiry dates; unknowns stay null. Server receipts, explicit retries, offline queues, lost-response recovery and linked corrections are retained. Old local-only records are not silently uploaded.
 

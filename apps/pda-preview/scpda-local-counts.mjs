@@ -20,8 +20,8 @@ function date(value,unknown,label){
  return value;
 }
 export function prepareLocalCount({who,product,draft,now=new Date().toISOString()}){
- if(!who||who.branchCode!=='001'||!['01001','02001','03001'].includes(who.operatorCode))throw Error('เข้าสู่ระบบก่อนบันทึก');
- if(!product?.productCode||typeof product.barcode!=='string')throw Error('ตรวจสินค้าก่อนนับ');
+ if(!who||({'01001':'001','02001':'001','03001':'001','01005':'005'})[who.operatorCode]!==who.branchCode)throw Error('เข้าสู่ระบบก่อนบันทึก');
+ if(!product?.productCode||typeof product.barcode!=='string'||product.branchCode&&product.branchCode!==who.branchCode)throw Error('ตรวจสินค้าก่อนนับ');
  if(!['pharma','common','normal'].includes(draft.category)||![1,2,3].includes(Number(draft.round)))throw Error('เลือกหมวดและรอบนับ');
  const unit=String(draft.unit||'').trim();if(!unit||unit.length>80)throw Error('ระบุหน่วยที่นับ');
  if(!Array.isArray(draft.lots)||!draft.lots.length||draft.lots.length>100)throw Error('เพิ่มล็อตที่นับ');
@@ -36,7 +36,7 @@ export function prepareLocalCount({who,product,draft,now=new Date().toISOString(
   return {code,manufacturedOn:mfg,expiresOn:exp,quantity:n,unit};
  });
  if(draft.supersedesId&&String(draft.reason||'').trim().length<3)throw Error('ระบุเหตุผลที่แก้ไข');
- return {schema:'scpda-local-count-v1',id:draft.id,branchCode:'001',operatorCode:who.operatorCode,productCode:product.productCode,skuId:product.skuId,barcode:product.barcode,productName:product.name,productSnapshot:clone(product),category:draft.category,round:Number(draft.round),unit,quantity,lots,completeProduct:!!draft.completeProduct,countedAt:draft.originalCountedAt||now,recordedOnDeviceAt:now,...(draft.supersedesId?{supersedesId:draft.supersedesId,correctionReason:String(draft.reason).trim()}:{}),referenceAtCount:clone(product.stock),stockComparisonAllowed:false,conversionFactor:null,sourceSelectionChanged:false,uploadIntent:draft.uploadIntent===true,syncState:'local-only',serverReceipt:null,officialStockWrites:false};
+ return {schema:'scpda-local-count-v1',id:draft.id,branchCode:who.branchCode,operatorCode:who.operatorCode,productCode:product.productCode,skuId:product.skuId,barcode:product.barcode,productName:product.name,productSnapshot:clone(product),category:draft.category,round:Number(draft.round),unit,quantity,lots,completeProduct:!!draft.completeProduct,countedAt:draft.originalCountedAt||now,recordedOnDeviceAt:now,...(draft.supersedesId?{supersedesId:draft.supersedesId,correctionReason:String(draft.reason).trim()}:{}),referenceAtCount:clone(product.stock),stockComparisonAllowed:false,conversionFactor:null,sourceSelectionChanged:false,uploadIntent:draft.uploadIntent===true,syncState:'local-only',serverReceipt:null,officialStockWrites:false};
 }
 export class LocalCountBook{
  constructor({demo=false}={}){this.ready=new Promise((ok,no)=>{try{const r=indexedDB.open(demo?'scpda-ui-review-counts-v1':'scpda-local-counts-001-v1',2);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('records')){const s=r.result.createObjectStore('records',{keyPath:'id'});s.createIndex('correctionOf','supersedesId',{unique:true});}if(!r.result.objectStoreNames.contains('drafts'))r.result.createObjectStore('drafts',{keyPath:'key'});if(!r.result.objectStoreNames.contains('uploads'))r.result.createObjectStore('uploads',{keyPath:'id'});};r.onsuccess=()=>{r.result.onversionchange=()=>r.result.close();ok(r.result);};r.onblocked=()=>no(Error('ปิดหน้า SCPDA อื่นแล้วเปิดใหม่'));r.onerror=()=>no(Error('พื้นที่เก็บข้อมูลไม่พร้อม'));}catch{no(Error('พื้นที่เก็บข้อมูลไม่พร้อม'));}});this.ready.catch(()=>{});}

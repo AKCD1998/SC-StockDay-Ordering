@@ -4,7 +4,7 @@ export class CountSync{
  constructor({book,getActor,request,onChange}){Object.assign(this,{book,getActor,request,onChange});this.available=false;this.flushing=false;this.serverRecords=[];this.epoch=0;this.nextFlush=false;window.addEventListener('online',()=>this.flush());}
  connect(available){this.epoch++;this.available=available;this.serverRecords=[];if(this.flushing){this.nextFlush=available;}else this.flush();}
  async queue(record){const row=await this.book.enqueue(record,countSubmission(record));await this.flush();return row;}
- receiptValid(r,id){if(r?.contract!=='scpda-counts-001-v1'||r.branchCode!=='001'||r.eventId!==id||!uuid.test(r.receiptId||'')||!Number.isFinite(Date.parse(r.receivedAt))||r.officialStockWrites!==false)throw Error('ใบรับจากเซิร์ฟเวอร์ไม่ตรงกัน');return r;}
+ receiptValid(r,id){if(r?.contract!=='scpda-counts-'+this.getActor()?.branchCode+'-v1'||r.branchCode!==this.getActor()?.branchCode||r.eventId!==id||!uuid.test(r.receiptId||'')||!Number.isFinite(Date.parse(r.receivedAt))||r.officialStockWrites!==false)throw Error('ใบรับจากเซิร์ฟเวอร์ไม่ตรงกัน');return r;}
  async flush(){if(this.flushing){this.nextFlush=this.available;return;}if(!this.available||!this.getActor())return;this.flushing=true;
   try{const epoch=this.epoch,who=this.getActor(),all=await this.book.list(who);for(const r of all.records)if(r.uploadIntent&&!all.uploads.some(u=>u.id===r.id)){try{await this.book.enqueue(r,countSubmission(r));}catch(e){await this.onChange?.(e.message);}}
    const current=await this.book.list(who),ordered=current.uploads.filter(u=>u.status!=='accepted').sort((a,b)=>{const ar=current.records.find(r=>r.id===a.id),br=current.records.find(r=>r.id===b.id);return(ar?.recordedOnDeviceAt||'').localeCompare(br?.recordedOnDeviceAt||'');});
