@@ -24,4 +24,13 @@ export function manualDateText(value){
  try{const date=normalizeManualDate(value),[year,month,day]=date.split('-');return Number(year)>=2400?date:day+'/'+month+'/'+year;}catch{return String(value);}
 }
 export function dateDraftValue(value){if(!value)return '';try{return normalizeManualDate(value);}catch{return value;}}
+// Formatting while typing is structural only: invalid dates remain editable
+// and Buddhist/Gregorian validation still happens at the existing boundaries.
+export function maskManualDate(value,{padSeparated=true}={}){
+ const text=digits(String(value));
+ if(/^\d{4}-\d{2}-\d{2}$/.test(text))return manualDateText(text);
+ if(padSeparated&&/^\d{1,2}[/.\-]\d{1,2}[/.\-]\d{4}$/.test(text)&&text.length<10){try{return manualDateText(text);}catch{/* Preserve invalid input for normal validation. */}}
+ const numbers=text.replace(/\D/g,'').slice(0,8);
+ return numbers.slice(0,2)+(numbers.length>=2?'/':'')+numbers.slice(2,4)+(numbers.length>=4?'/':'')+numbers.slice(4);
+}
 export function bangkokToday(){const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const get=t=>parts.find(p=>p.type===t).value;return get('year')+'-'+get('month')+'-'+get('day');}

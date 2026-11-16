@@ -1,11 +1,12 @@
 import {THAI_MONTHS,normalizeManualDate,manualDateText,isoDate,monthDays,bangkokToday} from './manual-label-date.mjs';
+import {bindManualDateInput} from './manual-date-input.mjs';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const clampYear=year=>Math.max(1,Math.min(9999,year));
 export class ManualDatePicker{
  constructor(){
   this.dialog=document.createElement('dialog');this.dialog.id='manualDatePicker';this.dialog.className='scpda-manual-date-dialog';this.dialog.setAttribute('aria-labelledby','manualDateTitle');
-  this.dialog.innerHTML=`<header class="scpda-manual-date-header"><h2 id="manualDateTitle">เลือกวันที่</h2><button type="button" id="manualDateClose" aria-label="ปิดเลือกวันที่">×</button></header><label for="manualDateText">วัน / เดือน / ปี</label><input id="manualDateText" type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off" autocapitalize="none" maxlength="10" placeholder="วว/ดด/ปปปป"><p class="scpda-manual-date-hint">กรอกได้ทั้ง ค.ศ. / พ.ศ. · แสดงเป็น ค.ศ.</p><p id="manualDateError" class="scpda-manual-date-error" role="alert" hidden></p><nav class="scpda-manual-date-nav" aria-label="เลือกเดือนและปี"><button type="button" id="manualDatePrev" aria-label="ปีก่อน">‹ ปี</button><div><button type="button" id="manualDateMonth"></button><button type="button" id="manualDateYear"></button></div><button type="button" id="manualDateNext" aria-label="ปีถัดไป">ปี ›</button></nav><div id="manualDateGrid"></div><footer class="scpda-manual-date-actions"><button type="button" id="manualDateCancel">ยกเลิก</button><button type="button" id="manualDateApply">ตกลง</button></footer>`;
-  document.body.append(this.dialog);this.text=this.dialog.querySelector('#manualDateText');
+  this.dialog.innerHTML=`<header class="scpda-manual-date-header"><h2 id="manualDateTitle">เลือกวันที่</h2><button type="button" id="manualDateClose" aria-label="ปิดเลือกวันที่">×</button></header><label for="manualDateText">วัน / เดือน / ปี (ค.ศ.)</label><input id="manualDateText" type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off" autocapitalize="none" maxlength="10" placeholder="วว/ดด/ค.ศ."><p class="scpda-manual-date-hint">กรอกได้ทั้ง ค.ศ. / พ.ศ. · แสดงเป็น ค.ศ.</p><p id="manualDateError" class="scpda-manual-date-error" role="alert" hidden></p><nav class="scpda-manual-date-nav" aria-label="เลือกเดือนและปี"><button type="button" id="manualDatePrev" aria-label="ปีก่อน">‹ ปี</button><div><button type="button" id="manualDateMonth"></button><button type="button" id="manualDateYear"></button></div><button type="button" id="manualDateNext" aria-label="ปีถัดไป">ปี ›</button></nav><div id="manualDateGrid"></div><footer class="scpda-manual-date-actions"><button type="button" id="manualDateCancel">ยกเลิก</button><button type="button" id="manualDateApply">ตกลง</button></footer>`;
+  document.body.append(this.dialog);this.text=this.dialog.querySelector('#manualDateText');bindManualDateInput(this.text);
   this.dialog.querySelector('#manualDateClose').onclick=this.dialog.querySelector('#manualDateCancel').onclick=()=>this.close();
   this.dialog.querySelector('#manualDateApply').onclick=()=>this.apply();
   this.dialog.querySelector('#manualDateMonth').onclick=()=>{this.view=this.view==='month'?'day':'month';this.render();};
@@ -17,7 +18,7 @@ export class ManualDatePicker{
   this.dialog.addEventListener('close',()=>{const opener=this.opener;this.target=null;this.opener=null;if(opener?.isConnected)opener.focus({preventScroll:true});});
  }
  bind(root){
-  for(const input of root.querySelectorAll('.local-manual-date'))input.addEventListener('blur',()=>{if(!input.value)return;try{input.value=manualDateText(normalizeManualDate(input.value));input.dispatchEvent(new Event('change',{bubbles:true}));}catch{/* Validation on confirm preserves the raw draft. */}});
+  for(const input of root.querySelectorAll('.local-manual-date')){bindManualDateInput(input);input.addEventListener('blur',()=>{if(!input.value)return;try{input.value=manualDateText(normalizeManualDate(input.value));input.dispatchEvent(new Event('change',{bubbles:true}));}catch{/* Validation on confirm preserves the raw draft. */}});}
   for(const button of root.querySelectorAll('[data-pick-date]'))button.onclick=()=>this.open(document.getElementById(button.dataset.pickDate),button.dataset.dateLabel);
  }
  open(input,label){
