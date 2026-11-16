@@ -1889,6 +1889,10 @@ export default function App() {
     );
   }
 
+  if (view === "app-center") {
+    return <div className="ac-standalone-page"><AppCenterPanel isAdminUser={isAdminUser} csrfToken={session.csrfToken} userLabel={session.user.id} onBack={() => setView("receipts")} onLogout={handleLogout} /></div>;
+  }
+
   return (
     <div className="page">
       <div className="topbar">
@@ -2013,8 +2017,6 @@ export default function App() {
         <PreorderPanel enabled={customerPreordersEnabled} csrfToken={session.csrfToken} isAdmin={isAdminUser} branchCode={branchCode} apiBaseUrl={apiBaseUrl} onBadgeChanged={refreshPreorderBadgeCount} />
       ) : view === "pos-admin" && isAdminUser ? (
         <PosAdminPanel />
-      ) : view === "app-center" ? (
-        <AppCenterPanel isAdminUser={isAdminUser} csrfToken={session.csrfToken} />
       ) : view === "members" ? (
         <MembersPanel isAdmin={isAdminUser} csrfToken={session.csrfToken} />
       ) : (
