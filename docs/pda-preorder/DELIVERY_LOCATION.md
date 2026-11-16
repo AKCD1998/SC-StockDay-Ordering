@@ -7,7 +7,18 @@ User instruction, 15 November 2026: place completed PDA app deliveries in Google
 - Verified parent: เภสัชอู๋, ID `1usItMowEj6llCqWYjdpMAkswB5bubGkD`.
 - Parent was found by exact name; the child was created under that verified parent. Existing sharing was preserved.
 
-## Current delivery — R11
+## Current delivery — R12
+
+| File | Bytes | Drive link |
+| --- | ---: | --- |
+| SCPDA-0.6.2-test.12.apk |2995013| [APK](https://drive.google.com/file/d/1K-JEn0hS76QUIlwQnZ6PggjrMse2H4DE/view?usp=drivesdk) |
+| SCPDA-005-device-setup.json |297| [New005-phone enrollment](https://drive.google.com/file/d/1Xz9eY4H6uwBuuRyborX2-pItNQdeMxqU/view?usp=drivesdk) |
+| SCPDA-0.6.2-test.12-Android-005.zip |2738842| [Installation package](https://drive.google.com/file/d/1xvNAk_VvYyjbcdRVno7_KoBrKYDLTZS7/view?usp=drivesdk) |
+| START-HERE-SCPDA-0.6.2-test.12-005.txt |5469| [Instructions](https://drive.google.com/file/d/1tNGLn7avJVSTq2q_p-Nx0rSODpPCSi--/view?usp=drivesdk) |
+
+User explicitly requested01005 and confirmed a new/unregistered005 phone. Account, scoped enrollment and001-compatible R12 backend/web are live. Import the separately downloaded JSON once; no ZIP selection inside the app. The enrollment credential expires18 Nov2026,09:35 Bangkok and is the explicit new-phone exception to ordinary credential-free delivery. Folder/file permissions were verified as existing individually shared owner/writer, with no public/domain sharing or sharing changes. APK/ZIP contain no password, setup invitation, private key or fixture. Metadata readback verified all four names/sizes/parent IDs; remote checksums unavailable. Same package/signing certificate; actual phone enrollment/first real count remains pending. [R12 evidence/source/hash](events/2026-11-16-pda-branch005-pilot.md). Receipt `/workspace/artifacts/scpda-005-2026-11-16/GOOGLE-DRIVE-DELIVERY.json`.
+
+## Earlier delivery — R11
 
 | File | Bytes | Drive link |
 | --- | ---: | --- |

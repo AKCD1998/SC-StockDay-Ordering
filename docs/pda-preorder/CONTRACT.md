@@ -47,6 +47,10 @@ Existing registered-device reader authentication negotiates separate count-purpo
 
 `GET /api/stock-check` / `scpda-stock-check-001-v1` uses existing web-cookie auth for admin or both original/effective branch001. The website **ข้อมูลสินค้า → เช็คสินค้า** shows actual catalog products, latest PDA server receipt per product first, never-submitted products last, categories เภสัช/ปกติ/สามัญ, quantities/lots/dates and review status. Branch001 reads; admin has review actions. This **เช็คสินค้า** evidence catalog is distinct from mobile **เช็คราคา** and Preorder customer **สอบถามราคา**. Intake and admin review do not themselves replace current Full Sync balances or adjust Ada stock. [Deployment/test/delivery evidence](events/2026-11-15-pda-r11-count-activation.md).
 
+## Deployed005 pilot extension — R12
+
+The user authorized account01005 at branch005 and confirmed a new Android phone on16 November. R12 adds005-scoped enrollment/reader/count audiences and response contracts while preserving001. Exact operator/branch pairs are server-owned; absent005 flag denies005 and explicit count allowlist remains required. Scope:01001/001 and01005/005 count intake; admin can inspect001/005 separately, existing branch001 web accounts stay001-only. There is no new005 web or named Preorder identity. New005 reader/counter credentials must not be reused as the separate enrolled Preorder capability token. Manual fields, observed-versus-received time, whole quantities, units/pack uncertainty, receipt idempotency and append-only corrections remain. [R12 source/deployment/test/delivery event](events/2026-11-16-pda-branch005-pilot.md). Future mobile continuation uses the current005-capable app source in the handoff; it must not regress to an001-only build.
+
 ## Existing source evidence, not today's runtime proof
 
 The inspected preorder backend has authenticated web-session routes under `/api/customer-preorders` for cases, quotes, customer decisions, mark-ordered, case-level branch arrival/notification/completion, messages/photos, receipt/transfer evidence links and ETA. Its available source uses admin/staff checks.

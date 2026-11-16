@@ -1,5 +1,7 @@
 # วิธีรับช่วงงานร่วมกับ PDA และหาซอร์สแอป
 
+**Current16 November — R12:** source checkpoint updated to the delivered005-capable app below. [R12 authorization/deploy/delivery](events/2026-11-16-pda-branch005-pilot.md). Preserve01001/001 and01005/005; Preorder identity/permissions remain separate. Historical examples/PR observations later in this guide retain their dated scope.
+
 ผู้ใช้ขอให้ PDA owner ชี้แจงวิธีทำงานให้แชต Preorder หลังมีรายงานว่าใน Drive มี APK/รายงานแต่ไม่มีซอร์สให้ต่อหน้า Preorder เอกสารนี้แก้จุดส่งต่องานนั้น ไม่ได้โอน ownership หรืออนุญาตเขียนข้อมูลจริงใน ADA
 
 ## แหล่งข้อมูลแต่ละชนิด
@@ -12,32 +14,32 @@
 ## ซอร์ส Android ที่ตรวจจาก remote แล้ว
 
 - Repository: **`AKCD1998/SC-StockDay-Ordering`**
-- Branch: **`codex/pda-count-send-r11`**
-- Commit: **`1d2c29569fd72435fd58315bdb1bca7f225040eb`**
-- รุ่นส่งมอบ: **0.6.1-test.11**, versionCode11
-- [เปิดซอร์สที่ commit นี้](https://github.com/AKCD1998/SC-StockDay-Ordering/tree/1d2c29569fd72435fd58315bdb1bca7f225040eb)
+- Branch: **`codex/scpda-005-app-r12`**
+- Commit: **`c74eaeb2ccd5de25e698a6e5912715c10d44954d`**
+- รุ่นส่งมอบ: **0.6.2-test.12**, versionCode12
+- [เปิดซอร์สที่ commit นี้](https://github.com/AKCD1998/SC-StockDay-Ordering/tree/c74eaeb2ccd5de25e698a6e5912715c10d44954d)
 
 ใช้ checkout ของ repository เดิม ตรวจ remote/status/worktree ก่อน อย่าสลับหรือ merge ใส่ branch ที่ผู้อื่นกำลังทำงาน ตัวอย่างคำสั่งตรวจแบบไม่เปลี่ยน engineering branch:
 
 ```sh
-git fetch origin coord/pda-preorder-ledger codex/pda-count-send-r11
+git fetch origin coord/pda-preorder-ledger codex/scpda-005-app-r12
 git show origin/coord/pda-preorder-ledger:docs/pda-preorder/STATE.md
 git show origin/coord/pda-preorder-ledger:docs/pda-preorder/CONTRACT.md
-git show 1d2c29569fd72435fd58315bdb1bca7f225040eb:apps/scpda-android/README.md
-git ls-tree -r --name-only 1d2c29569fd72435fd58315bdb1bca7f225040eb apps/scpda-android apps/pda-preview scripts
+git show c74eaeb2ccd5de25e698a6e5912715c10d44954d:apps/scpda-android/README.md
+git ls-tree -r --name-only c74eaeb2ccd5de25e698a6e5912715c10d44954d apps/scpda-android apps/pda-preview scripts
 ```
 
 ถ้าต้องอ่านหลายไฟล์ ให้ใช้ worktree สำหรับอ่านโดยเฉพาะ หลังตรวจว่าปลายทางยังไม่มีและไม่มีเจ้าของใช้งาน:
 
 ```sh
-git worktree add --detach /workspace/preorder-pda-r11-source-review 1d2c29569fd72435fd58315bdb1bca7f225040eb
+git worktree add --detach /workspace/preorder-pda-r12-source-review c74eaeb2ccd5de25e698a6e5912715c10d44954d
 ```
 
 path นี้เป็นตัวอย่างใหม่บนเครื่องของผู้รับ ไม่ใช่การอ้างว่าเข้าถึงเครื่อง PDA owner แล้ว ห้าม merge coordination branch เข้า app/Preorder branch เพื่อให้เห็นเอกสาร และไม่ต้อง merge/cherry-pick ทั้ง R11 เข้า PR100 เพียงเพื่ออ่านไฟล์
 
 ## แผนที่ไฟล์ที่เกี่ยวข้องจริง
 
-| งาน | ไฟล์ในซอร์ส R11 |
+| งาน | ไฟล์ในซอร์ส R12 |
 |---|---|
 | หน้าจอหลัก/สามแท็บ/การสลับแท็บและคงร่าง | `apps/pda-preview/scpda.html`, `scpda-ui.mjs`, `scpda.css` |
 | หน้าตาและคิวผลนับเดิม | `apps/pda-preview/scpda-count-ui.mjs`, `scpda-count-sync.mjs`, `scpda-local-counts.mjs` |
