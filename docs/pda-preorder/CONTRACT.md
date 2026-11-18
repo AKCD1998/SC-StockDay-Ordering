@@ -90,3 +90,12 @@ Production deployment, schema migration, permission/account/CORS changes, added 
 ### 16 November — user-authorized004 Android count pilot (R16)
 
 Add01004→004 with independently default-off004 admission, explicit count allowlist and branch-bound004 device/reader/count audiences/DTOs. Preserve001/005 credentials and identities. Admin004 evidence reads do not create a004 web account. Migration087 extends only immutable evidence constraints; no official Ada/current-stock writes. AndroidR16 and App Center support004; browser enrollment transport remains001-only. New004 account does not grant enrolled Preorder/product/CEO rights. Local controls the separate product-writer TEST round. [Verified source/deployment/delivery](events/2026-11-16-pda-branch004-r16.md).
+
+
+## 18 November — accepted daily companion policy, candidate transport
+
+For the branch005 pilot, primary01005 approves secondary02005 through a two-minute QR from the current Android release. The matching iOS Home Screen PWA shares that release's UI; admission binds one installation key, not physical iPhone hardware. Each day begins with a selfie and actor/device/branch work log. Reader and count access expire00:00 Asia/Bangkok; proof-only reopen does not extend that date. No background screenshots. Private Drive images are deleted90 days after capture; stock evidence and work history are separate.
+
+The user explicitly accepted **QR + matching public IP** as an interim check and requested a weekly Monday-morning reminder to improve real store-network verification. This is not an assertion of sameSSID/LAN. Existing001/004 accounts are not silently included in this candidate.
+
+Backend PR70/mobile PR108 remain draft and production admission is off. Drive backend OAuth and real-phone acceptance are prerequisites. This policy adds no Preorder/product/CEO privileges; those owners must review an explicit capability contract before reuse. See [R17 candidate event](events/2026-11-18-pda-r17-daily-companion-candidate.md).
