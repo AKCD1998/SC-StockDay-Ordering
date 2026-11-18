@@ -8,5 +8,6 @@ public final class AndroidDevice implements StockDaySession.DeviceProof {
  private KeyStore keys()throws Exception{KeyStore k=KeyStore.getInstance("AndroidKeyStore");k.load(null);if(!k.containsAlias(ALIAS)){KeyPairGenerator g=KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC,"AndroidKeyStore");g.initialize(new KeyGenParameterSpec.Builder(ALIAS,KeyProperties.PURPOSE_SIGN|KeyProperties.PURPOSE_VERIFY).setAlgorithmParameterSpec(new ECGenParameterSpec("secp256r1")).setDigests(KeyProperties.DIGEST_SHA256).build());g.generateKeyPair();}return k;}
  public String publicKey()throws Exception{return Base64.getEncoder().encodeToString(keys().getCertificate(ALIAS).getPublicKey().getEncoded());}
  public String deviceId(){return prefs.getString("id","");}public String certificate(){return prefs.getString("certificate","");}public void saveCertificate(String c){prefs.edit().putString("certificate",c).apply();}
+ public String dailySessionId(){return prefs.getString("dailySessionId","");}public void saveDailySessionId(String id){prefs.edit().putString("dailySessionId",id).apply();}
  public String sign(String text)throws Exception{Signature s=Signature.getInstance("SHA256withECDSA");s.initSign((PrivateKey)keys().getKey(ALIAS,null));s.update(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));return Base64.getEncoder().encodeToString(s.sign());}
 }
