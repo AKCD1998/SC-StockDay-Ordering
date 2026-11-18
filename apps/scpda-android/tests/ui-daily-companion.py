@@ -1,0 +1,16 @@
+"""Synthetic loopback PWA camera/login/count/reopen acceptance harness.
+Requires the companion UI fixture API on39817 and a fixture-only exported PWA
+on5207. Never points the shipping transport at a live environment.
+"""
+from playwright.sync_api import sync_playwright
+from pathlib import Path
+import json,argparse
+parser=argparse.ArgumentParser();parser.add_argument('--fixture-root',required=True);args=parser.parse_args();root=Path(args.fixture_root).resolve();checks=[]
+with sync_playwright() as p:
+ ctx=p.chromium.launch_persistent_context(str(root/'ui-fixture/pwa-profile'),executable_path='/usr/bin/chromium',headless=True,viewport={'width':390,'height':844},permissions=['camera'],args=['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream','--use-file-for-fake-video-capture='+str(root/'ui-fixture/qr.y4m')]);ctx.add_init_script("Object.defineProperty(navigator,'standalone',{get:()=>true})");page=ctx.new_page();errors=[];page.on('pageerror',lambda e: errors.append(str(e)));page.on('console',lambda msg: print('browser',msg.text[:250]) if msg.type=='error' else None)
+ try:
+  page.goto('http://127.0.0.1:5207/scpda/');page.locator('#activateDevice').click();page.locator('#loginPane').wait_for(state='visible',timeout=30000);checks.append('installed PWA camera decodes real primary QR');assert page.locator('#username').input_value()=='02005';page.locator('#password').fill('fixturePassword');page.locator('#loginButton').click();page.get_by_role('button',name='ถ่ายรูป',exact=True).click();page.get_by_role('button',name='ใช้รูปนี้',exact=True).click();page.locator('#sessionBar').wait_for(state='visible',timeout=30000);checks.append('daily selfie login and count grant');assert '02005' in page.locator('#accountLabel').inner_text();page.locator('#barcode').fill('0001234567890');page.locator('#lookupButton').click();page.locator('#recentPane').wait_for(state='visible',timeout=15000);checks.append('real catalog and branch005 stock lookup');page.screenshot(path=str(root/'PWA-DAILY-LOGGED-IN.png'));page.locator('#recentList [data-recent-count]').click();page.locator('#localUnit').select_option(label='เม็ด');page.locator('#localCategory').select_option('pharma');page.locator('.local-lot-code').fill('PWA-LABEL');page.locator('.local-mfg').fill('01012026');page.locator('.local-exp').fill('31012028');page.locator('.local-quantity').fill('3');page.locator('#localCountReviewButton').click();page.locator('#localCountReviewSave').click();page.get_by_text('เซิร์ฟเวอร์รับแล้ว · รอตรวจ',exact=False).wait_for(state='visible',timeout=20000);checks.append('UI count quantity, lot, dates, real server receipt');page.reload();page.locator('#sessionBar').wait_for(state='visible',timeout=15000);checks.append('page reload proof-only resume without selfie or password');assert not page.locator('.scpda-daily-camera').count();assert not errors,errors
+  (root/'PWA-DAILY-UI.json').write_text(json.dumps({'checks':checks,'passed':True,'realIphoneAccepted':False,'fixtureOnly':True},ensure_ascii=False,indent=2));print(checks)
+ except Exception:
+  page.screenshot(path=str(root/'PWA-DAILY-FAILURE.png'));print('STATUS',page.locator('#status').inner_text());print('ERRORS',errors);print('PAGE',page.locator('body').inner_text()[-2500:]);raise
+ finally:ctx.close()

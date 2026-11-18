@@ -1,7 +1,11 @@
 """Build/sign a local internal-test APK with the verified Android SDK. No deploy."""
+import re
 import argparse,os,subprocess,pathlib,zipfile,json,hashlib,secrets,shutil,xml.etree.ElementTree as ET
 from PIL import Image
 p=argparse.ArgumentParser();p.add_argument('--sdk',required=True);p.add_argument('--out',required=True);p.add_argument('--signing-dir',required=True);a=p.parse_args();root=pathlib.Path(__file__).resolve().parent.parent;app=root/'apps/scpda-android';out=pathlib.Path(a.out).resolve();out.mkdir(parents=True,exist_ok=True);sdk=pathlib.Path(a.sdk).resolve();bt=sdk/'build-tools/35.0.0' if (sdk/'build-tools/35.0.0').exists() else sdk/'build-tools/android-15';android=sdk/'platforms/android-35/android.jar' if (sdk/'platforms/android-35/android.jar').exists() else sdk/'platform/android-35/android.jar';private=pathlib.Path(a.signing_dir).resolve();private.mkdir(parents=True,exist_ok=True,mode=0o700)
+manifest_version=ET.parse(app/'AndroidManifest.xml').getroot()
+contract_source=(root/'apps/pda-preview/scpda-daily-contract.mjs').read_text()
+if str(manifest_version.get('{http://schemas.android.com/apk/res/android}versionCode')) != re.search(r'SCPDA_VERSION_CODE=(\d+)',contract_source).group(1) or manifest_version.get('{http://schemas.android.com/apk/res/android}versionName') != re.search(r"SCPDA_VERSION_NAME='([^']+)'",contract_source).group(1):raise RuntimeError('Android and PWA release versions must match')
 env={'PATH':os.environ['PATH'],'LANG':'C.UTF-8'}
 def run(*cmd):subprocess.run([str(c) for c in cmd],cwd=root,env=env,check=True)
 work=out/'build'

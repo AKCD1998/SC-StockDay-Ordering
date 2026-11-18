@@ -1,21 +1,26 @@
 package th.co.scgroup1989.scpda;
 import org.json.*;
+import java.security.MessageDigest;
 import java.net.*;import java.io.*;import java.nio.charset.StandardCharsets;import java.util.*;
 // Separate reader sessions, not StockDay web cookies. Private device keys remain
 // in Android Keystore; admission certificates are public, PINs/tokens are not saved.
 public final class StockDaySession {
  public static final String ORIGIN="https://paasrtsm-project.onrender.com",CONTRACT="scpda-read-001-v1";
  public interface Wire {Reply send(String method,String path,JSONObject body,Map<String,String> headers,CookieManager jar)throws Exception;}
- public interface DeviceProof {String publicKey()throws Exception;String deviceId();String certificate();void saveCertificate(String c);String sign(String text)throws Exception;}
+ public interface DeviceProof {String publicKey()throws Exception;String deviceId();String certificate();void saveCertificate(String c);String sign(String text)throws Exception;default String dailySessionId(){return "";}default void saveDailySessionId(String id){} }
  public static final class Reply {public final int status;public final JSONObject data;public Reply(int s,JSONObject d){status=s;data=d;}}
  public static final class ApiError extends Exception {public final int status;public final String code;public ApiError(int s,String m){this(s,"REQUEST_REJECTED",m);}public ApiError(int s,String c,String m){super(m);status=s;code=c;}}
- private final Wire wire;private final DeviceProof device;private final CookieManager emptyJar=new CookieManager(null,CookiePolicy.ACCEPT_NONE);private String token,countToken,branch="001";
- public StockDaySession(DeviceProof d){this(new HttpsWire(),d);}StockDaySession(Wire w,DeviceProof d){wire=w;device=d;}
+ private final Wire wire;private final DeviceProof device;private final CookieManager emptyJar=new CookieManager(null,CookiePolicy.ACCEPT_NONE);private String token,countToken,branch="001";private final int versionCode;
+ public StockDaySession(DeviceProof d){this(new HttpsWire(),d,0);}public StockDaySession(DeviceProof d,int version){this(new HttpsWire(),d,version);}StockDaySession(Wire w,DeviceProof d){this(w,d,16);}StockDaySession(Wire w,DeviceProof d,int version){wire=w;device=d;versionCode=version;}
  public synchronized JSONObject execute(String operation,JSONObject args)throws Exception{
   if(operation.equals("status"))return status();
   if(operation.equals("login"))return login(args);
-  if(operation.equals("logout")){try{if(token!=null)call("POST","/api/scpda/auth/logout",new JSONObject(),true);}finally{token=null;countToken=null;}return new JSONObject().put("ok",true);}
+  if(operation.equals("dailyPolicy"))return dailyPolicy();
+  if(operation.equals("resume"))return resume();
+  if(operation.equals("logout")){try{if(token!=null)call("POST","/api/scpda/auth/logout",new JSONObject(),true);}finally{token=null;countToken=null;device.saveDailySessionId("");}return new JSONObject().put("ok",true);}
   if(token==null)throw new ApiError(401,"LOGIN_REQUIRED","เข้าสู่ระบบ SCPDA ก่อน");
+  if(operation.equals("createCompanionQr"))return createCompanionQr();
+  if(operation.equals("dailySelfie"))return call("GET","/api/scpda/daily/selfie",null,true);
   if(operation.equals("countCapabilities"))return countCall("GET","/api/scpda/counts/capabilities",null,countToken);
   if(operation.equals("countCheck"))return countCall("POST","/api/scpda/counts/check",args,countToken);
   if(operation.equals("countSubmit"))return countCall("POST","/api/scpda/counts",args,countToken);
@@ -26,7 +31,7 @@ public final class StockDaySession {
   if(operation.equals("stock"))return call("GET","/api/scpda/stock?search="+encoded(text(args,"search",160))+"&limit=200&offset=0",null,true);
   throw new ApiError(400,"แอปนี้รองรับเฉพาะการตรวจสินค้า");
  }
- public synchronized JSONObject status()throws Exception{boolean paired=false;String expires=null,c=device.certificate();try{JSONObject p=new JSONObject(new String(Base64.getUrlDecoder().decode(c.split("\\.")[1]),StandardCharsets.UTF_8));String b=p.optString("branch_code");paired=(b.equals("001")||b.equals("004")||b.equals("005"))&&p.optString("public_key").equals(device.publicKey())&&p.optString("device_id").equals(device.deviceId())&&p.optLong("exp",0)>System.currentTimeMillis()/1000;if(paired)branch=b;expires=java.time.Instant.ofEpochSecond(p.optLong("exp",0)).toString();}catch(Exception ignored){}return new JSONObject().put("contract","scpda-read-"+branch+"-v1").put("branchCode",branch).put("paired",paired).put("expiresAt",expires==null?JSONObject.NULL:expires);}
+ public synchronized JSONObject status()throws Exception{boolean paired=false;String expires=null,c=device.certificate();try{JSONObject p=new JSONObject(new String(Base64.getUrlDecoder().decode(c.split("\\.")[1]),StandardCharsets.UTF_8));String b=p.optString("branch_code");paired=(b.equals("001")||b.equals("004")||b.equals("005"))&&p.optString("public_key").equals(device.publicKey())&&p.optString("device_id").equals(device.deviceId())&&p.optLong("exp",0)>System.currentTimeMillis()/1000;if(paired)branch=b;expires=java.time.Instant.ofEpochSecond(p.optLong("exp",0)).toString();}catch(Exception ignored){}return new JSONObject().put("contract","scpda-read-"+branch+"-v1").put("branchCode",branch).put("paired",paired).put("dailyResumeAvailable",!device.dailySessionId().isEmpty()).put("expiresAt",expires==null?JSONObject.NULL:expires);}
  public synchronized JSONObject activate(JSONObject invitation)throws Exception{
   if(!invitation.optString("contract").equals("scpda-device-invitation-v1")||!(invitation.optString("branchCode").equals("001")||invitation.optString("branchCode").equals("004")||invitation.optString("branchCode").equals("005"))||!invitation.optString("apiOrigin").equals(ORIGIN))throw new ApiError(400,"ไฟล์เชื่อมเครื่องไม่ถูกต้อง");
   branch=invitation.getString("branchCode");JSONObject r=call("POST","/api/scpda/device/pair",new JSONObject().put("invitationId",text(invitation,"invitationId",100)).put("code",text(invitation,"activationCode",200)).put("publicKey",device.publicKey()).put("deviceId",device.deviceId()),false);
@@ -36,9 +41,19 @@ public final class StockDaySession {
   token=null;countToken=null;if(!status().optBoolean("paired"))throw new ApiError(409,"DEVICE_ACTIVATION_REQUIRED","เลือกไฟล์เชื่อมเครื่องก่อนเริ่มใช้งาน");String user=text(args,"username",5);Object raw=args.opt("password");if(!(raw instanceof String))throw new ApiError(400,"เลือกผู้ใช้งานและกรอกรหัสผ่าน");String pin=(String)raw;if(!user.matches("(?:0[123]001|01004|01005)")||!(pin.matches("[0-9]{4}")||pin.matches("[!-~]{6,64}")))throw new ApiError(400,"เลือกผู้ใช้งานและกรอกรหัสผ่าน");
   if(!(user.equals("01004")?"004":user.equals("01005")?"005":"001").equals(branch))throw new ApiError(403,"DEVICE_BRANCH_MISMATCH","บัญชีไม่ตรงกับสาขาของเครื่อง");try{String cert=device.certificate();JSONObject c=call("POST","/api/scpda/auth/challenge",new JSONObject().put("deviceCertificate",cert),false);String message="SCPDA-LOGIN-V1\n"+c.getString("challengeId")+"\n"+c.getString("nonce")+"\n"+user+"\n"+c.getString("deviceRef");
    JSONObject r=call("POST","/api/scpda/auth/login",new JSONObject().put("operatorCode",user).put("pin",pin).put("deviceCertificate",cert).put("challengeId",c.getString("challengeId")).put("signature",device.sign(message)),false);token=r.optString("token","");JSONObject u=r.optJSONObject("user");if(token.isEmpty()||u==null||!u.optString("operatorCode").equals(user)||!u.optString("branchCode").equals(branch)||!u.optString("role").equals("reader"))throw new ApiError(502,"ข้อมูลบัญชี SCPDA ไม่ตรงกัน");
+   if(user.equals("01005")&&dailyPolicy().optBoolean("enabled")){
+    String image=args.optString("selfie","");String imageHash=sha256Image(image);JSONObject challenge=call("POST","/api/scpda/daily/primary/challenge",new JSONObject(),true);
+    String parent=sessionId(),proof="SCPDA-DAILY-PRIMARY-V1\n"+challenge.getString("challengeId")+"\n"+challenge.getString("nonce")+"\n"+parent+"\n"+imageHash+"\n"+versionCode;
+    JSONObject daily=call("POST","/api/scpda/daily/primary/start",new JSONObject().put("deviceCertificate",cert).put("challengeId",challenge.getString("challengeId")).put("selfie",image).put("versionCode",versionCode).put("signature",device.sign(proof)),true);token=daily.getString("token");device.saveDailySessionId(daily.getString("dailySessionId"));
+   }
    JSONObject me=call("GET","/api/scpda/session",null,true);if(me.optBoolean("officialStockWrites",true)||me.optBoolean("countSubmissionAvailable",true)||!me.getJSONObject("user").optString("operatorCode").equals(user))throw new ApiError(502,"ขอบเขตเซสชันไม่ตรงกัน");try{negotiateCountAccess(user);}catch(Exception unavailable){countToken=null;}me.put("countUploadAvailable",countToken!=null);return me;
   }catch(Exception e){token=null;countToken=null;throw e;}
  }
+ private JSONObject dailyPolicy()throws Exception{if(!branch.equals("005"))return new JSONObject().put("enabled",false);try{return call("GET","/api/scpda/daily/policy",null,false);}catch(ApiError e){if(e.status==404||e.status==405)return new JSONObject().put("enabled",false);throw e;}}
+ private String sessionId()throws Exception{if(token==null)throw new ApiError(401,"LOGIN_REQUIRED","เข้าสู่ระบบก่อน");return new JSONObject(new String(Base64.getUrlDecoder().decode(token.split("\\.")[1]),StandardCharsets.UTF_8)).getString("jti");}
+ private static String sha256Image(String image)throws Exception{if(!image.startsWith("data:image/jpeg;base64,")||image.length()>273072)throw new ApiError(400,"SELFIE_REQUIRED","ถ่ายเซลฟี่ก่อนเริ่มงาน");byte[] digest=MessageDigest.getInstance("SHA-256").digest(Base64.getDecoder().decode(image.substring(23)));StringBuilder out=new StringBuilder();for(byte b:digest)out.append(String.format(java.util.Locale.ROOT,"%02x",b&255));return out.toString();}
+ private JSONObject createCompanionQr()throws Exception{JSONObject c=call("POST","/api/scpda/daily/qr/challenge",new JSONObject(),true);String proof="SCPDA-COMPANION-QR-V1\n"+c.getString("challengeId")+"\n"+c.getString("nonce")+"\n"+sessionId()+"\n"+versionCode;return call("POST","/api/scpda/daily/qr",new JSONObject().put("deviceCertificate",device.certificate()).put("challengeId",c.getString("challengeId")).put("versionCode",versionCode).put("signature",device.sign(proof)),true);}
+ private JSONObject resume()throws Exception{status();String id=device.dailySessionId();if(!branch.equals("005")||id.isEmpty())throw new ApiError(401,"DAILY_LOGIN_REQUIRED","เข้าสู่ระบบสำหรับวันนี้");try{JSONObject c=call("POST","/api/scpda/daily/resume/challenge",new JSONObject().put("sessionId",id),false);String proof="SCPDA-DAILY-RESUME-V1\n"+c.getString("challengeId")+"\n"+c.getString("nonce")+"\n"+id;JSONObject r=call("POST","/api/scpda/daily/resume",new JSONObject().put("sessionId",id).put("challengeId",c.getString("challengeId")).put("signature",device.sign(proof)),false);JSONObject u=r.getJSONObject("user");if(!u.optString("operatorCode").equals("01005")||!r.optString("dailySessionId").equals(id))throw new ApiError(502,"IDENTITY_INVALID","ข้อมูลเครื่องหลักไม่ตรงกัน");token=r.getString("token");JSONObject me=call("GET","/api/scpda/session",null,true);try{negotiateCountAccess("01005");}catch(Exception unavailable){countToken=null;}return me.put("countUploadAvailable",countToken!=null);}catch(Exception e){token=null;countToken=null;throw e;}}
  private void negotiateCountAccess(String user)throws Exception{
   JSONObject admission=countCall("GET","/api/scpda/counts/admission",null,token);if(!admission.optBoolean("canRequestCountAccess"))return;
   JSONObject c=countCall("POST","/api/scpda/counts/access/challenge",new JSONObject().put("deviceCertificate",device.certificate()),token);

@@ -113,3 +113,7 @@
 .scpda .scpda-manual-date-actions button{min-height:48px;border-radius:12px;border:1px solid #bcc9df;background:white;color:#0b1fb8;font-size:16px}
 .scpda .scpda-manual-date-actions #manualDateApply{background:#0b1fb8;border-color:#0b1fb8;color:white}
 @media(max-width:480px){.scpda-lot-dates{grid-template-columns:minmax(0,1fr)}}
+
+.scpda-daily-camera{max-width:440px;width:calc(100% - 24px);max-height:95dvh;padding:18px}.scpda-daily-camera video,.scpda-daily-camera canvas{width:100%;max-height:55dvh;object-fit:contain;border-radius:18px;background:#0a1224}.scpda-daily-camera button{margin-top:10px}.scpda-store-qr .qr-image{padding:14px;background:white}.scpda-store-qr svg{display:block;width:100%;height:auto;max-width:320px;margin:auto}.scpda-daily-camera [hidden]{display:none!important}
+
+#staffSelfie{width:32px;height:32px;object-fit:cover;border-radius:50%}
