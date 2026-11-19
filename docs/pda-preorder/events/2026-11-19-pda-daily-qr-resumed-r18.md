@@ -8,7 +8,7 @@ Backend draft PR70 now includes live R18/main0899934 and preserves full01004SHPE
 
 Default PWA version is18. The delivered Android R18 already contains the daily/QR/selfie UI; matching PWA18 exported from that APK without publishing or creating another Android app. Local export `/workspace/artifacts/scpda-daily-qr-resume-2026-11-19/pwa18`, source APK SHA2561067b82f77bad62f3c7de094b61005ab4a0dee9b71490dd16a65cf99e655bd31. No mock transport is shipped.
 
-23 isolated policy/provider/CORS/HTTP/PostgreSQL tests passed, including seven-account coexistence with004-Shopee read/count/pick capabilities while005 daily admission is on.32 other SCPDA regression checks passed;6 optional integration checks skipped. CI now provisions a dedicated loopback daily fixture database alongside the004 area fixture. Final hosted CI status must be checked on the stated head. Owned daily PostgreSQL fixture stopped with data retained.
+23 isolated policy/provider/CORS/HTTP/PostgreSQL tests passed, including seven-account coexistence with004-Shopee read/count/pick capabilities while005 daily admission is on.32 other SCPDA regression checks passed;6 optional integration checks skipped. CI now provisions a dedicated loopback daily fixture database alongside the004 area fixture. Hosted CI44445478958 completed successfully on the stated head, including the dedicated daily and004 area PostgreSQL fixtures. Owned daily PostgreSQL fixture stopped with data retained.
 
 ## Actual access and remaining dependency
 
