@@ -37,7 +37,7 @@ with sync_playwright() as p:
  page.screenshot(path=str(out/'pda-scan-mobile.png'),full_page=True)
  page.locator('#cameraButton').click()
  page.wait_for_function("!document.querySelector('#cameraCapture').disabled")
- assert page.locator('#cameraTorch').inner_text() in ['ไฟฉาย: ปิด','ไฟฉาย: ไม่รองรับ']
+ assert page.locator('#cameraTorch,#cameraSound').count()==0
  assert page.locator('#cameraResult').is_hidden()
  assert page.locator('#countForm').is_hidden()
  assert page.locator('#cameraCapture').bounding_box()['height']>=48
@@ -67,6 +67,6 @@ with sync_playwright() as p:
  page.locator('#operatorAvatar').click();page.locator('#disconnectButton').click();page.wait_for_function("document.querySelector('[data-pane=count]').disabled");assert page.locator('[data-pane=count]').is_disabled()
  assert writes==[],'Targeted UI/camera check must not save a count'
  assert errors==[],errors
- report={'environment':'cloud-loopback-existing-postgresql-fixture','cameraSource':'Chromium fake camera, not physical Android','loginAndOperatorViews':True,'deliberateAimingNoCountWrite':True,'torchDefaultOffOrUnsupported':True,'cameraTouchControls48px':True,'exactBarcodeAndExplicitUnit':True,'invalidFieldVisibleAboveStickyBar':True,'escapeFromReviewPreservesDraft':True,'logoutDisablesCounting':True,'touchControlSizes':sizes,'noHorizontalOverflow':True,'historyRefreshPreservesExpandedReceipt':True,'countPostRequests':len(writes),'browserErrors':errors,'physicalPhoneVerified':False,'hostedPreviewChanged':False,'productionOrStagingVerified':False}
+ report={'environment':'cloud-loopback-existing-postgresql-fixture','cameraSource':'Chromium fake camera, not physical Android','loginAndOperatorViews':True,'deliberateAimingNoCountWrite':True,'torchAndSoundControlsRemoved':True,'cameraTouchControls48px':True,'exactBarcodeAndExplicitUnit':True,'invalidFieldVisibleAboveStickyBar':True,'escapeFromReviewPreservesDraft':True,'logoutDisablesCounting':True,'touchControlSizes':sizes,'noHorizontalOverflow':True,'historyRefreshPreservesExpandedReceipt':True,'countPostRequests':len(writes),'browserErrors':errors,'physicalPhoneVerified':False,'hostedPreviewChanged':False,'productionOrStagingVerified':False}
  (out/'targeted-ui-checks.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))
  context.close();browser.close()
