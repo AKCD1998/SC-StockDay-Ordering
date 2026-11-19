@@ -1,5 +1,7 @@
 # PDA owner checkpoint
 
+**R21 server correction —19 November:** PR74 is live on064ea1c. Fixes same-public-IP iPhone rejection caused by comparing rotating Cloudflare edges. Current app/PWA21 and credentials unchanged; primary must issue a fresh QR after rollout. [Evidence and acceptance](../events/2026-11-19-pda-proxy-network-correction.md).
+
 **Current R21 — 19 November:**004 front/Shopee and005 daily QR are live with multiple companion device slots, per-team count scopes and midnight expiry. Android/PWA/server21; existing seven primary/legacy records and invitations preserved. [Source, deployment, tests and delivery](../events/2026-11-19-pda-r21-004-multiple-companions.md).
 
 **App Center entry — 19 November:** PR112 is live with separate Android R20 and iPhone web app actions. Same version-20 PWA and 005 pilot; no APK/backend/account change. [Publication and verification](../events/2026-11-19-pda-app-center-iphone-entry.md).

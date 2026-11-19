@@ -1,5 +1,7 @@
 # Continue the original PDA owner
 
+**Current backend correction:** PR74/064ea1cc454cf56a351a5b42392dc245a459553d is live; preserve the bounded SCPDA Render/Cloudflare client resolver. Mobile/PWA remainR21. [Network fix](events/2026-11-19-pda-proxy-network-correction.md).
+
 **Current R21 — 19 November:** use mobile source `c8e884ed7348d3f99129d931b029e45e06b55c3b` / `codex/scpda-004-daily-r21`, backend PR73/migration092 and web PR113.004 and005 support multiple daily QR companions; preserve separate004 scopes and R20 updater/camera fixes. [Live checkpoint](events/2026-11-19-pda-r21-004-multiple-companions.md).
 
 **App Center entry — 19 November:** [SC App Center](https://sc-stockday-ordering.onrender.com/#/app-center) now offers Android R20 installation and the iPhone Home Screen web app entry. [Live PR112 checkpoint](events/2026-11-19-pda-app-center-iphone-entry.md).
