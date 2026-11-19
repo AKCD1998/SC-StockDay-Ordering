@@ -1,7 +1,7 @@
 """Prepare the existing SCPDA UI with real browser auth transport; no deploy.
 Uses the accepted APK UI assets rather than a new product/layout or mock host.
 """
-import argparse,subprocess,zipfile,hashlib,json,io
+import argparse,subprocess,zipfile,hashlib,json,io,re
 from PIL import Image
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--apk',required=True);p.add_argument('--out',required=True);a=p.parse_args()
@@ -9,7 +9,7 @@ root=Path(__file__).resolve().parent.parent;out=Path(a.out).resolve();out.mkdir(
 subprocess.run(['node',str(root/'node_modules/esbuild/bin/esbuild'),str(root/'apps/pda-preview/scpda-browser-host.mjs'),'--bundle','--format=iife','--global-name=SCPDAWeb','--target=chrome109,safari16','--outfile='+str(out/'browser-host.js')],cwd=root,check=True)
 with zipfile.ZipFile(a.apk) as z:html=z.read('assets/scpda.html').decode();icon=z.read('assets/scpda-icon.png');licenses=z.read('assets/licenses.txt')
 origin='https://paasrtsm-project.onrender.com'
-csp="default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; media-src blob:; connect-src 'self' "+origin+"; worker-src 'self'; base-uri 'none'; form-action 'none'"
+csp="default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; media-src blob:; manifest-src 'self'; connect-src 'self' "+origin+"; worker-src 'self'; base-uri 'none'; form-action 'none'"
 host=(out/'browser-host.js').read_text().replace('</script','<\\/script')
 html=html.replace('<head>','<head><meta http-equiv="Content-Security-Policy" content="'+csp+'"><script>'+host+'\nSCPDAWeb.installBrowserHost({companion:true});</script>',1)
 html=html.replace('<title>SCPDA</title>','<title>SCPDA</title>')
@@ -24,5 +24,5 @@ for size in [192,512]:Image.open(io.BytesIO(icon)).convert('RGB').resize((size,s
 cache='scpda-shell-'+hashlib.sha256(html.encode()).hexdigest()[:16]
 (out/'sw.js').write_text("const CACHE="+json.dumps(cache)+";self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./','./scpda-icon.png','./scpda-icon-192.png','./scpda-icon-512.png','./manifest.webmanifest'])))});self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('scpda-shell-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));self.addEventListener('fetch',e=>{const u=new URL(e.request.url);if(e.request.method!=='GET'||u.origin!==self.location.origin||!u.pathname.startsWith('/scpda/')||!['/scpda/','/scpda/index.html','/scpda/scpda-icon.png','/scpda/scpda-icon-192.png','/scpda/scpda-icon-512.png','/scpda/manifest.webmanifest'].includes(u.pathname))return;e.respondWith(fetch(e.request,{cache:'no-store'}).catch(()=>caches.match(e.request).then(r=>r||Response.error())))});")
 (out/'index.html').write_text(html);(out/'scpda-icon.png').write_bytes(icon)
-(out/'BUILD.json').write_text(json.dumps({'sourceApkSha256':hashlib.sha256(Path(a.apk).read_bytes()).hexdigest(),'entrySha256':hashlib.sha256(html.encode()).hexdigest(),'apiOrigin':origin,'mockTransport':False,'fixedOrigin':True,'requiresApprovedCorsAndRegisteredBrowserDevice':True,'companionOperator':'02005','branchCode':'005','requiresStandaloneInstallation':True,'permanentHardwareAttestation':False,'requiresDailyQrSelfieAndSamePublicIp':True,'productionActivated':False},indent=2))
+(out/'BUILD.json').write_text(json.dumps({'sourceApkSha256':hashlib.sha256(Path(a.apk).read_bytes()).hexdigest(),'entrySha256':hashlib.sha256(html.encode()).hexdigest(),'apiOrigin':origin,'mockTransport':False,'fixedOrigin':True,'requiresApprovedCorsAndRegisteredBrowserDevice':True,'companionOperators':['02004','02004SHPEE','02005'],'branchCodes':['004','005'],'versionCode':int(re.search(r'SCPDA_VERSION_CODE=(\d+)',(root/'apps/pda-preview/scpda-daily-contract.mjs').read_text()).group(1)),'requiresStandaloneInstallation':True,'permanentHardwareAttestation':False,'requiresDailyQrSelfieAndSamePublicIp':True,'productionActivated':False},indent=2))
 print(json.dumps({'entry':str(out/'index.html'),'mockTransport':False,'productionActivated':False}))

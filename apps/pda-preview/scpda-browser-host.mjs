@@ -1,4 +1,4 @@
-import {enrollmentFromUrl,SCPDA_VERSION_CODE} from './scpda-daily-contract.mjs';
+import {enrollmentFromUrl,SCPDA_VERSION_CODE,isCompanionOperator,dailyOperatorBranch} from './scpda-daily-contract.mjs';
 import {validScpdaCredential} from './scpda-credential.mjs';
 // Browser transport for the existing SCPDA device/PIN/count contracts.
 // No shared keys, credentials, fallback fixtures, proxy or arbitrary URLs.
@@ -26,7 +26,7 @@ export class BrowserDevice {
   }
   if(!state.privateKey||state.privateKey.extractable||typeof state.publicKey!=='string'||typeof state.deviceId!=='string')throw error(0,'DEVICE_STORAGE','ข้อมูลเครื่องไม่สมบูรณ์ ติดต่อผู้ดูแล');this.state=state;return state;
  }
- async status(){const s=await this.ready;let paired=false,expiresAt=null;try{const part=s.certificate.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'),p=JSON.parse(atob(part));paired=p.public_key===s.publicKey&&p.device_id===s.deviceId&&['001','004','005'].includes(p.branch_code)&&p.exp>Date.now()/1000;expiresAt=new Date(p.exp*1000).toISOString();if(paired)this.branch=p.branch_code;}catch{}return {contract:'scpda-read-'+(this.branch||'001')+'-v1',branchCode:this.branch||'001',paired,expiresAt,dailyResumeAvailable:!!s.dailySessionId};}
+ async status(){const s=await this.ready;let paired=false,expiresAt=null,operatorCode=null;try{const part=s.certificate.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'),p=JSON.parse(atob(part));paired=p.public_key===s.publicKey&&p.device_id===s.deviceId&&['001','004','005'].includes(p.branch_code)&&p.exp>Date.now()/1000;expiresAt=new Date(p.exp*1000).toISOString();if(paired){this.branch=p.branch_code;operatorCode=p.operator_code||null;}}catch{}return {contract:'scpda-read-'+(this.branch||'001')+'-v1',branchCode:this.branch||'001',paired,expiresAt,operatorCode,dailyResumeAvailable:!!s.dailySessionId};}
  async dailySession(value){const s=await this.ready;if(value===undefined)return s.dailySessionId||'';await this.transaction('readwrite',store=>store.put({...s,dailySessionId:value},'identity'));s.dailySessionId=value;}
  async certificate(value){const s=await this.ready;if(value===undefined)return s.certificate;const next={...s,certificate:value};await this.transaction('readwrite',store=>store.put(next,'identity'));Object.assign(s,next);}
  async sign(message){const s=await this.ready;return b64(ecdsaDer(await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},s.privateKey,new TextEncoder().encode(message))));}
@@ -37,6 +37,7 @@ export class BrowserSession {
  constructor({device=new BrowserDevice(),origin=API_ORIGIN,fetcher=globalThis.fetch.bind(globalThis),fixtureOnly=false,companion=false,versionCode=SCPDA_VERSION_CODE}={}){
   if(origin!==API_ORIGIN&&!(fixtureOnly&&/^http:\/\/127\.0\.0\.1:\d+$/.test(origin)))throw Error('Fixed SCPDA API origin required');Object.assign(this,{device,origin,fetcher,companion,versionCode});this.branch=companion?'005':'001';this.grant=null;
  }
+ companionIdentity(state={}){const operatorCode=this.grant?.operatorCode||state.operatorCode||'02005';if(!isCompanionOperator(operatorCode))throw error(401,'IDENTITY_INVALID','ข้อมูลบัญชีเครื่องย่อยไม่ตรงกัน');this.branch=dailyOperatorBranch(operatorCode);return operatorCode;}
  async call(path,{method='GET',body,token,contract=null}={}){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);let response;
   try{response=await this.fetcher(this.origin+path,{method,cache:'no-store',redirect:'error',credentials:'omit',signal:controller.signal,headers:{Accept:'application/json',...(body===undefined?{}:{'Content-Type':'application/json'}),...(token?{Authorization:'Bearer '+token}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});}
@@ -52,8 +53,8 @@ export class BrowserSession {
   if(typeof r.deviceCertificate!=='string')throw error(502,'DEVICE_CERT_INVALID','ระบบไม่ส่งใบยืนยันเครื่อง');await this.device.certificate(r.deviceCertificate);const status=await this.device.status();if(!status.paired)throw error(502,'DEVICE_CERT_INVALID','ใบยืนยันเครื่องไม่ตรงกัน');return status;
  }
  async login({username,password,selfie}){
-  this.#reader=this.#counter=null;if(!/^(?:0[123]001|01004|01004SHPEE|01005|02005)$/.test(username||'')||!validScpdaCredential(password))throw error(400,'LOGIN_INVALID','เลือกผู้ใช้งานและกรอกรหัสผ่าน');const state=await this.device.status();this.branch=this.companion?'005':state.branchCode||'001';if(!this.companion&&!state.paired)throw error(409,'DEVICE_ACTIVATION_REQUIRED','เชื่อมเครื่องก่อนเริ่มใช้งาน');
-  if(username==='02005')return this.enroll(password,selfie);
+  this.#reader=this.#counter=null;if(!(/^(?:0[123]001|01004|01004SHPEE|01005)$/.test(username||'')||isCompanionOperator(username))||!validScpdaCredential(password))throw error(400,'LOGIN_INVALID','เลือกผู้ใช้งานและกรอกรหัสผ่าน');const state=await this.device.status();this.branch=this.companion?dailyOperatorBranch(this.companionIdentity(state)):state.branchCode||'001';if(!this.companion&&!state.paired)throw error(409,'DEVICE_ACTIVATION_REQUIRED','เชื่อมเครื่องก่อนเริ่มใช้งาน');
+  if(isCompanionOperator(username)){if(!this.companion||username!==this.companionIdentity(state))throw error(403,'IDENTITY_INVALID','เลือกบัญชีให้ตรงกับ QR ของทีม');return this.enroll(password,selfie,username);}if(this.companion)throw error(403,'IDENTITY_INVALID','เว็บแอปนี้ใช้บัญชีเครื่องย่อยจาก QR');
   try{const cert=await this.device.certificate(),c=await this.call('/api/scpda/auth/challenge',{method:'POST',body:{deviceCertificate:cert}}),signature=await this.device.sign(['SCPDA-LOGIN-V1',c.challengeId,c.nonce,username,c.deviceRef].join('\n'));
    const r=await this.call('/api/scpda/auth/login',{method:'POST',body:{operatorCode:username,pin:password,deviceCertificate:cert,challengeId:c.challengeId,signature}});
    if(typeof r.token!=='string'||r.user?.operatorCode!==username||r.user?.branchCode!==this.branch||r.user?.role!=='reader')throw error(502,'IDENTITY_INVALID','ข้อมูลบัญชีไม่ตรงกัน');this.#reader=r.token;
@@ -69,21 +70,21 @@ export class BrowserSession {
    return {...me,countUploadAvailable:!!this.#counter};
 
  }
- async enroll(password,image){
+ async enroll(password,image,username){
   if(!this.grant)throw error(409,'QR_REQUIRED','สแกน QR จากเครื่องหลักก่อน');
   const d=await this.device.ready,bytes=Uint8Array.from(atob((image||'').split(',')[1]||''),c=>c.charCodeAt(0)),imageHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),x=>x.toString(16).padStart(2,'0')).join('');
-  const body={...this.grant,deviceId:d.deviceId,publicKey:d.publicKey,pin:password,selfie:image,versionCode:this.versionCode};body.signature=await this.device.sign(['SCPDA-COMPANION-ENROLL-V1',body.grantId,body.secret,d.deviceId,imageHash,this.versionCode].join('\n'));
-  const r=await this.call('/api/scpda/daily/companion/enroll',{method:'POST',body});if(r.user?.operatorCode!=='02005'||typeof r.token!=='string'||!r.dailySessionId||!r.deviceCertificate)throw error(502,'IDENTITY_INVALID','ข้อมูลเครื่องย่อยไม่ครบ');
-  await this.device.certificate(r.deviceCertificate);await this.device.dailySession(r.dailySessionId);this.#reader=r.token;this.grant=null;return this.finish('02005');
+  const body={...this.grant,deviceId:d.deviceId,publicKey:d.publicKey,pin:password,selfie:image,versionCode:this.versionCode,operatorCode:username};body.signature=await this.device.sign(['SCPDA-COMPANION-ENROLL-V1',body.grantId,body.secret,d.deviceId,imageHash,this.versionCode].join('\n'));
+  const r=await this.call('/api/scpda/daily/companion/enroll',{method:'POST',body});if(r.user?.operatorCode!==username||typeof r.token!=='string'||!r.dailySessionId||!r.deviceCertificate)throw error(502,'IDENTITY_INVALID','ข้อมูลเครื่องย่อยไม่ครบ');
+  await this.device.certificate(r.deviceCertificate);await this.device.dailySession(r.dailySessionId);this.#reader=r.token;this.grant=null;return this.finish(username);
  }
  async resume(){
-  const sessionId=await this.device.dailySession();if(!sessionId)throw error(401,'DAILY_LOGIN_REQUIRED','เข้าสู่ระบบสำหรับวันนี้');this.branch='005';
+  const sessionId=await this.device.dailySession();if(!sessionId)throw error(401,'DAILY_LOGIN_REQUIRED','เข้าสู่ระบบสำหรับวันนี้');const state=await this.device.status(),username=this.companionIdentity(state);
   const c=await this.call('/api/scpda/daily/resume/challenge',{method:'POST',body:{sessionId}}),signature=await this.device.sign(['SCPDA-DAILY-RESUME-V1',c.challengeId,c.nonce,sessionId].join('\n'));
-  const r=await this.call('/api/scpda/daily/resume',{method:'POST',body:{sessionId,challengeId:c.challengeId,signature}});if(r.user?.operatorCode!=='02005'||r.dailySessionId!==sessionId||typeof r.token!=='string')throw error(502,'IDENTITY_INVALID','ข้อมูลเครื่องย่อยไม่ตรงกัน');this.#reader=r.token;if(r.deviceCertificate)await this.device.certificate(r.deviceCertificate);return this.finish('02005');
+  const r=await this.call('/api/scpda/daily/resume',{method:'POST',body:{sessionId,challengeId:c.challengeId,signature}});if(r.user?.operatorCode!==username||r.dailySessionId!==sessionId||typeof r.token!=='string')throw error(502,'IDENTITY_INVALID','ข้อมูลเครื่องย่อยไม่ตรงกัน');this.#reader=r.token;if(r.deviceCertificate)await this.device.certificate(r.deviceCertificate);return this.finish(username);
  }
  async countCall(path,body){if(!this.#counter)throw error(401,'COUNT_ACCESS_REQUIRED','ยังไม่เชื่อมระบบรับผลนับ');try{return await this.call('/api/scpda/counts'+path,{...(body===undefined?{}:{method:'POST',body}),token:this.#counter,contract:'scpda-counts-'+this.branch+'-v1'});}catch(e){if(e.status===401)this.#counter=null;throw e;}}
  async perform(op,args){
-  if(op==='status'){const state=await this.device.status();if(state.paired&&!this.companion)this.branch=state.branchCode;return this.companion?{...state,paired:!!this.grant||state.paired,branchCode:'005',operatorCode:'02005'}:state;}if(op==='dailyPolicy')return this.branch==='005'?this.call('/api/scpda/daily/policy'):{enabled:false};if(op==='resume')return this.resume();if(op==='activateDevice')return this.activate(args);if(op==='login')return this.login(args);
+  if(op==='status'){const state=await this.device.status();if(this.companion){const operatorCode=this.companionIdentity(state);return {...state,paired:!!this.grant||state.paired,branchCode:this.branch,operatorCode};}if(state.paired)this.branch=state.branchCode;return state;}if(op==='dailyPolicy')return ['004','005'].includes(this.branch)?this.call('/api/scpda/daily/policy?branchCode='+this.branch):{enabled:false};if(op==='resume')return this.resume();if(op==='activateDevice')return this.activate(args);if(op==='login')return this.login(args);
   if(op==='logout'){try{if(this.#reader)await this.call('/api/scpda/auth/logout',{method:'POST',body:{},token:this.#reader});}finally{this.#reader=this.#counter=null;await this.device.dailySession?.('');}return {ok:true};}
   if(!this.#reader)throw error(401,'LOGIN_REQUIRED','เข้าสู่ระบบก่อน');
   const input=(key,max)=>{const v=args?.[key];if(typeof v!=='string'||!v.trim()||v.length>max)throw error(400,'INPUT_INVALID','ข้อมูลไม่ถูกต้อง');return v.trim();};

@@ -35,5 +35,15 @@ export async function scanStoreQr(){
 }
 export function showStoreQr(data){
  const dialog=document.createElement('dialog');dialog.className='scpda-account scpda-store-qr';dialog.innerHTML='<header class="scpda-dialog-header"><h2>เชื่อมเครื่องย่อย · 02005</h2><button aria-label="ปิด">✕</button></header><div class="qr-image"></div><p>เปิด SCPDA บนเครื่องย่อย แล้วสแกน QR นี้</p><p class="subtle">เชื่อม Wi-Fi ร้าน · QR ใช้ได้ 2 นาที</p>';
- dialog.querySelector('.qr-image').innerHTML=qrSvg(data.url);let timer;const close=()=>{clearTimeout(timer);dialog.close();dialog.remove();};dialog.querySelector('button').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});document.body.append(dialog);dialog.showModal();timer=setTimeout(()=>{dialog.querySelector('.qr-image').replaceChildren();dialog.querySelector('p').textContent='QR หมดอายุแล้ว ปิดแล้วสร้างใหม่';},Math.max(0,Date.parse(data.expiresAt)-Date.now()));
+ if(data.initialPassword){const credentials=document.createElement('p');credentials.textContent='รหัสผ่านเริ่มต้น: '+data.initialPassword;dialog.append(credentials);}dialog.querySelector('h2').textContent='เชื่อมเครื่องย่อย · '+(data.operatorCode||'02005');dialog.querySelector('.qr-image').innerHTML=qrSvg(data.url);let timer;const close=()=>{clearTimeout(timer);dialog.close();dialog.remove();};dialog.querySelector('button').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});document.body.append(dialog);dialog.showModal();timer=setTimeout(()=>{dialog.querySelector('.qr-image').replaceChildren();dialog.querySelector('p').textContent='QR หมดอายุแล้ว ปิดแล้วสร้างใหม่';},Math.max(0,Date.parse(data.expiresAt)-Date.now()));
+}
+export function chooseCompanion(records){
+ return new Promise(resolve=>{
+  const dialog=document.createElement('dialog');dialog.className='scpda-account';let settled=false;
+  const finish=value=>{if(settled)return;settled=true;dialog.close();dialog.remove();resolve(value);};
+  const header=document.createElement('header');header.className='scpda-dialog-header';const title=document.createElement('h2');title.textContent='QR เชื่อมเครื่องย่อย';const close=document.createElement('button');close.textContent='✕';close.setAttribute('aria-label','ปิด');close.onclick=()=>finish(null);header.append(title,close);dialog.append(header);
+  const hint=document.createElement('p');hint.className='subtle';hint.textContent='เลือกเครื่องเดิมสำหรับวันนี้ หรือเพิ่มเครื่องให้พนักงานอีกคน';dialog.append(hint);
+  for(const row of records){const button=document.createElement('button');button.type='button';button.className='scpda-secondary';button.textContent=row.operatorCode+' · '+(row.paired?'เครื่องเดิม':'ยังไม่เชื่อมเครื่อง');button.onclick=()=>finish(row.operatorCode);dialog.append(button);}
+  const add=document.createElement('button');add.type='button';add.className='scpda-primary';add.textContent='＋ เพิ่มเครื่องย่อย';add.onclick=()=>finish('new');dialog.append(add);dialog.addEventListener('cancel',e=>{e.preventDefault();finish(null);});document.body.append(dialog);dialog.showModal();
+ });
 }
