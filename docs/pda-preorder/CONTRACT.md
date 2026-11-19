@@ -99,3 +99,23 @@ For the branch005 pilot, primary01005 approves secondary02005 through a two-minu
 The user explicitly accepted **QR + matching public IP** as an interim check and requested a weekly Monday-morning reminder to improve real store-network verification. This is not an assertion of sameSSID/LAN. Existing001/004 accounts are not silently included in this candidate.
 
 Backend PR70/mobile PR108 remain draft and production admission is off. Drive backend OAuth and real-phone acceptance are prerequisites. This policy adds no Preorder/product/CEO privileges; those owners must review an explicit capability contract before reuse. See [R17 candidate event](events/2026-11-18-pda-r17-daily-companion-candidate.md).
+
+
+## 19 November —004 front/Shopee counting and internal order picks
+
+User-confirmed physical layout: front sales floor and its middle/front warehouse,
+with Shopee at the back. Separate team counts retain one branch004 stock reference.
+Requested login01004SHPEE is distinct from01004; actor identity must not become
+another stock balance. The proposed default scopes are front-plus-front-warehouse
+and Shopee, with packed/unshipped goods explicitly covered. Exact alias/scope and
+server capabilities still need compatible app/API implementation; current R16 has
+no such area model.
+
+Urgent front-warehouse → Shopee-order picking stays internal004, conserves branch
+physical quantity until actual dispatch, and needs a traceable paired/idempotent
+handoff. Interbranch001/003/005 movements keep their existing transfer process.
+Do not add independent rounds or asynchronous/incomplete area counts as an exact
+branch total. Preserve the existing sole Shopee commitment ledger, opening and
+cutover, and reconcile shipments already represented by a new physical baseline
+before deducting them again. This adds no CEO/product or official-Ada-write right.
+[Detailed proposed contract](BRANCH004_COUNT_AREAS.md).

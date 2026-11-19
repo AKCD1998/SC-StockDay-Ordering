@@ -1,5 +1,8 @@
 # PDA owner checkpoint
 
+**19 November —004 front/Shopee scope design:** user confirms front plus middle/front warehouse and a separate back-store Shopee team; urgent picks can go directly from the front warehouse into Shopee packing. Requested `01004SHPEE` remains branch004 with its own count scope;01004 covers front plus front warehouse. Read-only checks confirm01004 is active/admitted and R16 published, with no004 phone/count evidence yet. The new alias/scope is not provisioned. Existing Shopee commitments are live and must be reused/reconciled before adopting a physical baseline. [Design](../BRANCH004_COUNT_AREAS.md) / [event](../events/2026-11-19-pda-004-front-shopee-scopes.md). R17 Drive and Local product work remain intact.
+
+
 **18 November — R17 daily companion candidate:** user accepted01005→02005 QR admission, first-daily selfie/work log, Bangkok-midnight expiry,90-day private Drive retention, and temporary same-public-IP checking with Monday-morning reminder. Draft backend PR70 `bafdccef…` and mobile PR108 `a1a83ae…` prepared; isolated API/JVM/PWA camera/count/reopen checks passed. **Not activated:**02005, migration089, Drive runtime OAuth, production deployment/publication and actual iPhone acceptance remain pending. User confirms an existing company Google Cloud project; its ID/client/grant is being resolved. Live App Center remains R16; preserve001/004/005 and Local product connector ownership. [Full candidate checkpoint](../events/2026-11-18-pda-r17-daily-companion-candidate.md).
 
 
