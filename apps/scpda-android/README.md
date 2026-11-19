@@ -2,6 +2,15 @@
 
 This is the Android target of the existing SC StockDay PDA project. It retains the navy/yellow/white identity, manual camera capture, decoder and separate count demo. It does not publish the existing Site.
 
+## Update delivery policy — user confirmed 19 November 2026
+
+Publish each completed Android update in SC App Center as part of delivery.
+Uploading an APK to Google Drive alone does not update the version advertised to
+installed apps. After publication, verify the latest published version and the
+APK digest on the server. Keep the existing package/signing identity so phones
+can install over their current app. Physical-device acceptance remains a
+separate validation result and must be reported accurately.
+
 ## Current Android build — R12
 
 Version `0.6.2-test.12` (code12) supports the user's new branch005 phone/account01005 as well as existing001 installations. Import the separately supplied005 device-setup JSON once; the new phone then selects01005 automatically. Native proof, reader/count audiences, response contracts, stock quantities, local records and server receipts all retain branch scope. Existing001 accounts/data/package/signing certificate remain compatible. Admins can select005 in the existing stock-check page; this does not create a005 web account.

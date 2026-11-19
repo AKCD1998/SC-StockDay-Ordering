@@ -53,6 +53,14 @@ This is a common Android APK for all branches, including both 004 teams.
 Physical-phone acceptance is still required: focus response and indicator,
 preview alignment/crop in portrait and landscape, runtime camera permission,
 scrolling on a short screen, background/reopen and repeated capture. No actual
-phone was connected in this workspace. App Center publication is separate from
-building this candidate; the existing published release is not changed by the
-build.
+phone was connected in this workspace.
+
+## Publication — 19 November 2026
+
+Following the user's instruction to publish Android updates in App Center as
+part of delivery, R19 was published at `2026-11-19T03:12:45Z` (10:12 Thailand).
+Release `900db957-bec5-4687-b339-fa2d2891138c` is the latest published release,
+verified through a read-only server query; versionCode19 is an update for R18.
+The server verified the stored APK before publication. Its SHA-256 is
+`ffb6afc5263288cab41c85316020a4e827f8d5f4a15ea547251ef3b02b77a4ed`, matching the
+signed APK delivered through Drive. Physical-phone camera acceptance is pending.
