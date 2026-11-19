@@ -106,10 +106,10 @@ Backend PR70/mobile PR108 remain draft and production admission is off. Drive ba
 User-confirmed physical layout: front sales floor and its middle/front warehouse,
 with Shopee at the back. Separate team counts retain one branch004 stock reference.
 Requested login01004SHPEE is distinct from01004; actor identity must not become
-another stock balance. The proposed default scopes are front-plus-front-warehouse
-and Shopee, with packed/unshipped goods explicitly covered. Exact alias/scope and
-server capabilities still need compatible app/API implementation; current R16 has
-no such area model.
+another stock balance. R18 implements server mappings004-front and004-shopee,
+with packed/unshipped goods explicitly covered. Backend PR72/migration090, web
+PR109 and Android code18 are live/published; existing enrollment and legacy
+unspecified observations remain compatible. [Release checkpoint](events/2026-11-19-pda-004-r18-area-release.md).
 
 Urgent front-warehouse → Shopee-order picking stays internal004, conserves branch
 physical quantity until actual dispatch, and needs a traceable paired/idempotent
@@ -119,3 +119,5 @@ branch total. Preserve the existing sole Shopee commitment ledger, opening and
 cutover, and reconcile shipments already represented by a new physical baseline
 before deducting them again. This adds no CEO/product or official-Ada-write right.
 [Detailed proposed contract](BRANCH004_COUNT_AREAS.md).
+
+R18 internal-pick receipts require separate count-purpose scope capability, are immutable/idempotent and carry `branchNetChange:0`, `officialStockWrites:false`, `orderDeductionApplied:false`. A scoped complete flag means `declared-area-only`, never whole-branch proof. All downstream stock/discrepancy consumers must honor scope and packed coverage before selecting any baseline. Website `areaCounts` exposes each latest area receipt and `combinedCount.quantity` remains null pending time/unit/movement reconciliation. Scoped FEFO cannot use branch-wide movement coverage. This does not activate R17/02005, a new product/CEO grant or any Ada writer.

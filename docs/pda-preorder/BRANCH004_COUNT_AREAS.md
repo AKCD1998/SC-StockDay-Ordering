@@ -1,7 +1,7 @@
 # Branch004 — separate teams, shared branch stock
 
 19 November2026, PDA design checkpoint. The physical layout and workflow below
-are user-confirmed. The proposed account/scope model is not implemented or live.
+are user-confirmed. **R18 now implements and activates the model:** [release checkpoint](events/2026-11-19-pda-004-r18-area-release.md). Earlier readiness notes below retain their original pre-rollout time.
 Preserve the R17 daily companion/Drive candidate and the independent Local Ada
 product connector; this design does not replace either workstream.
 
@@ -21,8 +21,8 @@ from count scope; an account is not another stock balance.
 
 | Login | Branch | Default count scope | Covered goods |
 | --- | --- | --- | --- |
-|01004|004|front-team|Sales floor plus the middle/front store|
-|01004SHPEE|004|shopee-team|Back-store Shopee goods, with packed/unshipped goods explicitly accounted for|
+|01004|004|004-front|Sales floor plus the middle/front store|
+|01004SHPEE|004|004-shopee|Back-store Shopee goods, with packed/unshipped goods explicitly accounted for|
 |Existing admin|Review permitted scope|Inspect both scopes|No account-name-based stock/CEO rights|
 
 Retain the user's exact requested login `01004SHPEE`. Server-owned mapping must
@@ -142,7 +142,7 @@ Reference source:
   explicitly warns that warehouse mappings are unreliable for inferring branch
   ownership. Do not invent an Ada warehouse mapping for these physical areas.
 
-## Today’s actual01004 readiness
+## Initial01004 readiness before R18 rollout
 
 Read-only runtime checks on19 November2026 around08:27 Bangkok verified01004 is
 configured, branch004 enabled and01004 admitted for count intake. Published Android
@@ -163,3 +163,7 @@ re-fetch migration ceilings before numbering. Prepare on isolated branches,
 preserve001/005 and Local product work, and verify count/transfer/replay scenarios
 before any production activation. Google Cloud/Drive R17 work remains queued at
 its existing project-ID/OAuth checkpoint.
+
+## Current R18 implementation
+
+R18 supersedes the initial pending status above.01004SHPEE is provisioned, the compatible API/migration/web are live, and Android code18 is published in SC App Center/Drive. Scoped observations retain independent receipts; the combined count stays unknown. The new internal-pick log records front warehouse→packing/shelf without changing branch quantity or the existing Shopee order ledger. Existing01004 and001/005 records/invitations are preserved. No production pairing/count/pick QA or physical-phone acceptance is claimed. See the linked R18 release checkpoint for exact sources, deploys, tests and continuation constraints.

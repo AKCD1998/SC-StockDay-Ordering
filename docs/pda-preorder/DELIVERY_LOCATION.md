@@ -7,7 +7,18 @@ User instruction, 15 November 2026: place completed PDA app deliveries in Google
 - Verified parent: เภสัชอู๋, ID `1usItMowEj6llCqWYjdpMAkswB5bubGkD`.
 - Parent was found by exact name; the child was created under that verified parent. Existing sharing was preserved.
 
-## Current delivery — R16 / new004 phone
+## Current delivery — R18 /004 front and Shopee
+
+| File | Bytes | Drive link |
+| --- | ---: | --- |
+| SCPDA-0.8.1-test.18.apk |3023685|[Download](https://drive.google.com/file/d/1ZrcLLx2gdKsxKP2An1WeTm-AtWxcvCoZ/view)|
+| SCPDA-R18-Android.zip |2764170|[Download](https://drive.google.com/file/d/1ah0IhGQCa5s8r6A3cxfvFifPn2nk30fj/view)|
+| SCPDA-004-SHOPEE-device-setup.json |321|[Private download](https://drive.google.com/file/d/1wd6i-sc_xTVwRGPzXKuuRDhbxlOawVy2/view)|
+| SCPDA-004-R18-PRIVATE-GUIDE.txt |3970|[Private guide](https://drive.google.com/file/d/1kDYgm4wqYctYumor5BQPbXKIAV2N-rRw/view)|
+
+Published in [SC App Center](https://sc-stockday-ordering.onrender.com/#/app-center), release88d9d87c-816e-4849-b532-dc41169b430b. Install over the existing app without clearing data. Preserve the existing front004 setup listed below; only the new Shopee phone uses the new operator-bound setup. Shopee setup expires26 November23:59 Bangkok; registered account use does not expire with the invitation. Current source/deployment/testing boundaries are in the [R18 release checkpoint](events/2026-11-19-pda-004-r18-area-release.md). File metadata and private owner/writer permissions verified; no public sharing added.
+
+## Earlier delivery — R16 / new004 phone
 
 | File | Bytes | Drive link |
 | --- | ---: | --- |
