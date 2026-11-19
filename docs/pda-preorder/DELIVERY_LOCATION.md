@@ -7,7 +7,18 @@ User instruction, 15 November 2026: place completed PDA app deliveries in Google
 - Verified parent: เภสัชอู๋, ID `1usItMowEj6llCqWYjdpMAkswB5bubGkD`.
 - Parent was found by exact name; the child was created under that verified parent. Existing sharing was preserved.
 
-## Current005 companion —19 November
+## Current R21 —004 teams and multiple companion devices
+
+Published in [SC App Center](https://sc-stockday-ordering.onrender.com/#/app-center),0.8.4-test.21/code21. Same package/key, install over the existing app. Matching iPhone PWA21 and004/005 daily policy are live. Gear → QR → existing account or เพิ่มเครื่องย่อย. [Full checkpoint](events/2026-11-19-pda-r21-004-multiple-companions.md).
+
+| File | Bytes | Drive link |
+| --- | ---: | --- |
+| SCPDA-0.8.4-test.21.apk |3040069|[Download](https://drive.google.com/file/d/16nGxM6S9hRAuZb512bwYjSrXcddAg3Jh/view)|
+| START-HERE-SCPDA-R21.txt |5765|[Guide](https://drive.google.com/file/d/1NDeBqmGI71lXlUWuLdqikMnlnTrerFQN/view)|
+
+Exact metadata/parent/private owner and existing writer read back. Sharing unchanged; remote checksums unavailable. Initial new-account credentials appear only on the authenticated primary. Existing004 enrollment files below remain valid as previously recorded; no credential rotation or QA phone enrollment. Physical device acceptance remains pending.
+
+## Earlier R20 /005 companion —19 November
 
 [SC App Center](https://sc-stockday-ordering.onrender.com/#/app-center) now provides both Android R20 installation and an iPhone web app entry. [PR112 publication evidence](events/2026-11-19-pda-app-center-iphone-entry.md).
 

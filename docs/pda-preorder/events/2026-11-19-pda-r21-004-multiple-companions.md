@@ -1,0 +1,31 @@
+# R21: branch004 QR and multiple companion devices — 19 November 2026
+
+User requested004 QR in addition to005, then clarified that a branch has more than two or three staff. Implemented multiple permanent installation slots under each approved primary, with daily selfie/access and Bangkok midnight expiry. This supersedes the005-only QR limitation; existing004 front/Shopee count separation remains.
+
+## Live sources and releases
+
+- AndroidR21 /0.8.4-test.21, source `c8e884ed7348d3f99129d931b029e45e06b55c3b`, branch `codex/scpda-004-daily-r21`. Retains R18 areas, R19 camera and R20 signer fallback. APK3,040,069bytes; SHA256 `21a0ec4fc20eacbcbf03bfc25e2615df75b9b1209abbd732031c3aec14611bac`; same package/signer. App Center release `9c0b4d0c-4404-4a28-bc71-20015c5c83b3` is published. Stored release metadata/signature identity read back successfully. Node publisher transport failed before reaching the service; database readback confirmed no21 record before a single urllib publication succeeded. No duplicate release was created.
+- Backend PR73 head `4f7c68440bf698efb47d69ed6eb05d4471dc099b`, merged `3ef88a2258fe63d52bbe3b0124df8dcf2b7dbf42`. PR CI44464217673 passed949 tests:840 pass,0 fail,109 skip; main CI44464729722 passed. Migration092 is recorded as `migrations/092_enable_scpda004_daily_companions.sql` with Linux separators.
+- Web PR113 head `1729984ce610497a52d45367640cc3c484b40761`, merged `4203dc445768713202069a49529116f8939510f5`. PR CI44464316799 and main CI44465017253 passed. Matching PWA21 deploy `dep-dbv8gc6i0phs73cdg3d0` is live.
+- Backend config/code deploy `dep-dbv8h5ajnfac73cujol0`, pinned to3ef88a2, became live at12:28:01Bangkok. The service advertised autoDeploy/checksPass but did not start a deployment after main CI; deployment was explicitly triggered to apply the reviewed saved configuration after matching PWA/APK publication. Exact source was pinned to avoid unrelated changes.
+
+Only FEATURE_SCPDA_DAILY_004=true and SCPDA_PWA_VERSION_CODE=21 were changed. Private preimage/readback proves all seven existing operator records, invitation JSON, revocations, explicit count allowlist and004/005 flags remain byte-identical. No companion account was seeded or enrolled by QA in production. Current policies explicitly enable01004(front),01004SHPEE(Shopee) and01005 at21. Existing001 identities/flow remain unchanged;02001/03001 are not reclassified as daily companions.
+
+## Account and permission contract
+
+Primary gear → QR เชื่อมเครื่องย่อย lists existing accounts plus เพิ่มเครื่องย่อย. New records live in ordering.scpda_companion_accounts under the primary/team, with a transaction lock and unique ordinal. Codes progress02004,03004… for front and02004SHPEE,03004SHPEE… for Shopee;005 retains configured02005 and can add03005…. New accounts use ordinals2–9999. Unused/unbound slots are reused on a lost QR response; permanent or revoked installation slots are not reassigned. The signed V2 QR proof includes the selected existing/new target. Cross-team targets are refused by the server.
+
+Each account retains a separate permanent installation key, first daily selfie, work/receipt history, same-public-IP check and00:00Asia/Bangkok expiry. New account initial credentials are returned only to the authenticated manager, outside QR/audit logs. Existing accounts must be selected for a returning device instead of creating another account each morning. Install the iPhone PWA on Home Screen before QR enrollment. Reinstallation/storage deletion may require administrator recovery; this is not hardware attestation or SSID verification. The existing Monday reminder remains untouched.
+
+Dynamic companion count admission derives only from an already admitted primary and the active branch/day policy.004 companions must send their own explicit front/Shopee scope; missing/foreign scope is rejected. They do not inherit manager internal-pick or product-writer rights. Manager pick rights and zero-net-change evidence remain. Counts still await review; no Ada stock/current-balance or Shopee sale adjustment occurs. Local retains separate product-writer/TEST ownership.
+
+## Verification and delivery
+
+130 mobile model checks passed. Local clean backend run929 total:727 pass,0 fail,202 skips for other unconfigured integration fixtures.20 isolated HTTP/Postgres checks cover several new devices for each of three primary teams, proof-bound target selection, racing phones/replay, actor/scope/branch denial, exact quantity/lot/dates, unchanged source stock, midnight expiry and Drive retry/90-day cleanup. Shipping Java21 login/count/cold resume/new-target QR → actual QR camera decode → PWA selfie/count receipt/page resume passed for03004,03004SHPEE and03005. Actual APK UI gear/picker/issued-account heading passed separately with a layout-only native stub; actual Java transport was tested against the isolated API. These are not physical phone acceptance.
+
+Live checks at12:30Bangkok: PWA entry SHA matches BUILD and source APK, manifest CSP/SW preserved, all three policiesenabled/version21/reset00:00/retention90days, /admin/health200; unauthenticated companion/product/count/pick/App Center calls401. Production guest PWA boot/SW readiness has zero page errors and no mutating requests. Existing five005 observations remain; production daily sessions, bindings, companion accounts and employee photos are still zero at rollout verification. No production count, photo or phone binding was used for QA. The earlier real owner/private Drive upload/read/delete proof remains applicable; provider/storage authorization was unchanged.
+
+Private delivery folder remains เภสัชอู๋/pdaAppProject:
+- APK: https://drive.google.com/file/d/16nGxM6S9hRAuZb512bwYjSrXcddAg3Jh/view (3,040,069bytes)
+- Guide: https://drive.google.com/file/d/1NDeBqmGI71lXlUWuLdqikMnlnTrerFQN/view (5,765bytes)
+Metadata confirms exact names/sizes/parents and the existing owner/writer-only permissions. No sharing changes; remote checksums unavailable. App Center: https://sc-stockday-ordering.onrender.com/#/app-center ; PWA: https://sc-stockday-ordering.onrender.com/scpda/ . Source/evidence are in the commits above and `/workspace/artifacts/scpda004-daily-r21-2026-11-19/`; no keys, passwords, invitations or fixture identities enter this ledger.
