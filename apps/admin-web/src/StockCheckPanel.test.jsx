@@ -49,3 +49,13 @@ it('navigation and direct-route admission require the feature plus admin or orig
  expect(getNavigationGroups(false,false,true).flatMap(g=>g.items).find(i=>i.view==='stock-check').label).toBe('เช็คสินค้า');
  expect(buildAdminViewHash('stock-check')).toBe('#/stock-check');window.location.hash='#/stock-check';expect(readAdminViewFromLocation()).toBe('stock-check');
 });
+it('004 shows two area quantities with their lots and never promotes either to a branch total',async()=>{
+ vi.stubEnv('VITE_FEATURE_SCPDA_BRANCH_004','true');
+ try{
+  const base=records[0].latestCount,areaProduct={...records[0],latestCount:null,latestPdaReceivedAt:base.receivedAt,areaCounts:[{scopeId:'004-front',label:'หน้าร้าน · รวมคลังหน้าร้าน',latestCount:{...base,quantity:30,operatorCode:'01004',receiptId:'front-receipt',countScope:{id:'004-front'}}},{scopeId:'004-shopee',label:'Shopee · หลังร้าน',latestCount:{...base,quantity:10,operatorCode:'01004SHPEE',receiptId:'shopee-receipt',packedCoverage:'included',countScope:{id:'004-shopee'}}}],combinedCount:{quantity:null,status:'awaiting-reconciliation'}};
+  fetch.mockImplementation(async url=>{const branch=new URL(url,'http://fixture').searchParams.get('branchCode')||'001';return {ok:true,status:200,json:async()=>({contract:'scpda-stock-check-001-v1',branchCode:branch,records:branch==='004'?[areaProduct]:records,pagination:{total:branch==='004'?1:2,limit:50,offset:0}})};});
+  render(<StockCheckPanel isAdminUser/>);await screen.findByText(records[0].name);fireEvent.change(screen.getByRole('combobox',{name:'สาขาผลนับ PDA'}),{target:{value:'004'}});
+  expect(await screen.findByText('หน้าร้าน · รวมคลังหน้าร้าน')).toBeVisible();expect(screen.getByText('Shopee · หลังร้าน')).toBeVisible();expect(screen.getByText('30',{selector:'strong'})).toBeVisible();expect(screen.getByText('10',{selector:'strong'})).toBeVisible();expect(screen.queryByText('40',{selector:'strong'})).not.toBeInTheDocument();expect(screen.getByText(/ยอดนับรวมทั้ง004: รอเทียบ/)).toBeVisible();
+  fireEvent.click(screen.getByRole('button',{name:'ดูล็อต / วันที่'}));expect(screen.getByText('แพ็ครอส่ง: นับรวมแล้ว')).toBeVisible();expect(screen.getAllByText('ล็อต LOT-A')).toHaveLength(2);
+ }finally{vi.unstubAllEnvs();}
+});
