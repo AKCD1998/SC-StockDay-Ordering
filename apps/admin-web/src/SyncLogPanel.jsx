@@ -32,12 +32,26 @@ const BRANCH_LABELS = {
 function syncLogStatusIcon(status) {
   if (status === "success") return { icon: "✅", label: "สำเร็จ",              cls: "sl-success" };
   if (status === "failed")  return { icon: "❌", label: "ล้มเหลว",             cls: "sl-failed"  };
+  if (status === "partial") return { icon: "⚠️", label: "กู้คืนบางส่วน",       cls: "sl-partial" };
   if (status === "running") return { icon: "⏳", label: "กำลังรัน",            cls: "sl-running" };
   if (status === "stale")   return { icon: "⚠️", label: "ค้าง (ไม่จบใน 1 ชม.)", cls: "sl-stale"   };
   if (status === "pending") return { icon: "🌙", label: "รอคืนนี้",            cls: "sl-pending" };
   if (status === "waiting") return { icon: "🕐", label: "รอ sync ชั่วโมงนี้",  cls: "sl-pending" };
   if (status === "offline") return { icon: "💤", label: "ปิดเครื่อง",          cls: "sl-offline" };
   return { icon: "—",  label: "ไม่มีข้อมูล", cls: "sl-unknown" };
+}
+
+const RECOVERY_DATASET_LABELS = {
+  "sales headers": "หัวบิลขาย",
+  "sales lines": "รายการขาย",
+  "transfer headers": "หัวใบโอน",
+  "transfer lines": "รายการสินค้าในใบโอน",
+  "branch stock snapshot": "snapshot สต๊อกสาขาของวันนั้น",
+};
+
+function formatRecoveryDatasets(values) {
+  if (!Array.isArray(values) || values.length === 0) return "-";
+  return values.map((value) => RECOVERY_DATASET_LABELS[value] || value).join(", ");
 }
 
 function formatShortDate(isoDate) {
@@ -220,6 +234,41 @@ function SyncLogMetaCard({ selection, mode }) {
         <span className="sync-log-meta-label">message ล่าสุด</span>
         <div className="sync-log-meta-message-body">{cell?.message?.trim() || "-"}</div>
       </div>
+      {cell?.recovery ? (
+        <section className="sync-log-recovery" aria-label="รายละเอียดการกู้คืนข้อมูลบางส่วน">
+          <div className="sync-log-recovery-header">
+            <strong>⚠️ กู้คืนข้อมูลบางส่วน</strong>
+            <span>
+              รอบที่กู้คืน #{cell.recovery.recoveredBySyncRunId ?? "-"}
+              {cell.recovery.recoveredByStartedAt
+                ? ` · ${formatSyncLogStamp(cell.recovery.recoveredByStartedAt)}`
+                : ""}
+            </span>
+          </div>
+          <p>{cell.recovery.note || ""}</p>
+          <div className="sync-log-recovery-fields">
+            <div>
+              <span className="sync-log-meta-label">ส่วนข้อมูลที่กู้คืน</span>
+              <strong>{formatRecoveryDatasets(cell.recovery.recoveredDatasets)}</strong>
+            </div>
+            <div>
+              <span className="sync-log-meta-label">ส่วนข้อมูลที่ยังขาด</span>
+              <strong>{formatRecoveryDatasets(cell.recovery.missingDatasets)}</strong>
+            </div>
+            <div>
+              <span className="sync-log-meta-label">รอบเดิมที่ล้มเหลว</span>
+              <strong>{cell.recovery.originalFailedRunIds?.map((id) => `#${id}`).join(", ") || "-"}</strong>
+            </div>
+          </div>
+          {cell.recovery.evidence ? (
+            <div className="sync-log-recovery-evidence">
+              <span>พบรายการขาย {formatNumber(cell.recovery.evidence.salesHeaders ?? 0)} บิล / {formatNumber(cell.recovery.evidence.salesLines ?? 0)} รายการ</span>
+              <span>ใบโอน {formatNumber(cell.recovery.evidence.transferHeaders ?? 0)} ใบ / {formatNumber(cell.recovery.evidence.transferLines ?? 0)} รายการ</span>
+              <span>snapshot สต๊อกของวันนั้น {formatNumber(cell.recovery.evidence.stockSnapshots ?? 0)} รายการ</span>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
       {Array.isArray(cell?.datasets) && cell.datasets.length > 0 ? (
         <div className="sync-log-meta-datasets">
           <span className="sync-log-meta-label">แยกตามส่วนที่ส่ง (run ล่าสุด)</span>
@@ -315,7 +364,7 @@ function NightlySyncGrid({ days, refreshKey, onUnauthorized }) {
                     <td
                       key={d}
                       className={`sync-log-cell ${cls}${isActive ? " active" : ""}`}
-                      title={`${BRANCH_LABELS[branch] ?? branch} · ${d} · ${label}`}
+                      title={`${BRANCH_LABELS[branch] ?? branch} · ${d} · ${label}${cell?.recovery?.note ? ` · ${cell.recovery.note}` : ""}`}
                       onClick={() => setSelection({
                         branch,
                         slotLabel: formatShortDate(d),
@@ -335,6 +384,7 @@ function NightlySyncGrid({ days, refreshKey, onUnauthorized }) {
       <div className="sync-log-legend">
         {[
           { icon: "✅", label: "สำเร็จ" },
+          { icon: "⚠️", label: "กู้คืนบางส่วน (มีข้อมูลขาย/โอน แต่ไม่มี snapshot สต๊อกของวันนั้น)" },
           { icon: "❌", label: "ล้มเหลว (laptop เปิด แต่ sync error)" },
           { icon: "⚠️", label: "ค้าง (เริ่มมากกว่า 1 ชม. ที่แล้ว ไม่จบ — น่าจะถูกขัดจังหวะ)" },
           { icon: "💤", label: "ปิดเครื่อง (ไม่มี heartbeat)" },
