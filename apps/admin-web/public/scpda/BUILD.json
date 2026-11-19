@@ -1,19 +1,23 @@
 {
-  "sourceApkSha256": "613556f7825acebcb485bfab13fe08dfd9e86b93d375cd30b6a7ebdf4240fb09",
-  "entrySha256": "c85fef8b9c85f3c58370b9dafc7f5d3f0486038854c560c8909a0d218f49404c",
+  "sourceApkSha256": "21a0ec4fc20eacbcbf03bfc25e2615df75b9b1209abbd732031c3aec14611bac",
+  "entrySha256": "75baa13845498c2005e7b7547bc2f461d6583d752cc1496a97cb6ea177f7f23f",
   "apiOrigin": "https://paasrtsm-project.onrender.com",
   "mockTransport": false,
   "fixedOrigin": true,
   "requiresApprovedCorsAndRegisteredBrowserDevice": true,
-  "companionOperator": "02005",
-  "branchCode": "005",
+  "companionOperators": [
+    "02004",
+    "02004SHPEE",
+    "02005"
+  ],
+  "branchCodes": [
+    "004",
+    "005"
+  ],
+  "versionCode": 21,
   "requiresStandaloneInstallation": true,
   "permanentHardwareAttestation": false,
   "requiresDailyQrSelfieAndSamePublicIp": true,
   "productionActivated": false,
-  "versionCode": 20,
-  "sourceMobileCommit": "12dffa4",
-  "wrapperFixes": [
-    "allow-same-origin-webmanifest"
-  ]
+  "sourceMobileCommit": "c8e884ed7348d3f99129d931b029e45e06b55c3b"
 }
