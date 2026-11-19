@@ -1,13 +1,14 @@
 import sql from "mssql";
 import { performance } from "node:perf_hooks";
 import { readHourlyDerivedStock } from "./hourlyStockDerivedSource.js";
+import { hourlyStage, emitHourlyDiagnostic } from "./hourlyAttemptDiagnostics.js";
 import { HOURLY_SOURCE_COUNTERS } from "./hourlyStockSource.js";
 import { buildCohortCoverage, HOURLY_COMPLETE_COHORT_MAX_RECORDS, HOURLY_COMPLETE_COHORT_MAX_WINDOW_MS,
   HOURLY_SOURCE_DEFAULT_BATCH_RECORDS, HOURLY_SOURCE_MAX_BATCH_RECORDS } from "./hourlyCohortCoverage.js";
 
 const fail = code => { throw Object.assign(new Error("Hourly complete-cohort read stopped; details withheld."), { code }); };
 export async function readHourlyCompleteCohort(pool, productCodes, { branchCode, scope = "explicit", batchSize = HOURLY_SOURCE_DEFAULT_BATCH_RECORDS,
-  guard, readBatch = readHourlyDerivedStock, now = Date.now, monotonic = () => performance.now(), maxWindowMs = HOURLY_COMPLETE_COHORT_MAX_WINDOW_MS } = {}) {
+  guard, readBatch = readHourlyDerivedStock, now = Date.now, monotonic = () => performance.now(), maxWindowMs = HOURLY_COMPLETE_COHORT_MAX_WINDOW_MS, onDiagnostic } = {}) {
   if (branchCode !== "004" || !Array.isArray(productCodes) || !productCodes.length || productCodes.length > HOURLY_COMPLETE_COHORT_MAX_RECORDS
       || new Set(productCodes).size !== productCodes.length || productCodes.some(code => typeof code !== "string" || !code || code.trim() !== code || code.length > 80)
       || !Number.isSafeInteger(batchSize) || batchSize < 1 || batchSize > HOURLY_SOURCE_MAX_BATCH_RECORDS || typeof guard !== "function"
@@ -39,7 +40,7 @@ export async function readHourlyCompleteCohort(pool, productCodes, { branchCode,
     check();await guard({ phase: "before", batchIndex: index, batches, remainingMs: maxWindowMs - (monotonic() - start) });check();
     const batchStart = monotonic(), deadline = batchStart + Math.min(60_000, maxWindowMs - (batchStart - start));
     const remaining = () => { check(); const ms = Math.floor(deadline - monotonic()); if (ms < 1) fail("HOURLY_SOURCE_TIMEOUT"); return ms; };
-    if (!verifiedBoundary) {
+    if (!verifiedBoundary) await hourlyStage(onDiagnostic, "readonly-boundary", async () => {
       const id = (await query(`SELECT CONVERT(varchar(128),SERVERPROPERTY('MachineName')) AS machine_name,DB_NAME() AS database_name,
         CONVERT(varchar(32),DATABASEPROPERTYEX(DB_NAME(),'Status')) AS database_status,
         IS_SRVROLEMEMBER('sysadmin') AS is_admin,IS_MEMBER('db_owner') AS is_owner,IS_MEMBER('db_datawriter') AS is_writer,
@@ -48,18 +49,18 @@ export async function readHourlyCompleteCohort(pool, productCodes, { branchCode,
       if (id?.machine_name !== "SERVER004" || id.database_name !== "AdaAcc" || id.database_status !== "ONLINE"
           || [id.is_admin,id.is_owner,id.is_writer,id.can_insert,id.can_update,id.can_delete].some(value => value !== 0)) fail("HOURLY_SOURCE_READONLY_BOUNDARY_UNVERIFIED");
       verifiedBoundary = true;
-    }
+    });
     const codes = productCodes.slice(offset, offset + batchSize);
     const cohort = codes.map((_, i) => `SELECT @cohortCode${i} AS product_code`).join(" UNION ALL ");
-    const available = (await query(`WITH cohort AS (${cohort}) SELECT c.product_code,
+    const available = (await hourlyStage(onDiagnostic, "sql-batch", () => query(`WITH cohort AS (${cohort}) SELECT c.product_code,
       CASE WHEN p.FTPdtStaActive = 1 THEN 1 ELSE 0 END AS source_available
-      FROM cohort c LEFT JOIN dbo.TCNMPdt p ON p.FTPdtCode = c.product_code`, codes, remaining())).recordset;
+      FROM cohort c LEFT JOIN dbo.TCNMPdt p ON p.FTPdtCode = c.product_code`, codes, remaining()), { batchIndex: index, batches, requestedProducts: codes.length, remainingMs: maxWindowMs - (monotonic() - start) })).recordset;
     if (!Array.isArray(available) || available.length !== codes.length || new Set(available.map(row => row.product_code)).size !== codes.length
         || available.some(row => !codes.includes(row.product_code) || ![0, 1].includes(row.source_available))) fail("HOURLY_SOURCE_COHORT_INCOMPLETE");
     const present = available.filter(row => row.source_available === 1).map(row => row.product_code);
     missing.push(...available.filter(row => row.source_available === 0).map(row => row.product_code));
     if (present.length) {
-      const snapshot = await readBatch(pool, present, { branchCode, queryTimeoutMs: remaining(), maxQueryTimeoutMs: 60_000 });
+      const snapshot = await hourlyStage(onDiagnostic, "sql-batch", () => readBatch(pool, present, { branchCode, queryTimeoutMs: remaining(), maxQueryTimeoutMs: 60_000 }), { batchIndex: index, batches, requestedProducts: present.length, remainingMs: maxWindowMs - (monotonic() - start) });
       check();remaining();
       if (!snapshot || snapshot.rows.length !== present.length || snapshot.derivedObservation.records.length !== present.length
           || new Set(snapshot.rows.map(row => row.product_code)).size !== present.length
@@ -83,6 +84,7 @@ export async function readHourlyCompleteCohort(pool, productCodes, { branchCode,
     const durationMs = monotonic() - batchStart;
     sourceBatchTimings.push({ batchIndex: index, requestedProducts: codes.length, observedProducts: present.length,
       unavailableProducts: codes.length - present.length, durationMs, timeWarning: durationMs > 3000, warningThresholdMs: 3000 });
+    emitHourlyDiagnostic(onDiagnostic, { stage: "sql-batch", kind: "progress", batchIndex: index, batches, observedProducts: present.length, readProducts: rows.length, durationMs, remainingMs: maxWindowMs - (monotonic() - start) });
     await guard({ phase: "after", batchIndex: index, batches, remainingMs: maxWindowMs - (monotonic() - start) });
     check();
   }
