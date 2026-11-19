@@ -23,3 +23,5 @@
 @media(max-width:600px){.stock-check-controls form{flex-basis:100%;min-width:0}.stock-check-controls{padding-inline:14px}}
 
 .stock-check-review{display:block;font-size:.75em;opacity:.8;margin-top:4px}
+
+.stock-check-area-counts{min-width:260px;display:grid;grid-template-columns:1fr 1fr;gap:8px}.stock-check-area{border:1px solid #dbe5f8;border-radius:12px;padding:10px;background:#edf3ff}.stock-check-area[class~="004-shopee"]{background:#fff9de;border-color:#eee1a0}.stock-check-area small{display:block;margin:3px 0}.stock-check-area-total{grid-column:1/-1;color:var(--muted,#6f7d91)}
