@@ -121,3 +121,9 @@ before deducting them again. This adds no CEO/product or official-Ada-write righ
 [Detailed proposed contract](BRANCH004_COUNT_AREAS.md).
 
 R18 internal-pick receipts require separate count-purpose scope capability, are immutable/idempotent and carry `branchNetChange:0`, `officialStockWrites:false`, `orderDeductionApplied:false`. A scoped complete flag means `declared-area-only`, never whole-branch proof. All downstream stock/discrepancy consumers must honor scope and packed coverage before selecting any baseline. Website `areaCounts` exposes each latest area receipt and `combinedCount.quantity` remains null pending time/unit/movement reconciliation. Scoped FEFO cannot use branch-wide movement coverage. This does not activate R17/02005, a new product/CEO grant or any Ada writer.
+
+## Activated005 daily companion —19 November, version20
+
+This supersedes the R17 pending admission: PR70/migration091 and matching PWA PR111 are live. Explicit server version20 matches published AndroidR20 and /scpda/.01005 must use current Android/daily selfie proof to create a short-lived QR;02005 enrolls one standalone installation with its own key and explicit count admission, then uses proof-only resume until Bangkok midnight. The permanent binding is not hardware attestation. Both reader/count requests enforce the temporary same-public-IP-with-primary check;001/004 remain outside this daily pilot.
+
+Actual owner/private Drive upload/read/delete passed with a synthetic image, Internal projectmy-scpdaproject-19955 user-confirmed.90-day tracked-image cleanup preserves work/count history. No real staff phone/image was used by QA. Older pending source17/migration089 must not be deployed. Future Android releases must coordinate PWA publication and the server version policy before new QR admission. This adds no product/CEO/Ada-write authority. [Checkpoint](events/2026-11-19-pda-drive-qr005-activation.md).

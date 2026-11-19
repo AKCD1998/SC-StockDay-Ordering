@@ -7,7 +7,13 @@ User instruction, 15 November 2026: place completed PDA app deliveries in Google
 - Verified parent: เภสัชอู๋, ID `1usItMowEj6llCqWYjdpMAkswB5bubGkD`.
 - Parent was found by exact name; the child was created under that verified parent. Existing sharing was preserved.
 
-## Current delivery — R18 /004 front and Shopee
+## Current005 companion —19 November
+
+Current AndroidR20 is published in SC App Center; preserve R18 branch004 areas and later R19/R20 scanner/updater changes. Matching [SCPDA Home Screen web app](https://sc-stockday-ordering.onrender.com/scpda/) is live for the activated005 pilot.
+
+[Private005 QR start guide](https://drive.google.com/file/d/1OlvMaLwDKlyyt5ovhGFSqxmaaEcRWTwF/view),3,517bytes, same private delivery folder and sharing. Install the PWA on the iOS Home Screen before first QR enrollment. The separate existing Android004 invitation files below remain unchanged. [Full activation and acceptance boundaries](events/2026-11-19-pda-drive-qr005-activation.md).
+
+## Earlier delivery — R18 /004 front and Shopee
 
 | File | Bytes | Drive link |
 | --- | ---: | --- |
