@@ -117,3 +117,5 @@
 .scpda-daily-camera{max-width:440px;width:calc(100% - 24px);max-height:95dvh;padding:18px}.scpda-daily-camera video,.scpda-daily-camera canvas{width:100%;max-height:55dvh;object-fit:contain;border-radius:18px;background:#0a1224}.scpda-daily-camera button{margin-top:10px}.scpda-store-qr .qr-image{padding:14px;background:white}.scpda-store-qr svg{display:block;width:100%;height:auto;max-width:320px;margin:auto}.scpda-daily-camera [hidden]{display:none!important}
 
 #staffSelfie{width:32px;height:32px;object-fit:cover;border-radius:50%}
+
+.scpda-area-chip{padding:10px 14px;background:#eef3ff;border:1px solid #dce4ff;border-radius:12px;color:#183585;font-size:13px}.scpda-area-modes{display:flex;gap:6px;margin-bottom:12px}.scpda-area-modes button{border:1px solid #ccd6ee;background:white;border-radius:12px;padding:10px;color:#173359}.scpda-area-modes button[aria-pressed=true]{background:#101cb7;color:white}.scpda-area-modes[hidden]{display:none!important}#internalPickPane form{display:grid;gap:9px}#internalPickPane .scpda-primary{margin-top:12px}

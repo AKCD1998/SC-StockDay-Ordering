@@ -52,7 +52,7 @@ export class BrowserSession {
   if(typeof r.deviceCertificate!=='string')throw error(502,'DEVICE_CERT_INVALID','ระบบไม่ส่งใบยืนยันเครื่อง');await this.device.certificate(r.deviceCertificate);const status=await this.device.status();if(!status.paired)throw error(502,'DEVICE_CERT_INVALID','ใบยืนยันเครื่องไม่ตรงกัน');return status;
  }
  async login({username,password,selfie}){
-  this.#reader=this.#counter=null;if(!/^(?:0[123]001|01004|01005|02005)$/.test(username||'')||!validScpdaCredential(password))throw error(400,'LOGIN_INVALID','เลือกผู้ใช้งานและกรอกรหัสผ่าน');const state=await this.device.status();this.branch=this.companion?'005':state.branchCode||'001';if(!this.companion&&!state.paired)throw error(409,'DEVICE_ACTIVATION_REQUIRED','เชื่อมเครื่องก่อนเริ่มใช้งาน');
+  this.#reader=this.#counter=null;if(!/^(?:0[123]001|01004|01004SHPEE|01005|02005)$/.test(username||'')||!validScpdaCredential(password))throw error(400,'LOGIN_INVALID','เลือกผู้ใช้งานและกรอกรหัสผ่าน');const state=await this.device.status();this.branch=this.companion?'005':state.branchCode||'001';if(!this.companion&&!state.paired)throw error(409,'DEVICE_ACTIVATION_REQUIRED','เชื่อมเครื่องก่อนเริ่มใช้งาน');
   if(username==='02005')return this.enroll(password,selfie);
   try{const cert=await this.device.certificate(),c=await this.call('/api/scpda/auth/challenge',{method:'POST',body:{deviceCertificate:cert}}),signature=await this.device.sign(['SCPDA-LOGIN-V1',c.challengeId,c.nonce,username,c.deviceRef].join('\n'));
    const r=await this.call('/api/scpda/auth/login',{method:'POST',body:{operatorCode:username,pin:password,deviceCertificate:cert,challengeId:c.challengeId,signature}});
@@ -91,6 +91,7 @@ export class BrowserSession {
   if(op==='products')return this.call('/api/scpda/products?keyword='+encodeURIComponent(input('keyword',160))+'&limit=200&offset=0',{token:this.#reader});
   if(op==='stock')return this.call('/api/scpda/stock?search='+encodeURIComponent(input('search',160))+'&limit=200&offset=0',{token:this.#reader});
   if(op==='product'){const id=input('skuId',15);if(!/^[1-9]\d*$/.test(id))throw error(400,'INPUT_INVALID','ตรวจรหัส SKU');return this.call('/api/scpda/products/'+id,{token:this.#reader});}
+  if(op==='internalPickSubmit')return this.countCall('/internal-picks',args);if(op==='internalPickHistory')return this.countCall('/internal-picks/history');
   if(op==='countCapabilities')return this.countCall('/capabilities');if(op==='countCheck')return this.countCall('/check',args);if(op==='countSubmit')return this.countCall('',args);if(op==='countHistory')return this.countCall('/history');
   if(op==='countReceipt'){const id=input('id',36);if(!/^[a-f0-9-]{36}$/i.test(id))throw error(400,'INPUT_INVALID','ตรวจรหัสผลนับ');return this.countCall('/events/'+id);}
   throw error(400,'OPERATION_REJECTED','คำสั่งนี้ไม่รองรับ');

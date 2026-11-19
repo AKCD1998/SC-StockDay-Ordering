@@ -1,5 +1,5 @@
-export const SCPDA_VERSION_CODE=17;
-export const SCPDA_VERSION_NAME='0.8.0-test.17';
+export const SCPDA_VERSION_CODE=18;
+export const SCPDA_VERSION_NAME='0.8.1-test.18';
 const webOrigin='https://sc-stockday-ordering.onrender.com';
 export function enrollmentFromUrl(value){
  let u;try{u=new URL(value);}catch{throw Error('QR ไม่ถูกต้อง');}
