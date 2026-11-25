@@ -143,6 +143,7 @@ $('#openScpdaAppCenter').onclick=async()=>{if(window.SCPDA_WEB_COMPANION){try{aw
 let restoringSession=false;
 function startupLoading(phase='loading',message='กำลังตรวจสอบการเข้าสู่ระบบ'){
  const overlay=$('#sessionLoading');overlay.hidden=phase==='done';overlay.dataset.state=phase;
+ if(phase==='loading'){$('#loginPane').hidden=true;$('#activationPane').hidden=true;}
  $('#sessionLoadingMessage').textContent=message;
  $('#sessionLoadingRetry').hidden=phase!=='retry';$('#sessionLoadingLogin').hidden=phase!=='retry'||!paired;
  document.querySelector('main').setAttribute('aria-busy',String(phase==='loading'));document.querySelector('main').inert=phase!=='done';
