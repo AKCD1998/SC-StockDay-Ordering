@@ -1,6 +1,6 @@
 {
-  "sourceApkSha256": "73a9c164a6ee8d4cb05aa815861f81ffd0a438084947c01db6d0b3386aa63f9f",
-  "entrySha256": "00e1ab0fe34d9bdd9fccbc304724ca0a81189102ed1932e886b72746efb6c505",
+  "sourceApkSha256": "634865cdd7efd5aae8c67e9b6d10baec752413f59c9d4ae730394fd504e8b003",
+  "entrySha256": "2746cfbeec62b02a825ffbb337d919d2a9b9cb9d5d3e3bb8eb40ad8326b696a0",
   "apiOrigin": "https://paasrtsm-project.onrender.com",
   "mockTransport": false,
   "fixedOrigin": true,
@@ -14,7 +14,7 @@
     "004",
     "005"
   ],
-  "versionCode": 23,
+  "versionCode": 24,
   "requiresStandaloneInstallation": true,
   "permanentHardwareAttestation": false,
   "requiresDailyQrSelfieAndSamePublicIp": true,
