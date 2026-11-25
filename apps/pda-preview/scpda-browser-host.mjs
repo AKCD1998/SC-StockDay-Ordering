@@ -89,6 +89,11 @@ export class BrowserSession {
   if(!this.#reader)throw error(401,'LOGIN_REQUIRED','เข้าสู่ระบบก่อน');
   const input=(key,max)=>{const v=args?.[key];if(typeof v!=='string'||!v.trim()||v.length>max)throw error(400,'INPUT_INVALID','ข้อมูลไม่ถูกต้อง');return v.trim();};
   if(op==='dailySelfie')return this.call('/api/scpda/daily/selfie',{token:this.#reader});
+  if(op==='annualOverview')return this.call('/api/scpda/annual',{token:this.#reader});
+  if(op==='annualRequest'||op==='annualAssign'||op==='annualSave'||op==='annualExport'){
+   const segment={annualRequest:'request',annualAssign:'assign',annualSave:'save',annualExport:'export'}[op];
+   return this.call('/api/scpda/annual/'+segment,{method:'POST',body:args,token:this.#reader});
+  }
   if(op==='products')return this.call('/api/scpda/products?keyword='+encodeURIComponent(input('keyword',160))+'&limit=200&offset=0',{token:this.#reader});
   if(op==='stock')return this.call('/api/scpda/stock?search='+encodeURIComponent(input('search',160))+'&limit=200&offset=0',{token:this.#reader});
   if(op==='product'){const id=input('skuId',15);if(!/^[1-9]\d*$/.test(id))throw error(400,'INPUT_INVALID','ตรวจรหัส SKU');return this.call('/api/scpda/products/'+id,{token:this.#reader});}
@@ -103,7 +108,7 @@ function pickInvitation(){
  return new Promise((ok,no)=>{const input=document.createElement('input');input.type='file';input.accept='.json,application/json';input.hidden=true;document.body.append(input);const clean=()=>input.remove();input.oncancel=()=>{clean();no(error(0,'PICK_CANCELLED','ยกเลิกการเลือกไฟล์'));};input.onchange=async()=>{try{const f=input.files?.[0];if(!f||f.size>32768)throw error(400,'INVITATION_INVALID','เลือกไฟล์เชื่อมเครื่อง JSON ที่ถูกต้อง');ok(JSON.parse(await f.text()));}catch{no(error(400,'INVITATION_INVALID','อ่านไฟล์เชื่อมเครื่องไม่ได้'));}finally{clean();}};input.click();});
 }
 export function installBrowserHost(options={}){
- const session=new BrowserSession(options);if(options.companion){window.SCPDA_WEB_COMPANION=true;if(location.hash.startsWith('#enroll=')){try{if(navigator.standalone||matchMedia('(display-mode: standalone)').matches)session.grant=enrollmentFromUrl(location.href);}catch{}history.replaceState(null,'',location.pathname);}}window.SCPDAHost={invoke(id,op,raw){let args;try{if(typeof raw!=='string'||raw.length>(op==='login'?300000:['countSubmit','countCheck'].includes(op)?65536:4096))throw Error();args=JSON.parse(raw);}catch{window.__scpdaReceive(id,{ok:false,status:400,code:'INPUT_INVALID',error:'ข้อมูลไม่ถูกต้อง'});return;}
+ const session=new BrowserSession(options);if(options.companion){window.SCPDA_WEB_COMPANION=true;if(location.hash.startsWith('#enroll=')){try{if(navigator.standalone||matchMedia('(display-mode: standalone)').matches)session.grant=enrollmentFromUrl(location.href);}catch{}history.replaceState(null,'',location.pathname);}}window.SCPDAHost={invoke(id,op,raw){let args;try{if(typeof raw!=='string'||raw.length>(op==='annualSave'?320000:op==='login'?300000:['countSubmit','countCheck'].includes(op)?65536:4096))throw Error();args=JSON.parse(raw);}catch{window.__scpdaReceive(id,{ok:false,status:400,code:'INPUT_INVALID',error:'ข้อมูลไม่ถูกต้อง'});return;}
   const task=op==='activateDevice'?(options.companion?((navigator.standalone||matchMedia('(display-mode: standalone)').matches)?window.__scpdaScanStoreQr().then(grant=>{session.grant=grant;return session.execute('status');}):Promise.reject(error(409,'INSTALL_FIRST','เพิ่ม SCPDA ลงหน้าจอโฮม แล้วเปิดจากไอคอนก่อนสแกน QR'))):pickInvitation().then(x=>session.execute(op,x))):op==='openWebsite'?Promise.resolve(window.open('https://sc-stockday-ordering.onrender.com/#/branch-stock','_blank','noopener')).then(()=>({ok:true})):session.execute(op,args);
   task.then(data=>window.__scpdaReceive(id,{ok:true,data}),e=>window.__scpdaReceive(id,{ok:false,status:e.status||0,code:e.code||'CLIENT_UNAVAILABLE',error:e.message||'เชื่อมต่อไม่ได้'}));
  }};

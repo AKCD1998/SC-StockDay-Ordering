@@ -22,6 +22,11 @@ public final class StockDaySession {
   if(operation.equals("createCompanionQr"))return createCompanionQr(args);
   if(operation.equals("companionDevices"))return call("GET","/api/scpda/daily/companions",null,true);
   if(operation.equals("dailySelfie"))return call("GET","/api/scpda/daily/selfie",null,true);
+  if(operation.equals("annualOverview"))return call("GET","/api/scpda/annual",null,true);
+  if(operation.equals("annualRequest"))return call("POST","/api/scpda/annual/request",args,true);
+  if(operation.equals("annualAssign"))return call("POST","/api/scpda/annual/assign",args,true);
+  if(operation.equals("annualSave"))return call("POST","/api/scpda/annual/save",args,true);
+  if(operation.equals("annualExport"))return call("POST","/api/scpda/annual/export",args,true);
   if(operation.equals("internalPickSubmit"))return countCall("POST","/api/scpda/counts/internal-picks",args,countToken);
   if(operation.equals("internalPickHistory"))return countCall("GET","/api/scpda/counts/internal-picks/history",null,countToken);
   if(operation.equals("countCapabilities"))return countCall("GET","/api/scpda/counts/capabilities",null,countToken);

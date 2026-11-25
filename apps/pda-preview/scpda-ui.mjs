@@ -7,6 +7,7 @@ import {RecentProductBook,recentProduct,touchRecent} from './scpda-recent-produc
 import {Scpda004Picks} from './scpda-004-picks.mjs';
 import {ScpdaCountUI} from './scpda-count-ui.mjs';
 import {ScpdaAppCenter} from './scpda-app-center.mjs';
+import {ScpdaAnnualUI} from './scpda-annual-ui.mjs';
 import { StockDayLookup, requireScpdaActor } from './stockday-live-contract.mjs';
 import { CameraScanner } from './camera-scanner.mjs';
 window.__scpdaScanStoreQr=scanStoreQr;
@@ -15,12 +16,13 @@ let dailyExpiryTimer=null;
 const pending=new Map();let serial=0,actor=null,generation=0,selected=null,busy=false,paired=false,recentItems=[],activeTab='count',currentView='lookup',lookupMode='count';
 const recentBook=new RecentProductBook();
 window.__scpdaReceive=(id,reply)=>{const row=pending.get(id);if(!row)return;clearTimeout(row.timer);pending.delete(id);if(reply.ok)row.resolve(reply.data);else{const e=Object.assign(new Error(reply.error||'เชื่อมต่อระบบไม่ได้'),{status:reply.status,code:reply.code});row.reject(e);}};
-function native(op,body={}){return new Promise((resolve,reject)=>{if(!window.SCPDAHost?.invoke){reject(new Error('เปิดผ่านแอป SCPDA บน Android เพื่อเชื่อมระบบจริง'));return;}const id=String(++serial),timer=setTimeout(()=>{pending.delete(id);reject(new Error('ระบบตอบช้า กรุณาลองใหม่'));},op==='activateDevice'?300000:45000);pending.set(id,{resolve,reject,timer});try{window.SCPDAHost.invoke(id,op,JSON.stringify(body));}catch{clearTimeout(timer);pending.delete(id);reject(new Error('เชื่อมกับแอปไม่ได้ กรุณาเปิดแอปใหม่'));}});}
+function native(op,body={}){return new Promise((resolve,reject)=>{if(!window.SCPDAHost?.invoke){reject(new Error('เปิดผ่านแอป SCPDA บน Android เพื่อเชื่อมระบบจริง'));return;}const id=String(++serial),timer=setTimeout(()=>{pending.delete(id);reject(new Error('ระบบตอบช้า กรุณาลองใหม่'));},['activateDevice','annualExport'].includes(op)?300000:45000);pending.set(id,{resolve,reject,timer});try{window.SCPDAHost.invoke(id,op,JSON.stringify(body));}catch{clearTimeout(timer);pending.delete(id);reject(new Error('เชื่อมกับแอปไม่ได้ กรุณาเปิดแอปใหม่'));}});}
 function status(text,tone='error'){$('#status').hidden=!text;$('#status').textContent=text;$('#status').dataset.tone=tone;}
 function deviceBranch(state){if(!state.paired)return;const branch=state.branchCode;if(state.operatorCode&&isCompanionOperator(state.operatorCode)&&![...$('#username').options].some(o=>o.value===state.operatorCode)){const option=document.createElement('option');option.value=option.textContent=state.operatorCode;$('#username').append(option);}for(const o of $('#username').options){const own=operatorBranch(o.value)===branch;const eligible=own&&(state.operatorCode?o.value===state.operatorCode:!isCompanionOperator(o.value));o.hidden=!eligible;o.disabled=!eligible;}$('#username').value=state.operatorCode|| (branch==='004'?'01004':branch==='005'?'01005':'01001');}
-function loggedOut(){clearTimeout(dailyExpiryTimer);$('#resumeDaily').hidden=true;priceRefresh.stop();$('#priceStockInfo').close();countUI?.disconnect();picks?.disconnect();$('#countAreaLabel').hidden=true;$('#areaMode').hidden=true;actor=null;selected=null;activeTab='count';currentView='lookup';recentItems=[];renderRecent();generation++;$('#staffSelfie').hidden=true;$('#staffSelfie').removeAttribute('src');$('#sessionBar').hidden=true;$('#mainTabs').hidden=true;$('#preorderPane').hidden=true;$('#pricePane').hidden=true;camera.close();$('#activationPane').hidden=paired;$('#loginPane').hidden=!paired;$('#lookupPane').hidden=true;$('#productPane').hidden=true;$('#choices').hidden=true;$('#profile').textContent='ยังไม่ได้เชื่อมบัญชี';$('#logoutButton').hidden=true;$('#createCompanionQr').hidden=true;$('#accountDialog').close();}
+function loggedOut(){annualUI.disconnect();clearTimeout(dailyExpiryTimer);$('#resumeDaily').hidden=true;priceRefresh.stop();$('#priceStockInfo').close();countUI?.disconnect();picks?.disconnect();$('#countAreaLabel').hidden=true;$('#areaMode').hidden=true;actor=null;selected=null;activeTab='count';currentView='lookup';recentItems=[];renderRecent();generation++;$('#staffSelfie').hidden=true;$('#staffSelfie').removeAttribute('src');$('#sessionBar').hidden=true;$('#mainTabs').hidden=true;$('#preorderPane').hidden=true;$('#pricePane').hidden=true;camera.close();$('#activationPane').hidden=paired;$('#loginPane').hidden=!paired;$('#lookupPane').hidden=true;$('#productPane').hidden=true;$('#choices').hidden=true;$('#profile').textContent='ยังไม่ได้เชื่อมบัญชี';$('#logoutButton').hidden=true;$('#createCompanionQr').hidden=true;$('#accountDialog').close();}
 function handle(e){if(window.SCPDA_WEB_COMPANION&&(e.status===401||['QR_REQUIRED','QR_EXPIRED','QR_USED','QR_INVALID'].includes(e.code))&&e.code!=='LOGIN_REJECTED'&&e.code!=='DEVICE_PROOF_INVALID'){paired=false;loggedOut();status(e.code==='LOGIN_REQUIRED'?'สแกน QR จากเครื่องหลักก่อนเข้าใช้':e.message||'สแกน QR จากเครื่องหลักสำหรับวันนี้');return;}if(e.code==='LOGIN_REJECTED'||e.code==='DEVICE_PROOF_INVALID'){status(e.message);return;}if(['DEVICE_CERT_INVALID','DEVICE_ACTIVATION_REQUIRED','DEVICE_REVOKED'].includes(e.code)){paired=false;loggedOut();status(e.message);return;}if(e.status===401){loggedOut();status('เซสชันหมดอายุ กรุณาใส่รหัสผ่านอีกครั้ง');}else status(e.message||'เชื่อมต่อระบบไม่ได้');}
 async function request(op,body){try{return await native(op,body);}catch(e){if(e.status===401)loggedOut();throw e;}}
+const annualUI=new ScpdaAnnualUI({mount:$('#lookupPane'),request});
 const lookup=new StockDayLookup(request);
 function countNavigate(view){
  if(['count','history'].includes(view)&&activeTab!=='count'){countUI.close();return;}
@@ -34,6 +36,8 @@ function countNavigate(view){
 }
 function switchTab(tab){
  if(!actor||!['count','preorder','price'].includes(tab))return;
+ annualUI.button.hidden=tab!=='count'||actor.branchCode!=='005';
+ if(tab==='count'&&annualUI.actor!==actor)annualUI.connect(actor);
  if(currentView==='count')countUI.autosave();priceRefresh.stop();$('#priceStockInfo').close();camera.close();countUI.close();generation++;selected=null;lookupMode='count';activeTab=tab;currentView='lookup';
  status('');$('#lookupPane').hidden=tab==='preorder';$('#preorderPane').hidden=tab!=='preorder';$('#localHistoryButton').hidden=tab!=='count';
  for(const b of document.querySelectorAll('[data-app-tab]'))b.setAttribute('aria-pressed',String(b.dataset.appTab===tab));
@@ -112,7 +116,7 @@ async function activate(){if(busy)return;busy=true;$('#activateDevice').disabled
 $('#activateDevice').onclick=$('#activateFromSettings').onclick=activate;
 for(const b of document.querySelectorAll('[data-lookup-mode]'))b.onclick=()=>{lookupMode=b.dataset.lookupMode;for(const row of document.querySelectorAll('[data-lookup-mode]'))row.setAttribute('aria-pressed',String(row===b));countNavigate('lookup');$('#scanActionLabel').textContent=lookupMode==='pick'?'สแกนสินค้าที่จะหยิบ':'ใช้กล้องสแกน';renderRecent();};$('#openPickHistory').onclick=()=>picks.showHistory();
 for(const b of document.querySelectorAll('[data-app-tab]'))b.onclick=()=>switchTab(b.dataset.appTab);
-window.__scpdaBack=()=>{if(!actor)return false;if(currentView!=='lookup'){if(currentView==='count')countUI.autosave();countUI.close();countNavigate('lookup');return true;}if(activeTab!=='count'){switchTab('count');return true;}return false;};
+window.__scpdaBack=()=>{if(!actor)return false;if(annualUI.dialog.open){annualUI.dialog.close();return true;}if(currentView!=='lookup'){if(currentView==='count')countUI.autosave();countUI.close();countNavigate('lookup');return true;}if(activeTab!=='count'){switchTab('count');return true;}return false;};
 
 const appCenter=new ScpdaAppCenter({request:native,prepareInstall:async()=>{camera.close();if(!countUI.root.hidden)await countUI.autosave();}});
 $('#openScpdaAppCenter').onclick=async()=>{if(window.SCPDA_WEB_COMPANION){try{await countUI.autosave();const registration=await navigator.serviceWorker?.getRegistration();await registration?.update();location.reload();}catch(e){handle(e);}}else appCenter.check({manual:true});};
