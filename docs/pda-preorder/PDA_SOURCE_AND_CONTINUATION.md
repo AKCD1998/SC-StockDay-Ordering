@@ -1,8 +1,10 @@
 # วิธีรับช่วงงานร่วมกับ PDA และหาซอร์สแอป
 
-**Current R22 —25November:** branch005 annual count is live:74A4pages/3035items, warehouse001 inside005, initially blank. Android/PWA22 published; existing004 R21 daily/QR/counts remain accepted. Same package/signer/storage and seven credential records preserved; no Ada stock write. [Release, event and acceptance](events/2026-11-25-pda-r22-annual005.md).
+**Current R23 —25November:** Android/PWA23 is published and live with queued005 pages, explicit save/pause, primary self-count, shared assignment summaries, startup resume and preserved branch profiles. Visiting staff receive ordinary destination-branch functions within existing admission; home work remains separate. Same package/signer, seven static credentials and the existing74-page/3035-item005 event preserved. [Source, delivery, contract and tests](events/2026-11-25-pda-r23-queued-work-and-branch-profiles.md).
 
-**Current R16 —16 November:** user-authorized01004 / new branch004 Android pilot for Thursday19 November. App **0.7.1-test.16**, branch `codex/scpda-004-r16`, source `98f479db1edd479cb3b218dabc3e7d3568892a57`; published in SC App Center and delivered in the existing Drive folder. Backend PR66/migration087 and admin web PR105 are live;001/005 credentials, enrollment and evidence preserved. [Source, activation and delivery](events/2026-11-16-pda-branch004-r16.md). Counts are physical evidence pending review, not an Ada/current-stock adjustment. Physical004 Android enrollment/first count remains pending. The separate Local product-connector candidate is not included; preserve its work and its single TEST-round ownership.
+**Historical R22 —25November:** branch005 annual count is live:74A4pages/3035items, warehouse001 inside005, initially blank. Android/PWA22 published; existing004 R21 daily/QR/counts remain accepted. Same package/signer/storage and seven credential records preserved; no Ada stock write. [Release, event and acceptance](events/2026-11-25-pda-r22-annual005.md).
+
+**Historical R16 —16 November:** user-authorized01004 / new branch004 Android pilot for Thursday19 November. App **0.7.1-test.16**, branch `codex/scpda-004-r16`, source `98f479db1edd479cb3b218dabc3e7d3568892a57`; published in SC App Center and delivered in the existing Drive folder. Backend PR66/migration087 and admin web PR105 are live;001/005 credentials, enrollment and evidence preserved. [Source, activation and delivery](events/2026-11-16-pda-branch004-r16.md). Counts are physical evidence pending review, not an Ada/current-stock adjustment. Physical004 Android enrollment/first count remains pending. The separate Local product-connector candidate is not included; preserve its work and its single TEST-round ownership.
 
 ผู้ใช้ขอให้ PDA owner ชี้แจงวิธีทำงานให้แชต Preorder หลังมีรายงานว่าใน Drive มี APK/รายงานแต่ไม่มีซอร์สให้ต่อหน้า Preorder เอกสารนี้แก้จุดส่งต่องานนั้น ไม่ได้โอน ownership หรืออนุญาตเขียนข้อมูลจริงใน ADA
 
@@ -13,7 +15,15 @@
 - **Google Drive `เภสัชอู๋ / pdaAppProject`:** APK/ชุดติดตั้ง/คู่มือ/หลักฐานส่งมอบ ไม่ใช่ที่เดียวที่เก็บซอร์ส การไม่พบ source ZIP ใน Drive ไม่ได้แปลว่าไม่มีซอร์สแอป
 - **เครื่อง Cloud:** แต่ละแชตอาจอยู่คนละเครื่อง path/SDK/localhost/session จึงไม่จำเป็นต้องมีเหมือนกัน ใช้ Git กู้ซอร์สเดิม ไม่ต้องให้ผู้ใช้เล่าทุกอย่างหรือส่งรหัสใหม่
 
-## ซอร์ส Android ที่ตรวจจาก remote แล้ว
+## ซอร์ส Android ล่าสุด —R23
+
+- Branch: `codex/scpda-annual005-app-r23`
+- Commit: `818a13e94ddd3c4ab953e1bafaa3eabddeb20ea3`
+- Version: **0.9.1-test.23/code23**
+- [ซอร์สที่ส่งมอบ](https://github.com/AKCD1998/SC-StockDay-Ordering/tree/818a13e94ddd3c4ab953e1bafaa3eabddeb20ea3)
+- รักษา startup gate และ branch profiles; การสลับสาขาต้องล้างและขอ ProductSession/Preorder capabilities แยก ไม่ใช้ reader/count แทนสิทธิ์สินค้า
+
+## ซอร์ส Android ใน checkpoint R16 (ประวัติ)
 
 - Repository: **`AKCD1998/SC-StockDay-Ordering`**
 - Branch: **`codex/scpda-004-r16`**

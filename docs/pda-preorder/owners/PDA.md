@@ -1,10 +1,12 @@
 # PDA owner checkpoint
 
-**Current R22 —25November:** branch005 annual count is live:74A4pages/3035items, warehouse001 inside005, initially blank. Android/PWA22 published; existing004 R21 daily/QR/counts remain accepted. Same package/signer/storage and seven credential records preserved; no Ada stock write. [Release, event and acceptance](../events/2026-11-25-pda-r22-annual005.md).
+**Current R23 —25November:** Android/PWA23 is published and live with queued005 pages, explicit save/pause, primary self-count, shared assignment summaries, startup resume and preserved branch profiles. Visiting staff receive ordinary destination-branch functions within existing admission; home work remains separate. Same package/signer, seven static credentials and the existing74-page/3035-item005 event preserved. [Source, delivery, contract and tests](../events/2026-11-25-pda-r23-queued-work-and-branch-profiles.md).
+
+**Historical R22 —25November:** branch005 annual count is live:74A4pages/3035items, warehouse001 inside005, initially blank. Android/PWA22 published; existing004 R21 daily/QR/counts remain accepted. Same package/signer/storage and seven credential records preserved; no Ada stock write. [Release, event and acceptance](../events/2026-11-25-pda-r22-annual005.md).
 
 **R21 server correction —19 November:** PR74 is live on064ea1c. Fixes same-public-IP iPhone rejection caused by comparing rotating Cloudflare edges. Current app/PWA21 and credentials unchanged; primary must issue a fresh QR after rollout. [Evidence and acceptance](../events/2026-11-19-pda-proxy-network-correction.md).
 
-**Current R21 — 19 November:**004 front/Shopee and005 daily QR are live with multiple companion device slots, per-team count scopes and midnight expiry. Android/PWA/server21; existing seven primary/legacy records and invitations preserved. [Source, deployment, tests and delivery](../events/2026-11-19-pda-r21-004-multiple-companions.md).
+**Historical R21 — 19 November:**004 front/Shopee and005 daily QR are live with multiple companion device slots, per-team count scopes and midnight expiry. Android/PWA/server21; existing seven primary/legacy records and invitations preserved. [Source, deployment, tests and delivery](../events/2026-11-19-pda-r21-004-multiple-companions.md).
 
 **App Center entry — 19 November:** PR112 is live with separate Android R20 and iPhone web app actions. Same version-20 PWA and 005 pilot; no APK/backend/account change. [Publication and verification](../events/2026-11-19-pda-app-center-iphone-entry.md).
 

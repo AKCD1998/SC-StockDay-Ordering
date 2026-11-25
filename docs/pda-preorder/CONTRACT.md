@@ -146,3 +146,10 @@ The public-IP criterion is unchanged, but SCPDA now normalizes the actual client
 The user authorized the December2569 branch005/warehouse001 event in the existing app. Daily primary01005 manages74frozen A4pages; paired005 companions request/receive only their own pages and submit exact per-location quantities through durable revision/mutation receipts. Branch/role/day/device/network checks stay on the server. Extra locations count toward the sum and survive Excel export. Audit changes expire60days; this event neither changes Ada stock nor supplies product/CEO/Preorder rights.
 
 Published-build compatibility is now explicit per branch:004 daily/count/QR accepts21/22 during rollout,005 ordinary daily accepts21/22 while its QR/annual flow uses22. No arbitrary minimum-version bypass. R22 signed resumeV2 can update an existing day's admitted build without resetting the session, selfie or midnight expiry; oldV1 remains supported. [Source, deployment and limits](events/2026-11-25-pda-r22-annual005.md).
+
+
+## Deployed R23 —queued work and temporary branch profiles,25November
+
+User authorizes visiting staff to use ordinary destination-branch functions through existing primaryQR, same-public-IP admission and Bangkok-midnight sessions; this does not activate disabled branches or product/CEO rights. Profiles retain the original installation key/device ID and separate home/guest work. Switching must clear and reauthorize reader, count, Preorder and ProductSession independently. No persisted passwords or reader/count bearer tokens.
+
+Annual005 now allows several owned pages, primary01005 self-assignment/counting, per-page durable drafts and explicit บันทึกพักงาน. Incomplete drafts survive session expiry; final completion remains separate. Reuse the same machine code on next-dayQR. Shared team views contain assignment/progress and self-entered display names; another actor's count details remain denied. Names grant no authority. LegacyR22 FIFO remains compatible. No physical baseline/Ada stock write or event reset. [FullR23 checkpoints and verification](events/2026-11-25-pda-r23-queued-work-and-branch-profiles.md).
