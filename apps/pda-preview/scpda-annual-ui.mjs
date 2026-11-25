@@ -43,6 +43,7 @@ export class ScpdaAnnualUI {
   constructor({ mount, request }) {
     this.request = request;
     this.storage = new AnnualStorage();
+    this.boxes = new Map();
     this.button = action('งานนับสต๊อกพิเศษ · ธ.ค. 2569', () => this.open());
     this.button.hidden = true;
     this.button.classList.add('scpda-annual-launch');
@@ -53,7 +54,8 @@ export class ScpdaAnnualUI {
     this.notice = el('p');
     this.notice.setAttribute('role', 'status');
     this.notice.className = 'scpda-annual-status';
-    this.body = el('div');
+    this.body = el('fieldset');
+    this.body.className = 'scpda-annual-body';
     const top = el('header');
     top.append(this.title, action('ปิด', () => this.dialog.close()));
     this.dialog.append(top, this.notice, this.body);
@@ -68,11 +70,14 @@ export class ScpdaAnnualUI {
     this.disconnect();
     if (actor.branchCode !== '005' || actor.annualCountAvailable !== true) return;
     this.actor = actor;
+    this.view = actor.operatorCode === '01005' ? 'team' : 'mine';
     this.button.hidden = false;
   }
 
   disconnect() {
-    if (this.outbox) this.outbox.closed = true;
+    for (const box of this.boxes.values()) box.closed = true;
+    this.boxes.clear();
+    this.selectedPage = this.restoredEvent = null;
     this.actor = this.data = this.outbox = null;
     clearTimeout(this.syncTimer);
     clearInterval(this.refreshTimer);
@@ -91,6 +96,7 @@ export class ScpdaAnnualUI {
         const cached = await this.storage.get(this.overviewKey(actor));
         if (cached?.assigned && this.actor === actor && this.dialog.open) {
           this.data = cached;
+          this.selectedPage = { category: cached.assigned.category, pageNo: cached.assigned.pageNo };
           await this.attachDraft(cached, actor);
           if (this.actor === actor && this.dialog.open) this.render();
         }
@@ -115,6 +121,9 @@ export class ScpdaAnnualUI {
   async send(op, body, onResult) {
     if (this.actionRunning) return;
     this.actionRunning = true;
+    this.body.disabled = true;
+    this.body.setAttribute('aria-busy','true');
+    this.status('กำลังบันทึก…');
     const actor = this.actor;
     try {
       const result = await this.request(op, { eventId: this.data.event.id, ...body });
@@ -126,24 +135,40 @@ export class ScpdaAnnualUI {
       if (this.actor === actor) this.status(error.message);
     } finally {
       this.actionRunning = false;
+      this.body.disabled = false;
+      this.body.setAttribute('aria-busy','false');
     }
   }
 
-  async update(force = false) {
+  update(force = false) {
+    if (this.refreshTask) return force ? this.refreshTask.then(() => this.update(true)) : this.refreshTask;
+    this.refreshTask = this.performUpdate(force).finally(() => { this.refreshTask = null; });
+    return this.refreshTask;
+  }
+
+  async performUpdate(force = false) {
     if (this.refreshing || !this.actor || (!this.dialog.open && !this.outbox)) return;
-    const actor = this.actor;
+    const actor = this.actor, choiceAtStart = this.pageChoiceVersion || 0;
     this.refreshing = true;
     try {
-      if (this.outbox && navigator.onLine !== false) await this.outbox.flush();
-      if (this.actor !== actor || !this.dialog.open) return;
-      const next = await this.request('annualOverview');
-      if (this.actor !== actor || !this.dialog.open) return;
+      if (navigator.onLine !== false) await this.flushAll();
+      if (this.actor !== actor || !this.dialog.open || choiceAtStart !== (this.pageChoiceVersion || 0)) return;
+      let next = await this.request('annualOverview', this.overviewArgs());
+      if (!next.manager && next.event && await this.restoreQueued(next, actor) && navigator.onLine !== false) {
+        await this.flushAll();
+        next = await this.request('annualOverview', this.overviewArgs());
+      }
+      if (this.actor !== actor || !this.dialog.open || choiceAtStart !== (this.pageChoiceVersion || 0)) return;
       this.data = next;
       if (!next.manager) {
         await this.storage.put(this.overviewKey(actor), next);
-        if (next.assigned) await this.attachDraft(next, actor);
+        if (next.assigned) {
+          this.selectedPage = { category: next.assigned.category, pageNo: next.assigned.pageNo };
+          await this.storage.put(this.pageKey(actor, next.event.id, next.assigned) + '::detail', next.assigned);
+          await this.attachDraft(next, actor);
+        } else { this.selectedPage = null; this.outbox = null; }
       }
-      if (this.actor !== actor || !this.dialog.open) return;
+      if (this.actor !== actor || !this.dialog.open || choiceAtStart !== (this.pageChoiceVersion || 0)) return;
       if (!this.outbox?.draft?.sending) this.status();
       this.title.textContent = next.event?.label || 'ใบนับสต๊อกตามหน้า A4';
       const editing = this.body.contains(document.activeElement);
@@ -159,41 +184,147 @@ export class ScpdaAnnualUI {
     }
   }
 
-  async attachDraft(data, actor) {
-    const page = data.assigned;
-    const identity = { eventId: data.event.id, category: page.category, pageNo: page.pageNo };
-    const key = JSON.stringify([actor.branchCode, actor.operatorCode, identity.eventId, page.category, page.pageNo]);
-    if (this.outbox?.key === key) return;
-    const cached = await this.storage.get(key);
-    if (this.actor !== actor) return;
-    if (this.outbox) this.outbox.closed = true;
-    this.outbox = new AnnualOutbox({
-      key, storage: this.storage, identity, draft: cached || freshAnnualDraft(page),
+  overviewArgs() {
+    return this.view === 'mine' ? { view: 'mine', ...(this.selectedPage || {}) } : {};
+  }
+
+  renderContext() {
+    if (this.data.canManage) {
+      const row = el('div'); row.className = 'scpda-annual-inline';
+      for (const [view, text] of [['team', 'มอบหมายและติดตาม'], ['mine', 'ใบนับของฉัน']]) {
+        const button = action(text, async () => {
+          if (this.body.querySelector('[data-editing-point], input:invalid')) { this.status('บันทึกจุดนับและตรวจจำนวนก่อนเปลี่ยนหน้า'); return; }
+          this.pageChoiceVersion = (this.pageChoiceVersion || 0) + 1; this.view = view; await this.update(true);
+        }, this.view === view ? 'primary' : 'secondary');
+        row.append(button);
+      }
+      this.body.append(row);
+    }
+    // Name is a display label; server roles still use the bound operator.
+    const name = el('label', 'ชื่อที่ใช้ในงานนับ'); const input = el('input');
+    input.value = this.data.myDisplayName || ''; input.maxLength = 80; name.append(input);
+    const saveName = action('บันทึกชื่อ', () => this.send('annualParticipant', { displayName: input.value }));
+    const details = el('details'); details.append(el('summary', 'ชื่อผู้ใช้งานและงานของทีม'));
+    details.append(name, saveName);
+    for (const page of this.data.team || []) {
+      details.append(el('p', `${page.displayName || 'ยังไม่ระบุชื่อ'} · ${page.operator}${page.primary ? ' (เครื่องแม่)' : ''} · ${pageLabel(page)} · ${page.state === 'submitted' ? 'ส่งแล้ว' : `นับแล้ว ${page.countedRows}/${page.totalRows}`}`));
+    }
+    this.body.append(details);
+  }
+
+  pageKey(actor, eventId, page) {
+    return JSON.stringify([actor.branchCode, actor.operatorCode, eventId, page.category, page.pageNo]);
+  }
+
+  async checkpoint() {
+    for (const box of this.boxes.values()) await this.storage.put(box.key, box.draft);
+  }
+
+  async flushAll() {
+    for (const box of [...this.boxes.values()]) await box.flush();
+  }
+
+  makeBox(actor, eventId, page, draft) {
+    const key = this.pageKey(actor, eventId, page);
+    if (this.boxes.has(key)) return this.boxes.get(key);
+    const identity = { eventId, category: page.category, pageNo: page.pageNo };
+    const box = new AnnualOutbox({ key, storage: this.storage, identity, draft,
       remote: payload => this.request('annualSave', payload),
       changed: error => {
         if (this.actor !== actor || !this.dialog.open) return;
-        const draft = this.outbox.draft;
-        if (draft.receipt) {
+        if (box !== this.outbox) {
+          if (box.draft.receipt) setTimeout(() => { void this.update(); }, 0);
+          return;
+        }
+        if (box.draft.receipt) {
           this.status('ส่งแล้ว · เครื่องแม่ได้รับใบนับครบ');
           setTimeout(() => { void this.update(true); }, 0);
-        } else if (error) {
-          this.status((draft.sending ? 'รอส่ง · ' : '') + error.message);
-        } else if (draft.submitRequested) {
-          this.status('รอส่ง · เก็บผลนับไว้ในเครื่อง');
-        } else {
-          this.status('บันทึกผลนับไว้แล้ว');
-        }
+        } else if (error) this.status((box.draft.sending ? 'รอส่ง · ' : '') + error.message);
+        else if (box.draft.submitRequested) this.status('รอส่ง · เก็บผลนับไว้ในเครื่อง');
+        else this.status('บันทึกผลนับไว้แล้ว');
       },
     });
+    this.boxes.set(key, box);
+    return box;
+  }
+
+  async restoreQueued(data, actor) {
+    if (this.restoredEvent === data.event.id) return false;
+    const pages = [...(data.assignedPages || (data.assigned ? [data.assigned] : [])), ...(data.receipts || [])];
+    const allowed = new Map(pages.map(page => [this.pageKey(actor, data.event.id, page), page]));
+    const prefix = JSON.stringify([actor.branchCode, actor.operatorCode, data.event.id]).slice(0, -1) + ',';
+    const entries = await this.storage.list(prefix);
+    if (this.actor !== actor) return false;
+    let pending = false;
+    for (const { key, value } of entries) {
+      if (!allowed.has(key) || !value || !Number.isInteger(value.revision) || !value.counts) continue;
+      if (value.sending || value.dirty || value.submitRequested && !value.receipt) {
+        this.makeBox(actor, data.event.id, allowed.get(key), value);
+        pending = true;
+      }
+    }
+    this.restoredEvent = data.event.id;
+    return pending;
+  }
+
+  async attachDraft(data, actor) {
+    const page = data.assigned, key = this.pageKey(actor, data.event.id, page);
+    const cached = await this.storage.get(key);
+    if (this.actor !== actor) return;
+    const draft = cached && (cached.dirty || cached.sending || cached.submitRequested || cached.receipt || cached.revision >= page.revision)
+      ? cached : freshAnnualDraft(page);
+    this.outbox = this.makeBox(actor, data.event.id, page, draft);
+  }
+
+  async choosePage(page) {
+    const editing = this.body.querySelector('[data-editing-point], input:invalid');
+    if (editing) { this.status('บันทึกจุดนับและตรวจจำนวนก่อนเปลี่ยนหน้า'); const picker = this.body.querySelector('[data-page-picker]'); if(picker)picker.value=`${this.data.assigned.category}:${this.data.assigned.pageNo}`; return; }
+    const actor = this.actor, previous = this.selectedPage;
+    const target = { category: page.category, pageNo: page.pageNo };
+    this.pageChoiceVersion = (this.pageChoiceVersion || 0) + 1;
+    if (navigator.onLine !== false) {
+      if (this.refreshTask) await this.refreshTask;
+      if (this.actor !== actor) return;
+      this.selectedPage = target; await this.update(true); return;
+    }
+    this.selectedPage = target;
+    try {
+      const cached = await this.storage.get(this.pageKey(actor, this.data.event.id, page) + '::detail');
+      if (this.actor !== actor) return;
+      if (!cached) throw Error('เชื่อมต่ออินเทอร์เน็ตเพื่อเปิดหน้านี้ครั้งแรก');
+      const next = { ...this.data, assigned: cached };
+      await this.storage.put(this.overviewKey(actor), next);
+      if (this.actor !== actor) return;
+      this.data = next;
+      await this.attachDraft(this.data, actor);
+      if (this.actor === actor) this.render();
+    } catch (error) { this.selectedPage = previous; this.status(error.message); this.render(); }
+  }
+
+  renderPagePicker() {
+    const pages = this.data.assignedPages || [this.data.assigned];
+    this.body.append(el('p', `ใบนับของคุณ ${pages.length} หน้า · งานแต่ละหน้าเก็บแยกกัน`));
+    if (pages.length < 2) return;
+    const field = picker('ใบนับของฉัน', pages.map(page => [`${page.category}:${page.pageNo}`, pageLabel(page)]));
+    field.select.dataset.pagePicker = '';
+    field.select.value = `${this.data.assigned.category}:${this.data.assigned.pageNo}`;
+    field.select.onchange = async () => {
+      const page = pages.find(page => `${page.category}:${page.pageNo}` === field.select.value);
+      if (!page) return;field.select.disabled = true;
+      try{await this.choosePage(page);}finally{field.select.disabled = false;}
+    };
+    this.body.append(field.field);
   }
 
   render() {
     this.body.replaceChildren();
+    if (this.data.event) this.renderContext();
     if (!this.data.event) {
       this.body.append(el('p', 'ยังไม่มีอีเวนท์ที่เปิดสำหรับสาขา'));
     } else if (this.data.manager) {
       this.renderManager();
     } else if (this.data.assigned && this.outbox) {
+      this.renderPagePicker();
       this.renderPage();
     } else {
       this.renderRequests();
@@ -214,9 +345,10 @@ export class ScpdaAnnualUI {
       this.body.append(row);
     }
     const free = pages.filter(page => page.state === 'free');
-    const busy = new Set(pages.filter(page => page.state === 'assigned').map(page => page.assignee));
+    const loads = new Map();
+    for (const page of pages.filter(page => page.state === 'assigned')) loads.set(page.assignee, (loads.get(page.assignee) || 0) + 1);
     const directPage = picker('หน้าที่จะมอบหมาย', free.map((page, index) => [String(index + 1), pageLabel(page)]));
-    const directDevice = picker('เครื่องลูก', helpers.filter(helper => !busy.has(helper)).map(helper => [helper, helper]));
+    const directDevice = picker('เครื่องที่รับงาน', ['01005', ...helpers].map(helper => [helper, (helper === '01005' ? '01005 · เครื่องแม่ (นับเอง)' : helper) + (loads.get(helper) ? ` · ค้าง ${loads.get(helper)} หน้า` : ' · พร้อมรับงาน')]));
     const assign = action('มอบหมายหน้า', () => {
       const page = free[Number(directPage.select.value) - 1];
       if (page && directDevice.select.value) this.send('annualAssign', { category: page.category, pageNo: page.pageNo, operator: directDevice.select.value, approve: false });
@@ -225,7 +357,7 @@ export class ScpdaAnnualUI {
     for (const field of [directPage, directDevice]) {
       field.select.onchange = () => { assign.disabled = !(directPage.select.value && directDevice.select.value); };
     }
-    this.body.append(directPage.field, directDevice.field, assign);
+    this.body.append(directPage.field, directDevice.field, assign, el('p', 'มอบหมายเพิ่มให้เครื่องเดิมได้ งานที่ถืออยู่ยังอยู่ครบ'));
     const progress = el('ul');
     progress.className = 'scpda-annual-progress';
     for (const page of pages.filter(page => page.state !== 'free')) {
@@ -271,7 +403,7 @@ export class ScpdaAnnualUI {
     const progress = el('p');
     progress.className = 'scpda-annual-summary';
     const submit = action('ส่งหน้าให้เครื่องแม่', async () => {
-      const invalid = [...this.body.querySelectorAll('input')].find(input => !input.checkValidity());
+      const invalid = [...this.body.querySelectorAll('.scpda-annual-item input')].find(input => !input.checkValidity());
       if (invalid) { invalid.reportValidity(); return; }
       const counts = outbox.draft.counts;
       if (Object.keys(counts).length !== page.items.length) return;
@@ -385,7 +517,25 @@ export class ScpdaAnnualUI {
       this.body.append(row);
       sum();
     }
-    this.body.append(submit);
+    const saved = el('p'); saved.className = 'scpda-annual-summary';
+    const savedText = () => {
+      saved.textContent = outbox.draft.savedAt && !outbox.draft.dirty && !outbox.draft.sending
+        ? 'ระบบรับร่างล่าสุด ' + new Date(outbox.draft.savedAt).toLocaleString('th-TH') + ' · กลับมานับต่อได้'
+        : 'กรอกแล้วเก็บร่างในเครื่องอัตโนมัติ · ยังไม่ใช่การส่งจบหน้า';
+    };
+    savedText();
+    const pause = action('บันทึกพักงาน', async () => {
+      const invalid = [...this.body.querySelectorAll('.scpda-annual-item input')].find(input => !input.checkValidity());
+      if (invalid || this.body.querySelector('[data-editing-point]')) { this.status('ตรวจจำนวนและบันทึกจุดนับก่อนพักงาน'); return; }
+      await outbox.replace(outbox.draft.counts);
+      if (outbox.storageError) return;
+      this.status('บันทึกร่างในเครื่องแล้ว · ' + (navigator.onLine === false ? 'รอเชื่อมต่อเพื่อส่งร่าง' : 'กำลังส่งร่างเข้าระบบ'));
+      if (navigator.onLine !== false) await outbox.flush();
+      if (this.outbox !== outbox) return;
+      savedText();
+      if (!outbox.draft.sending && !outbox.draft.dirty && outbox.draft.savedAt) this.status('ระบบรับร่างแล้ว · ปิดแอปแล้วกลับมานับต่อได้');
+    });
+    this.body.append(saved, pause, submit);
     progressText();
   }
 }

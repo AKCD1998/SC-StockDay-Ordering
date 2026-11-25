@@ -1,3 +1,4 @@
+import {profileIdentity,rememberProfile,profileRecords} from './scpda-device-profiles.mjs';
 import {enrollmentFromUrl,SCPDA_VERSION_CODE,isCompanionOperator,dailyOperatorBranch} from './scpda-daily-contract.mjs';
 import {validScpdaCredential} from './scpda-credential.mjs';
 // Browser transport for the existing SCPDA device/PIN/count contracts.
@@ -27,8 +28,19 @@ export class BrowserDevice {
   if(!state.privateKey||state.privateKey.extractable||typeof state.publicKey!=='string'||typeof state.deviceId!=='string')throw error(0,'DEVICE_STORAGE','ข้อมูลเครื่องไม่สมบูรณ์ ติดต่อผู้ดูแล');this.state=state;return state;
  }
  async status(){const s=await this.ready;let paired=false,expiresAt=null,operatorCode=null;try{const part=s.certificate.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'),p=JSON.parse(atob(part));paired=p.public_key===s.publicKey&&p.device_id===s.deviceId&&['001','004','005'].includes(p.branch_code)&&p.exp>Date.now()/1000;expiresAt=new Date(p.exp*1000).toISOString();if(paired){this.branch=p.branch_code;operatorCode=p.operator_code||null;}}catch{}return {contract:'scpda-read-'+(this.branch||'001')+'-v1',branchCode:this.branch||'001',paired,expiresAt,operatorCode,dailyResumeAvailable:!!s.dailySessionId};}
- async dailySession(value){const s=await this.ready;if(value===undefined)return s.dailySessionId||'';await this.transaction('readwrite',store=>store.put({...s,dailySessionId:value},'identity'));s.dailySessionId=value;}
- async certificate(value){const s=await this.ready;if(value===undefined)return s.certificate;const next={...s,certificate:value};await this.transaction('readwrite',store=>store.put(next,'identity'));Object.assign(s,next);}
+ async updateIdentity(change){
+  const s=await this.ready;
+  let failure;let next;try{next=await this.transaction('readwrite',(store,set)=>{const q=store.get('identity');q.onsuccess=()=>{try{const value=change(q.result||s);store.put(value,'identity');set(value);}catch(e){failure=e;store.transaction.abort();}};});}catch(e){throw failure||e;}
+  Object.assign(s,next);return s;
+ }
+ async dailySession(value){const s=await this.ready;if(value===undefined)return s.dailySessionId||'';await this.updateIdentity(current=>{const next={...current,dailySessionId:value};return {...next,profiles:rememberProfile(next)};});}
+ async certificate(value){const s=await this.ready;if(value===undefined)return s.certificate;await this.updateIdentity(current=>{
+  const profiles=rememberProfile(current),key=profileIdentity(value)?.key;
+  const next={...current,certificate:value,dailySessionId:key===profileIdentity(current.certificate)?.key?current.dailySessionId||'':profiles[key]?.dailySessionId||'',profiles};
+  return {...next,profiles:rememberProfile(next)};
+ });}
+ async profiles(){return profileRecords(await this.ready);}
+ async useProfile(key){await this.updateIdentity(current=>{const profiles=rememberProfile(current),profile=profiles[key];if(!profile)throw error(400,'PROFILE_MISSING','ไม่พบสาขาที่เคยเชื่อม');return {...current,certificate:profile.certificate,dailySessionId:profile.dailySessionId||'',profiles};});}
  async sign(message){const s=await this.ready;return b64(ecdsaDer(await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},s.privateKey,new TextEncoder().encode(message))));}
 }
 
@@ -84,14 +96,20 @@ export class BrowserSession {
  }
  async countCall(path,body){if(!this.#counter)throw error(401,'COUNT_ACCESS_REQUIRED','ยังไม่เชื่อมระบบรับผลนับ');try{return await this.call('/api/scpda/counts'+path,{...(body===undefined?{}:{method:'POST',body}),token:this.#counter,contract:'scpda-counts-'+this.branch+'-v1'});}catch(e){if(e.status===401)this.#counter=null;throw e;}}
  async perform(op,args){
+  if(op==='deviceProfiles')return {records:await this.device.profiles()};
+  if(op==='switchDeviceProfile'){this.#reader=this.#counter=null;this.grant=null;await this.device.useProfile(args.profileKey);return this.perform('status',{});}
+  if(op==='setCompanionGrant'){
+   const url='https://sc-stockday-ordering.onrender.com/scpda/#enroll='+args.grantId+'.'+args.secret+(args.operatorCode?'&operator='+args.operatorCode:'');
+   this.grant=enrollmentFromUrl(url);this.#reader=this.#counter=null;return this.perform('status',{});
+  }
   if(op==='status'){const state=await this.device.status();if(this.companion){const operatorCode=this.companionIdentity(state);return {...state,paired:!!this.grant||state.paired,branchCode:this.branch,operatorCode};}if(state.paired)this.branch=state.branchCode;return state;}if(op==='dailyPolicy')return ['004','005'].includes(this.branch)?this.call('/api/scpda/daily/policy?branchCode='+this.branch):{enabled:false};if(op==='resume')return this.resume();if(op==='activateDevice')return this.activate(args);if(op==='login')return this.login(args);
   if(op==='logout'){try{if(this.#reader)await this.call('/api/scpda/auth/logout',{method:'POST',body:{},token:this.#reader});}finally{this.#reader=this.#counter=null;await this.device.dailySession?.('');}return {ok:true};}
   if(!this.#reader)throw error(401,'LOGIN_REQUIRED','เข้าสู่ระบบก่อน');
   const input=(key,max)=>{const v=args?.[key];if(typeof v!=='string'||!v.trim()||v.length>max)throw error(400,'INPUT_INVALID','ข้อมูลไม่ถูกต้อง');return v.trim();};
   if(op==='dailySelfie')return this.call('/api/scpda/daily/selfie',{token:this.#reader});
-  if(op==='annualOverview')return this.call('/api/scpda/annual',{token:this.#reader});
-  if(op==='annualRequest'||op==='annualAssign'||op==='annualSave'||op==='annualExport'){
-   const segment={annualRequest:'request',annualAssign:'assign',annualSave:'save',annualExport:'export'}[op];
+  if(op==='annualOverview')return this.call('/api/scpda/annual'+((args.category&&args.pageNo)||args.view?'?'+new URLSearchParams({...(args.category&&args.pageNo?{category:args.category,pageNo:String(args.pageNo)}:{}),...(args.view?{view:args.view}:{})}).toString():''),{token:this.#reader});
+  if(op==='annualRequest'||op==='annualAssign'||op==='annualSave'||op==='annualExport'||op==='annualParticipant'){
+   const segment={annualRequest:'request',annualAssign:'assign',annualSave:'save',annualExport:'export',annualParticipant:'participant'}[op];
    return this.call('/api/scpda/annual/'+segment,{method:'POST',body:args,token:this.#reader});
   }
   if(op==='products')return this.call('/api/scpda/products?keyword='+encodeURIComponent(input('keyword',160))+'&limit=200&offset=0',{token:this.#reader});

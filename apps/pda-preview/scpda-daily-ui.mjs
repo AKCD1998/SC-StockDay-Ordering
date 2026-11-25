@@ -47,3 +47,13 @@ export function chooseCompanion(records){
   const add=document.createElement('button');add.type='button';add.className='scpda-primary';add.textContent='＋ เพิ่มเครื่องย่อย';add.onclick=()=>finish('new');dialog.append(add);dialog.addEventListener('cancel',e=>{e.preventDefault();finish(null);});document.body.append(dialog);dialog.showModal();
  });
 }
+
+export function chooseDeviceProfile(records){
+ return new Promise(resolve=>{
+  const dialog=document.createElement('dialog');dialog.className='scpda-account';
+  const title=document.createElement('h2');title.textContent='สาขาที่เคยเชื่อม';dialog.append(title);const hint=document.createElement('p');hint.textContent='การเชื่อมต่อเดิมยังอยู่ ระบบจะตรวจสิทธิ์สำหรับวันนี้อีกครั้ง';dialog.append(hint);
+  const finish=value=>{dialog.close();dialog.remove();resolve(value);};
+  for(const row of records){const b=document.createElement('button');b.type='button';b.className='scpda-secondary';b.textContent='สาขา '+row.branchCode+' · '+(row.operatorCode||'เครื่องเดิม')+(row.active?' · กำลังใช้':'');b.onclick=()=>finish(row.key);dialog.append(b);}
+  const cancel=document.createElement('button');cancel.textContent='ยกเลิก';cancel.className='scpda-secondary';cancel.onclick=()=>finish(null);dialog.append(cancel);dialog.addEventListener('cancel',e=>{e.preventDefault();finish(null);});document.body.append(dialog);dialog.showModal();
+ });
+}

@@ -1,5 +1,5 @@
-export const SCPDA_VERSION_CODE=22;
-export const SCPDA_VERSION_NAME='0.9.0-test.22';
+export const SCPDA_VERSION_CODE=23;
+export const SCPDA_VERSION_NAME='0.9.1-test.23';
 export const DAILY_PAIRS=Object.freeze({'01004':'02004','01004SHPEE':'02004SHPEE','01005':'02005'});
 const companionParts=code=>typeof code==='string'?code.match(/^(0[2-9]|[1-9]\d{1,3})(004|005)(SHPEE)?$/):null;
 export const isCompanionOperator=code=>{const m=companionParts(code);return !!m&&!(m[2]==='005'&&m[3]);};

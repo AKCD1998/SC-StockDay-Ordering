@@ -1,4 +1,5 @@
-import {takeDailySelfie,showStoreQr,chooseCompanion,scanStoreQr,SCPDA_VERSION_NAME} from './scpda-daily-ui.mjs';
+import {restoreScpdaSession} from './scpda-startup.mjs';
+import {takeDailySelfie,showStoreQr,chooseCompanion,chooseDeviceProfile,scanStoreQr,SCPDA_VERSION_NAME} from './scpda-daily-ui.mjs';
 import {DAILY_PAIRS,dailyOperatorBranch,isCompanionOperator,operatorBranch} from './scpda-daily-contract.mjs';
 import {validScpdaCredential} from './scpda-credential.mjs';
 import {priceCheckHtml,priceStockInfoHtml} from './scpda-price-check.mjs';
@@ -20,8 +21,8 @@ function native(op,body={}){return new Promise((resolve,reject)=>{if(!window.SCP
 function status(text,tone='error'){$('#status').hidden=!text;$('#status').textContent=text;$('#status').dataset.tone=tone;}
 function deviceBranch(state){if(!state.paired)return;const branch=state.branchCode;if(state.operatorCode&&isCompanionOperator(state.operatorCode)&&![...$('#username').options].some(o=>o.value===state.operatorCode)){const option=document.createElement('option');option.value=option.textContent=state.operatorCode;$('#username').append(option);}for(const o of $('#username').options){const own=operatorBranch(o.value)===branch;const eligible=own&&(state.operatorCode?o.value===state.operatorCode:!isCompanionOperator(o.value));o.hidden=!eligible;o.disabled=!eligible;}$('#username').value=state.operatorCode|| (branch==='004'?'01004':branch==='005'?'01005':'01001');}
 function loggedOut(){annualUI.disconnect();clearTimeout(dailyExpiryTimer);$('#resumeDaily').hidden=true;priceRefresh.stop();$('#priceStockInfo').close();countUI?.disconnect();picks?.disconnect();$('#countAreaLabel').hidden=true;$('#areaMode').hidden=true;actor=null;selected=null;activeTab='count';currentView='lookup';recentItems=[];renderRecent();generation++;$('#staffSelfie').hidden=true;$('#staffSelfie').removeAttribute('src');$('#sessionBar').hidden=true;$('#mainTabs').hidden=true;$('#preorderPane').hidden=true;$('#pricePane').hidden=true;camera.close();$('#activationPane').hidden=paired;$('#loginPane').hidden=!paired;$('#lookupPane').hidden=true;$('#productPane').hidden=true;$('#choices').hidden=true;$('#profile').textContent='ยังไม่ได้เชื่อมบัญชี';$('#logoutButton').hidden=true;$('#createCompanionQr').hidden=true;$('#accountDialog').close();}
-function handle(e){if(window.SCPDA_WEB_COMPANION&&(e.status===401||['QR_REQUIRED','QR_EXPIRED','QR_USED','QR_INVALID'].includes(e.code))&&e.code!=='LOGIN_REJECTED'&&e.code!=='DEVICE_PROOF_INVALID'){paired=false;loggedOut();status(e.code==='LOGIN_REQUIRED'?'สแกน QR จากเครื่องหลักก่อนเข้าใช้':e.message||'สแกน QR จากเครื่องหลักสำหรับวันนี้');return;}if(e.code==='LOGIN_REJECTED'||e.code==='DEVICE_PROOF_INVALID'){status(e.message);return;}if(['DEVICE_CERT_INVALID','DEVICE_ACTIVATION_REQUIRED','DEVICE_REVOKED'].includes(e.code)){paired=false;loggedOut();status(e.message);return;}if(e.status===401){loggedOut();status('เซสชันหมดอายุ กรุณาใส่รหัสผ่านอีกครั้ง');}else status(e.message||'เชื่อมต่อระบบไม่ได้');}
-async function request(op,body){try{return await native(op,body);}catch(e){if(e.status===401)loggedOut();throw e;}}
+function handle(e){if((window.SCPDA_WEB_COMPANION||isCompanionOperator($('#username').value))&&(e.status===401||['QR_REQUIRED','QR_EXPIRED','QR_USED','QR_INVALID'].includes(e.code))&&e.code!=='LOGIN_REJECTED'&&e.code!=='DEVICE_PROOF_INVALID'){paired=false;loggedOut();status(e.code==='LOGIN_REQUIRED'?'สแกน QR จากเครื่องหลักก่อนเข้าใช้':e.message||'สแกน QR จากเครื่องหลักสำหรับวันนี้');return;}if(e.code==='LOGIN_REJECTED'||e.code==='DEVICE_PROOF_INVALID'){status(e.message);return;}if(['DEVICE_CERT_INVALID','DEVICE_ACTIVATION_REQUIRED','DEVICE_REVOKED'].includes(e.code)){paired=false;loggedOut();status(e.message);return;}if(e.status===401){loggedOut();status('เซสชันหมดอายุ กรุณาใส่รหัสผ่านอีกครั้ง');}else status(e.message||'เชื่อมต่อระบบไม่ได้');}
+async function request(op,body){const currentActor=actor;try{return await native(op,body);}catch(e){if(e.status===401&&actor===currentActor)loggedOut();throw e;}}
 const annualUI=new ScpdaAnnualUI({mount:$('#lookupPane'),request});
 const lookup=new StockDayLookup(request);
 function countNavigate(view){
@@ -114,12 +115,51 @@ $('#createCompanionQr').onclick=async()=>{const button=$('#createCompanionQr');b
 $('#websiteButton').onclick=()=>native('openWebsite').catch(handle);$('#demoButton').onclick=()=>native('openDemo').catch(handle);
 async function activate(){if(busy)return;busy=true;$('#activateDevice').disabled=true;$('#activateFromSettings').disabled=true;$('#accountDialog').close();try{const state=await native('activateDevice');paired=state.paired===true;deviceBranch(state);loggedOut();status('เชื่อมเครื่องแล้ว เลือกผู้ใช้งานและใส่รหัสผ่าน','info');}catch(e){handle(e);}finally{busy=false;$('#activateDevice').disabled=false;$('#activateFromSettings').disabled=false;}}
 $('#activateDevice').onclick=$('#activateFromSettings').onclick=activate;
+async function checkpointBeforeSwitch(){
+ if(annualUI.dialog.open&&annualUI.body.querySelector('[data-editing-point], input:invalid'))throw Error('ตรวจจำนวนและบันทึกจุดนับก่อนเปลี่ยนสาขา');
+ if(!countUI.root.hidden)await countUI.autosave();await annualUI.checkpoint();camera.close();
+}
+async function joinBranch(){
+ if(busy)return;busy=true;$('#loginButton').disabled=true;
+ try{await checkpointBeforeSwitch();$('#accountDialog').close();const grant=await scanStoreQr();
+  const state=await native('setCompanionGrant',grant);paired=state.paired===true;deviceBranch(state);loggedOut();
+  status('กำลังเชื่อมสาขา '+state.branchCode+' · '+state.operatorCode+' · ใส่รหัสผ่านเพื่อเริ่มงาน','info');
+ }catch(error){handle(error);}finally{busy=false;$('#loginButton').disabled=false;}
+}
+$('#joinBranchQr').onclick=$('#joinBranchFromActivation').onclick=joinBranch;
+$('#switchDeviceProfile').onclick=async()=>{
+ if(busy)return;busy=true;$('#loginButton').disabled=true;
+ try{await checkpointBeforeSwitch();const data=await native('deviceProfiles');const key=await chooseDeviceProfile(data.records||[]);if(!key)return;
+  const state=await native('switchDeviceProfile',{profileKey:key});paired=state.paired===true;deviceBranch(state);loggedOut();$('#accountDialog').close();await startup();
+ }catch(error){handle(error);}finally{busy=false;$('#loginButton').disabled=false;}
+};
+
 for(const b of document.querySelectorAll('[data-lookup-mode]'))b.onclick=()=>{lookupMode=b.dataset.lookupMode;for(const row of document.querySelectorAll('[data-lookup-mode]'))row.setAttribute('aria-pressed',String(row===b));countNavigate('lookup');$('#scanActionLabel').textContent=lookupMode==='pick'?'สแกนสินค้าที่จะหยิบ':'ใช้กล้องสแกน';renderRecent();};$('#openPickHistory').onclick=()=>picks.showHistory();
 for(const b of document.querySelectorAll('[data-app-tab]'))b.onclick=()=>switchTab(b.dataset.appTab);
 window.__scpdaBack=()=>{if(!actor)return false;if(annualUI.dialog.open){annualUI.dialog.close();return true;}if(currentView!=='lookup'){if(currentView==='count')countUI.autosave();countUI.close();countNavigate('lookup');return true;}if(activeTab!=='count'){switchTab('count');return true;}return false;};
 
 const appCenter=new ScpdaAppCenter({request:native,prepareInstall:async()=>{camera.close();if(!countUI.root.hidden)await countUI.autosave();}});
 $('#openScpdaAppCenter').onclick=async()=>{if(window.SCPDA_WEB_COMPANION){try{await countUI.autosave();const registration=await navigator.serviceWorker?.getRegistration();await registration?.update();location.reload();}catch(e){handle(e);}}else appCenter.check({manual:true});};
-loggedOut();if(!window.SCPDAHost?.invoke){$('#activationPane').hidden=true;$('#loginPane').hidden=false;$('#hostHint').hidden=false;$('#loginButton').disabled=true;}else native('status').then(s=>{paired=s.paired===true;deviceBranch(s);loggedOut();if(paired)void appCenter.check();if(s.dailyResumeAvailable)native('resume').then(acceptSession).catch(e=>{handle(e);if(e.status!==401)$('#resumeDaily').hidden=false;});}).catch(handle);
+let restoringSession=false;
+function startupLoading(phase='loading',message='กำลังตรวจสอบการเข้าสู่ระบบ'){
+ const overlay=$('#sessionLoading');overlay.hidden=phase==='done';overlay.dataset.state=phase;
+ $('#sessionLoadingMessage').textContent=message;
+ $('#sessionLoadingRetry').hidden=phase!=='retry';$('#sessionLoadingLogin').hidden=phase!=='retry'||!paired;
+ document.querySelector('main').setAttribute('aria-busy',String(phase==='loading'));document.querySelector('main').inert=phase!=='done';
+}
+async function startup(){
+ if(restoringSession)return;restoringSession=true;
+ try{
+  await restoreScpdaSession({status:()=>native('status'),resume:()=>native('resume'),
+   busy:()=>startupLoading(),device:s=>{paired=s.paired===true;deviceBranch(s);loggedOut();if(s.dailyResumeAvailable){$('#loginPane').hidden=true;$('#activationPane').hidden=true;}},
+   authenticated:acceptSession,ready:()=>startupLoading('done'),
+   needsLogin:error=>{if(error)handle(error);startupLoading('done');},
+   retryable:error=>startupLoading('retry',error.message||'ยังเชื่อมต่อไม่ได้ งานที่บันทึกไว้ยังอยู่ในเครื่อง')});
+ }finally{restoringSession=false;}
+ if(paired&&$('#sessionLoading').hidden)void appCenter.check();
+}
+$('#sessionLoadingRetry').onclick=startup;
+$('#sessionLoadingLogin').onclick=()=>{startupLoading('done');loggedOut();};
+loggedOut();if(!window.SCPDAHost?.invoke){$('#activationPane').hidden=true;$('#loginPane').hidden=false;$('#hostHint').hidden=false;$('#loginButton').disabled=true;startupLoading('done');}else void startup();
 
 if(window.SCPDA_WEB_COMPANION){$('#openScpdaAppCenter').textContent='อัปเดตเว็บแอป';$('#username').value='02005';$('#activationPane h2').textContent='เชื่อมกับเครื่องร้าน';$('#activationPane .subtle').textContent=(navigator.standalone||matchMedia('(display-mode: standalone)').matches)?'เชื่อม Wi-Fi ร้าน แล้วสแกน QR จากเครื่องหลัก':'Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม แล้วเปิด SCPDA จากไอคอน';$('#activateDevice').textContent=$('#activateFromSettings').textContent='สแกน QR จากเครื่องหลัก';$('#demoButton').hidden=true;}

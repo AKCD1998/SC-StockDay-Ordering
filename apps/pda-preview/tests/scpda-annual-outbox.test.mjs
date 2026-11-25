@@ -79,3 +79,10 @@ test('an edit while a draft is in flight is sent at the next revision', async ()
   assert.equal(outbox.draft.revision, 2);
   assert.equal(outbox.draft.dirty, false);
 });
+
+test('pause waits for an existing in-flight save and keeps its durable saved time', async () => {
+  let started,ack;const ready=new Promise(resolve=>{started=resolve;});const savedAt='2026-11-25T10:00:00.000Z';let calls=0;
+  const box=new AnnualOutbox({key:'fixture',identity:{eventId:'fixture',category:'normal',pageNo:1},draft:freshAnnualDraft({revision:0,counts:{}}),storage:{put:async()=>{}},changed:()=>{},remote:async operation=>{calls++;started();await new Promise(resolve=>{ack=resolve;});return {category:'normal',pageNo:1,mutationId:operation.mutationId,revision:1,state:'assigned',savedAt};}});
+  await box.replace({3:[{quantityMilli:0},null,null]});const sending=box.flush();await ready;
+  let done=false;const pause=box.flush().then(()=>{done=true;});await new Promise(resolve=>setImmediate(resolve));assert.equal(done,false);ack();await Promise.all([sending,pause]);assert.equal(calls,1);assert.equal(box.draft.savedAt,savedAt);
+});

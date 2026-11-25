@@ -5,6 +5,7 @@ export const freshAnnualDraft = page => ({
   submitRequested: false,
   sending: null,
   receipt: null,
+  savedAt: page.savedAt || null,
 });
 
 export function parseAnnualQuantity(raw) {
@@ -37,8 +38,14 @@ export class AnnualOutbox {
     this.changed();
   }
 
-  async flush() {
-    if (this.flushing || this.closed || this.draft.receipt) return;
+  flush() {
+    if (this.flushTask) return this.flushTask;
+    this.flushTask = this.flushPending().finally(() => { this.flushTask = null; });
+    return this.flushTask;
+  }
+
+  async flushPending() {
+    if (this.closed || this.draft.receipt) return;
     this.flushing = true;
     try {
       while (!this.closed && (this.draft.dirty || this.draft.sending)) {
@@ -68,10 +75,10 @@ export class AnnualOutbox {
               !Number.isFinite(Date.parse(response.receivedAt))))) {
           throw Error('ใบตอบรับจากเครื่องแม่ไม่ตรงกับหน้านี้');
         }
-        const committed = { ...this.draft, revision: response.revision, sending: null, receipt: op.submit ? response : null };
+        const committed = { ...this.draft, revision: response.revision, sending: null, savedAt: response.savedAt || this.draft.savedAt || null, receipt: op.submit ? response : null };
         await this.storage.put(this.key, committed);
         // An edit made while IndexedDB was committing remains current.
-        this.draft = { ...this.draft, revision: response.revision, sending: null, receipt: committed.receipt };
+        this.draft = { ...this.draft, revision: response.revision, sending: null, savedAt: committed.savedAt, receipt: committed.receipt };
         await this.storage.put(this.key, this.draft);
         if (!this.closed) this.changed();
       }
@@ -102,6 +109,17 @@ export class AnnualStorage {
       const request = write ? store.put(data, key) : store.get(key);
       tx.oncomplete = () => resolve(request.result);
       tx.onabort = tx.onerror = () => reject(Error('ยังบันทึกใบนับในเครื่องไม่สำเร็จ'));
+    });
+  }
+
+  async list(prefix) {
+    const db = await this.ready;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('pages', 'readonly'), entries = [];
+      const cursor = tx.objectStore('pages').openCursor(IDBKeyRange.bound(prefix, prefix + '\uffff'));
+      cursor.onsuccess = () => { const row = cursor.result; if (row) { entries.push({ key: row.key, value: row.value }); row.continue(); } };
+      tx.oncomplete = () => resolve(entries);
+      tx.onabort = tx.onerror = () => reject(Error('ยังอ่านคิวใบนับในเครื่องไม่ได้'));
     });
   }
 
