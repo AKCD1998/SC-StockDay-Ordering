@@ -30,6 +30,9 @@ public final class StockDaySession {
   if(operation.equals("annualRequest"))return call("POST","/api/scpda/annual/request",args,true);
   if(operation.equals("annualAssign"))return call("POST","/api/scpda/annual/assign",args,true);
   if(operation.equals("annualSave"))return call("POST","/api/scpda/annual/save",args,true);
+  if(operation.equals("annualAmendPreview"))return call("POST","/api/scpda/annual/amend-preview",args,true);
+  if(operation.equals("annualAmend"))return call("POST","/api/scpda/annual/amend",args,true);
+  if(operation.equals("annualHistory"))return call("POST","/api/scpda/annual/history",args,true);
   if(operation.equals("annualExport"))return call("POST","/api/scpda/annual/export",args,true);
   if(operation.equals("internalPickSubmit"))return countCall("POST","/api/scpda/counts/internal-picks",args,countToken);
   if(operation.equals("internalPickHistory"))return countCall("GET","/api/scpda/counts/internal-picks/history",null,countToken);

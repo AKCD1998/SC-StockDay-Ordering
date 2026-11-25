@@ -45,7 +45,7 @@ export class AnnualOutbox {
   }
 
   async flushPending() {
-    if (this.closed || this.draft.receipt) return;
+    if (this.closed || this.draft.receipt || this.amendment && !this.draft.submitRequested && !this.draft.sending) return;
     this.flushing = true;
     try {
       while (!this.closed && (this.draft.dirty || this.draft.sending)) {
@@ -53,7 +53,8 @@ export class AnnualOutbox {
           const sending = {
             ...this.identity,
             counts: this.draft.counts,
-            revision: this.draft.revision,
+            ...(this.amendment ? { baseReceiptId: this.draft.review.baseReceiptId, baseRevision: this.draft.review.baseRevision, previewToken: this.draft.review.previewToken } : {}),
+            revision: this.amendment ? this.draft.review.baseRevision : this.draft.revision,
             submit: this.draft.submitRequested,
             mutationId: crypto.randomUUID(),
           };
@@ -85,7 +86,7 @@ export class AnnualOutbox {
     } catch (error) {
       // An explicit confirmation rejection proves that no final write occurred.
       // Keep the counts editable; ambiguous network failures retain the exact operation.
-      if (this.draft.sending?.submit && ['ANNUAL_CONFIRM_REQUIRED', 'ANNUAL_CONFIRM_PASSWORD_INVALID'].includes(error.code)) {
+      if (this.draft.sending?.submit && ['ANNUAL_CONFIRM_REQUIRED', 'ANNUAL_CONFIRM_PASSWORD_INVALID', 'ANNUAL_REVIEW_EXPIRED', 'ANNUAL_REVIEW_CHANGED', 'ANNUAL_AMEND_CHANGED', 'ANNUAL_AMEND_UNCHANGED'].includes(error.code)) {
         this.draft = { ...this.draft, submitRequested: false, sending: null, dirty: true };
         try { await this.storage.put(this.key, this.draft); }
         catch { this.storageError = true; }

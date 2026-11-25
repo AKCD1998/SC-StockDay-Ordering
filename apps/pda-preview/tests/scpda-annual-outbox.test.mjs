@@ -106,3 +106,20 @@ test('a rejected confirmation keeps counts editable while an uncertain response 
   await box.replace(corrected, true); await box.flush();
   assert.equal(box.draft.submitRequested, true); assert.equal(box.draft.sending.submit, true);
 });
+
+test('an amendment stays local until review and replays one immutable reviewed operation', async () => {
+  const stored = new Map(), requests = [];
+  const common = { key:'amendment', identity:{eventId:'event',category:'normal',pageNo:1},
+    storage:{put:async(key,value)=>stored.set(key,structuredClone(value))},changed:()=>{} };
+  const counts = {3:[{quantityMilli:0},null,null]};
+  const first = new AnnualOutbox({...common,draft:{...freshAnnualDraft({revision:4,counts}),review:{baseRevision:7,baseReceiptId:'previous',previewToken:'reviewed-exact-counts'}},remote:async op=>{requests.push(op);throw Error('lost reply');}});
+  first.amendment=true;
+  await first.replace(counts);await first.flush();assert.equal(requests.length,0);
+  await first.replace(counts,true);await first.flush();
+  assert.equal(requests.length,1);assert.equal(requests[0].revision,7);assert.equal(requests[0].baseRevision,7);
+  const restored = new AnnualOutbox({...common,draft:stored.get('amendment'),remote:async op=>{
+    assert.deepEqual(op,requests[0]);return {...common.identity,revision:8,mutationId:op.mutationId,state:'submitted',receiptId:'receipt',receivedAt:'2026-11-25T12:00:00Z'};
+  }});restored.amendment=true;
+  await restored.flush();assert.equal(restored.draft.receipt.receiptId,'receipt');
+  assert.equal(JSON.stringify(stored.get('amendment')).includes('confirmationPassword'),false);
+});

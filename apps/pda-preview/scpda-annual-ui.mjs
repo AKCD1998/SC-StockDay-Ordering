@@ -1,3 +1,4 @@
+import { reviewCountChanges, reviewValue } from './scpda-change-review.mjs';
 import { AnnualOutbox, AnnualStorage, freshAnnualDraft, parseAnnualQuantity } from './scpda-annual-outbox.mjs';
 
 const labels = { common: 'สามัญ', normal: 'ปกติ', pharma: 'เภสัช' };
@@ -93,6 +94,7 @@ export class ScpdaAnnualUI {
   }
 
   disconnect() {
+    this.reviewController?.abort();
     for (const box of this.boxes.values()) box.closed = true;
     this.boxes.clear();
     this.selectedPage = this.restoredEvent = null;
@@ -225,7 +227,7 @@ export class ScpdaAnnualUI {
     const details = el('details'); details.append(el('summary', 'ชื่อผู้ใช้งานและงานของทีม'));
     details.append(name, saveName);
     for (const page of this.data.team || []) {
-      details.append(el('p', `${page.displayName || 'ยังไม่ระบุชื่อ'} · ${page.operator}${page.primary ? ' (เครื่องแม่)' : ''} · ${pageLabel(page)} · ${page.state === 'submitted' ? 'ส่งแล้ว' : `นับแล้ว ${page.countedRows}/${page.totalRows}`}`));
+      details.append(el('p', `${page.displayName || 'ยังไม่ระบุชื่อ'} · ${page.operator}${page.primary ? ' (เครื่องแม่)' : ''} · ${pageLabel(page)} · ${page.state === 'submitted' ? `ส่งแล้วครั้งที่ ${page.submissionNo || 1}` : `นับแล้ว ${page.countedRows}/${page.totalRows}`}`));
     }
     this.body.append(details);
   }
@@ -242,12 +244,12 @@ export class ScpdaAnnualUI {
     for (const box of [...this.boxes.values()]) await box.flush();
   }
 
-  makeBox(actor, eventId, page, draft) {
-    const key = this.pageKey(actor, eventId, page);
+  makeBox(actor, eventId, page, draft, amendment = false) {
+    const key = this.pageKey(actor, eventId, page) + (amendment ? '::amend' : '');
     if (this.boxes.has(key)) return this.boxes.get(key);
     const identity = { eventId, category: page.category, pageNo: page.pageNo };
     const box = new AnnualOutbox({ key, storage: this.storage, identity, draft,
-      remote: payload => this.request('annualSave', { ...payload, ...(payload.submit && box.confirmationPassword ? { confirmationPassword: box.confirmationPassword } : {}) }),
+      remote: payload => this.request(amendment ? 'annualAmend' : 'annualSave', { ...payload, ...(payload.submit && box.confirmationPassword ? { confirmationPassword: box.confirmationPassword } : {}) }),
       changed: error => {
         if (this.actor !== actor || !this.dialog.open) return;
         if (box !== this.outbox) {
@@ -255,6 +257,7 @@ export class ScpdaAnnualUI {
           return;
         }
         if (box.draft.receipt) {
+          if (amendment) { void this.storage.put(box.key, null); box.closed = true; this.boxes.delete(box.key); this.outbox = null; }
           this.status('ส่งแล้ว · เครื่องแม่ได้รับใบนับครบ');
           setTimeout(() => { void this.update(true); }, 0);
         } else if (error) this.status((box.draft.sending ? 'รอส่ง · ' : '') + error.message);
@@ -262,6 +265,7 @@ export class ScpdaAnnualUI {
         else this.status('บันทึกผลนับไว้แล้ว');
       },
     });
+    box.amendment = amendment;
     this.boxes.set(key, box);
     return box;
   }
@@ -275,6 +279,7 @@ export class ScpdaAnnualUI {
     if (this.actor !== actor) return false;
     let pending = false;
     for (const { key, value } of entries) {
+      if (key.endsWith('::amend')) continue;
       if (!allowed.has(key) || !value || !Number.isInteger(value.revision) || !value.counts) continue;
       if (value.sending || value.dirty || value.submitRequested && !value.receipt) {
         this.makeBox(actor, data.event.id, allowed.get(key), value);
@@ -287,6 +292,17 @@ export class ScpdaAnnualUI {
 
   async attachDraft(data, actor) {
     const page = data.assigned, key = this.pageKey(actor, data.event.id, page);
+    if (page.state === 'submitted') {
+      const oldDraft = await this.storage.get(key);
+      if (oldDraft?.receipt && !oldDraft.sending) {
+        const box=this.boxes.get(key);if(box)box.closed=true;this.boxes.delete(key);
+        await this.storage.put(key,null);
+      }
+      const amendment = await this.storage.get(key + '::amend');
+      if (this.actor !== actor) return;
+      this.outbox = amendment?.amendment && amendment.editingActive !== false && !amendment.receipt ? this.makeBox(actor,data.event.id,page,amendment,true) : null;
+      return;
+    }
     const cached = await this.storage.get(key);
     if (this.actor !== actor) return;
     const draft = cached && (cached.dirty || cached.sending || cached.submitRequested || cached.receipt || cached.revision >= page.revision)
@@ -320,10 +336,10 @@ export class ScpdaAnnualUI {
   }
 
   renderPagePicker() {
-    const pages = this.data.assignedPages || [this.data.assigned];
+    const pages = [...(this.data.assignedPages || (this.data.assigned ? [this.data.assigned] : [])), ...(this.data.receipts || [])];
     this.body.append(el('p', `ใบนับของคุณ ${pages.length} หน้า · งานแต่ละหน้าเก็บแยกกัน`));
     if (pages.length < 2) return;
-    const field = picker('ใบนับของฉัน', pages.map(page => [`${page.category}:${page.pageNo}`, pageLabel(page)]));
+    const field = picker('ใบนับของฉัน', pages.map(page => [`${page.category}:${page.pageNo}`, pageLabel(page) + (page.state === 'submitted' ? ' · ส่งแล้ว' : '')]));
     field.select.dataset.pagePicker = '';
     field.select.value = `${this.data.assigned.category}:${this.data.assigned.pageNo}`;
     field.select.onchange = async () => {
@@ -341,6 +357,8 @@ export class ScpdaAnnualUI {
       this.body.append(el('p', 'ยังไม่มีอีเวนท์ที่เปิดสำหรับสาขา'));
     } else if (this.data.manager) {
       this.renderManager();
+    } else if (this.data.assigned && this.data.assigned.state === 'submitted' && !this.outbox) {
+      this.renderPagePicker(); this.renderSubmittedPage();
     } else if (this.data.assigned && this.outbox) {
       this.renderPagePicker();
       this.renderPage();
@@ -379,7 +397,7 @@ export class ScpdaAnnualUI {
     const progress = el('ul');
     progress.className = 'scpda-annual-progress';
     for (const page of pages.filter(page => page.state !== 'free')) {
-      progress.append(el('li', `${pageLabel(page)} · ${page.assignee} · ${page.state === 'submitted' ? 'ส่งแล้ว' : `นับแล้ว ${page.countedRows}/${page.totalRows}`}`));
+      progress.append(el('li', `${pageLabel(page)} · ${page.assignee} · ${page.state === 'submitted' ? `ส่งแล้วครั้งที่ ${page.submissionNo || 1}` : `นับแล้ว ${page.countedRows}/${page.totalRows}`}`));
     }
     this.body.append(progress);
     if (submitted && submitted === pages.length) {
@@ -396,6 +414,7 @@ export class ScpdaAnnualUI {
     const { free, pending, receipts } = this.data;
     if (receipts.length) {
       this.body.append(el('p', `เครื่องแม่ได้รับผลแล้ว ${receipts.length} หน้า`));
+      for (const page of receipts) this.body.append(action('ดู / แก้ไข ' + pageLabel(page), () => this.choosePage(page)));
     }
     if (pending) {
       this.body.append(el('h3', `รออนุมัติ · ${pageLabel(pending)}`));
@@ -414,12 +433,63 @@ export class ScpdaAnnualUI {
     this.body.append(field.field, button);
   }
 
+  async renderHistory(page, mount) {
+    const actor=this.actor;
+    try {
+      const result = await this.request('annualHistory', { eventId:this.data.event.id, category:page.category, pageNo:page.pageNo });
+      if(this.actor!==actor || !this.dialog.open) return;
+      mount.replaceChildren(el('p', 'เก็บข้อมูลเต็มล่าสุด 3 เวอร์ชัน รวมฉบับปัจจุบัน'));
+      for (const version of result.versions) {
+        const details = el('details'); details.append(el('summary', `ครั้งที่ ${version.submissionNo} · ${new Date(version.receivedAt).toLocaleString('th-TH', { timeZone:'Asia/Bangkok' })}`));
+        for (const item of result.items) {
+          const points = version.counts[String(item.row)] || [];
+          const row = el('section'); row.className = 'scpda-annual-item';
+          row.append(el('strong', `${item.ordinal}. ${item.name}`), el('small', item.code + ' · ' + item.unit));
+          points.forEach((point,index) => { if(point) row.append(el('p', `นับ ${index+1}${point.place ? ' · '+point.place : ''}: ${reviewValue(point.quantityMilli,'quantity')} ${item.unit}`)); });
+          details.append(row);
+        }
+        mount.append(details);
+      }
+    } catch(error) { this.status(error.message); }
+  }
+
+  renderSubmittedPage() {
+    const page = this.data.assigned;
+    this.body.append(el('h3',pageLabel(page)), el('p',`ส่งแล้วครั้งที่ ${page.submissionNo || 1} · ${new Date(page.receivedAt).toLocaleString('th-TH', { timeZone:'Asia/Bangkok' })}`));
+    this.body.append(action('แก้ไขและส่งอีกครั้ง',async () => {
+      const actor = this.actor;
+      const key = this.pageKey(actor,this.data.event.id,page)+'::amend';
+      const cached = await this.storage.get(key);
+      const draft = cached?.amendment && !cached.receipt ? { ...cached, editingActive:true } : { ...freshAnnualDraft(page), savedAt:null, amendment:true, editingActive:true, baseReceiptId:page.receiptId };
+      await this.storage.put(key,draft);
+      if(this.actor!==actor || !this.dialog.open) return;
+      this.outbox = this.makeBox(actor,this.data.event.id,page,draft,true); this.render();
+    },'primary'));
+    const history = el('div');
+    this.body.append(action('ดูประวัติการส่ง (ล่าสุด 3 เวอร์ชัน)',() => this.renderHistory(page,history)),history);
+  }
+
   async confirmAndSubmit(page, box) {
     if (this.actionRunning || this.outbox !== box || box.draft.receipt) return;
     if (this.body.querySelector('[data-editing-point], input:invalid')) { this.status('ตรวจจำนวนและบันทึกจุดนับก่อนส่งหน้า'); return; }
     if (Object.keys(box.draft.counts).length !== page.items.length) return;
     clearTimeout(this.syncTimer);
     const actor = this.actor;
+    if (box.amendment) {
+      if (this.reviewing) return;
+      this.reviewing = true; this.reviewController = new AbortController();
+      try {
+        if (box.draft.sending) { await box.flush(); if(this.outbox !== box || box.draft.sending) return; }
+        if (navigator.onLine === false) throw Error('เชื่อมต่อก่อนตรวจความต่าง · ฉบับแก้ไขยังเก็บไว้ในเครื่อง');
+        const review = await this.request('annualAmendPreview',{eventId:this.data.event.id,category:page.category,pageNo:page.pageNo,counts:box.draft.counts});
+        if (this.actor !== actor || this.outbox !== box) return;
+        if (review.unchanged) { this.status('ข้อมูลตรงกับฉบับล่าสุด ไม่มีรายการให้ส่งใหม่'); return; }
+        if (!await reviewCountChanges({...review,signal:this.reviewController.signal})) return;
+        if (this.actor !== actor || this.outbox !== box) return;
+        box.draft = { ...box.draft, review: { baseReceiptId:review.baseReceiptId,baseRevision:review.baseRevision,previewToken:review.previewToken } };
+      } catch(error) { this.status(error.message); return; }
+      finally { this.reviewing = false; this.reviewController = null; }
+    }
     let password = await submitPassword();
     if (password === null || this.actor !== actor || this.outbox !== box || !this.dialog.open) return;
     this.actionRunning = true; this.body.disabled = true;
@@ -449,6 +519,11 @@ export class ScpdaAnnualUI {
       submit.disabled = counted !== page.items.length || locked || this.body.querySelector('[data-editing-point]') !== null;
     };
     this.body.append(el('h3', pageLabel(page)), progress);
+    if (outbox.amendment) this.body.append(el('p','ฉบับแก้ไขเก็บในเครื่อง · ข้อมูลที่ส่งครั้งก่อนจะเปลี่ยนเมื่อยืนยันส่งซ้ำสำเร็จเท่านั้น'));
+    if (outbox.amendment && !locked) this.body.append(action('กลับไปดูฉบับที่ส่งแล้ว',async () => {
+      const actor=this.actor; await this.storage.put(outbox.key,{...outbox.draft,editingActive:false});
+      if(this.actor!==actor) return;outbox.closed=true;this.boxes.delete(outbox.key);this.outbox=null;this.render();
+    }));
     if (locked) {
       const received = Boolean(outbox.draft.receipt);
       this.body.append(el('p', received ? 'ส่งแล้ว · เครื่องแม่ได้รับใบนับครบ' : 'รอส่ง · เก็บผลไว้ในเครื่องแล้ว'));
@@ -550,8 +625,9 @@ export class ScpdaAnnualUI {
     }
     const saved = el('p'); saved.className = 'scpda-annual-summary';
     const savedText = () => {
+      if (outbox.amendment) { saved.textContent = 'ฉบับแก้ไขเก็บไว้ในเครื่อง · ยังไม่ได้ส่งแทนฉบับก่อน'; return; }
       saved.textContent = outbox.draft.savedAt && !outbox.draft.dirty && !outbox.draft.sending
-        ? 'ระบบรับร่างล่าสุด ' + new Date(outbox.draft.savedAt).toLocaleString('th-TH') + ' · กลับมานับต่อได้'
+        ? 'ระบบรับร่างล่าสุด ' + new Date(outbox.draft.savedAt).toLocaleString('th-TH', { timeZone:'Asia/Bangkok' }) + ' · กลับมานับต่อได้'
         : 'กรอกแล้วเก็บร่างในเครื่องอัตโนมัติ · ยังไม่ใช่การส่งจบหน้า';
     };
     savedText();
@@ -560,6 +636,7 @@ export class ScpdaAnnualUI {
       if (invalid || this.body.querySelector('[data-editing-point]')) { this.status('ตรวจจำนวนและบันทึกจุดนับก่อนพักงาน'); return; }
       await outbox.replace(outbox.draft.counts);
       if (outbox.storageError) return;
+      if (outbox.amendment) { this.status('บันทึกฉบับแก้ไขในเครื่องแล้ว · กลับมาทำต่อด้วยรหัสเครื่องเดิมได้'); return; }
       this.status('บันทึกร่างในเครื่องแล้ว · ' + (navigator.onLine === false ? 'รอเชื่อมต่อเพื่อส่งร่าง' : 'กำลังส่งร่างเข้าระบบ'));
       if (navigator.onLine !== false) await outbox.flush();
       if (this.outbox !== outbox) return;
