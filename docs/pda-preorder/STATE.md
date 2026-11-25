@@ -1,5 +1,7 @@
 # Shared checkpoint — 25 November 2026 (Bangkok)
 
+**Current R24 —25November:** each real annual page submission requires server-verified password confirmation; drafts remain editable after explicit rejection and uncertain retries retain their original receipt identity. Android/PWA24 delivered, existing work/accounts retained. [Source, delivery and acceptance](events/2026-11-25-pda-r24-final-submit-confirmation.md).
+
 **R23 PWA correction —25November:** companion activation now shows one blue QR scan action. WebPR116 only; existing signedAPK23 and all saved work retained. Future PWA export source follows `eda9585` on `codex/scpda-r23-single-qr-source`. [Correction and verification](events/2026-11-25-pda-r23-single-qr.md).
 
 **Current R23 —25November:** Android/PWA23 is published and live with queued005 pages, explicit save/pause, primary self-count, shared assignment summaries, startup resume and preserved branch profiles. Visiting staff receive ordinary destination-branch functions within existing admission; home work remains separate. Same package/signer, seven static credentials and the existing74-page/3035-item005 event preserved. [Source, delivery, contract and tests](events/2026-11-25-pda-r23-queued-work-and-branch-profiles.md).
@@ -42,11 +44,11 @@ The current task is this verified destination chat. Separate review checkouts ar
 
 | Item | Evidence / state |
 |---|---|
-| Web main checked 25 Nov | `dd6a6ece069c962301076a1a1da79a8594f3f843`, live R23 PWA single-QR correction/App Center and existing admin001/004/005 count selector |
-| PDA branch source | Current R23 `codex/scpda-annual005-app-r23`, `818a13e94ddd3c4ab953e1bafaa3eabddeb20ea3`; [PDA owner checkpoint](owners/PDA.md) |
+| Web main checked 25 Nov | `53d82bcb44a1cb72edd06479d7788a2b03db3178`, live R24 PWA/App Center and existing admin001/004/005 count selector |
+| PDA branch source | Current R24 `codex/scpda-annual-delivery-test-app-r24`, `340aca5ec9a5ff2d72d45fe57eb326a28aad4843`; [PDA owner checkpoint](owners/PDA.md) |
 | Combined mobile UI batch | R13 pending-only medicine queue, R14 live date slashes/Gregorian labels and R15 App Center update client are included in delivered R15. [R15 event](events/2026-11-16-pda-r15-app-center.md) |
 | Android source handoff | [Verified source paths, fetch instructions and joint workflow](PDA_SOURCE_AND_CONTINUATION.md); source exists in Git, Drive is delivery only. User requested clarification to Preorder owner; receiver acknowledgment is not yet recorded |
-| Latest APK in Drive | [SCPDA0.9.1-test.23](https://drive.google.com/file/d/1hrInnmqVy3cQjBX4XfPKQNi9F5oB5UkH/view),001/004/005 retained;005 annual queues and saved branch profiles. Same package/key/storage. Product/Preorder integration remains separate |
+| Latest APK in Drive | [SCPDA0.9.2-test.24](https://drive.google.com/file/d/1yoVRJMooavbJ0eIb2akLDTG2oi77TCWa/view),001/004/005 retained;005 annual queues and saved branch profiles. Same package/key/storage. Product/Preorder integration remains separate |
 | PDA count activation / web stock check |01001/001,01004/004 and01005/005 live; backend`6bec065d4533e290667deaf1e3f307f538e90e02`, migrations083/084/087. Existing admins inspect branches separately; branch001 web rights remain001-only. No official stock adjustment. [R16 evidence](events/2026-11-16-pda-branch004-r16.md) |
 | Mobile integration request | Latest direction: `นับสต๊อก / พรีออเดอร์ / เช็คราคา`; catalog price check is separate from customer price inquiry. R8 shell/price reads implemented. A registered-device Bearer adapter into the existing Preorder domain is now in draft PR #61; Android client integration is still pending. [R8 event](events/2026-11-15-pda-r8-price-check.md), [adapter event](events/2026-11-15-014-mobile-bearer-adapter.md) |
 | Customer lookup/sync request | User specified phone-first member lookup, single/multiple/no-match behavior, double-confirm for new members and SCCRM → ADA → all-branch SCPDA sync; detailed in [event 006](events/2026-11-15-006-mobile-member-lookup-sync.md). Draft API now supports exact-phone existing-member lookup and stable member reference on a preorder case (`9c206b1`, PR #61); SCCRM member creation and downstream sync receipt remain unimplemented. See [event 015](events/2026-11-15-015-member-directory-and-registration-boundary.md) |

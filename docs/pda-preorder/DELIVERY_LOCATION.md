@@ -1,5 +1,7 @@
 # PDA delivery destination
 
+**Current R24 —25November:** each real annual page submission requires server-verified password confirmation; drafts remain editable after explicit rejection and uncertain retries retain their original receipt identity. Android/PWA24 delivered, existing work/accounts retained. [Source, delivery and acceptance](events/2026-11-25-pda-r24-final-submit-confirmation.md).
+
 **R23 PWA correction —25November:** companion activation now shows one blue QR scan action. WebPR116 only; existing signedAPK23 and all saved work retained. Future PWA export source follows `eda9585` on `codex/scpda-r23-single-qr-source`. [Correction and verification](events/2026-11-25-pda-r23-single-qr.md).
 
 **Current R23 —25November:** Android/PWA23 is published and live with queued005 pages, explicit save/pause, primary self-count, shared assignment summaries, startup resume and preserved branch profiles. Visiting staff receive ordinary destination-branch functions within existing admission; home work remains separate. Same package/signer, seven static credentials and the existing74-page/3035-item005 event preserved. [Source, delivery, contract and tests](events/2026-11-25-pda-r23-queued-work-and-branch-profiles.md).
