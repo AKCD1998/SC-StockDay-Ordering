@@ -15,6 +15,24 @@ function action(label, handler, kind = 'secondary') {
   return button;
 }
 
+function submitPassword() {
+  return new Promise(resolve => {
+    const dialog = el('dialog'); dialog.className = 'scpda-account';
+    const form = el('form');
+    form.append(el('h2', 'ยืนยันส่งหน้าให้เครื่องแม่'), el('p', 'ส่งจบหน้านี้ให้เครื่องแม่ หลังส่งแล้วจะแก้ไขหน้านี้ไม่ได้'));
+    const label = el('label', 'รหัสยืนยันการส่ง'); const input = el('input');
+    input.type = 'password'; input.required = true; input.maxLength = 72;
+    input.autocomplete = 'off'; input.autocapitalize = 'none'; input.spellcheck = false; label.append(input);
+    const confirm = el('button', 'ยืนยันส่งหน้า'); confirm.type = 'submit'; confirm.className = 'scpda-primary';
+    const cancel = action('ยกเลิก', () => finish(null));
+    let settled = false;
+    const finish = value => { if (settled) return; settled = true; input.value = ''; dialog.close(); dialog.remove(); resolve(value); };
+    form.addEventListener('submit', event => { event.preventDefault(); if (form.reportValidity()) finish(input.value); });
+    dialog.addEventListener('cancel', event => { event.preventDefault(); finish(null); });
+    form.append(label, confirm, cancel); dialog.append(form); document.body.append(dialog); dialog.showModal(); input.focus();
+  });
+}
+
 function picker(label, choices) {
   const field = el('label', label);
   const select = el('select');
@@ -229,7 +247,7 @@ export class ScpdaAnnualUI {
     if (this.boxes.has(key)) return this.boxes.get(key);
     const identity = { eventId, category: page.category, pageNo: page.pageNo };
     const box = new AnnualOutbox({ key, storage: this.storage, identity, draft,
-      remote: payload => this.request('annualSave', payload),
+      remote: payload => this.request('annualSave', { ...payload, ...(payload.submit && box.confirmationPassword ? { confirmationPassword: box.confirmationPassword } : {}) }),
       changed: error => {
         if (this.actor !== actor || !this.dialog.open) return;
         if (box !== this.outbox) {
@@ -396,22 +414,35 @@ export class ScpdaAnnualUI {
     this.body.append(field.field, button);
   }
 
+  async confirmAndSubmit(page, box) {
+    if (this.actionRunning || this.outbox !== box || box.draft.receipt) return;
+    if (this.body.querySelector('[data-editing-point], input:invalid')) { this.status('ตรวจจำนวนและบันทึกจุดนับก่อนส่งหน้า'); return; }
+    if (Object.keys(box.draft.counts).length !== page.items.length) return;
+    clearTimeout(this.syncTimer);
+    const actor = this.actor;
+    let password = await submitPassword();
+    if (password === null || this.actor !== actor || this.outbox !== box || !this.dialog.open) return;
+    this.actionRunning = true; this.body.disabled = true;
+    try {
+      if (navigator.onLine === false) throw Error('ยังออฟไลน์อยู่ · เก็บร่างไว้ในเครื่องแล้ว เชื่อมต่อแล้วใส่รหัสเพื่อส่งอีกครั้ง');
+      if (box.flushTask) await box.flushTask;
+      box.confirmationPassword = password;
+      await box.replace(box.draft.counts, true);
+      if (box.storageError) return;
+      this.render(); this.body.disabled = true;
+      await box.flush();
+      if (this.outbox === box && this.dialog.open) this.render();
+    } catch (error) { if (this.actor === actor) this.status(error.message); }
+    finally { password = ''; box.confirmationPassword = ''; this.actionRunning = false; this.body.disabled = false; }
+  }
+
   renderPage() {
     const page = this.data.assigned;
     const outbox = this.outbox;
     const locked = outbox.draft.submitRequested || Boolean(outbox.draft.receipt);
     const progress = el('p');
     progress.className = 'scpda-annual-summary';
-    const submit = action('ส่งหน้าให้เครื่องแม่', async () => {
-      const invalid = [...this.body.querySelectorAll('.scpda-annual-item input')].find(input => !input.checkValidity());
-      if (invalid) { invalid.reportValidity(); return; }
-      const counts = outbox.draft.counts;
-      if (Object.keys(counts).length !== page.items.length) return;
-      await outbox.replace(counts, true);
-      if (this.outbox !== outbox || !this.dialog.open) return;
-      this.render();
-      void this.update(true);
-    }, 'primary');
+    const submit = action('ส่งหน้าให้เครื่องแม่', () => this.confirmAndSubmit(page, outbox), 'primary');
     const progressText = () => {
       const counted = Object.keys(outbox.draft.counts).length;
       progress.textContent = `นับแล้ว ${counted} / ${page.items.length} รายการ`;
@@ -421,7 +452,7 @@ export class ScpdaAnnualUI {
     if (locked) {
       const received = Boolean(outbox.draft.receipt);
       this.body.append(el('p', received ? 'ส่งแล้ว · เครื่องแม่ได้รับใบนับครบ' : 'รอส่ง · เก็บผลไว้ในเครื่องแล้ว'));
-      if (!received) this.body.append(action('ลองส่งอีกครั้ง', () => this.update(true), 'primary'));
+      if (!received) this.body.append(action('ใส่รหัสเพื่อส่งหน้าอีกครั้ง', () => this.confirmAndSubmit(page, outbox), 'primary'));
       progressText();
       return;
     }
