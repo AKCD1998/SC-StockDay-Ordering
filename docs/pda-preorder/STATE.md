@@ -1,5 +1,7 @@
 # Shared checkpoint — 25 November 2026 (Bangkok)
 
+**Current R25 —25November:** submitted005 count pages support exact change review, scroll-to-end green confirmation, the existing password and three full versions including current. Cancellation/local amendments preserve accepted data. Android/PWA25 delivered; existing work and R21–R24 ordinary clients retained. [Source, retention, delivery and tests](events/2026-11-25-pda-r25-reviewed-resubmission.md).
+
 **Current R24 —25November:** each real annual page submission requires server-verified password confirmation; drafts remain editable after explicit rejection and uncertain retries retain their original receipt identity. Android/PWA24 delivered, existing work/accounts retained. [Source, delivery and acceptance](events/2026-11-25-pda-r24-final-submit-confirmation.md).
 
 **R23 PWA correction —25November:** companion activation now shows one blue QR scan action. WebPR116 only; existing signedAPK23 and all saved work retained. Future PWA export source follows `eda9585` on `codex/scpda-r23-single-qr-source`. [Correction and verification](events/2026-11-25-pda-r23-single-qr.md).
@@ -44,11 +46,11 @@ The current task is this verified destination chat. Separate review checkouts ar
 
 | Item | Evidence / state |
 |---|---|
-| Web main checked 25 Nov | `53d82bcb44a1cb72edd06479d7788a2b03db3178`, live R24 PWA/App Center and existing admin001/004/005 count selector |
-| PDA branch source | Current R24 `codex/scpda-annual-delivery-test-app-r24`, `340aca5ec9a5ff2d72d45fe57eb326a28aad4843`; [PDA owner checkpoint](owners/PDA.md) |
+| Web main checked 25 Nov | `b9154e8ebd49c5ab4f9b0cabb9e84592f29f2467`, live R25 PWA/App Center and existing admin001/004/005 count selector |
+| PDA branch source | Current R25 `codex/scpda-change-review-r25`, `9bbf38bb1aebbf74df6b61940c57f16af4d01875`; [PDA owner checkpoint](owners/PDA.md) |
 | Combined mobile UI batch | R13 pending-only medicine queue, R14 live date slashes/Gregorian labels and R15 App Center update client are included in delivered R15. [R15 event](events/2026-11-16-pda-r15-app-center.md) |
 | Android source handoff | [Verified source paths, fetch instructions and joint workflow](PDA_SOURCE_AND_CONTINUATION.md); source exists in Git, Drive is delivery only. User requested clarification to Preorder owner; receiver acknowledgment is not yet recorded |
-| Latest APK in Drive | [SCPDA0.9.2-test.24](https://drive.google.com/file/d/1yoVRJMooavbJ0eIb2akLDTG2oi77TCWa/view),001/004/005 retained;005 annual queues and saved branch profiles. Same package/key/storage. Product/Preorder integration remains separate |
+| Latest APK in Drive | [SCPDA0.9.3-test.25](https://drive.google.com/file/d/1Fu9nslLy5P3WRYFeUO8l0_DMKAWlqnr-/view),001/004/005 retained;005 annual queues and saved branch profiles. Same package/key/storage. Product/Preorder integration remains separate |
 | PDA count activation / web stock check |01001/001,01004/004 and01005/005 live; backend`6bec065d4533e290667deaf1e3f307f538e90e02`, migrations083/084/087. Existing admins inspect branches separately; branch001 web rights remain001-only. No official stock adjustment. [R16 evidence](events/2026-11-16-pda-branch004-r16.md) |
 | Mobile integration request | Latest direction: `นับสต๊อก / พรีออเดอร์ / เช็คราคา`; catalog price check is separate from customer price inquiry. R8 shell/price reads implemented. A registered-device Bearer adapter into the existing Preorder domain is now in draft PR #61; Android client integration is still pending. [R8 event](events/2026-11-15-pda-r8-price-check.md), [adapter event](events/2026-11-15-014-mobile-bearer-adapter.md) |
 | Customer lookup/sync request | User specified phone-first member lookup, single/multiple/no-match behavior, double-confirm for new members and SCCRM → ADA → all-branch SCPDA sync; detailed in [event 006](events/2026-11-15-006-mobile-member-lookup-sync.md). Draft API now supports exact-phone existing-member lookup and stable member reference on a preorder case (`9c206b1`, PR #61); SCCRM member creation and downstream sync receipt remain unimplemented. See [event 015](events/2026-11-15-015-member-directory-and-registration-boundary.md) |

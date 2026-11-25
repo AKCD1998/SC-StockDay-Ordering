@@ -1,5 +1,7 @@
 # วิธีรับช่วงงานร่วมกับ PDA และหาซอร์สแอป
 
+**Current R25 —25November:** submitted005 count pages support exact change review, scroll-to-end green confirmation, the existing password and three full versions including current. Cancellation/local amendments preserve accepted data. Android/PWA25 delivered; existing work and R21–R24 ordinary clients retained. [Source, retention, delivery and tests](events/2026-11-25-pda-r25-reviewed-resubmission.md).
+
 **Current R24 —25November:** each real annual page submission requires server-verified password confirmation; drafts remain editable after explicit rejection and uncertain retries retain their original receipt identity. Android/PWA24 delivered, existing work/accounts retained. [Source, delivery and acceptance](events/2026-11-25-pda-r24-final-submit-confirmation.md).
 
 **R23 PWA correction —25November:** companion activation now shows one blue QR scan action. WebPR116 only; existing signedAPK23 and all saved work retained. Future PWA export source follows `eda9585` on `codex/scpda-r23-single-qr-source`. [Correction and verification](events/2026-11-25-pda-r23-single-qr.md).
@@ -19,12 +21,12 @@
 - **Google Drive `เภสัชอู๋ / pdaAppProject`:** APK/ชุดติดตั้ง/คู่มือ/หลักฐานส่งมอบ ไม่ใช่ที่เดียวที่เก็บซอร์ส การไม่พบ source ZIP ใน Drive ไม่ได้แปลว่าไม่มีซอร์สแอป
 - **เครื่อง Cloud:** แต่ละแชตอาจอยู่คนละเครื่อง path/SDK/localhost/session จึงไม่จำเป็นต้องมีเหมือนกัน ใช้ Git กู้ซอร์สเดิม ไม่ต้องให้ผู้ใช้เล่าทุกอย่างหรือส่งรหัสใหม่
 
-## ซอร์ส Android ล่าสุด —R24
+## ซอร์ส Android ล่าสุด —R25
 
-- Branch: `codex/scpda-annual-delivery-test-app-r24`
-- Commit: `340aca5ec9a5ff2d72d45fe57eb326a28aad4843`
-- Version: **0.9.2-test.24/code24**
-- [ซอร์สที่ส่งมอบ](https://github.com/AKCD1998/SC-StockDay-Ordering/tree/340aca5ec9a5ff2d72d45fe57eb326a28aad4843)
+- Branch: `codex/scpda-change-review-r25`
+- Commit: `9bbf38bb1aebbf74df6b61940c57f16af4d01875`
+- Version: **0.9.3-test.25/code25**
+- [ซอร์สที่ส่งมอบ](https://github.com/AKCD1998/SC-StockDay-Ordering/tree/9bbf38bb1aebbf74df6b61940c57f16af4d01875)
 - รักษา startup gate และ branch profiles; การสลับสาขาต้องล้างและขอ ProductSession/Preorder capabilities แยก ไม่ใช้ reader/count แทนสิทธิ์สินค้า
 
 ## ซอร์ส Android ใน checkpoint R16 (ประวัติ)

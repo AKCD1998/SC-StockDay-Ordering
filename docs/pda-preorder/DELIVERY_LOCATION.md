@@ -1,5 +1,7 @@
 # PDA delivery destination
 
+**Current R25 —25November:** submitted005 count pages support exact change review, scroll-to-end green confirmation, the existing password and three full versions including current. Cancellation/local amendments preserve accepted data. Android/PWA25 delivered; existing work and R21–R24 ordinary clients retained. [Source, retention, delivery and tests](events/2026-11-25-pda-r25-reviewed-resubmission.md).
+
 **Current R24 —25November:** each real annual page submission requires server-verified password confirmation; drafts remain editable after explicit rejection and uncertain retries retain their original receipt identity. Android/PWA24 delivered, existing work/accounts retained. [Source, delivery and acceptance](events/2026-11-25-pda-r24-final-submit-confirmation.md).
 
 **R23 PWA correction —25November:** companion activation now shows one blue QR scan action. WebPR116 only; existing signedAPK23 and all saved work retained. Future PWA export source follows `eda9585` on `codex/scpda-r23-single-qr-source`. [Correction and verification](events/2026-11-25-pda-r23-single-qr.md).

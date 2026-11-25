@@ -158,3 +158,8 @@ Annual005 now allows several owned pages, primary01005 self-assignment/counting,
 ## R24 final annual page confirmation —25November
 
 User requires password confirmation for each real final annual-page submission, not an incomplete-page trial bypass. The server verifies a private configured bcrypt hash before a new final commit; drafts remain unchanged. Exact committed-operation replay returns its original receipt. Explicit password rejection preserves counts and restores editing; uncertain network responses retain their UUID/body. Password text must stay outside durable outboxes, snapshots, logs and product/Preorder capabilities. Existing work is retained; use R24 for the new final confirmation. [R24 source and verification](events/2026-11-25-pda-r24-final-submit-confirmation.md).
+
+
+## R25 reviewed amendments and three full versions —25November
+
+User selected mobile count-result resubmission, not Excel reimport. Only the owner may preview and amend its submitted005 page. Exact field/point differences require scroll-to-end UI confirmation and the existing final-submit password. The server binds the preview to actor/device/credential, normalized proposed counts and latest receipt/revision; stale reviews cannot overwrite newer accepted results. Cancel/no-change creates no version. Corrections are local drafts until committed, keeping accepted data unchanged. Full snapshots retain the newest three versions including current; old receipt/digest metadata remains small for idempotent retries. No Ada stock movement, product permission or new count round is implied. [R25 source and verification](events/2026-11-25-pda-r25-reviewed-resubmission.md).
