@@ -14,6 +14,8 @@ host=(out/'browser-host.js').read_text().replace('</script','<\\/script')
 html=html.replace('<head>','<head><meta http-equiv="Content-Security-Policy" content="'+csp+'"><script>'+host+'\nSCPDAWeb.installBrowserHost({companion:true});</script>',1)
 html=html.replace('<title>SCPDA</title>','<title>SCPDA</title>')
 html=html.replace('<button id="demoButton" class="scpda-secondary">','<button id="demoButton" class="scpda-secondary" hidden>')
+# Companion PWA already activates through QR; keep only its primary scan action.
+html=html.replace('<button id="joinBranchFromActivation" class="scpda-secondary">','<button id="joinBranchFromActivation" class="scpda-secondary" hidden>')
 html=html.replace('รุ่นทดสอบ 0.4.0 · ตรวจสินค้าและเก็บผลนับในเครื่อง','SCPDA · เชื่อม StockDay สาขา 001')
 html=html.replace('</head>','<link rel="manifest" href="./manifest.webmanifest"><link rel="apple-touch-icon" href="./scpda-icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="SCPDA"></head>')
 html=html.replace('</body>','<script>if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js");</script></body>')
