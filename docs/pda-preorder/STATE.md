@@ -1,5 +1,7 @@
 # Shared checkpoint — 25 November 2026 (Bangkok)
 
+**R23 PWA correction —25November:** companion activation now shows one blue QR scan action. WebPR116 only; existing signedAPK23 and all saved work retained. Future PWA export source follows `eda9585` on `codex/scpda-r23-single-qr-source`. [Correction and verification](events/2026-11-25-pda-r23-single-qr.md).
+
 **Current R23 —25November:** Android/PWA23 is published and live with queued005 pages, explicit save/pause, primary self-count, shared assignment summaries, startup resume and preserved branch profiles. Visiting staff receive ordinary destination-branch functions within existing admission; home work remains separate. Same package/signer, seven static credentials and the existing74-page/3035-item005 event preserved. [Source, delivery, contract and tests](events/2026-11-25-pda-r23-queued-work-and-branch-profiles.md).
 
 **Historical R22 —25November:** branch005 annual count is live:74A4pages/3035items, warehouse001 inside005, initially blank. Android/PWA22 published; existing004 R21 daily/QR/counts remain accepted. Same package/signer/storage and seven credential records preserved; no Ada stock write. [Release, event and acceptance](events/2026-11-25-pda-r22-annual005.md).
@@ -40,7 +42,7 @@ The current task is this verified destination chat. Separate review checkouts ar
 
 | Item | Evidence / state |
 |---|---|
-| Web main checked 25 Nov | `bffc7f8546c43660b38ace1ef51f6233b0328d00`, live R23 PWA/App Center and existing admin001/004/005 count selector |
+| Web main checked 25 Nov | `dd6a6ece069c962301076a1a1da79a8594f3f843`, live R23 PWA single-QR correction/App Center and existing admin001/004/005 count selector |
 | PDA branch source | Current R23 `codex/scpda-annual005-app-r23`, `818a13e94ddd3c4ab953e1bafaa3eabddeb20ea3`; [PDA owner checkpoint](owners/PDA.md) |
 | Combined mobile UI batch | R13 pending-only medicine queue, R14 live date slashes/Gregorian labels and R15 App Center update client are included in delivered R15. [R15 event](events/2026-11-16-pda-r15-app-center.md) |
 | Android source handoff | [Verified source paths, fetch instructions and joint workflow](PDA_SOURCE_AND_CONTINUATION.md); source exists in Git, Drive is delivery only. User requested clarification to Preorder owner; receiver acknowledgment is not yet recorded |

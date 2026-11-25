@@ -1,5 +1,7 @@
 # PDA owner checkpoint
 
+**R23 PWA correction —25November:** companion activation now shows one blue QR scan action. WebPR116 only; existing signedAPK23 and all saved work retained. Future PWA export source follows `eda9585` on `codex/scpda-r23-single-qr-source`. [Correction and verification](../events/2026-11-25-pda-r23-single-qr.md).
+
 **Current R23 —25November:** Android/PWA23 is published and live with queued005 pages, explicit save/pause, primary self-count, shared assignment summaries, startup resume and preserved branch profiles. Visiting staff receive ordinary destination-branch functions within existing admission; home work remains separate. Same package/signer, seven static credentials and the existing74-page/3035-item005 event preserved. [Source, delivery, contract and tests](../events/2026-11-25-pda-r23-queued-work-and-branch-profiles.md).
 
 **Historical R22 —25November:** branch005 annual count is live:74A4pages/3035items, warehouse001 inside005, initially blank. Android/PWA22 published; existing004 R21 daily/QR/counts remain accepted. Same package/signer/storage and seven credential records preserved; no Ada stock write. [Release, event and acceptance](../events/2026-11-25-pda-r22-annual005.md).
