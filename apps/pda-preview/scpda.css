@@ -136,3 +136,5 @@
 .scpda-annual-inline output{display:grid;place-items:center;min-height:44px;background:#e4f4db;border-radius:8px;font-size:18px;font-weight:700}
 .scpda-annual-progress{margin:8px 0;padding-left:20px}
 .scpda-annual-item button{margin:4px 4px 0 0}
+
+.scpda-annual-launch{width:100%;margin:0 0 16px;padding:16px;background:#eef2ff;border:1px solid #c7d3fb;border-radius:14px;color:#1428a7;font-weight:700;text-align:left}

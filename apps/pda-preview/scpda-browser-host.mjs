@@ -79,8 +79,8 @@ export class BrowserSession {
  }
  async resume(){
   const sessionId=await this.device.dailySession();if(!sessionId)throw error(401,'DAILY_LOGIN_REQUIRED','เข้าสู่ระบบสำหรับวันนี้');const state=await this.device.status(),username=this.companionIdentity(state);
-  const c=await this.call('/api/scpda/daily/resume/challenge',{method:'POST',body:{sessionId}}),signature=await this.device.sign(['SCPDA-DAILY-RESUME-V1',c.challengeId,c.nonce,sessionId].join('\n'));
-  const r=await this.call('/api/scpda/daily/resume',{method:'POST',body:{sessionId,challengeId:c.challengeId,signature}});if(r.user?.operatorCode!==username||r.dailySessionId!==sessionId||typeof r.token!=='string')throw error(502,'IDENTITY_INVALID','ข้อมูลเครื่องย่อยไม่ตรงกัน');this.#reader=r.token;if(r.deviceCertificate)await this.device.certificate(r.deviceCertificate);return this.finish(username);
+  const c=await this.call('/api/scpda/daily/resume/challenge',{method:'POST',body:{sessionId}}),signature=await this.device.sign(['SCPDA-DAILY-RESUME-V2',c.challengeId,c.nonce,sessionId,this.versionCode].join('\n'));
+  const r=await this.call('/api/scpda/daily/resume',{method:'POST',body:{sessionId,challengeId:c.challengeId,versionCode:this.versionCode,signature}});if(r.user?.operatorCode!==username||r.dailySessionId!==sessionId||typeof r.token!=='string')throw error(502,'IDENTITY_INVALID','ข้อมูลเครื่องย่อยไม่ตรงกัน');this.#reader=r.token;if(r.deviceCertificate)await this.device.certificate(r.deviceCertificate);return this.finish(username);
  }
  async countCall(path,body){if(!this.#counter)throw error(401,'COUNT_ACCESS_REQUIRED','ยังไม่เชื่อมระบบรับผลนับ');try{return await this.call('/api/scpda/counts'+path,{...(body===undefined?{}:{method:'POST',body}),token:this.#counter,contract:'scpda-counts-'+this.branch+'-v1'});}catch(e){if(e.status===401)this.#counter=null;throw e;}}
  async perform(op,args){

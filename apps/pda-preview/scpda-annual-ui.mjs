@@ -43,9 +43,10 @@ export class ScpdaAnnualUI {
   constructor({ mount, request }) {
     this.request = request;
     this.storage = new AnnualStorage();
-    this.button = action('ใบนับสต๊อกตามหน้า A4', () => this.open());
+    this.button = action('งานนับสต๊อกพิเศษ · ธ.ค. 2569', () => this.open());
     this.button.hidden = true;
-    mount.append(this.button);
+    this.button.classList.add('scpda-annual-launch');
+    mount.prepend(this.button);
     this.dialog = el('dialog');
     this.dialog.className = 'scpda-annual-dialog';
     this.title = el('h2', 'ใบนับสต๊อกตามหน้า A4');
@@ -65,7 +66,7 @@ export class ScpdaAnnualUI {
 
   connect(actor) {
     this.disconnect();
-    if (actor.branchCode !== '005') return;
+    if (actor.branchCode !== '005' || actor.annualCountAvailable !== true) return;
     this.actor = actor;
     this.button.hidden = false;
   }

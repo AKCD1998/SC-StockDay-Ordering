@@ -45,10 +45,10 @@ with zipfile.ZipFile(work/'unaligned.apk','a',zipfile.ZIP_DEFLATED) as z:
  for f in dex.glob('classes*.dex'):z.write(f,f.name)
 run(bt/'zipalign','-P','16','-f','4',work/'unaligned.apk',work/'aligned.apk')
 store=private/'scpda-internal-test.p12';password_file=private/'keystore-password.txt'
-if not store.exists():
- if password_file.exists():raise RuntimeError('Signing key missing but password exists; inspect without overwriting')
- password_file.write_text(secrets.token_urlsafe(32));password_file.chmod(0o600);env['SCPDA_TEST_KEY_PASSWORD']=password_file.read_text();run('keytool','-genkeypair','-keystore',store,'-storetype','PKCS12','-storepass:env','SCPDA_TEST_KEY_PASSWORD','-keypass:env','SCPDA_TEST_KEY_PASSWORD','-alias','scpda-internal-test','-keyalg','RSA','-keysize','3072','-validity','365','-dname','CN=SCPDA Internal Test,O=SC Group 1989,C=TH');store.chmod(0o600)
-else:env['SCPDA_TEST_KEY_PASSWORD']=password_file.read_text()
+if not store.is_file() or not password_file.is_file():raise RuntimeError('Original SCPDA signing key and password are required; never generate a replacement')
+cert=subprocess.run(['keytool','-exportcert','-keystore',str(store),'-storepass:file',str(password_file),'-alias','scpda-internal-test'],env=env,check=True,capture_output=True).stdout
+if hashlib.sha256(cert).hexdigest()!='3d11b6af0d2f472632e313d6b94fab745cc4af8c360dfe356be7bf627847c20a':raise RuntimeError('Original SCPDA signing certificate does not match')
+env['SCPDA_TEST_KEY_PASSWORD']=password_file.read_text()
 version=ET.parse(app/'AndroidManifest.xml').getroot().get('{http://schemas.android.com/apk/res/android}versionName');apk=out/('SCPDA-'+version+'.apk');run(bt/'apksigner','sign','--ks',store,'--ks-key-alias','scpda-internal-test','--ks-pass','env:SCPDA_TEST_KEY_PASSWORD','--key-pass','env:SCPDA_TEST_KEY_PASSWORD','--v1-signing-enabled','true','--v2-signing-enabled','true','--v3-signing-enabled','true','--out',apk,work/'aligned.apk');run(bt/'apksigner','verify','--verbose','--print-certs',apk);run(bt/'zipalign','-c','-P','16','4',apk)
 with zipfile.ZipFile(apk) as z:
  assert z.testzip() is None;assert 'classes.dex' in z.namelist();assert b'NativeReadHarness' not in z.read('classes.dex');assert all(not n.endswith(('.p12','.sqlite','.db','.env')) for n in z.namelist());assert b'SCPDAHost' not in z.read('assets/count-demo.html')

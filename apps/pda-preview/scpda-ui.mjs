@@ -36,7 +36,7 @@ function countNavigate(view){
 }
 function switchTab(tab){
  if(!actor||!['count','preorder','price'].includes(tab))return;
- annualUI.button.hidden=tab!=='count'||actor.branchCode!=='005';
+ annualUI.button.hidden=tab!=='count'||actor.branchCode!=='005'||actor.annualCountAvailable!==true;
  if(tab==='count'&&annualUI.actor!==actor)annualUI.connect(actor);
  if(currentView==='count')countUI.autosave();priceRefresh.stop();$('#priceStockInfo').close();camera.close();countUI.close();generation++;selected=null;lookupMode='count';activeTab=tab;currentView='lookup';
  status('');$('#lookupPane').hidden=tab==='preorder';$('#preorderPane').hidden=tab!=='preorder';$('#localHistoryButton').hidden=tab!=='count';

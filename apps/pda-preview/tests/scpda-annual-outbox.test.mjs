@@ -50,7 +50,8 @@ test('a lost submit response survives a restart and retries the same operation',
 test('an edit while a draft is in flight is sent at the next revision', async () => {
   const requests = [];
   let ack;
-  const started = Promise.withResolvers();
+  let begin;
+  const started = { promise: new Promise(resolve => { begin = resolve; }), resolve: () => begin() };
   const outbox = new AnnualOutbox({
     key: 'fixture',
     storage: { put: async () => {} },
