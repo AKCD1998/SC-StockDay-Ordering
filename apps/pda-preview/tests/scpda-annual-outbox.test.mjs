@@ -86,3 +86,23 @@ test('pause waits for an existing in-flight save and keeps its durable saved tim
   await box.replace({3:[{quantityMilli:0},null,null]});const sending=box.flush();await ready;
   let done=false;const pause=box.flush().then(()=>{done=true;});await new Promise(resolve=>setImmediate(resolve));assert.equal(done,false);ack();await Promise.all([sending,pause]);assert.equal(calls,1);assert.equal(box.draft.savedAt,savedAt);
 });
+
+
+test('a rejected confirmation keeps counts editable while an uncertain response keeps its operation', async () => {
+  const stored = new Map();
+  const identity = { eventId: 'event', category: 'common', pageNo: 1 };
+  const counts = { 3: [{ quantityMilli: 0 }, null, null] };
+  const box = new AnnualOutbox({ key: 'confirmation', identity,
+    storage: { put: async (key, value) => stored.set(key, structuredClone(value)) },
+    draft: freshAnnualDraft({ revision: 2, counts }), changed: () => {},
+    remote: async () => { throw Object.assign(Error('wrong confirmation'), { code: 'ANNUAL_CONFIRM_PASSWORD_INVALID' }); },
+  });
+  await box.replace(counts, true); await box.flush();
+  assert.equal(box.draft.submitRequested, false); assert.equal(box.draft.sending, null);
+  assert.equal(box.draft.receipt, null); assert.deepEqual(box.draft.counts, counts);
+  const corrected = { 3: [{ quantityMilli: 1000 }, null, null] };
+  await box.replace(corrected); assert.deepEqual(stored.get('confirmation').counts, corrected);
+  box.remote = async () => { throw Error('lost response'); };
+  await box.replace(corrected, true); await box.flush();
+  assert.equal(box.draft.submitRequested, true); assert.equal(box.draft.sending.submit, true);
+});
