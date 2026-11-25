@@ -1,5 +1,7 @@
 # PDA delivery destination
 
+**Current R22 —25November:** branch005 annual count is live:74A4pages/3035items, warehouse001 inside005, initially blank. Android/PWA22 published; existing004 R21 daily/QR/counts remain accepted. Same package/signer/storage and seven credential records preserved; no Ada stock write. [Release, event and acceptance](events/2026-11-25-pda-r22-annual005.md).
+
 User instruction, 15 November 2026: place completed PDA app deliveries in Google Drive under **เภสัชอู๋ / pdaAppProject**. Reuse this destination for later completed PDA deliveries.
 
 - [pdaAppProject folder](https://drive.google.com/drive/folders/16AOkKtFp2LMaHyHOrrwmVaLc_stHLwCL)

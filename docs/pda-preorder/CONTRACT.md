@@ -139,3 +139,10 @@ New companion accounts live in Render PostgreSQL with a locked per-team ordinal,
 ## 19 November — trusted client IP for daily network matching
 
 The public-IP criterion is unchanged, but SCPDA now normalizes the actual client through its already trusted Render socket plus at most one recognized Cloudflare hop. Arbitrary forwarded prefixes/deeper hops are refused. The resolver is scoped to SCPDA daily HMAC, audit and rate buckets; global Express behavior is untouched. Real004 primary/iPhone request logs had the same client IP while old audit addresses were proxies, explaining the false rejection. Existing primary references refresh on their next authenticated request; create a fresh QR after the server-only PR74 rollout. No mobile version, binding reset, credential or schema change. [Source/proof](events/2026-11-19-pda-proxy-network-correction.md).
+
+
+## 25November — R22 scoped annual005 event and version rollout
+
+The user authorized the December2569 branch005/warehouse001 event in the existing app. Daily primary01005 manages74frozen A4pages; paired005 companions request/receive only their own pages and submit exact per-location quantities through durable revision/mutation receipts. Branch/role/day/device/network checks stay on the server. Extra locations count toward the sum and survive Excel export. Audit changes expire60days; this event neither changes Ada stock nor supplies product/CEO/Preorder rights.
+
+Published-build compatibility is now explicit per branch:004 daily/count/QR accepts21/22 during rollout,005 ordinary daily accepts21/22 while its QR/annual flow uses22. No arbitrary minimum-version bypass. R22 signed resumeV2 can update an existing day's admitted build without resetting the session, selfie or midnight expiry; oldV1 remains supported. [Source, deployment and limits](events/2026-11-25-pda-r22-annual005.md).

@@ -1,5 +1,7 @@
 # วิธีรับช่วงงานร่วมกับ PDA และหาซอร์สแอป
 
+**Current R22 —25November:** branch005 annual count is live:74A4pages/3035items, warehouse001 inside005, initially blank. Android/PWA22 published; existing004 R21 daily/QR/counts remain accepted. Same package/signer/storage and seven credential records preserved; no Ada stock write. [Release, event and acceptance](events/2026-11-25-pda-r22-annual005.md).
+
 **Current R16 —16 November:** user-authorized01004 / new branch004 Android pilot for Thursday19 November. App **0.7.1-test.16**, branch `codex/scpda-004-r16`, source `98f479db1edd479cb3b218dabc3e7d3568892a57`; published in SC App Center and delivered in the existing Drive folder. Backend PR66/migration087 and admin web PR105 are live;001/005 credentials, enrollment and evidence preserved. [Source, activation and delivery](events/2026-11-16-pda-branch004-r16.md). Counts are physical evidence pending review, not an Ada/current-stock adjustment. Physical004 Android enrollment/first count remains pending. The separate Local product-connector candidate is not included; preserve its work and its single TEST-round ownership.
 
 ผู้ใช้ขอให้ PDA owner ชี้แจงวิธีทำงานให้แชต Preorder หลังมีรายงานว่าใน Drive มี APK/รายงานแต่ไม่มีซอร์สให้ต่อหน้า Preorder เอกสารนี้แก้จุดส่งต่องานนั้น ไม่ได้โอน ownership หรืออนุญาตเขียนข้อมูลจริงใน ADA
